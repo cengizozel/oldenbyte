@@ -180,19 +180,21 @@ export default function TopBar() {
   });
 
   return (
-    <div className="flex items-center justify-between py-1">
+    <div className="grid grid-cols-3 items-center py-1">
       <EditableField
         storageKey="topbar-phrase"
         defaultValue="a place to rest"
         className="text-sm text-neutral-600"
       />
-      <p className="text-sm text-neutral-600" suppressHydrationWarning>{date}</p>
-      <EditableField
-        storageKey="topbar-mood"
-        defaultValue="feeling quiet"
-        className="text-sm text-neutral-600"
-        align="right"
-      />
+      <p className="text-sm text-neutral-600 text-center" suppressHydrationWarning>{date}</p>
+      <div className="flex justify-end">
+        <EditableField
+          storageKey="topbar-mood"
+          defaultValue="feeling quiet"
+          className="text-sm text-neutral-600"
+          align="right"
+        />
+      </div>
     </div>
   );
 }
