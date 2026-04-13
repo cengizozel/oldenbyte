@@ -1,4 +1,4 @@
-import type { Widget } from "@/lib/widgets";
+import { colorMap, type Widget } from "@/lib/widgets";
 
 export default function WidgetCard({
   widget,
@@ -7,21 +7,25 @@ export default function WidgetCard({
   widget: Widget;
   className?: string;
 }) {
+  const c = colorMap[widget.color];
   const muted = widget.type === "empty";
 
   return (
     <div
       className={`
-        rounded-2xl border border-neutral-200 bg-white p-5
+        rounded-2xl border p-5
         flex flex-col h-full
+        ${c.bg} ${c.border}
         ${muted ? "opacity-40" : ""}
         ${className}
       `}
     >
-      <p className="text-xs font-medium tracking-widest text-neutral-400 uppercase mb-3">
+      <p className={`text-xs font-semibold tracking-widest uppercase mb-2 ${c.label}`}>
         {widget.title}
       </p>
-      <p className="text-sm text-neutral-300">{widget.description}</p>
+      <p className={`text-sm ${muted ? "text-neutral-400" : c.text} opacity-60`}>
+        {widget.description}
+      </p>
     </div>
   );
 }
