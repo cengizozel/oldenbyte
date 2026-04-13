@@ -1,6 +1,6 @@
-export type WidgetType = "notebook" | "ebook" | "item" | "empty";
+export type WidgetType = "notebook" | "ebook" | "item" | "empty" | "text";
 
-export type WidgetColor = "amber" | "sky" | "violet" | "neutral";
+export type WidgetColor = "amber" | "sky" | "violet" | "neutral" | "rose";
 
 export type Widget = {
   id: string;
@@ -16,10 +16,11 @@ export const colorMap: Record<WidgetColor, {
   label: string;
   text: string;
 }> = {
-  amber:   { bg: "bg-amber-50",   border: "border-amber-100",   label: "text-amber-600",   text: "text-amber-900"   },
-  sky:     { bg: "bg-sky-50",     border: "border-sky-100",     label: "text-sky-600",     text: "text-sky-900"     },
-  violet:  { bg: "bg-violet-50",  border: "border-violet-100",  label: "text-violet-600",  text: "text-violet-900"  },
-  neutral: { bg: "bg-neutral-50", border: "border-neutral-200", label: "text-neutral-500", text: "text-neutral-700" },
+  amber:   { bg: "bg-amber-50",   border: "border-amber-100",   label: "text-amber-800",   text: "text-amber-900"   },
+  sky:     { bg: "bg-sky-50",     border: "border-sky-100",     label: "text-sky-700",     text: "text-sky-900"     },
+  violet:  { bg: "bg-violet-50",  border: "border-violet-100",  label: "text-violet-700",  text: "text-violet-900"  },
+  neutral: { bg: "bg-neutral-50", border: "border-neutral-200", label: "text-neutral-600", text: "text-neutral-700" },
+  rose:    { bg: "bg-rose-50",    border: "border-rose-100",    label: "text-rose-700",    text: "text-rose-900"    },
 };
 
 export const widgets: Widget[] = [
@@ -45,17 +46,10 @@ export const widgets: Widget[] = [
     description: "A single resurfaced thing.",
   },
   {
-    id: "empty-1",
-    type: "empty",
-    color: "neutral",
-    title: "—",
-    description: "Reserved for something future.",
-  },
-  {
-    id: "empty-2",
-    type: "empty",
-    color: "neutral",
-    title: "—",
-    description: "Reserved for something future.",
+    id: "text",
+    type: "text",
+    color: "rose",
+    title: "Text",
+    description: "A word, quote, or live string.",
   },
 ];

@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { LayoutGrid, Check, RotateCcw } from "lucide-react";
 import GridLayout from "react-grid-layout";
 import type { Layout as LayoutItem } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import type { Widget } from "@/lib/widgets";
+import { colorMap } from "@/lib/widgets";
 import WidgetCard from "./WidgetCard";
 import NotebookWidget from "./NotebookWidget";
+import TextWidget from "./TextWidget";
 
 const COLS = 2;
 const GAP = 16;
@@ -16,21 +19,33 @@ const initialLayout: LayoutItem[] = [
   { i: "notebook", x: 0, y: 0, w: 1, h: 2, minW: 1, minH: 1, maxW: 2, maxH: 3 },
   { i: "ebook",    x: 1, y: 0, w: 1, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 3 },
   { i: "one-item", x: 1, y: 1, w: 1, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 3 },
-  { i: "empty-1",  x: 0, y: 2, w: 1, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 3 },
-  { i: "empty-2",  x: 1, y: 2, w: 1, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 3 },
+  { i: "text",     x: 0, y: 2, w: 2, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 3 },
 ];
 
 function renderWidget(widget: Widget) {
-  if (widget.type === "notebook") {
-    return <NotebookWidget widget={widget} className="h-full" />;
-  }
+  if (widget.type === "notebook") return <NotebookWidget widget={widget} className="h-full" />;
+  if (widget.type === "text")     return <TextWidget     widget={widget} className="h-full" />;
   return <WidgetCard widget={widget} className="h-full" />;
 }
 
 export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
   const [editing, setEditing] = useState(false);
+
   const [layout, setLayout] = useState<LayoutItem[]>(initialLayout);
-  const [activeIds, setActiveIds] = useState<string[]>(() => initialLayout.map(l => l.i));
+  const [instances, setInstances] = useState<Record<string, Widget>>(
+    () => Object.fromEntries(widgets.map(w => [w.id, w]))
+  );
+
+  // Load persisted layout from localStorage after hydration
+  useEffect(() => {
+    try {
+      const savedLayout = localStorage.getItem("widget-layout");
+      const savedInstances = localStorage.getItem("widget-instances");
+      if (savedLayout) setLayout(JSON.parse(savedLayout));
+      if (savedInstances) setInstances(JSON.parse(savedInstances));
+    } catch {}
+  }, []);
+
   const [droppingId, setDroppingId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -47,26 +62,68 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
     return () => ro.disconnect();
   }, []);
 
-  const widgetById = Object.fromEntries(widgets.map(w => [w.id, w]));
-  const inactiveWidgets = widgets.filter(w => !activeIds.includes(w.id));
+  useEffect(() => {
+    localStorage.setItem("widget-layout", JSON.stringify(layout));
+  }, [layout]);
+
+  useEffect(() => {
+    localStorage.setItem("widget-instances", JSON.stringify(instances));
+  }, [instances]);
 
   const numRows = Math.max(...layout.map(l => l.y + l.h), 1);
   const rowHeight = size.height > 0
     ? Math.floor((size.height - (numRows - 1) * GAP) / numRows)
     : 200;
 
-  function removeWidget(id: string) {
-    setActiveIds(ids => ids.filter(i => i !== id));
-    setLayout(l => l.filter(item => item.i !== id));
+  function removeWidget(instanceId: string) {
+    setLayout(l => l.filter(item => item.i !== instanceId));
+    setInstances(prev => {
+      const next = { ...prev };
+      delete next[instanceId];
+      return next;
+    });
   }
 
-  function addWidget(widget: Widget) {
-    const maxY = layout.reduce((max, item) => Math.max(max, item.y + item.h), 0);
-    setActiveIds(ids => [...ids, widget.id]);
+  function findNextPosition(currentLayout: LayoutItem[]): { x: number; y: number } {
+    if (currentLayout.length === 0) return { x: 0, y: 0 };
+
+    // Build a set of occupied cells
+    const occupied = new Set<string>();
+    for (const item of currentLayout) {
+      for (let row = item.y; row < item.y + item.h; row++) {
+        for (let col = item.x; col < item.x + item.w; col++) {
+          occupied.add(`${col},${row}`);
+        }
+      }
+    }
+
+    // Scan left-to-right, top-to-bottom for the first empty 1×1 cell
+    const maxY = Math.max(...currentLayout.map(l => l.y + l.h));
+    for (let row = 0; row <= maxY; row++) {
+      for (let col = 0; col < COLS; col++) {
+        if (!occupied.has(`${col},${row}`)) {
+          return { x: col, y: row };
+        }
+      }
+    }
+
+    // Grid is fully packed — append a new row
+    return { x: 0, y: maxY };
+  }
+
+  function addWidget(template: Widget, instanceId?: string) {
+    const id = instanceId ?? `${template.id}-${Date.now()}`;
+    const { x, y } = findNextPosition(layout);
+
+    // Number the title if instances of this type already exist
+    const sameType = Object.values(instances).filter(w => w.type === template.type);
+    const title = sameType.length === 0
+      ? template.title
+      : `${template.title} ${sameType.length + 1}`;
+
+    setInstances(prev => ({ ...prev, [id]: { ...template, id, title } }));
     setLayout(l => [...l, {
-      i: widget.id,
-      x: 0, y: maxY,
-      w: 1, h: 1,
+      i: id, x, y, w: 1, h: 1,
       minW: 1, minH: 1, maxW: 2, maxH: 3,
     }]);
   }
@@ -75,38 +132,57 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
     <div className="flex flex-col flex-1 min-h-0 gap-2">
 
       {/* Edit toggle */}
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        {editing && (
+          <button
+            onClick={() => {
+              if (!confirm("Reset the widget layout to default?")) return;
+              localStorage.removeItem("widget-layout");
+              localStorage.removeItem("widget-instances");
+              setLayout(initialLayout);
+              setInstances(Object.fromEntries(widgets.map(w => [w.id, w])));
+            }}
+            className="text-neutral-300 hover:text-neutral-500"
+            title="Reset layout"
+          >
+            <RotateCcw size={15} />
+          </button>
+        )}
         <button
           onClick={() => setEditing(e => !e)}
-          className="text-xs text-neutral-400 hover:text-neutral-600"
+          className="text-neutral-400 hover:text-neutral-600"
+          title={editing ? "Done" : "Edit layout"}
         >
-          {editing ? "done" : "edit"}
+          {editing ? <Check size={15} /> : <LayoutGrid size={15} />}
         </button>
       </div>
 
-      {/* Widget shelf — visible in edit mode, shows widgets not on the grid */}
+      {/* Widget shelf — always shows all templates so duplicates are possible */}
       {editing && (
         <div className="border border-neutral-200 rounded-2xl bg-white p-3">
           <p className="text-xs text-neutral-400 tracking-widest uppercase mb-2.5">Add widgets</p>
-          {inactiveWidgets.length === 0 ? (
-            <p className="text-xs text-neutral-300 italic">All widgets are on the grid.</p>
-          ) : (
-            <div className="flex gap-2 flex-wrap">
-              {inactiveWidgets.map(widget => (
+          <div className="flex gap-2 flex-wrap">
+            {widgets.map(template => {
+              const c = colorMap[template.color];
+              return (
                 <div
-                  key={widget.id}
+                  key={template.id}
                   draggable
-                  onDragStart={() => setDroppingId(widget.id)}
+                  onDragStart={() => {
+                    const id = `${template.id}-${Date.now()}`;
+                    setInstances(prev => ({ ...prev, [id]: { ...template, id } }));
+                    setDroppingId(id);
+                  }}
                   onDragEnd={() => setDroppingId(null)}
-                  onClick={() => addWidget(widget)}
-                  className="flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-white hover:border-neutral-300 cursor-grab w-32 select-none"
+                  onClick={() => addWidget(template)}
+                  className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border cursor-grab w-32 select-none ${c.bg} ${c.border}`}
                 >
-                  <span className="text-xs font-medium text-neutral-500">{widget.title}</span>
-                  <span className="text-xs text-neutral-300 truncate">{widget.description}</span>
+                  <span className={`text-xs font-semibold ${c.label}`}>{template.title}</span>
+                  <span className={`text-xs truncate opacity-50 ${c.text}`}>{template.description}</span>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -126,9 +202,8 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
               isResizable
               isDroppable
               droppingItem={droppingId ? { i: droppingId, w: 1, h: 1 } : undefined}
-              onDrop={(newLayout, item) => {
+              onDrop={(newLayout) => {
                 if (!droppingId) return;
-                setActiveIds(ids => [...ids, droppingId]);
                 setLayout(newLayout.map(l =>
                   l.i === droppingId
                     ? { ...l, minW: 1, minH: 1, maxW: 2, maxH: 3 }
@@ -140,12 +215,11 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
               compactType="vertical"
             >
               {layout.map(({ i }) => {
-                const widget = widgetById[i];
+                const widget = instances[i];
                 if (!widget) return <div key={i} />;
                 return (
                   <div key={i} className="relative rounded-2xl overflow-hidden">
                     <div className="absolute inset-0 z-10 rounded-2xl border-2 border-dashed border-neutral-300 cursor-grab" />
-                    {/* Remove button — stops mousedown so drag doesn't swallow the click */}
                     <button
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={() => removeWidget(i)}
@@ -168,7 +242,7 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
             }}
           >
             {layout.map((item) => {
-              const widget = widgetById[item.i];
+              const widget = instances[item.i];
               if (!widget) return null;
               return (
                 <div
@@ -185,7 +259,6 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
           </div>
         )}
       </div>
-
 
     </div>
   );

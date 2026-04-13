@@ -23,7 +23,7 @@ export default function WidgetCard({
       <p className={`text-xs font-semibold tracking-widest uppercase mb-2 ${c.label}`}>
         {widget.title}
       </p>
-      <p className={`text-sm ${muted ? "text-neutral-400" : c.text} opacity-60`}>
+      <p className={`text-sm ${muted ? "text-neutral-500" : c.text}`}>
         {widget.description}
       </p>
     </div>
