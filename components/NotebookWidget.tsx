@@ -27,9 +27,6 @@ export default function NotebookWidget({
   const storageKey = `notebook-${widget.id}-dates`;
   const today = toDateStr(new Date());
 
-  const lastWord = widget.title.split(" ").pop() ?? "";
-  const num = isNaN(Number(lastWord)) ? "1" : lastWord;
-
   // notesByDate: { "2026-04-14": "content...", ... }
   const [notesByDate, setNotesByDate] = useState<Record<string, string>>({});
   const [viewDate, setViewDate] = useState(today);
@@ -75,7 +72,6 @@ export default function NotebookWidget({
         <p className={`text-xs font-semibold tracking-widest uppercase ${c.label}`}>
           {widget.title}
         </p>
-        <span className={`text-xs font-medium opacity-30 ${c.label}`}>#{num}</span>
       </div>
 
       {/* Body: textarea + calendar side by side */}
