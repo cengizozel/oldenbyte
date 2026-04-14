@@ -78,6 +78,49 @@ export default function WidgetGrid({
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
+  // Draggable shelf
+  const shelfRef = useRef<HTMLDivElement>(null);
+  const [shelfPos, setShelfPos] = useState<{ x: number; y: number } | null>(null);
+  const isDragging = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!isDragging.current || !shelfRef.current) return;
+      setShelfPos({
+        x: Math.max(0, Math.min(window.innerWidth  - shelfRef.current.offsetWidth,  e.clientX - dragOffset.current.x)),
+        y: Math.max(0, Math.min(window.innerHeight - shelfRef.current.offsetHeight, e.clientY - dragOffset.current.y)),
+      });
+    }
+    function onTouchMove(e: TouchEvent) {
+      if (!isDragging.current || !shelfRef.current) return;
+      const t = e.touches[0];
+      setShelfPos({
+        x: Math.max(0, Math.min(window.innerWidth  - shelfRef.current.offsetWidth,  t.clientX - dragOffset.current.x)),
+        y: Math.max(0, Math.min(window.innerHeight - shelfRef.current.offsetHeight, t.clientY - dragOffset.current.y)),
+      });
+      e.preventDefault();
+    }
+    function onUp() { isDragging.current = false; }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("touchend", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onTouchMove);
+      document.removeEventListener("touchend", onUp);
+    };
+  }, []);
+
+  function startShelfDrag(clientX: number, clientY: number, currentTarget: HTMLDivElement) {
+    const rect = currentTarget.getBoundingClientRect();
+    dragOffset.current = { x: clientX - rect.left, y: clientY - rect.top };
+    if (shelfPos === null) setShelfPos({ x: rect.left, y: rect.top });
+    isDragging.current = true;
+  }
+
   useEffect(() => {
     if (!containerRef.current) return;
     const ro = new ResizeObserver(([entry]) => {
@@ -169,7 +212,20 @@ export default function WidgetGrid({
     <>
     {/* Fixed shelf — outside the flex column so it never shifts children indices */}
     {editing && (
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-neutral-200 rounded-2xl shadow-lg px-3 py-2.5">
+      <div
+        ref={shelfRef}
+        onMouseDown={e => {
+          if ((e.target as HTMLElement).closest("button,[draggable]")) return;
+          e.preventDefault();
+          startShelfDrag(e.clientX, e.clientY, e.currentTarget);
+        }}
+        onTouchStart={e => {
+          if ((e.target as HTMLElement).closest("button,[draggable]")) return;
+          startShelfDrag(e.touches[0].clientX, e.touches[0].clientY, e.currentTarget);
+        }}
+        className={`fixed z-50 flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-neutral-200 rounded-2xl shadow-lg px-3 py-2.5 select-none cursor-grab active:cursor-grabbing ${shelfPos === null ? "bottom-6 left-1/2 -translate-x-1/2" : ""}`}
+        style={shelfPos !== null ? { left: shelfPos.x, top: shelfPos.y } : undefined}
+      >
         {widgets.map(template => {
           const c = colorMap[template.color];
           return (
