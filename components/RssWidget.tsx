@@ -6,7 +6,7 @@ import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
 type RssItem = { title: string; link: string; pubDate: string };
-type RssConfig = { url: string; limit: number };
+type RssConfig = { url: string; limit: number; name?: string };
 
 const DEFAULT: RssConfig = { url: "", limit: 5 };
 const LIMITS = [3, 5, 7, 10];
@@ -97,7 +97,7 @@ export default function RssWidget({
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
         <p className={`text-xs font-semibold tracking-widest uppercase ${c.label}`}>
-          {widget.title}
+          {widget.title}{config.name ? ` | ${config.name}` : ""}
         </p>
         {!settingsOpen && (
           <button
@@ -114,6 +114,14 @@ export default function RssWidget({
 
           <input
             autoFocus
+            type="text"
+            value={draft.name ?? ""}
+            onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
+            placeholder="Name (e.g. BBC, Reddit…)"
+            className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
+          />
+
+          <input
             type="url"
             value={draft.url}
             onChange={e => setDraft(d => ({ ...d, url: e.target.value }))}
@@ -166,28 +174,34 @@ export default function RssWidget({
 
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-            </div>
-          ) : items.length ? (
-            <ul className="flex flex-col gap-2.5">
-              {items.map((item, i) => (
-                <li key={i}>
-                  <a
-                    href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
-                  >
-                    {item.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className={`text-xs opacity-45 ${c.text}`}>hover and click the pencil to add an RSS feed URL</p>
+        <div className="flex-1 min-h-0 relative">
+          <div className="absolute inset-0 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
+              </div>
+            ) : items.length ? (
+              <ul className="flex flex-col">
+                {items.map((item, i) => (
+                  <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                    <a
+                      href={item.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                    >
+                      {item.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className={`text-xs opacity-45 ${c.text}`}>hover and click the pencil to add an RSS feed URL</p>
+            )}
+          </div>
+          {/* Fade hint — only visible when there's content to scroll */}
+          {items.length > 0 && (
+            <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
           )}
         </div>
       )}

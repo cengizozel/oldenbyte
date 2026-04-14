@@ -15,12 +15,13 @@ export const colorMap: Record<WidgetColor, {
   border: string;
   label: string;
   text: string;
+  fade: string;
 }> = {
-  amber:   { bg: "bg-amber-50",   border: "border-amber-100",   label: "text-amber-800",   text: "text-amber-900"   },
-  sky:     { bg: "bg-sky-50",     border: "border-sky-100",     label: "text-sky-700",     text: "text-sky-900"     },
-neutral: { bg: "bg-neutral-50", border: "border-neutral-200", label: "text-neutral-600", text: "text-neutral-700" },
-  rose:    { bg: "bg-rose-50",    border: "border-rose-100",    label: "text-rose-700",    text: "text-rose-900"    },
-  teal:    { bg: "bg-teal-50",    border: "border-teal-100",    label: "text-teal-800",    text: "text-teal-900"    },
+  amber:   { bg: "bg-amber-50",   border: "border-amber-100",   label: "text-amber-800",   text: "text-amber-900",   fade: "from-amber-50"   },
+  sky:     { bg: "bg-sky-50",     border: "border-sky-100",     label: "text-sky-700",     text: "text-sky-900",     fade: "from-sky-50"     },
+  neutral: { bg: "bg-neutral-50", border: "border-neutral-200", label: "text-neutral-600", text: "text-neutral-700", fade: "from-neutral-50" },
+  rose:    { bg: "bg-rose-50",    border: "border-rose-100",    label: "text-rose-700",    text: "text-rose-900",    fade: "from-rose-50"    },
+  teal:    { bg: "bg-teal-50",    border: "border-teal-100",    label: "text-teal-800",    text: "text-teal-900",    fade: "from-teal-50"    },
 };
 
 export const widgets: Widget[] = [
