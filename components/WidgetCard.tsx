@@ -7,7 +7,7 @@ export default function WidgetCard({
   widget: Widget;
   className?: string;
 }) {
-  const c = colorMap[widget.color];
+  const c = colorMap[widget.color] ?? colorMap["neutral"];
   const muted = widget.type === "empty";
 
   return (

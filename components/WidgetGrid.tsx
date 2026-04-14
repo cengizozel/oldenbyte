@@ -11,20 +11,21 @@ import { colorMap } from "@/lib/widgets";
 import WidgetCard from "./WidgetCard";
 import NotebookWidget from "./NotebookWidget";
 import TextWidget from "./TextWidget";
+import RssWidget from "./RssWidget";
 
 const COLS = 2;
 const GAP = 16;
 
 const initialLayout: LayoutItem[] = [
   { i: "notebook", x: 0, y: 0, w: 1, h: 2, minW: 1, minH: 1, maxW: 2, maxH: 3 },
-  { i: "ebook",    x: 1, y: 0, w: 1, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 3 },
-  { i: "one-item", x: 1, y: 1, w: 1, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 3 },
+  { i: "ebook",    x: 1, y: 0, w: 1, h: 2, minW: 1, minH: 1, maxW: 2, maxH: 3 },
   { i: "text",     x: 0, y: 2, w: 2, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 3 },
 ];
 
 function renderWidget(widget: Widget) {
   if (widget.type === "notebook") return <NotebookWidget widget={widget} className="h-full" />;
   if (widget.type === "text")     return <TextWidget     widget={widget} className="h-full" />;
+  if (widget.type === "rss")      return <RssWidget      widget={widget} className="h-full" />;
   return <WidgetCard widget={widget} className="h-full" />;
 }
 
@@ -41,8 +42,21 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
     try {
       const savedLayout = localStorage.getItem("widget-layout");
       const savedInstances = localStorage.getItem("widget-instances");
-      if (savedLayout) setLayout(JSON.parse(savedLayout));
-      if (savedInstances) setInstances(JSON.parse(savedInstances));
+      if (savedInstances) {
+        const parsed: Record<string, Widget> = JSON.parse(savedInstances);
+        // Drop any instances with colors no longer in colorMap
+        const clean = Object.fromEntries(
+          Object.entries(parsed).filter(([, w]) => colorMap[w.color] !== undefined)
+        );
+        const validIds = new Set(Object.keys(clean));
+        setInstances(clean);
+        if (savedLayout) {
+          const parsedLayout = JSON.parse(savedLayout);
+          setLayout(parsedLayout.filter((l: LayoutItem) => validIds.has(l.i)));
+        }
+      } else if (savedLayout) {
+        setLayout(JSON.parse(savedLayout));
+      }
     } catch {}
   }, []);
 

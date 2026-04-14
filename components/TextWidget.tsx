@@ -75,36 +75,41 @@ export default function TextWidget({
     }
   }
 
-  // Binary search for largest font size that fits the container
+  // Binary search for largest font size that fits the container.
+  // Deferred to rAF so the browser finishes layout before we measure.
   const fitText = useCallback(() => {
-    const container = containerRef.current;
-    const el = textRef.current;
-    if (!container || !el || !el.textContent?.trim()) return;
+    requestAnimationFrame(() => {
+      const container = containerRef.current;
+      const el = textRef.current;
+      if (!container || !el || !el.textContent?.trim()) return;
 
-    const maxH = container.clientHeight;
-    const maxW = container.clientWidth;
-    if (maxH === 0 || maxW === 0) return;
+      const maxH = container.clientHeight;
+      const maxW = container.clientWidth;
+      if (maxH === 0 || maxW === 0) return;
 
-    // Pin the element width so it can't stretch the container
-    el.style.width = `${maxW}px`;
-    el.style.position = "absolute";
-    el.style.visibility = "hidden";
+      // Pin the element width so it can't stretch the container
+      el.style.width = `${maxW}px`;
+      el.style.position = "absolute";
+      el.style.visibility = "hidden";
 
-    let lo = 10, hi = 150;
-    while (lo < hi - 1) {
-      const mid = Math.floor((lo + hi) / 2);
-      el.style.fontSize = `${mid}px`;
-      if (el.scrollHeight <= maxH) {
-        lo = mid;
-      } else {
-        hi = mid;
+      let lo = 8, hi = 150;
+      while (lo < hi - 1) {
+        const mid = Math.floor((lo + hi) / 2);
+        el.style.fontSize = `${mid}px`;
+        if (el.scrollHeight <= maxH) {
+          lo = mid;
+        } else {
+          hi = mid;
+        }
       }
-    }
 
-    el.style.width = "";
-    el.style.position = "";
-    el.style.visibility = "";
-    setFontSize(lo);
+      // Apply the result before making the element visible again
+      el.style.fontSize = `${lo}px`;
+      el.style.width = "";
+      el.style.position = "";
+      el.style.visibility = "";
+      setFontSize(lo);
+    });
   }, [display, config.font]);
 
   useEffect(() => { fitText(); }, [fitText]);
