@@ -20,9 +20,10 @@ const COLS = 2;
 const GAP = 16;
 
 const initialLayout: LayoutItem[] = [
-  { i: "notebook", x: 0, y: 0, w: 1, h: 2, minW: 1, minH: 1, maxW: 2, maxH: 3 },
-  { i: "ebook",    x: 1, y: 0, w: 1, h: 2, minW: 1, minH: 1, maxW: 2, maxH: 3 },
-  { i: "text",     x: 0, y: 2, w: 2, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 3 },
+  { i: "notebook", x: 0, y: 0, w: 1, h: 2, minW: 1, minH: 1, maxW: 2, maxH: 6 },
+  { i: "ebook",    x: 1, y: 0, w: 1, h: 2, minW: 1, minH: 1, maxW: 2, maxH: 6 },
+  { i: "text",     x: 0, y: 2, w: 1, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 6 },
+  { i: "rss",      x: 1, y: 2, w: 1, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 6 },
 ];
 
 function renderWidget(widget: Widget) {
@@ -144,7 +145,7 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
     setInstances(prev => ({ ...prev, [id]: { ...template, id, title } }));
     setLayout(l => [...l, {
       i: id, x, y, w: 1, h: 1,
-      minW: 1, minH: 1, maxW: 2, maxH: 3,
+      minW: 1, minH: 1, maxW: 2, maxH: 6,
     }]);
   }
 
@@ -177,32 +178,28 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
         </button>
       </div>
 
-      {/* Widget shelf — always shows all templates so duplicates are possible */}
+      {/* Fixed shelf — viewport-anchored so it never affects layout */}
       {editing && (
-        <div className="border border-neutral-200 rounded-2xl bg-white p-3">
-          <p className="text-xs text-neutral-400 tracking-widest uppercase mb-2.5">Add widgets</p>
-          <div className="flex gap-2 flex-wrap">
-            {widgets.map(template => {
-              const c = colorMap[template.color];
-              return (
-                <div
-                  key={template.id}
-                  draggable
-                  onDragStart={() => {
-                    const id = `${template.id}-${Date.now()}`;
-                    setInstances(prev => ({ ...prev, [id]: { ...template, id } }));
-                    setDroppingId(id);
-                  }}
-                  onDragEnd={() => setDroppingId(null)}
-                  onClick={() => addWidget(template)}
-                  className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border cursor-grab w-32 select-none ${c.bg} ${c.border}`}
-                >
-                  <span className={`text-xs font-semibold ${c.label}`}>{template.title}</span>
-                  <span className={`text-xs truncate opacity-50 ${c.text}`}>{template.description}</span>
-                </div>
-              );
-            })}
-          </div>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-neutral-200 rounded-2xl shadow-lg px-3 py-2.5">
+          {widgets.map(template => {
+            const c = colorMap[template.color];
+            return (
+              <div
+                key={template.id}
+                draggable
+                onDragStart={() => {
+                  const id = `${template.id}-${Date.now()}`;
+                  setInstances(prev => ({ ...prev, [id]: { ...template, id } }));
+                  setDroppingId(id);
+                }}
+                onDragEnd={() => setDroppingId(null)}
+                onClick={() => addWidget(template)}
+                className={`flex flex-col gap-0.5 px-3 py-2 rounded-xl border cursor-grab select-none ${c.bg} ${c.border}`}
+              >
+                <span className={`text-xs font-semibold ${c.label}`}>{template.title}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -226,7 +223,7 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
                 if (!droppingId) return;
                 setLayout(newLayout.map(l =>
                   l.i === droppingId
-                    ? { ...l, minW: 1, minH: 1, maxW: 2, maxH: 3 }
+                    ? { ...l, minW: 1, minH: 1, maxW: 2, maxH: 6 }
                     : l
                 ));
                 setDroppingId(null);
@@ -238,7 +235,10 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
                 const widget = instances[i];
                 if (!widget) return <div key={i} />;
                 return (
-                  <div key={i} className="relative rounded-2xl overflow-hidden">
+                  <div key={i} className="relative rounded-2xl">
+                    <div className="pointer-events-none h-full">
+                      {renderWidget(widget)}
+                    </div>
                     <div className="absolute inset-0 z-10 rounded-2xl border-2 border-dashed border-neutral-300 cursor-grab" />
                     <button
                       onMouseDown={(e) => e.stopPropagation()}
@@ -247,7 +247,6 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
                     >
                       ×
                     </button>
-                    {renderWidget(widget)}
                   </div>
                 );
               })}
