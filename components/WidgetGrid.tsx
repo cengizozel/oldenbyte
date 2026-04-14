@@ -18,14 +18,16 @@ import YoutubeWidget from "./YoutubeWidget";
 import dynamic from "next/dynamic";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 
-const COLS = 2;
+const COLS = 4;
 const GAP = 16;
 
 const initialLayout: LayoutItem[] = [
-  { i: "notebook", x: 0, y: 0, w: 1, h: 2, minW: 1, minH: 1, maxW: 2, maxH: 6 },
-  { i: "ebook",    x: 1, y: 0, w: 1, h: 2, minW: 1, minH: 1, maxW: 2, maxH: 6 },
-  { i: "text",     x: 0, y: 2, w: 1, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 6 },
-  { i: "rss",      x: 1, y: 2, w: 1, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 6 },
+  { i: "notebook", x: 0, y: 0, w: 2, h: 2, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "rss",      x: 0, y: 2, w: 2, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "text",     x: 0, y: 6, w: 2, h: 2, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "ebook",    x: 2, y: 0, w: 2, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "reddit",   x: 2, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "youtube",  x: 3, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
 ];
 
 function renderWidget(widget: Widget) {
@@ -208,8 +210,8 @@ export default function WidgetGrid({
 
     setInstances(prev => ({ ...prev, [id]: { ...template, id, title } }));
     setLayout(l => [...l, {
-      i: id, x, y, w: 1, h: 1,
-      minW: 1, minH: 1, maxW: 2, maxH: 6,
+      i: id, x, y, w: 2, h: 1,
+      minW: 1, minH: 1, maxW: 4, maxH: 6,
     }]);
   }
 
@@ -283,7 +285,7 @@ export default function WidgetGrid({
                 if (!droppingId) return;
                 setLayout(newLayout.map(l =>
                   l.i === droppingId
-                    ? { ...l, minW: 1, minH: 1, maxW: 2, maxH: 6 }
+                    ? { ...l, minW: 1, minH: 1, maxW: 4, maxH: 6 }
                     : l
                 ));
                 setDroppingId(null);
