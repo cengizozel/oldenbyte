@@ -1,0 +1,14 @@
+services:
+  app:
+    image: ghcr.io/cengizozel/oldenbyte:latest
+    ports:
+      - "3847:3000"
+    restart: unless-stopped
+
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.docker/config.json:/config.json:ro
+    command: --interval 300 oldenbyte-app-1
+    restart: unless-stopped
