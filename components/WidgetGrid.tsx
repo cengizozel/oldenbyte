@@ -8,7 +8,7 @@ import type { Layout as LayoutItem } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import type { Widget } from "@/lib/widgets";
-import { colorMap } from "@/lib/widgets";
+import { colorMap, widgets as widgetDefs } from "@/lib/widgets";
 import WidgetCard from "./WidgetCard";
 import NotebookWidget from "./NotebookWidget";
 import TextWidget from "./TextWidget";
@@ -64,8 +64,11 @@ export default function WidgetGrid({
       try {
         if (savedInstances) {
           const parsed: Record<string, Widget> = JSON.parse(savedInstances);
+          const titleByType = Object.fromEntries(widgetDefs.map(w => [w.type, w.title]));
           const clean = Object.fromEntries(
-            Object.entries(parsed).filter(([, w]) => colorMap[w.color] !== undefined)
+            Object.entries(parsed)
+              .filter(([, w]) => colorMap[w.color] !== undefined)
+              .map(([k, w]) => [k, titleByType[w.type] ? { ...w, title: titleByType[w.type] } : w])
           );
           const validIds = new Set(Object.keys(clean));
           setInstances(clean);

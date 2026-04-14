@@ -30,7 +30,7 @@ export const widgets: Widget[] = [
     id: "notebook",
     type: "notebook",
     color: "amber",
-    title: "Notebook",
+    title: "Notepad",
     description: "A simple place for temporary notes.",
   },
   {

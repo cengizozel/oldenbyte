@@ -115,6 +115,7 @@ export default function TextWidget({
   }, [display, config.font]);
 
   useEffect(() => { fitText(); }, [fitText]);
+  useEffect(() => { if (!settingsOpen) fitText(); }, [settingsOpen, fitText]);
 
   useEffect(() => {
     if (!containerRef.current) return;

@@ -2,9 +2,11 @@
 
 A personal dashboard built with Next.js. Widgets are draggable, resizable, and persist their state to a local SQLite database. Responsive for mobile portrait view.
 
+![screenshot](public/screenshot.png)
+
 ## Widgets
 
-- **Notebook** - a daily notepad with a built-in calendar to browse past entries
+- **Notepad** - a daily notepad with a built-in calendar to browse past entries
 - **Reader** - upload and read PDF or EPUB files, with full-screen view and saved page position
 - **Text** - display any text or a live string fetched from a URL
 - **Feed** - subscribe to any RSS feed, configurable item count, headlines cached daily
