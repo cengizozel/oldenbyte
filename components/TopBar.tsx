@@ -8,6 +8,11 @@ import * as storage from "@/lib/storage";
 
 type FieldConfig = { type: "text" | "url"; value: string };
 
+const URL_EXAMPLES = [
+  { label: "Public IP address", url: "https://icanhazip.com" },
+  { label: "Weather",           url: "https://wttr.in/Istanbul?format=3" },
+];
+
 function EditableField({
   storageKey,
   defaultValue,
@@ -133,6 +138,20 @@ function EditableField({
             placeholder={draft.type === "url" ? "https://..." : defaultValue}
             className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300"
           />
+
+          {draft.type === "url" && (
+            <div className="mt-2 flex flex-col gap-0.5">
+              {URL_EXAMPLES.map(ex => (
+                <button
+                  key={ex.url}
+                  onClick={() => setDraft(d => ({ ...d, value: ex.url }))}
+                  className="text-left px-2 py-1 rounded-lg text-xs text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50 transition-colors"
+                >
+                  {ex.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
 
