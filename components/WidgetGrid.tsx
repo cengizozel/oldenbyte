@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import * as storage from "@/lib/storage";
-import { LayoutGrid, Check, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import GridLayout from "react-grid-layout";
 import type { Layout as LayoutItem } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -34,8 +34,15 @@ function renderWidget(widget: Widget) {
   return <WidgetCard widget={widget} className="h-full" />;
 }
 
-export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
-  const [editing, setEditing] = useState(false);
+export default function WidgetGrid({
+  widgets,
+  editing = false,
+  onToggleEdit,
+}: {
+  widgets: Widget[];
+  editing?: boolean;
+  onToggleEdit?: () => void;
+}) {
 
   const [layout, setLayout] = useState<LayoutItem[]>(initialLayout);
   const [instances, setInstances] = useState<Record<string, Widget>>(
@@ -95,6 +102,13 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
   const rowHeight = size.height > 0
     ? Math.floor((size.height - (numRows - 1) * GAP) / numRows)
     : 200;
+
+  function reset() {
+    setLayout(initialLayout);
+    setInstances(Object.fromEntries(widgets.map(w => [w.id, w])));
+    storage.removeItem("widget-layout");
+    storage.removeItem("widget-instances");
+  }
 
   function removeWidget(instanceId: string) {
     setLayout(l => l.filter(item => item.i !== instanceId));
@@ -173,36 +187,18 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
             </div>
           );
         })}
+        <div className="w-px h-4 bg-neutral-200 mx-1" />
+        <button
+          onClick={reset}
+          className="p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+          title="Reset layout"
+        >
+          <RotateCcw size={13} />
+        </button>
       </div>
     )}
 
     <div className="flex flex-col flex-1 min-h-0 gap-2">
-
-      {/* Edit controls — fixed height so the grid container never shifts */}
-      <div className="h-6 flex items-center justify-end gap-3 shrink-0">
-        {editing && (
-          <button
-            onClick={async () => {
-              if (!confirm("Reset the widget layout to default?")) return;
-              await storage.removeItem("widget-layout");
-              await storage.removeItem("widget-instances");
-              setLayout(initialLayout);
-              setInstances(Object.fromEntries(widgets.map(w => [w.id, w])));
-            }}
-            className="text-neutral-300 hover:text-neutral-500"
-            title="Reset layout"
-          >
-            <RotateCcw size={15} />
-          </button>
-        )}
-        <button
-          onClick={() => setEditing(e => !e)}
-          className="text-neutral-400 hover:text-neutral-600"
-          title={editing ? "Done" : "Edit layout"}
-        >
-          {editing ? <Check size={15} /> : <LayoutGrid size={15} />}
-        </button>
-      </div>
 
       {/* Grid */}
       <div ref={containerRef} className="flex-1 min-h-0">

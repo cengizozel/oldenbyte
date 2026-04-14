@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, Loader, X, RotateCcw } from "lucide-react";
+import { Pencil, Check, Loader, X, RotateCcw, LayoutGrid } from "lucide-react";
 import * as storage from "@/lib/storage";
 
 // ── EditableField ─────────────────────────────────────────────────────────
@@ -351,7 +351,13 @@ function DateDisplay() {
 
 // ── TopBar ─────────────────────────────────────────────────────────────────
 
-export default function TopBar() {
+export default function TopBar({
+  editing = false,
+  onToggleEdit,
+}: {
+  editing?: boolean;
+  onToggleEdit?: () => void;
+}) {
   return (
     <div className="grid grid-cols-3 items-center">
       <EditableField
@@ -362,13 +368,20 @@ export default function TopBar() {
       <div className="flex justify-center items-center h-12">
         <DateDisplay />
       </div>
-      <div className="flex justify-end">
+      <div className="flex justify-end items-center gap-2 group/right">
         <EditableField
           storageKey="topbar-mood"
           defaultValue="feeling quiet"
           className="text-sm text-neutral-600"
           align="right"
         />
+        <button
+          onClick={onToggleEdit}
+          className="transition-opacity text-neutral-400 hover:text-neutral-600"
+          title={editing ? "Done editing" : "Edit layout"}
+        >
+          {editing ? <Check size={16} /> : <LayoutGrid size={16} />}
+        </button>
       </div>
     </div>
   );
