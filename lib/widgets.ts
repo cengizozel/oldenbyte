@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -60,5 +60,12 @@ export const widgets: Widget[] = [
     color: "orange",
     title: "Reddit",
     description: "Top posts from your chosen subreddits.",
+  },
+  {
+    id: "youtube",
+    type: "youtube",
+    color: "rose",
+    title: "YouTube",
+    description: "Latest videos from your chosen channels.",
   },
 ];

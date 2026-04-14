@@ -14,6 +14,7 @@ import NotebookWidget from "./NotebookWidget";
 import TextWidget from "./TextWidget";
 import RssWidget from "./RssWidget";
 import RedditWidget from "./RedditWidget";
+import YoutubeWidget from "./YoutubeWidget";
 import dynamic from "next/dynamic";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 
@@ -32,6 +33,7 @@ function renderWidget(widget: Widget) {
   if (widget.type === "text")     return <TextWidget     widget={widget} className="h-full" />;
   if (widget.type === "rss")      return <RssWidget      widget={widget} className="h-full" />;
   if (widget.type === "reddit")   return <RedditWidget   widget={widget} className="h-full" />;
+  if (widget.type === "youtube")  return <YoutubeWidget  widget={widget} className="h-full" />;
   if (widget.type === "ebook")    return <ReaderWidget   widget={widget} className="h-full" />;
   return <WidgetCard widget={widget} className="h-full" />;
 }
