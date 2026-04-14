@@ -111,35 +111,42 @@ function EpubViewer({
   const viewerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renditionRef = useRef<any>(null);
-  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  const dimsRef = useRef<{ w: number; h: number } | null>(null);
+  const [dimsReady, setDimsReady] = useState(false);
 
-  // Measure wrapper once it has a real size
+  // Measure on every resize; call rendition.resize() directly — no state re-render needed
   useEffect(() => {
     if (!wrapperRef.current) return;
-    let set = false;
     const ro = new ResizeObserver(([e]) => {
       const { width, height } = e.contentRect;
-      if (width > 0 && height > 0 && !set) {
-        set = true;
-        setDims({ w: Math.floor(width), h: Math.floor(height) });
+      if (width > 0 && height > 0) {
+        dimsRef.current = { w: Math.floor(width), h: Math.floor(height) };
+        if (renditionRef.current) {
+          renditionRef.current.resize(dimsRef.current.w, dimsRef.current.h);
+        } else {
+          // Dims became available for the first time — trigger init
+          setDimsReady(true);
+        }
       }
     });
     ro.observe(wrapperRef.current);
     return () => ro.disconnect();
   }, []);
 
-  // Init epubjs once pixel dimensions are known
+  // Init / re-init when filename changes (dimsReady ensures dims are available)
   useEffect(() => {
-    if (!dims || !viewerRef.current) return;
+    if (!dimsReady || !dimsRef.current || !viewerRef.current) return;
     let active = true;
 
+    if (viewerRef.current) viewerRef.current.innerHTML = "";
+
     import("epubjs").then(({ default: Epub }) => {
-      if (!active || !viewerRef.current) return;
+      if (!active || !viewerRef.current || !dimsRef.current) return;
 
       const book = Epub(`/api/files/${filename}`);
       const rendition = book.renderTo(viewerRef.current, {
-        width: dims.w,
-        height: dims.h,
+        width: dimsRef.current.w,
+        height: dimsRef.current.h,
         flow: "paginated",
       });
       renditionRef.current = rendition;
@@ -157,7 +164,7 @@ function EpubViewer({
       renditionRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filename, dims]);
+  }, [filename, dimsReady]);
 
   // Keyboard nav in fullscreen
   useEffect(() => {

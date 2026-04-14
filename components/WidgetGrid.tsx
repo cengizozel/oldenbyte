@@ -98,6 +98,8 @@ export default function WidgetGrid({
     storage.setItem("widget-instances", JSON.stringify(instances));
   }, [instances]);
 
+  const isMobile = size.width > 0 && size.width < 600;
+
   const numRows = Math.max(...layout.map(l => l.y + l.h), 1);
   const rowHeight = size.height > 0
     ? Math.floor((size.height - (numRows - 1) * GAP) / numRows)
@@ -198,15 +200,15 @@ export default function WidgetGrid({
       </div>
     )}
 
-    <div className="flex flex-col flex-1 min-h-0 gap-2">
+    <div className={`flex flex-col gap-2 ${isMobile ? "" : "flex-1 min-h-0"}`}>
 
       {/* Grid */}
-      <div ref={containerRef} className="flex-1 min-h-0">
+      <div ref={containerRef} className={isMobile ? "" : "flex-1 min-h-0"}>
         {editing ? (
           size.width > 0 && (
             <GridLayout
               layout={layout}
-              cols={COLS}
+              cols={isMobile ? 1 : COLS}
               rowHeight={rowHeight}
               width={size.width}
               margin={[GAP, GAP]}
@@ -249,6 +251,20 @@ export default function WidgetGrid({
               })}
             </GridLayout>
           )
+        ) : isMobile ? (
+          <div className="flex flex-col gap-4 pb-4">
+            {[...layout]
+              .sort((a, b) => a.y === b.y ? a.x - b.x : a.y - b.y)
+              .map((item) => {
+                const widget = instances[item.i];
+                if (!widget) return null;
+                return (
+                  <div key={item.i} className="h-80 shrink-0 overflow-hidden">
+                    {renderWidget(widget)}
+                  </div>
+                );
+              })}
+          </div>
         ) : (
           <div
             className="h-full grid gap-4"

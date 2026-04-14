@@ -323,7 +323,7 @@ function DateDisplay() {
       >
         {format === "analog"
           ? <AnalogClock time={now} size={48} />
-          : <span className="text-sm text-neutral-600 text-center" suppressHydrationWarning>{fmt(now, format)}</span>
+          : <span className="text-sm md:text-lg text-neutral-500 text-center [font-family:var(--font-dm-mono)]" suppressHydrationWarning>{fmt(now, format)}</span>
         }
         <Pencil size={12} className="opacity-0 group-hover:opacity-30 text-neutral-400 transition-opacity" />
       </button>
@@ -378,20 +378,22 @@ export default function TopBar({
   onToggleEdit?: () => void;
 }) {
   return (
-    <div className="grid grid-cols-3 items-center">
-      <EditableField
-        storageKey="topbar-phrase"
-        defaultValue="oldenbyte"
-        className="text-sm text-neutral-600"
-      />
-      <div className="flex justify-center items-center h-12">
+    <div className="grid grid-cols-3 items-stretch h-12 md:h-14">
+      <div className="flex items-center">
+        <EditableField
+          storageKey="topbar-phrase"
+          defaultValue="oldenbyte"
+          className="text-lg md:text-2xl text-neutral-700 font-medium leading-none [font-family:var(--font-playfair)]"
+        />
+      </div>
+      <div className="flex justify-center items-center">
         <DateDisplay />
       </div>
       <div className="flex justify-end items-center gap-2 group/right">
         <EditableField
           storageKey="topbar-mood"
           defaultValue="feeling quiet"
-          className="text-sm text-neutral-600"
+          className="text-base md:text-xl text-neutral-500 italic leading-none [font-family:var(--font-playfair)]"
           align="right"
         />
         <button
