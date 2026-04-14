@@ -28,14 +28,22 @@ export async function GET(request: NextRequest) {
 
     const xml = await res.text();
     const items: { title: string; link: string; pubDate: string }[] = [];
-    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+
+    // Detect format: Atom uses <entry>, RSS uses <item>
+    const isAtom = /<entry[\s>]/i.test(xml);
+    const blockRegex = isAtom ? /<entry>([\s\S]*?)<\/entry>/g : /<item>([\s\S]*?)<\/item>/g;
     let match;
 
-    while ((match = itemRegex.exec(xml)) !== null && items.length < limit) {
+    while ((match = blockRegex.exec(xml)) !== null && items.length < limit) {
       const block = match[1];
       const title = extractTag(block, "title");
-      const link = extractTag(block, "link") || extractTag(block, "guid");
-      const pubDate = extractTag(block, "pubDate");
+      // Atom: <link href="..."/> — extract href attribute
+      // RSS:  <link>...</link> or <guid>...</guid>
+      const atomLinkMatch = block.match(/<link[^>]+href="([^"]+)"/i);
+      const link = atomLinkMatch
+        ? atomLinkMatch[1]
+        : extractTag(block, "link") || extractTag(block, "guid");
+      const pubDate = extractTag(block, "pubDate") || extractTag(block, "updated");
       if (title) items.push({ title, link, pubDate });
     }
 

@@ -9,6 +9,12 @@ type RssItem = { title: string; link: string; pubDate: string };
 type RssConfig = { url: string; limit: number; name?: string };
 
 const DEFAULT: RssConfig = { url: "", limit: 5 };
+
+const RSS_EXAMPLES = [
+  { label: "BBC News",     url: "https://feeds.bbci.co.uk/news/rss.xml" },
+  { label: "Hacker News",  url: "https://news.ycombinator.com/rss" },
+  { label: "The Guardian", url: "https://www.theguardian.com/world/rss" },
+];
 const LIMITS = [3, 5, 7, 10];
 
 export default function RssWidget({
@@ -129,6 +135,22 @@ export default function RssWidget({
             placeholder="https://feeds.bbci.co.uk/news/rss.xml"
             className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
           />
+
+          <div className="flex flex-col gap-0.5">
+            {RSS_EXAMPLES.map(ex => (
+              <button
+                key={ex.url}
+                onClick={() => setDraft(d => ({ ...d, url: ex.url }))}
+                className={`text-left px-2 py-1 rounded-lg text-xs transition-colors ${
+                  draft.url === ex.url
+                    ? `${c.label} font-medium opacity-100`
+                    : `${c.text} opacity-50 hover:opacity-80`
+                }`}
+              >
+                {ex.label}
+              </button>
+            ))}
+          </div>
 
           <div className="flex items-center gap-2">
             <span className={`text-xs opacity-60 ${c.label}`}>Items</span>

@@ -13,6 +13,7 @@ import WidgetCard from "./WidgetCard";
 import NotebookWidget from "./NotebookWidget";
 import TextWidget from "./TextWidget";
 import RssWidget from "./RssWidget";
+import RedditWidget from "./RedditWidget";
 import dynamic from "next/dynamic";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 
@@ -30,6 +31,7 @@ function renderWidget(widget: Widget) {
   if (widget.type === "notebook") return <NotebookWidget widget={widget} className="h-full" />;
   if (widget.type === "text")     return <TextWidget     widget={widget} className="h-full" />;
   if (widget.type === "rss")      return <RssWidget      widget={widget} className="h-full" />;
+  if (widget.type === "reddit")   return <RedditWidget   widget={widget} className="h-full" />;
   if (widget.type === "ebook")    return <ReaderWidget   widget={widget} className="h-full" />;
   return <WidgetCard widget={widget} className="h-full" />;
 }
@@ -195,8 +197,9 @@ export default function WidgetGrid({
     const id = instanceId ?? `${template.id}-${Date.now()}`;
     const { x, y } = findNextPosition(layout);
 
-    // Number the title if instances of this type already exist
-    const sameType = Object.values(instances).filter(w => w.type === template.type);
+    // Only count instances that are actually placed in the layout
+    const layoutIds = new Set(layout.map(l => l.i));
+    const sameType = Object.values(instances).filter(w => w.type === template.type && layoutIds.has(w.id));
     const title = sameType.length === 0
       ? template.title
       : `${template.title} ${sameType.length + 1}`;
