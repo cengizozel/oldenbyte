@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "comfort site",
+  title: "oldenbyte. a place to settle",
 };
 
 export default function RootLayout({
