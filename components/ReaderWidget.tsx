@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Pencil, ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2 } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 type FileType = "pdf" | "epub";
 type ReaderConfig = { filename: string; fileType: FileType; displayName: string };
@@ -19,34 +20,51 @@ function PdfViewer({
   filename,
   page,
   onPageChange,
+  fullscreen = false,
 }: {
   filename: string;
   page: number;
   onPageChange: (p: number) => void;
+  fullscreen?: boolean;
 }) {
   const [numPages, setNumPages] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const ro = new ResizeObserver(([e]) => setWidth(Math.floor(e.contentRect.width)));
+    const ro = new ResizeObserver(([e]) => setSize({
+      width: Math.floor(e.contentRect.width),
+      height: Math.floor(e.contentRect.height),
+    }));
     ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, []);
 
+  // Keyboard nav in fullscreen
+  useEffect(() => {
+    if (!fullscreen) return;
+    function handler(e: KeyboardEvent) {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") onPageChange(Math.min(numPages, page + 1));
+      if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   onPageChange(Math.max(1, page - 1));
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [fullscreen, page, numPages, onPageChange]);
+
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-2">
-      <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden flex items-start justify-center">
-        {width > 0 && (
+      <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden flex items-center justify-center">
+        {size.width > 0 && size.height > 0 && (
           <Document
             file={`/api/files/${filename}`}
             onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-            loading={<Loader size={16} className="animate-spin opacity-40 mt-8" />}
+            loading={<Loader size={16} className="animate-spin opacity-40" />}
           >
             <Page
               pageNumber={page}
-              width={width}
+              height={size.height}
+              width={undefined}
               renderAnnotationLayer={false}
               renderTextLayer={false}
             />
@@ -59,9 +77,9 @@ function PdfViewer({
           disabled={page <= 1}
           className="text-neutral-400 hover:text-neutral-700 disabled:opacity-20"
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={fullscreen ? 20 : 16} />
         </button>
-        <span className="text-xs text-neutral-500 tabular-nums">
+        <span className={`text-neutral-500 tabular-nums ${fullscreen ? "text-sm" : "text-xs"}`}>
           {page} / {numPages || "…"}
         </span>
         <button
@@ -69,7 +87,7 @@ function PdfViewer({
           disabled={numPages > 0 && page >= numPages}
           className="text-neutral-400 hover:text-neutral-700 disabled:opacity-20"
         >
-          <ChevronRight size={16} />
+          <ChevronRight size={fullscreen ? 20 : 16} />
         </button>
       </div>
     </div>
@@ -82,10 +100,12 @@ function EpubViewer({
   filename,
   cfi,
   onLocationChange,
+  fullscreen = false,
 }: {
   filename: string;
   cfi: string;
   onLocationChange: (cfi: string) => void;
+  fullscreen?: boolean;
 }) {
   const viewerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,9 +143,19 @@ function EpubViewer({
       renditionRef.current?.destroy();
       renditionRef.current = null;
     };
-  // Only re-mount when the file changes, not on every cfi/callback change
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filename]);
+
+  // Keyboard nav in fullscreen
+  useEffect(() => {
+    if (!fullscreen) return;
+    function handler(e: KeyboardEvent) {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") renditionRef.current?.next();
+      if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   renditionRef.current?.prev();
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [fullscreen]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-2">
@@ -135,16 +165,81 @@ function EpubViewer({
           onClick={() => renditionRef.current?.prev()}
           className="text-neutral-400 hover:text-neutral-700"
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={fullscreen ? 20 : 16} />
         </button>
         <button
           onClick={() => renditionRef.current?.next()}
           className="text-neutral-400 hover:text-neutral-700"
         >
-          <ChevronRight size={16} />
+          <ChevronRight size={fullscreen ? 20 : 16} />
         </button>
       </div>
     </div>
+  );
+}
+
+// ── Fullscreen overlay ─────────────────────────────────────────────────────
+
+function FullscreenOverlay({
+  config,
+  position,
+  onPageChange,
+  onClose,
+}: {
+  config: ReaderConfig;
+  position: string;
+  onPageChange: (pos: string) => void;
+  onClose: () => void;
+}) {
+  // Close on Escape
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="relative bg-white rounded-2xl shadow-2xl flex flex-col"
+        style={{ width: "min(90vw, 800px)", height: "min(92vh, 1000px)" }}
+      >
+        {/* Overlay header */}
+        <div className="flex items-center justify-between px-5 py-3 shrink-0 border-b border-neutral-100">
+          <div>
+            <p className="text-sm font-medium text-neutral-700 truncate">{config.displayName}</p>
+            <span className="text-xs text-neutral-400 uppercase tracking-widest">{config.fileType}</span>
+          </div>
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 ml-4">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Reader */}
+        <div className="flex flex-1 min-h-0 p-4">
+          {config.fileType === "pdf" ? (
+            <PdfViewer
+              filename={config.filename}
+              page={parseInt(position) || 1}
+              onPageChange={p => onPageChange(String(p))}
+              fullscreen
+            />
+          ) : (
+            <EpubViewer
+              filename={config.filename}
+              cfi={position}
+              onLocationChange={onPageChange}
+              fullscreen
+            />
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -164,6 +259,7 @@ export default function ReaderWidget({
   const [config, setConfig] = useState<ReaderConfig | null>(null);
   const [position, setPosition] = useState("1");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -199,9 +295,8 @@ export default function ReaderWidget({
         fileType: ext as FileType,
         displayName: file.name.replace(/\.[^.]+$/, ""),
       };
-      const initialPosition = ext === "pdf" ? "1" : "";
       setConfig(newConfig);
-      setPosition(initialPosition);
+      setPosition(ext === "pdf" ? "1" : "");
       await storage.setItem(configKey, JSON.stringify(newConfig));
       await storage.removeItem(positionKey);
       setSettingsOpen(false);
@@ -241,7 +336,7 @@ export default function ReaderWidget({
         <>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-neutral-200 bg-white text-neutral-600 hover:text-neutral-900 hover:border-neutral-300`}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-neutral-200 bg-white text-neutral-600 hover:text-neutral-900 hover:border-neutral-300"
           >
             <Upload size={13} />
             {compact ? "Upload new file" : "Upload PDF or EPUB"}
@@ -267,63 +362,99 @@ export default function ReaderWidget({
   );
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${className}`}>
+    <>
+      <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${className}`}>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className="flex flex-col min-w-0">
-          <p className={`text-xs font-semibold tracking-widest uppercase truncate ${c.label}`}>
-            {config?.displayName ?? widget.title}
-          </p>
-          {config && (
-            <span className={`text-xs opacity-40 uppercase tracking-widest ${c.label}`}>
-              {config.fileType}
-            </span>
-          )}
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3 shrink-0">
+          <div className="flex flex-col min-w-0">
+            <p className={`text-xs font-semibold tracking-widest uppercase truncate ${c.label}`}>
+              {config?.displayName ?? widget.title}
+            </p>
+            {config && (
+              <span className={`text-xs opacity-40 uppercase tracking-widest ${c.label}`}>
+                {config.fileType}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0 ml-2">
+            {config && !settingsOpen && (
+              <button
+                onClick={() => setFullscreen(true)}
+                className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
+                title="Open full view"
+              >
+                <Maximize2 size={12} />
+              </button>
+            )}
+            {!settingsOpen && (
+              <button
+                onClick={() => { setSettingsOpen(true); setError(""); }}
+                className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
+                title="Settings"
+              >
+                <Pencil size={12} />
+              </button>
+            )}
+          </div>
         </div>
-        {!settingsOpen && (
-          <button
-            onClick={() => { setSettingsOpen(true); setError(""); }}
-            className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 shrink-0 ml-2 ${c.label}`}
-          >
-            <Pencil size={12} />
-          </button>
+
+        {settingsOpen ? (
+          <div className="flex flex-col gap-3 flex-1 min-h-0">
+            {uploadZone(true)}
+            <div className="flex items-center justify-between mt-auto">
+              <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Remove file">
+                <RotateCcw size={13} />
+              </button>
+              <button
+                onClick={() => { setSettingsOpen(false); setError(""); }}
+                className="text-neutral-400 hover:text-neutral-600"
+                title="Cancel"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        ) : config ? (
+          // In fullscreen mode, show a minimal placeholder in the widget
+          fullscreen ? (
+            <div className="flex-1 min-h-0 flex items-center justify-center">
+              <p className={`text-xs opacity-30 ${c.text}`}>reading in full view</p>
+            </div>
+          ) : (
+            <div
+              className="flex flex-col flex-1 min-h-0 cursor-pointer"
+              onClick={() => setFullscreen(true)}
+              title="Click to open full view"
+            >
+              {config.fileType === "pdf" ? (
+                <PdfViewer
+                  filename={config.filename}
+                  page={parseInt(position) || 1}
+                  onPageChange={p => savePosition(String(p))}
+                />
+              ) : (
+                <EpubViewer
+                  filename={config.filename}
+                  cfi={position}
+                  onLocationChange={savePosition}
+                />
+              )}
+            </div>
+          )
+        ) : (
+          uploadZone()
         )}
       </div>
 
-      {settingsOpen ? (
-        <div className="flex flex-col gap-3 flex-1 min-h-0">
-          {uploadZone(true)}
-          <div className="flex items-center justify-between mt-auto">
-            <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Remove file">
-              <RotateCcw size={13} />
-            </button>
-            <button
-              onClick={() => { setSettingsOpen(false); setError(""); }}
-              className="text-neutral-400 hover:text-neutral-600"
-              title="Cancel"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-      ) : config ? (
-        config.fileType === "pdf" ? (
-          <PdfViewer
-            filename={config.filename}
-            page={parseInt(position) || 1}
-            onPageChange={p => savePosition(String(p))}
-          />
-        ) : (
-          <EpubViewer
-            filename={config.filename}
-            cfi={position}
-            onLocationChange={savePosition}
-          />
-        )
-      ) : (
-        uploadZone()
+      {fullscreen && config && (
+        <FullscreenOverlay
+          config={config}
+          position={position}
+          onPageChange={savePosition}
+          onClose={() => setFullscreen(false)}
+        />
       )}
-    </div>
+    </>
   );
 }
