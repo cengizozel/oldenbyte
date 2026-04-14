@@ -353,7 +353,7 @@ export default function TopBar() {
     <div className="grid grid-cols-3 items-center">
       <EditableField
         storageKey="topbar-phrase"
-        defaultValue="a place to rest"
+        defaultValue="oldenbyte"
         className="text-sm text-neutral-600"
       />
       <div className="flex justify-center items-center h-12">
