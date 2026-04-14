@@ -107,12 +107,30 @@ function EpubViewer({
   onLocationChange: (cfi: string) => void;
   fullscreen?: boolean;
 }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renditionRef = useRef<any>(null);
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
 
+  // Measure wrapper once it has a real size
   useEffect(() => {
-    if (!viewerRef.current) return;
+    if (!wrapperRef.current) return;
+    let set = false;
+    const ro = new ResizeObserver(([e]) => {
+      const { width, height } = e.contentRect;
+      if (width > 0 && height > 0 && !set) {
+        set = true;
+        setDims({ w: Math.floor(width), h: Math.floor(height) });
+      }
+    });
+    ro.observe(wrapperRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  // Init epubjs once pixel dimensions are known
+  useEffect(() => {
+    if (!dims || !viewerRef.current) return;
     let active = true;
 
     import("epubjs").then(({ default: Epub }) => {
@@ -120,17 +138,12 @@ function EpubViewer({
 
       const book = Epub(`/api/files/${filename}`);
       const rendition = book.renderTo(viewerRef.current, {
-        width: "100%",
-        height: "100%",
+        width: dims.w,
+        height: dims.h,
         flow: "paginated",
       });
       renditionRef.current = rendition;
-
-      if (cfi) {
-        rendition.display(cfi);
-      } else {
-        rendition.display();
-      }
+      rendition.display(cfi || undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       rendition.on("relocated", (location: any) => {
@@ -144,7 +157,7 @@ function EpubViewer({
       renditionRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filename]);
+  }, [filename, dims]);
 
   // Keyboard nav in fullscreen
   useEffect(() => {
@@ -159,16 +172,19 @@ function EpubViewer({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-2">
-      <div ref={viewerRef} className="flex-1 min-h-0 overflow-hidden rounded-xl" />
+      {/* wrapperRef measures available space; viewerRef is the epubjs mount target */}
+      <div ref={wrapperRef} className="flex-1 min-h-0 relative overflow-hidden rounded-xl">
+        <div ref={viewerRef} className="absolute inset-0" />
+      </div>
       <div className="flex items-center justify-center gap-4 shrink-0">
         <button
-          onClick={() => renditionRef.current?.prev()}
+          onClick={e => { e.stopPropagation(); renditionRef.current?.prev(); }}
           className="text-neutral-400 hover:text-neutral-700"
         >
           <ChevronLeft size={fullscreen ? 20 : 16} />
         </button>
         <button
-          onClick={() => renditionRef.current?.next()}
+          onClick={e => { e.stopPropagation(); renditionRef.current?.next(); }}
           className="text-neutral-400 hover:text-neutral-700"
         >
           <ChevronRight size={fullscreen ? 20 : 16} />
