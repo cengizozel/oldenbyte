@@ -150,10 +150,36 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
   }
 
   return (
+    <>
+    {/* Fixed shelf — outside the flex column so it never shifts children indices */}
+    {editing && (
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-neutral-200 rounded-2xl shadow-lg px-3 py-2.5">
+        {widgets.map(template => {
+          const c = colorMap[template.color];
+          return (
+            <div
+              key={template.id}
+              draggable
+              onDragStart={() => {
+                const id = `${template.id}-${Date.now()}`;
+                setInstances(prev => ({ ...prev, [id]: { ...template, id } }));
+                setDroppingId(id);
+              }}
+              onDragEnd={() => setDroppingId(null)}
+              onClick={() => addWidget(template)}
+              className={`flex flex-col gap-0.5 px-3 py-2 rounded-xl border cursor-grab select-none ${c.bg} ${c.border}`}
+            >
+              <span className={`text-xs font-semibold ${c.label}`}>{template.title}</span>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
     <div className="flex flex-col flex-1 min-h-0 gap-2">
 
-      {/* Edit toggle */}
-      <div className="flex items-center justify-end gap-3">
+      {/* Edit controls — fixed height so the grid container never shifts */}
+      <div className="h-6 flex items-center justify-end gap-3 shrink-0">
         {editing && (
           <button
             onClick={async () => {
@@ -177,31 +203,6 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
           {editing ? <Check size={15} /> : <LayoutGrid size={15} />}
         </button>
       </div>
-
-      {/* Fixed shelf — viewport-anchored so it never affects layout */}
-      {editing && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-neutral-200 rounded-2xl shadow-lg px-3 py-2.5">
-          {widgets.map(template => {
-            const c = colorMap[template.color];
-            return (
-              <div
-                key={template.id}
-                draggable
-                onDragStart={() => {
-                  const id = `${template.id}-${Date.now()}`;
-                  setInstances(prev => ({ ...prev, [id]: { ...template, id } }));
-                  setDroppingId(id);
-                }}
-                onDragEnd={() => setDroppingId(null)}
-                onClick={() => addWidget(template)}
-                className={`flex flex-col gap-0.5 px-3 py-2 rounded-xl border cursor-grab select-none ${c.bg} ${c.border}`}
-              >
-                <span className={`text-xs font-semibold ${c.label}`}>{template.title}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {/* Grid */}
       <div ref={containerRef} className="flex-1 min-h-0">
@@ -266,6 +267,7 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
               return (
                 <div
                   key={item.i}
+                  className="min-h-0 overflow-hidden"
                   style={{
                     gridColumn: `${item.x + 1} / span ${item.w}`,
                     gridRow: `${item.y + 1} / span ${item.h}`,
@@ -280,5 +282,6 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
       </div>
 
     </div>
+    </>
   );
 }

@@ -67,18 +67,14 @@ export default function NotebookWidget({
   return (
     <div className={`rounded-2xl border p-5 flex flex-col h-full ${c.bg} ${c.border} ${className}`}>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <p className={`text-xs font-semibold tracking-widest uppercase ${c.label}`}>
-          {widget.title}
-        </p>
-      </div>
-
-      {/* Body: textarea + calendar side by side */}
+      {/* Body: textarea + calendar side by side, title above textarea */}
       <div className="flex gap-3 flex-1 min-h-0">
 
-        {/* Textarea */}
+        {/* Left: title + textarea */}
         <div className="flex flex-col flex-1 min-h-0">
+          <p className={`text-xs font-semibold tracking-widest uppercase mb-3 shrink-0 ${c.label}`}>
+            {widget.title}
+          </p>
           {!isToday && (
             <p className={`text-xs mb-1.5 opacity-50 ${c.label}`}>
               {new Date(viewDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
