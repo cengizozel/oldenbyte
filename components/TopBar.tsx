@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Pencil, Check, Loader, X, RotateCcw } from "lucide-react";
+import * as storage from "@/lib/storage";
 
 // ── EditableField ─────────────────────────────────────────────────────────
 
@@ -27,18 +28,19 @@ function EditableField({
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
+    storage.getItem(storageKey).then(saved => {
       if (!saved) return;
-      const parsed: FieldConfig = JSON.parse(saved);
-      setConfig(parsed);
-      setDraft(parsed);
-      if (parsed.type === "text") {
-        setDisplay(parsed.value || defaultValue);
-      } else {
-        fetchAndSet(parsed.value);
-      }
-    } catch {}
+      try {
+        const parsed: FieldConfig = JSON.parse(saved);
+        setConfig(parsed);
+        setDraft(parsed);
+        if (parsed.type === "text") {
+          setDisplay(parsed.value || defaultValue);
+        } else {
+          fetchAndSet(parsed.value);
+        }
+      } catch {}
+    });
   }, [storageKey]);
 
   useEffect(() => {
@@ -66,7 +68,7 @@ function EditableField({
     }
   }
 
-  async function handleSave() {
+  async function handleSave(): Promise<void> {
     setError("");
     if (draft.type === "url") {
       if (!draft.value.startsWith("http")) {
@@ -85,7 +87,7 @@ function EditableField({
     }
     const next = { type: draft.type, value: draft.value };
     setConfig(next);
-    localStorage.setItem(storageKey, JSON.stringify(next));
+    await storage.setItem(storageKey, JSON.stringify(next));
     setOpen(false);
   }
 
@@ -136,8 +138,8 @@ function EditableField({
 
           <div className="flex items-center justify-between mt-3">
             <button
-              onClick={() => {
-                localStorage.removeItem(storageKey);
+              onClick={async () => {
+                await storage.removeItem(storageKey);
                 setDisplay(defaultValue);
                 setConfig({ type: "text", value: defaultValue });
                 setOpen(false);
@@ -261,8 +263,9 @@ function DateDisplay() {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("topbar-date-format") as DateFormat | null;
-    if (saved) { setFormat(saved); setDraft(saved); }
+    storage.getItem("topbar-date-format").then(saved => {
+      if (saved) { setFormat(saved as DateFormat); setDraft(saved as DateFormat); }
+    });
   }, []);
 
   useEffect(() => {
@@ -279,16 +282,16 @@ function DateDisplay() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  function handleSave() {
+  async function handleSave() {
     setFormat(draft);
-    localStorage.setItem("topbar-date-format", draft);
+    await storage.setItem("topbar-date-format", draft);
     setOpen(false);
   }
 
-  function handleReset() {
+  async function handleReset() {
     setFormat("date-long");
     setDraft("date-long");
-    localStorage.removeItem("topbar-date-format");
+    await storage.removeItem("topbar-date-format");
     setOpen(false);
   }
 

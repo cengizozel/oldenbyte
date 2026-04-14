@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { colorMap, type Widget } from "@/lib/widgets";
+import * as storage from "@/lib/storage";
 
 function toDateStr(date: Date) {
   return date.toISOString().split("T")[0]; // YYYY-MM-DD
@@ -35,16 +36,19 @@ export default function NotebookWidget({
   const [calMonth, setCalMonth] = useState(new Date());
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
+    storage.getItem(storageKey).then(saved => {
       if (saved) setNotesByDate(JSON.parse(saved));
-    } catch {}
+    });
   }, [storageKey]);
 
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const updated = { ...notesByDate, [today]: e.target.value };
     setNotesByDate(updated);
-    localStorage.setItem(storageKey, JSON.stringify(updated));
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      storage.setItem(storageKey, JSON.stringify(updated));
+    }, 600);
   }
 
   const isToday = viewDate === today;

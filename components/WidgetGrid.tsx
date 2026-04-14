@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import * as storage from "@/lib/storage";
 import { LayoutGrid, Check, RotateCcw } from "lucide-react";
 import GridLayout from "react-grid-layout";
 import type { Layout as LayoutItem } from "react-grid-layout";
@@ -37,27 +38,29 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
     () => Object.fromEntries(widgets.map(w => [w.id, w]))
   );
 
-  // Load persisted layout from localStorage after hydration
+  // Load persisted layout from DB after hydration
   useEffect(() => {
-    try {
-      const savedLayout = localStorage.getItem("widget-layout");
-      const savedInstances = localStorage.getItem("widget-instances");
-      if (savedInstances) {
-        const parsed: Record<string, Widget> = JSON.parse(savedInstances);
-        // Drop any instances with colors no longer in colorMap
-        const clean = Object.fromEntries(
-          Object.entries(parsed).filter(([, w]) => colorMap[w.color] !== undefined)
-        );
-        const validIds = new Set(Object.keys(clean));
-        setInstances(clean);
-        if (savedLayout) {
-          const parsedLayout = JSON.parse(savedLayout);
-          setLayout(parsedLayout.filter((l: LayoutItem) => validIds.has(l.i)));
+    Promise.all([
+      storage.getItem("widget-layout"),
+      storage.getItem("widget-instances"),
+    ]).then(([savedLayout, savedInstances]) => {
+      try {
+        if (savedInstances) {
+          const parsed: Record<string, Widget> = JSON.parse(savedInstances);
+          const clean = Object.fromEntries(
+            Object.entries(parsed).filter(([, w]) => colorMap[w.color] !== undefined)
+          );
+          const validIds = new Set(Object.keys(clean));
+          setInstances(clean);
+          if (savedLayout) {
+            const parsedLayout = JSON.parse(savedLayout);
+            setLayout(parsedLayout.filter((l: LayoutItem) => validIds.has(l.i)));
+          }
+        } else if (savedLayout) {
+          setLayout(JSON.parse(savedLayout));
         }
-      } else if (savedLayout) {
-        setLayout(JSON.parse(savedLayout));
-      }
-    } catch {}
+      } catch {}
+    });
   }, []);
 
   const [droppingId, setDroppingId] = useState<string | null>(null);
@@ -77,11 +80,11 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("widget-layout", JSON.stringify(layout));
+    storage.setItem("widget-layout", JSON.stringify(layout));
   }, [layout]);
 
   useEffect(() => {
-    localStorage.setItem("widget-instances", JSON.stringify(instances));
+    storage.setItem("widget-instances", JSON.stringify(instances));
   }, [instances]);
 
   const numRows = Math.max(...layout.map(l => l.y + l.h), 1);
@@ -149,10 +152,10 @@ export default function WidgetGrid({ widgets }: { widgets: Widget[] }) {
       <div className="flex items-center justify-end gap-3">
         {editing && (
           <button
-            onClick={() => {
+            onClick={async () => {
               if (!confirm("Reset the widget layout to default?")) return;
-              localStorage.removeItem("widget-layout");
-              localStorage.removeItem("widget-instances");
+              await storage.removeItem("widget-layout");
+              await storage.removeItem("widget-instances");
               setLayout(initialLayout);
               setInstances(Object.fromEntries(widgets.map(w => [w.id, w])));
             }}

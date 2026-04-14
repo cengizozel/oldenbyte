@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Pencil, Check, X, RotateCcw, Loader } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
+import * as storage from "@/lib/storage";
 
 type RssItem = { title: string; link: string; pubDate: string };
 type RssConfig = { url: string; limit: number };
@@ -29,22 +30,23 @@ export default function RssWidget({
   const [draft, setDraft] = useState<RssConfig>(DEFAULT);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
+    storage.getItem(storageKey).then(async saved => {
       if (!saved) return;
-      const parsed: RssConfig = JSON.parse(saved);
-      setConfig(parsed);
-      setDraft(parsed);
-      if (!parsed.url) return;
+      try {
+        const parsed: RssConfig = JSON.parse(saved);
+        setConfig(parsed);
+        setDraft(parsed);
+        if (!parsed.url) return;
 
-      const cacheKey = `${storageKey}-${today}`;
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        setItems(JSON.parse(cached));
-      } else {
-        fetchFeed(parsed.url, parsed.limit, cacheKey);
-      }
-    } catch {}
+        const cacheKey = `${storageKey}-${today}`;
+        const cached = await storage.getItem(cacheKey);
+        if (cached) {
+          setItems(JSON.parse(cached));
+        } else {
+          fetchFeed(parsed.url, parsed.limit, cacheKey);
+        }
+      } catch {}
+    });
   }, [storageKey]);
 
   async function fetchFeed(url: string, limit: number, cacheKey: string): Promise<boolean> {
@@ -56,7 +58,7 @@ export default function RssWidget({
       const data: RssItem[] = await res.json();
       if (!Array.isArray(data) || !data.length) throw new Error("No items found.");
       setItems(data);
-      localStorage.setItem(cacheKey, JSON.stringify(data));
+      await storage.setItem(cacheKey, JSON.stringify(data));
       return true;
     } catch {
       setError("Failed to load feed. Check the URL.");
@@ -76,13 +78,13 @@ export default function RssWidget({
     const ok = await fetchFeed(draft.url, draft.limit, cacheKey);
     if (ok) {
       setConfig(draft);
-      localStorage.setItem(storageKey, JSON.stringify(draft));
+      await storage.setItem(storageKey, JSON.stringify(draft));
       setSettingsOpen(false);
     }
   }
 
-  function handleReset() {
-    localStorage.removeItem(storageKey);
+  async function handleReset() {
+    await storage.removeItem(storageKey);
     setConfig(DEFAULT);
     setDraft(DEFAULT);
     setItems([]);

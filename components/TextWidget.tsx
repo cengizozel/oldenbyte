@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Pencil } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
+import * as storage from "@/lib/storage";
 
 type FontFamily = "sans" | "serif" | "mono";
 type SourceConfig = { type: "text" | "url"; value: string };
@@ -48,18 +49,19 @@ export default function TextWidget({
   const textRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
+    storage.getItem(storageKey).then(saved => {
       if (!saved) return;
-      const parsed: TextWidgetConfig = JSON.parse(saved);
-      setConfig(parsed);
-      setDraft(parsed);
-      if (parsed.source.type === "text") {
-        setDisplay(parsed.source.value);
-      } else {
-        fetchAndSet(parsed.source.value);
-      }
-    } catch {}
+      try {
+        const parsed: TextWidgetConfig = JSON.parse(saved);
+        setConfig(parsed);
+        setDraft(parsed);
+        if (parsed.source.type === "text") {
+          setDisplay(parsed.source.value);
+        } else {
+          fetchAndSet(parsed.source.value);
+        }
+      } catch {}
+    });
   }, [storageKey]);
 
   async function fetchAndSet(url: string): Promise<string | null> {
@@ -139,7 +141,7 @@ export default function TextWidget({
       setDisplay(draft.source.value);
     }
     setConfig(draft);
-    localStorage.setItem(storageKey, JSON.stringify(draft));
+    await storage.setItem(storageKey, JSON.stringify(draft));
     setSettingsOpen(false);
   }
 

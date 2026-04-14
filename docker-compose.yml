@@ -4,6 +4,10 @@ services:
     ports:
       - "3847:3000"
     restart: unless-stopped
+    environment:
+      - DATABASE_URL=file:/app/data/db.sqlite
+    volumes:
+      - ./data:/app/data
 
   watchtower:
     image: containrrr/watchtower
