@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     environment:
       - DATABASE_URL=file:/app/data/db.sqlite
+      - UPLOADS_DIR=/app/data/uploads
     volumes:
       - ./data:/app/data
 

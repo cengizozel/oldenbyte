@@ -35,8 +35,8 @@ export const widgets: Widget[] = [
     id: "ebook",
     type: "ebook",
     color: "sky",
-    title: "Ebook",
-    description: "A saved reading spot.",
+    title: "Reader",
+    description: "Read a PDF or EPUB file.",
   },
   {
     id: "text",

@@ -13,6 +13,8 @@ import WidgetCard from "./WidgetCard";
 import NotebookWidget from "./NotebookWidget";
 import TextWidget from "./TextWidget";
 import RssWidget from "./RssWidget";
+import dynamic from "next/dynamic";
+const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 
 const COLS = 2;
 const GAP = 16;
@@ -27,6 +29,7 @@ function renderWidget(widget: Widget) {
   if (widget.type === "notebook") return <NotebookWidget widget={widget} className="h-full" />;
   if (widget.type === "text")     return <TextWidget     widget={widget} className="h-full" />;
   if (widget.type === "rss")      return <RssWidget      widget={widget} className="h-full" />;
+  if (widget.type === "ebook")    return <ReaderWidget   widget={widget} className="h-full" />;
   return <WidgetCard widget={widget} className="h-full" />;
 }
 
