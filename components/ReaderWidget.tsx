@@ -71,24 +71,34 @@ function PdfViewer({
           </Document>
         )}
       </div>
-      <div className="flex items-center justify-center gap-4 shrink-0">
-        <button
-          onClick={() => onPageChange(Math.max(1, page - 1))}
-          disabled={page <= 1}
-          className="text-neutral-400 hover:text-neutral-700 disabled:opacity-20"
-        >
-          <ChevronLeft size={fullscreen ? 20 : 16} />
-        </button>
-        <span className={`text-neutral-500 tabular-nums ${fullscreen ? "text-sm" : "text-xs"}`}>
-          {page} / {numPages || "…"}
-        </span>
-        <button
-          onClick={() => onPageChange(Math.min(numPages, page + 1))}
-          disabled={numPages > 0 && page >= numPages}
-          className="text-neutral-400 hover:text-neutral-700 disabled:opacity-20"
-        >
-          <ChevronRight size={fullscreen ? 20 : 16} />
-        </button>
+      <div className="flex flex-col gap-1.5 shrink-0">
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={() => onPageChange(Math.max(1, page - 1))}
+            disabled={page <= 1}
+            className="text-neutral-400 hover:text-neutral-700 disabled:opacity-20"
+          >
+            <ChevronLeft size={fullscreen ? 20 : 16} />
+          </button>
+          <span className={`text-neutral-500 tabular-nums ${fullscreen ? "text-sm" : "text-xs"}`}>
+            {page} / {numPages || "…"}
+          </span>
+          <button
+            onClick={() => onPageChange(Math.min(numPages, page + 1))}
+            disabled={numPages > 0 && page >= numPages}
+            className="text-neutral-400 hover:text-neutral-700 disabled:opacity-20"
+          >
+            <ChevronRight size={fullscreen ? 20 : 16} />
+          </button>
+        </div>
+        {numPages > 0 && (
+          <div className="w-full h-0.5 bg-neutral-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-neutral-400 rounded-full transition-all duration-300"
+              style={{ width: `${(page / numPages) * 100}%` }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -111,8 +121,12 @@ function EpubViewer({
   const viewerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renditionRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bookRef = useRef<any>(null);
+  const lastCfiRef = useRef<string>("");
   const dimsRef = useRef<{ w: number; h: number } | null>(null);
   const [dimsReady, setDimsReady] = useState(false);
+  const [percentage, setPercentage] = useState<number | null>(null);
 
   // Measure on every resize; call rendition.resize() directly — no state re-render needed
   useEffect(() => {
@@ -144,6 +158,7 @@ function EpubViewer({
       if (!active || !viewerRef.current || !dimsRef.current) return;
 
       const book = Epub(`/api/files/${filename}`);
+      bookRef.current = book;
       const rendition = book.renderTo(viewerRef.current, {
         width: dimsRef.current.w,
         height: dimsRef.current.h,
@@ -154,7 +169,34 @@ function EpubViewer({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       rendition.on("relocated", (location: any) => {
+        lastCfiRef.current = location.start.cfi;
         onLocationChange(location.start.cfi);
+        const pct = book.locations.percentageFromCfi?.(location.start.cfi);
+        if (pct != null) setPercentage(Math.round(pct * 100));
+      });
+
+      // Generate locations for accurate percentage — cached in localStorage
+      book.ready.then(() => {
+        if (!active) return;
+        const cacheKey = `epub-locs-v1-${filename}`;
+        const cached = localStorage.getItem(cacheKey);
+
+        function refreshPct() {
+          if (!active || !lastCfiRef.current) return;
+          const pct = book.locations.percentageFromCfi(lastCfiRef.current);
+          if (pct != null) setPercentage(Math.round(pct * 100));
+        }
+
+        if (cached) {
+          book.locations.load(cached);
+          refreshPct();
+        } else {
+          book.locations.generate(1600).then(() => {
+            if (!active) return;
+            try { localStorage.setItem(cacheKey, book.locations.save()); } catch {}
+            refreshPct();
+          });
+        }
       });
     });
 
@@ -162,6 +204,8 @@ function EpubViewer({
       active = false;
       renditionRef.current?.destroy();
       renditionRef.current = null;
+      bookRef.current = null;
+      lastCfiRef.current = "";
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filename, dimsReady]);
@@ -183,19 +227,32 @@ function EpubViewer({
       <div ref={wrapperRef} className="flex-1 min-h-0 relative overflow-hidden rounded-xl">
         <div ref={viewerRef} className="absolute inset-0" />
       </div>
-      <div className="flex items-center justify-center gap-4 shrink-0">
-        <button
-          onClick={e => { e.stopPropagation(); renditionRef.current?.prev(); }}
-          className="text-neutral-400 hover:text-neutral-700"
-        >
-          <ChevronLeft size={fullscreen ? 20 : 16} />
-        </button>
-        <button
-          onClick={e => { e.stopPropagation(); renditionRef.current?.next(); }}
-          className="text-neutral-400 hover:text-neutral-700"
-        >
-          <ChevronRight size={fullscreen ? 20 : 16} />
-        </button>
+      <div className="flex flex-col gap-1.5 shrink-0">
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={e => { e.stopPropagation(); renditionRef.current?.prev(); }}
+            className="text-neutral-400 hover:text-neutral-700"
+          >
+            <ChevronLeft size={fullscreen ? 20 : 16} />
+          </button>
+          <span className={`text-neutral-500 tabular-nums ${fullscreen ? "text-sm" : "text-xs"}`}>
+            {percentage !== null ? `${percentage}%` : "…"}
+          </span>
+          <button
+            onClick={e => { e.stopPropagation(); renditionRef.current?.next(); }}
+            className="text-neutral-400 hover:text-neutral-700"
+          >
+            <ChevronRight size={fullscreen ? 20 : 16} />
+          </button>
+        </div>
+        {percentage !== null && (
+          <div className="w-full h-0.5 bg-neutral-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-neutral-400 rounded-full transition-all duration-300"
+              style={{ width: `${percentage}%` }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
