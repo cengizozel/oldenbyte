@@ -111,6 +111,18 @@ export default function RedditWidget({
   const [draft, setDraft]               = useState<RedditConfig>(DEFAULT);
   const [subInput, setSubInput]         = useState("");
   const [selected, setSelected]         = useState<Post | null>(null);
+  const [listShowFade, setListShowFade]           = useState(false);
+  const [listShowTopFade, setListShowTopFade]     = useState(false);
+  const [detailShowFade, setDetailShowFade]       = useState(false);
+  const [detailShowTopFade, setDetailShowTopFade] = useState(false);
+  const listScrollRef   = useRef<HTMLDivElement>(null);
+  const detailScrollRef = useRef<HTMLDivElement>(null);
+
+  function checkFade(el: HTMLDivElement, setBottom: (v: boolean) => void, setTop: (v: boolean) => void) {
+    const overflows = el.scrollHeight > el.clientHeight + 1;
+    setBottom(overflows && el.scrollHeight - el.scrollTop - el.clientHeight > 20);
+    setTop(overflows && el.scrollTop > 20);
+  }
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -138,6 +150,26 @@ export default function RedditWidget({
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
+
+  useEffect(() => {
+    const el = listScrollRef.current;
+    if (!el) return;
+    checkFade(el, setListShowFade, setListShowTopFade);
+    const ro = new ResizeObserver(() => checkFade(el, setListShowFade, setListShowTopFade));
+    ro.observe(el);
+    return () => ro.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts]);
+
+  useEffect(() => {
+    const el = detailScrollRef.current;
+    if (!el) return;
+    checkFade(el, setDetailShowFade, setDetailShowTopFade);
+    const ro = new ResizeObserver(() => checkFade(el, setDetailShowFade, setDetailShowTopFade));
+    ro.observe(el);
+    return () => ro.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   function cacheKeyFor(cfg: RedditConfig) {
     return `${storageKey}-v2-${today}-${cfg.subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
@@ -321,7 +353,7 @@ export default function RedditWidget({
 
           {/* Post list */}
           <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
-            <div className="absolute inset-0 overflow-y-auto pr-3">
+            <div ref={listScrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget, setListShowFade, setListShowTopFade)}>
               {loading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
@@ -370,7 +402,10 @@ export default function RedditWidget({
                 </p>
               )}
             </div>
-            {posts.length > 0 && (
+            {listShowTopFade && (
+              <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
+            )}
+            {listShowFade && (
               <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
             )}
           </div>
@@ -388,7 +423,7 @@ export default function RedditWidget({
                     <ExternalLink size={11} />
                   </a>
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto pr-3">
+                <div ref={detailScrollRef} className="flex-1 min-h-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget, setDetailShowFade, setDetailShowTopFade)}>
                   {sanitizeRedditHtml(selected.content) ? (
                     <div
                       className={`text-sm leading-relaxed ${c.text} opacity-80
@@ -407,6 +442,12 @@ export default function RedditWidget({
                     <p className={`text-xs opacity-40 ${c.text}`}>No text content — this is a link post.</p>
                   )}
                 </div>
+                {detailShowTopFade && (
+                  <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
+                )}
+                {detailShowFade && (
+                  <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
+                )}
               </>
             )}
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Pencil, Check, X, RotateCcw, Loader } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -31,9 +31,28 @@ export default function RssWidget({
   const [config, setConfig] = useState<RssConfig>(DEFAULT);
   const [items, setItems] = useState<RssItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showBottomFade, setShowBottomFade] = useState(false);
+  const [showTopFade, setShowTopFade] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  function checkFade(el: HTMLDivElement) {
+    const overflows = el.scrollHeight > el.clientHeight + 1;
+    setShowBottomFade(overflows && el.scrollHeight - el.scrollTop - el.clientHeight > 20);
+    setShowTopFade(overflows && el.scrollTop > 20);
+  }
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<RssConfig>(DEFAULT);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    checkFade(el);
+    const ro = new ResizeObserver(() => checkFade(el));
+    ro.observe(el);
+    return () => ro.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -197,7 +216,7 @@ export default function RssWidget({
         </div>
       ) : (
         <div className="flex-1 min-h-0 relative">
-          <div className="absolute inset-0 overflow-y-auto">
+          <div ref={scrollRef} className="absolute inset-0 overflow-y-auto" onScroll={e => checkFade(e.currentTarget)}>
             {loading ? (
               <div className="flex items-center justify-center h-full">
                 <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
@@ -221,8 +240,10 @@ export default function RssWidget({
               <p className={`text-xs opacity-45 ${c.text}`}>hover and click the pencil to add an RSS feed URL</p>
             )}
           </div>
-          {/* Fade hint — only visible when there's content to scroll */}
-          {items.length > 0 && (
+          {showTopFade && (
+            <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
+          )}
+          {showBottomFade && (
             <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
           )}
         </div>

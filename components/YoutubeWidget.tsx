@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Pencil, Check, X, RotateCcw, Loader, Plus } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -49,6 +49,15 @@ export default function YoutubeWidget({
 
   const [config, setConfig]             = useState<YoutubeConfig>(DEFAULT);
   const [videos, setVideos]             = useState<Video[]>([]);
+  const [showBottomFade, setShowBottomFade] = useState(false);
+  const [showTopFade, setShowTopFade]       = useState(false);
+  const scrollRef                           = useRef<HTMLDivElement>(null);
+
+  function checkFade(el: HTMLDivElement) {
+    const overflows = el.scrollHeight > el.clientHeight + 1;
+    setShowBottomFade(overflows && el.scrollHeight - el.scrollTop - el.clientHeight > 20);
+    setShowTopFade(overflows && el.scrollTop > 20);
+  }
   const [loading, setLoading]           = useState(false);
   const [resolving, setResolving]       = useState(false);
   const [error, setError]               = useState("");
@@ -80,6 +89,16 @@ export default function YoutubeWidget({
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    checkFade(el);
+    const ro = new ResizeObserver(() => checkFade(el));
+    ro.observe(el);
+    return () => ro.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videos]);
 
   function cacheKeyFor(cfg: YoutubeConfig) {
     return `${storageKey}-${today}-${cfg.channels.map(ch => `${ch.channelId}:${ch.limit}`).join(",")}`;
@@ -252,7 +271,7 @@ export default function YoutubeWidget({
         </div>
       ) : (
         <div className="flex-1 min-h-0 relative">
-          <div className="absolute inset-0 overflow-y-auto pr-3">
+          <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget)}>
             {loading ? (
               <div className="flex items-center justify-center h-full">
                 <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
@@ -289,7 +308,10 @@ export default function YoutubeWidget({
               </p>
             )}
           </div>
-          {videos.length > 0 && (
+          {showTopFade && (
+            <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
+          )}
+          {showBottomFade && (
             <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
           )}
         </div>
