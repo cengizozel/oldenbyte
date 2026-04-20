@@ -10,15 +10,34 @@ type SubEntry = { name: string; limit: number; period: Period };
 type RedditConfig = { subreddits: SubEntry[] };
 type Post = { title: string; link: string; subreddit: string; pubDate: string; content: string };
 
-function stripHtml(html: string | undefined): string {
-  if (!html) return "";
-  return html
-    .replace(/<!-- SC_OFF -->[\s\S]*?<!-- SC_ON -->/g, m => m.replace(/<!-- SC_(?:OFF|ON) -->/g, ""))
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
-    .replace(/&#\d+;/g, " ")
-    .replace(/\s+/g, " ").trim();
+function sanitizeRedditHtml(raw: string | undefined): string {
+  if (!raw) return "";
+  try {
+    // Reddit RSS entity-encodes the HTML body — decode it first
+    const ta = document.createElement("textarea");
+    ta.innerHTML = raw;
+    const decoded = ta.value;
+    const doc = new DOMParser().parseFromString(decoded, "text/html");
+    const mdDiv = doc.querySelector(".md");
+    if (!mdDiv) return "";
+  const ALLOWED = new Set(["p","em","strong","b","i","ol","ul","li","hr","a","blockquote","code","pre","br"]);
+  function walk(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE)
+      return (node.textContent ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const el = node as Element;
+    const tag = el.tagName.toLowerCase();
+    const children = Array.from(el.childNodes).map(walk).join("");
+    if (tag === "hr" || tag === "br") return `<${tag}/>`;
+    if (!ALLOWED.has(tag)) return children;
+    if (tag === "a") {
+      const href = el.getAttribute("href") ?? "";
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${children}</a>`;
+    }
+    return `<${tag}>${children}</${tag}>`;
+  }
+    return Array.from(mdDiv.childNodes).map(walk).join("");
+  } catch { return ""; }
 }
 
 const DEFAULT: RedditConfig = { subreddits: [] };
@@ -121,7 +140,7 @@ export default function RedditWidget({
   }, [storageKey]);
 
   function cacheKeyFor(cfg: RedditConfig) {
-    return `${storageKey}-${today}-${cfg.subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
+    return `${storageKey}-v2-${today}-${cfg.subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
   }
 
   async function fetchPosts(cfg: RedditConfig, cacheKey: string): Promise<boolean> {
@@ -369,9 +388,21 @@ export default function RedditWidget({
                     <ExternalLink size={11} />
                   </a>
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                  {stripHtml(selected.content) ? (
-                    <p className={`text-sm leading-relaxed ${c.text} opacity-80`}>{stripHtml(selected.content)}</p>
+                <div className="flex-1 min-h-0 overflow-y-auto pr-3">
+                  {sanitizeRedditHtml(selected.content) ? (
+                    <div
+                      className={`text-sm leading-relaxed ${c.text} opacity-80
+                        [&_p]:mb-2 [&_p:last-child]:mb-0
+                        [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-2
+                        [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-2
+                        [&_li]:mb-0.5
+                        [&_hr]:my-3 [&_hr]:border-black/10
+                        [&_a]:underline [&_a]:opacity-70 [&_a:hover]:opacity-100
+                        [&_blockquote]:pl-3 [&_blockquote]:border-l-2 [&_blockquote]:border-current/30 [&_blockquote]:italic [&_blockquote]:opacity-70
+                        [&_code]:font-mono [&_code]:text-xs [&_code]:bg-black/5 [&_code]:px-1 [&_code]:rounded
+                        [&_strong]:font-semibold [&_em]:italic`}
+                      dangerouslySetInnerHTML={{ __html: sanitizeRedditHtml(selected.content) }}
+                    />
                   ) : (
                     <p className={`text-xs opacity-40 ${c.text}`}>No text content — this is a link post.</p>
                   )}
