@@ -248,7 +248,10 @@ export default function RedditWidget({
 
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
-        <span className={`opacity-50 ${c.label}`}><Flame size={14} /></span>
+        <div className={`flex items-center gap-1.5 ${c.label}`}>
+          <span className="opacity-50"><Flame size={14} /></span>
+          <span className="text-xs font-medium opacity-60">Reddit</span>
+        </div>
         {!settingsOpen && (
           <button
             onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
