@@ -2,8 +2,6 @@
 
 A personal dashboard built with Next.js. Widgets are draggable, resizable, and persist their state to a local SQLite database. Responsive for mobile portrait view.
 
-While tools like Glance or Dashy are great read-only status boards, oldenbyte is closer to a personal workspace — the layout is freeform, content is interactive (Reddit posts open inline, EPUBs and PDFs are readable inside the widget), and there's a notepad with full date history.
-
 ![screenshot](public/screenshot.png)
 
 ## Widgets
