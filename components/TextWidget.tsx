@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Pencil, Type } from "lucide-react";
+import { Pencil, Type, Check, X, Loader } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
@@ -165,78 +165,80 @@ export default function TextWidget({
       {settingsOpen ? (
         /* Settings panel */
         <div className="flex flex-col gap-3 flex-1 min-h-0">
+          <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-1">
 
-          {/* Source type toggle */}
-          <div className="flex gap-1">
-            {(["text", "url"] as const).map(t => (
-              <button
-                key={t}
-                onClick={() => setDraft(d => ({ ...d, source: { ...d.source, type: t } }))}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  draft.source.type === t
-                    ? "bg-white text-neutral-700 shadow-sm"
-                    : "text-neutral-400 hover:text-neutral-600"
-                }`}
-              >
-                {t === "text" ? "Text" : "API URL"}
-              </button>
-            ))}
-          </div>
-
-          {/* Input */}
-          <input
-            autoFocus
-            type={draft.source.type === "url" ? "url" : "text"}
-            value={draft.source.value}
-            onChange={e => setDraft(d => ({ ...d, source: { ...d.source, value: e.target.value } }))}
-            onKeyDown={e => e.key === "Enter" && handleSave()}
-            placeholder={draft.source.type === "url" ? "https://..." : "Enter any text…"}
-            className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
-          />
-
-          {/* Font picker */}
-          <div>
-            <p className={`text-xs mb-1.5 opacity-50 ${c.label}`}>Font</p>
-            <div className="flex gap-1.5">
-              {(["sans", "serif", "mono"] as FontFamily[]).map(f => (
+            {/* Source type toggle */}
+            <div className="flex gap-1">
+              {(["text", "url"] as const).map(t => (
                 <button
-                  key={f}
-                  onClick={() => setDraft(d => ({ ...d, font: f }))}
-                  className={`px-3 py-1.5 rounded-xl text-xs border transition-colors ${FONT_PREVIEW_CLASS[f]} ${
-                    draft.font === f
-                      ? `border-neutral-300 bg-white text-neutral-700`
-                      : `border-neutral-200 text-neutral-400 hover:border-neutral-300`
+                  key={t}
+                  onClick={() => setDraft(d => ({ ...d, source: { ...d.source, type: t } }))}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    draft.source.type === t
+                      ? "bg-white text-neutral-700 shadow-sm"
+                      : "text-neutral-400 hover:text-neutral-600"
                   }`}
                 >
-                  Aa
+                  {t === "text" ? "Text" : "API URL"}
                 </button>
               ))}
             </div>
-            <div className="flex gap-1.5 mt-1">
-              {(["sans", "serif", "mono"] as FontFamily[]).map(f => (
-                <span key={f} className={`px-3 text-xs text-neutral-400 w-[52px] text-center ${FONT_PREVIEW_CLASS[f]}`}>
-                  {f}
-                </span>
-              ))}
+
+            {/* Input */}
+            <input
+              autoFocus
+              type={draft.source.type === "url" ? "url" : "text"}
+              value={draft.source.value}
+              onChange={e => setDraft(d => ({ ...d, source: { ...d.source, value: e.target.value } }))}
+              onKeyDown={e => e.key === "Enter" && handleSave()}
+              placeholder={draft.source.type === "url" ? "https://..." : "Enter any text…"}
+              className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
+            />
+
+            {/* Font picker */}
+            <div>
+              <p className={`text-xs mb-1.5 opacity-50 ${c.label}`}>Font</p>
+              <div className="flex gap-1.5">
+                {(["sans", "serif", "mono"] as FontFamily[]).map(f => (
+                  <div key={f} className="flex flex-col items-center gap-1">
+                    <button
+                      onClick={() => setDraft(d => ({ ...d, font: f }))}
+                      className={`px-3 py-1.5 rounded-xl text-xs border transition-colors ${FONT_PREVIEW_CLASS[f]} ${
+                        draft.font === f
+                          ? `border-neutral-300 bg-white text-neutral-700`
+                          : `border-neutral-200 text-neutral-400 hover:border-neutral-300`
+                      }`}
+                    >
+                      Aa
+                    </button>
+                    <span className={`text-[10px] text-neutral-400 ${FONT_PREVIEW_CLASS[f]}`}>
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
+
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+
           </div>
 
-          {error && <p className="text-red-400 text-xs">{error}</p>}
-
-          {/* Actions */}
-          <div className="flex gap-2 mt-auto">
+          {/* Actions — pinned outside scroll */}
+          <div className="flex items-center justify-end gap-3 shrink-0">
+            <button
+              onClick={() => { setSettingsOpen(false); setError(""); }}
+              className="text-neutral-400 hover:text-neutral-600"
+              title="Cancel"
+            >
+              <X size={14} />
+            </button>
             <button
               onClick={handleSave}
               disabled={testing}
-              className="flex-1 text-xs font-medium bg-white hover:bg-neutral-50 text-neutral-700 rounded-xl py-1.5 border border-neutral-200 disabled:opacity-40"
+              className="text-neutral-600 hover:text-neutral-900 disabled:opacity-40"
+              title={draft.source.type === "url" ? "Test & Save" : "Save"}
             >
-              {testing ? "Testing…" : draft.source.type === "url" ? "Test & Save" : "Save"}
-            </button>
-            <button
-              onClick={() => { setSettingsOpen(false); setError(""); }}
-              className="text-xs text-neutral-400 hover:text-neutral-600 px-2"
-            >
-              Cancel
+              {testing ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
             </button>
           </div>
         </div>
