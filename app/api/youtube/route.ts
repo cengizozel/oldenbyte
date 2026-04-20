@@ -43,9 +43,9 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; nam
   if (!res.ok) throw new Error(`Page fetch failed: ${res.status}`);
   const html = await res.text();
 
-  // Extract channel ID from page metadata
+  // Extract channel ID — canonical link is most reliable (always the page's own channel)
   const idMatch =
-    html.match(/"channelId"\s*:\s*"(UC[\w-]{22})"/) ||
+    html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[\w-]{22})"/) ||
     html.match(/"externalId"\s*:\s*"(UC[\w-]{22})"/) ||
     html.match(/\/channel\/(UC[\w-]{22})/);
   if (!idMatch) throw new Error("Could not find channel ID on page");
