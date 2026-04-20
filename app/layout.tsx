@@ -25,7 +25,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${playfair.variable} ${dmMono.variable}`}>
+    <html lang="en" className={`${playfair.variable} ${dmMono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html:
+          `(function(){try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}})()`
+        }} />
+      </head>
       <body>{children}</body>
     </html>
   );

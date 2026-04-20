@@ -191,7 +191,7 @@ export default function NotebookWidget({
             onChange={handleChange}
             disabled={!isToday}
             placeholder={isToday ? "write anything..." : "nothing written."}
-            className={`flex-1 resize-none outline-none text-sm bg-transparent leading-relaxed ${c.text} placeholder:opacity-50 disabled:opacity-60 disabled:cursor-default`}
+            className={`flex-1 resize-none outline-none text-sm !bg-transparent leading-relaxed ${c.text} placeholder:opacity-50 disabled:opacity-60 disabled:cursor-default`}
           />
         </div>
 

@@ -33,19 +33,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--page-bg)]">
       <form
         onSubmit={handleSubmit}
-        className="flex flex-col gap-3 w-72 bg-white border border-neutral-200 rounded-2xl p-6 shadow-sm"
+        className="flex flex-col gap-3 w-72 bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl p-6 shadow-sm"
       >
-        <p className="text-sm font-semibold text-neutral-700">Enter password</p>
+        <p className="text-sm font-semibold text-[var(--text-primary)]">Enter password</p>
         <input
           autoFocus
           type="password"
           value={password}
           onChange={e => setPassword(e.target.value)}
           placeholder="••••••••"
-          className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300"
+          className="text-sm border border-[var(--surface-border)] rounded-xl px-3 py-2 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
         />
         {error && <p className="text-red-400 text-xs">{error}</p>}
         <button

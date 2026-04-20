@@ -17,12 +17,12 @@ export const colorMap: Record<WidgetColor, {
   text: string;
   fade: string;
 }> = {
-  amber:   { bg: "bg-amber-50",   border: "border-amber-100",   label: "text-amber-800",   text: "text-amber-900",   fade: "from-amber-50"   },
-  sky:     { bg: "bg-sky-50",     border: "border-sky-100",     label: "text-sky-700",     text: "text-sky-900",     fade: "from-sky-50"     },
-  neutral: { bg: "bg-neutral-50", border: "border-neutral-200", label: "text-neutral-600", text: "text-neutral-700", fade: "from-neutral-50" },
-  rose:    { bg: "bg-rose-50",    border: "border-rose-100",    label: "text-rose-700",    text: "text-rose-900",    fade: "from-rose-50"    },
-  teal:    { bg: "bg-teal-50",    border: "border-teal-100",    label: "text-teal-800",    text: "text-teal-900",    fade: "from-teal-50"    },
-  orange:  { bg: "bg-orange-50",  border: "border-orange-100",  label: "text-orange-700",  text: "text-orange-900",  fade: "from-orange-50"  },
+  amber:   { bg: "bg-[var(--w-amber-bg)]",   border: "border-[var(--w-amber-border)]",   label: "text-[var(--w-amber-label)]",   text: "text-[var(--w-amber-text)]",   fade: "from-[var(--w-amber-bg)]"   },
+  sky:     { bg: "bg-[var(--w-sky-bg)]",     border: "border-[var(--w-sky-border)]",     label: "text-[var(--w-sky-label)]",     text: "text-[var(--w-sky-text)]",     fade: "from-[var(--w-sky-bg)]"     },
+  neutral: { bg: "bg-[var(--w-neutral-bg)]", border: "border-[var(--w-neutral-border)]", label: "text-[var(--w-neutral-label)]", text: "text-[var(--w-neutral-text)]", fade: "from-[var(--w-neutral-bg)]" },
+  rose:    { bg: "bg-[var(--w-rose-bg)]",    border: "border-[var(--w-rose-border)]",    label: "text-[var(--w-rose-label)]",    text: "text-[var(--w-rose-text)]",    fade: "from-[var(--w-rose-bg)]"    },
+  teal:    { bg: "bg-[var(--w-teal-bg)]",    border: "border-[var(--w-teal-border)]",    label: "text-[var(--w-teal-label)]",    text: "text-[var(--w-teal-text)]",    fade: "from-[var(--w-teal-bg)]"    },
+  orange:  { bg: "bg-[var(--w-orange-bg)]",  border: "border-[var(--w-orange-border)]",  label: "text-[var(--w-orange-label)]",  text: "text-[var(--w-orange-text)]",  fade: "from-[var(--w-orange-bg)]"  },
 };
 
 export const widgets: Widget[] = [

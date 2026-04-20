@@ -6,16 +6,16 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 
 ## Widgets
 
-- **Notepad** - a daily notepad with a built-in calendar to browse past entries
-- **Reader** - upload and read PDF or EPUB files, with full-screen view and saved page position
-- **Text** - display any text or a live string fetched from a URL
+- **Notepad** - a daily notepad with a built-in calendar to browse past entries; multiple instances each get a numbered tab when browsing a past date; renameable
+- **Reader** - upload and read PDF or EPUB files, with full-screen view, saved position, and a Kindle-style progress bar
+- **Text** - display any static text or a live string fetched from a URL endpoint
 - **Feed** - subscribe to any RSS feed, configurable item count, headlines cached daily
-- **Reddit** - top posts from one or more subreddits, selectable time period and post count, interleaved across subreddits with per-subreddit color coding
+- **Reddit** - top posts from one or more subreddits, selectable time period and post count, interleaved across subreddits
 - **YouTube** - latest videos from one or more channels, resolved by handle or URL, interleaved with relative upload timestamps
 
 ## Top bar
 
-The left and right text fields are editable and can display either a static string or a live value fetched from any URL that returns plain text (for example a weather or IP address endpoint). The center shows a configurable date or clock. The layout edit button lives in the top right corner.
+The left and right text fields are editable and can display either a static string or a live value fetched from any URL that returns plain text (for example a weather or IP address endpoint). The center shows a configurable date or clock. The top right corner holds the dark mode toggle and the layout edit button.
 
 ## Stack
 

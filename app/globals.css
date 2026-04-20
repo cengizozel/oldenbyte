@@ -1,18 +1,130 @@
 @import "tailwindcss";
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-  background-color: #ffffff;
+/* ── Color system ─────────────────────────────────────────────────────────── */
+
+:root {
+  /* Page & surfaces */
+  --page-bg:            #fafafa;
+  --surface:            #ffffff;
+  --surface-border:     #e5e5e5;
+  --surface-border-focus: #d4d4d4;
+  --shelf-bg:           rgb(255 255 255 / 0.95);
+
+  /* Text */
+  --text-primary:       #404040;
+  --text-secondary:     #737373;
+  --text-muted:         #a3a3a3;
+  --text-placeholder:   #d4d4d4;
+
+  /* Amber widget */
+  --w-amber-bg:         #fffbeb;
+  --w-amber-border:     #fef3c7;
+  --w-amber-label:      #92400e;
+  --w-amber-text:       #78350f;
+
+  /* Sky widget */
+  --w-sky-bg:           #f0f9ff;
+  --w-sky-border:       #e0f2fe;
+  --w-sky-label:        #0369a1;
+  --w-sky-text:         #0c4a6e;
+
+  /* Neutral widget */
+  --w-neutral-bg:       #fafafa;
+  --w-neutral-border:   #e5e5e5;
+  --w-neutral-label:    #525252;
+  --w-neutral-text:     #404040;
+
+  /* Rose widget */
+  --w-rose-bg:          #fff1f2;
+  --w-rose-border:      #ffe4e6;
+  --w-rose-label:       #be123c;
+  --w-rose-text:        #881337;
+
+  /* Teal widget */
+  --w-teal-bg:          #f0fdfa;
+  --w-teal-border:      #ccfbf1;
+  --w-teal-label:       #115e59;
+  --w-teal-text:        #134e4a;
+
+  /* Orange widget */
+  --w-orange-bg:        #fff7ed;
+  --w-orange-border:    #ffedd5;
+  --w-orange-label:     #c2410c;
+  --w-orange-text:      #7c2d12;
 }
 
-/* react-grid-layout: drop placeholder */
+.dark {
+  --page-bg:            #111111;
+  --surface:            #1e1e1e;
+  --surface-border:     #333333;
+  --surface-border-focus: #444444;
+  --shelf-bg:           rgb(20 20 20 / 0.97);
+
+  --text-primary:       #e5e5e5;
+  --text-secondary:     #a3a3a3;
+  --text-muted:         #737373;
+  --text-placeholder:   #4a4a4a;
+
+  --w-amber-bg:         #1a1100;
+  --w-amber-border:     #261800;
+  --w-amber-label:      #fcd34d;
+  --w-amber-text:       #fef3c7;
+
+  --w-sky-bg:           #04111e;
+  --w-sky-border:       #071828;
+  --w-sky-label:        #7dd3fc;
+  --w-sky-text:         #e0f2fe;
+
+  --w-neutral-bg:       #161616;
+  --w-neutral-border:   #262626;
+  --w-neutral-label:    #d4d4d4;
+  --w-neutral-text:     #f5f5f5;
+
+  --w-rose-bg:          #180610;
+  --w-rose-border:      #220a17;
+  --w-rose-label:       #fda4af;
+  --w-rose-text:        #ffe4e6;
+
+  --w-teal-bg:          #041613;
+  --w-teal-border:      #07201c;
+  --w-teal-label:       #5eead4;
+  --w-teal-text:        #ccfbf1;
+
+  --w-orange-bg:        #180c00;
+  --w-orange-border:    #221200;
+  --w-orange-label:     #fdba74;
+  --w-orange-text:      #ffedd5;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--page-bg);
+  color: var(--text-primary);
+}
+
+/* Global dark mode for form elements */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: var(--surface);
+  border-color: var(--surface-border);
+  color: var(--text-primary);
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--text-placeholder);
+}
+
+/* ── react-grid-layout ────────────────────────────────────────────────────── */
+
 .react-grid-item.react-grid-placeholder {
   background: rgb(212 212 212 / 0.4) !important;
   border-radius: 1rem;
   border: 2px dashed rgb(212 212 212);
 }
 
-/* react-grid-layout: resize handle */
 .react-resizable-handle {
   width: 20px !important;
   height: 20px !important;

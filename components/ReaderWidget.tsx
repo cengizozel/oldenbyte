@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
@@ -128,6 +128,25 @@ function EpubViewer({
   const [dimsReady, setDimsReady] = useState(false);
   const [percentage, setPercentage] = useState<number | null>(null);
 
+  const applyEpubTheme = useCallback(() => {
+    if (!renditionRef.current || !wrapperRef.current) return;
+    const widgetEl = wrapperRef.current.closest<HTMLElement>(".rounded-2xl");
+    const bg = widgetEl
+      ? getComputedStyle(widgetEl).backgroundColor
+      : getComputedStyle(document.documentElement).getPropertyValue("--surface").trim();
+    const fg = getComputedStyle(document.documentElement).getPropertyValue("--text-primary").trim();
+    renditionRef.current.themes.override("color", fg || "#404040");
+    renditionRef.current.themes.override("background", bg || "#ffffff");
+    if (wrapperRef.current) wrapperRef.current.style.background = bg || "";
+  }, []);
+
+  // Re-apply theme when dark mode toggles
+  useEffect(() => {
+    const observer = new MutationObserver(applyEpubTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, [applyEpubTheme]);
+
   // Measure on every resize; call rendition.resize() directly — no state re-render needed
   useEffect(() => {
     if (!wrapperRef.current) return;
@@ -165,6 +184,7 @@ function EpubViewer({
         flow: "paginated",
       });
       renditionRef.current = rendition;
+      rendition.hooks.content.register(() => applyEpubTheme());
       rendition.display(cfi || undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -208,7 +228,7 @@ function EpubViewer({
       lastCfiRef.current = "";
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filename, dimsReady]);
+  }, [filename, dimsReady, applyEpubTheme]);
 
   // Keyboard nav in fullscreen
   useEffect(() => {

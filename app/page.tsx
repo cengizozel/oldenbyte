@@ -8,7 +8,7 @@ import { widgets } from "@/lib/widgets";
 export default function Home() {
   const [editing, setEditing] = useState(false);
   return (
-    <div className="min-h-screen md:h-screen bg-[#fafafa] flex flex-col p-4 md:p-6 gap-4 md:gap-5 md:overflow-hidden">
+    <div className="min-h-screen md:h-screen bg-[var(--page-bg)] flex flex-col p-4 md:p-6 gap-4 md:gap-5 md:overflow-hidden">
       <TopBar editing={editing} onToggleEdit={() => setEditing(e => !e)} />
       <WidgetGrid widgets={widgets} editing={editing} onToggleEdit={() => setEditing(e => !e)} />
     </div>

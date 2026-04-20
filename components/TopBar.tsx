@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, Loader, X, RotateCcw, LayoutGrid } from "lucide-react";
+import { Pencil, Check, Loader, X, RotateCcw, LayoutGrid, Moon, Sun } from "lucide-react";
 import * as storage from "@/lib/storage";
 
 // ── EditableField ─────────────────────────────────────────────────────────
@@ -114,14 +114,14 @@ function EditableField({
       </button>
 
       {open && (
-        <div className={`absolute top-full mt-2 z-50 bg-white border border-neutral-200 rounded-2xl shadow-lg p-4 w-64 ${align === "right" ? "right-0" : "left-0"}`}>
+        <div className={`absolute top-full mt-2 z-50 bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-lg p-4 w-64 ${align === "right" ? "right-0" : "left-0"}`}>
           <div className="flex gap-1 mb-3">
             {(["text", "url"] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setDraft(d => ({ ...d, type: t }))}
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  draft.type === t ? "bg-neutral-100 text-neutral-700" : "text-neutral-400 hover:text-neutral-600"
+                  draft.type === t ? "bg-[var(--surface-border)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                 }`}
               >
                 {t === "text" ? "Text" : "API URL"}
@@ -136,7 +136,7 @@ function EditableField({
             onChange={e => setDraft(d => ({ ...d, value: e.target.value }))}
             onKeyDown={e => e.key === "Enter" && handleSave()}
             placeholder={draft.type === "url" ? "https://..." : defaultValue}
-            className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300"
+            className="w-full text-sm border border-[var(--surface-border)] rounded-xl px-3 py-2 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
           />
 
           {draft.type === "url" && (
@@ -145,7 +145,7 @@ function EditableField({
                 <button
                   key={ex.url}
                   onClick={() => setDraft(d => ({ ...d, value: ex.url }))}
-                  className="text-left px-2 py-1 rounded-lg text-xs text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50 transition-colors"
+                  className="text-left px-2 py-1 rounded-lg text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-border)] transition-colors"
                 >
                   {ex.label}
                 </button>
@@ -323,13 +323,13 @@ function DateDisplay() {
       >
         {format === "analog"
           ? <AnalogClock time={now} size={48} />
-          : <span className="text-sm md:text-lg text-neutral-500 text-center [font-family:var(--font-dm-mono)]" suppressHydrationWarning>{fmt(now, format)}</span>
+          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center [font-family:var(--font-dm-mono)]" suppressHydrationWarning>{fmt(now, format)}</span>
         }
         <Pencil size={12} className="opacity-0 group-hover:opacity-30 text-neutral-400 transition-opacity" />
       </button>
 
       {open && (
-        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 bg-white border border-neutral-200 rounded-2xl shadow-lg p-3 w-52">
+        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-lg p-3 w-52">
           <div className="flex flex-col gap-0.5">
             {FORMAT_OPTIONS.map(opt => (
               <button
@@ -337,8 +337,8 @@ function DateDisplay() {
                 onClick={() => setDraft(opt.value)}
                 className={`flex items-center gap-2 text-left px-3 py-1.5 rounded-xl text-xs transition-colors ${
                   draft === opt.value
-                    ? "bg-neutral-100 text-neutral-700 font-medium"
-                    : "text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50"
+                    ? "bg-[var(--surface-border)] text-[var(--text-primary)] font-medium"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-border)]"
                 }`}
               >
                 {opt.value === "analog"
@@ -377,13 +377,26 @@ export default function TopBar({
   editing?: boolean;
   onToggleEdit?: () => void;
 }) {
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  function toggleDark() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  }
+
   return (
     <div className="grid grid-cols-3 items-stretch h-12 md:h-14">
       <div className="flex items-center">
         <EditableField
           storageKey="topbar-phrase"
           defaultValue="oldenbyte"
-          className="text-lg md:text-2xl text-neutral-700 font-medium leading-none [font-family:var(--font-playfair)]"
+          className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none [font-family:var(--font-playfair)]"
         />
       </div>
       <div className="flex justify-center items-center">
@@ -393,12 +406,19 @@ export default function TopBar({
         <EditableField
           storageKey="topbar-mood"
           defaultValue="feeling quiet"
-          className="text-base md:text-xl text-neutral-500 italic leading-none [font-family:var(--font-playfair)]"
+          className="text-base md:text-xl text-[var(--text-secondary)] italic leading-none [font-family:var(--font-playfair)]"
           align="right"
         />
         <button
+          onClick={toggleDark}
+          className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+          title={dark ? "Light mode" : "Dark mode"}
+        >
+          {dark ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+        <button
           onClick={onToggleEdit}
-          className="transition-opacity text-neutral-400 hover:text-neutral-600"
+          className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
           title={editing ? "Done editing" : "Edit layout"}
         >
           {editing ? <Check size={16} /> : <LayoutGrid size={16} />}
