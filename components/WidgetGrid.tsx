@@ -269,7 +269,22 @@ export default function WidgetGrid({
     <div className={`flex flex-col gap-2 ${isMobile ? "" : "flex-1 min-h-0"}`}>
 
       {/* Grid */}
-      <div ref={containerRef} className={isMobile ? "" : "flex-1 min-h-0"}>
+      <div ref={containerRef} className={`relative ${isMobile ? "" : "flex-1 min-h-0"}`}>
+        {editing && size.width > 0 && (
+          <div
+            className="absolute inset-0 pointer-events-none z-0"
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${isMobile ? 1 : COLS}, 1fr)`,
+              gridTemplateRows: `repeat(${numRows}, ${rowHeight}px)`,
+              gap: GAP,
+            }}
+          >
+            {Array.from({ length: (isMobile ? 1 : COLS) * numRows }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-dashed border-neutral-900/10" />
+            ))}
+          </div>
+        )}
         {editing ? (
           size.width > 0 && (
             <GridLayout
