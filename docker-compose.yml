@@ -7,6 +7,8 @@ services:
     environment:
       - DATABASE_URL=file:/app/data/db.sqlite
       - UPLOADS_DIR=/app/data/uploads
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD}
+      - SESSION_SECRET=${SESSION_SECRET}
     volumes:
       - ./data:/app/data
 
