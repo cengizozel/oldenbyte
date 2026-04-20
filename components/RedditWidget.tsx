@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Pencil, Check, X, RotateCcw, Loader, Plus } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -8,7 +8,7 @@ import * as storage from "@/lib/storage";
 type Period = "day" | "week" | "month" | "year" | "all";
 type SubEntry = { name: string; limit: number; period: Period };
 type RedditConfig = { subreddits: SubEntry[] };
-type Post = { title: string; link: string; subreddit: string };
+type Post = { title: string; link: string; subreddit: string; pubDate: string };
 
 const DEFAULT: RedditConfig = { subreddits: [] };
 const PERIODS: { value: Period; label: string }[] = [
@@ -18,6 +18,40 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: "year",  label: "Year" },
   { value: "all",   label: "All" },
 ];
+
+function SubredditBadge({ post, rank, total, period, sc }: {
+  post: Post;
+  rank: number;
+  total: number;
+  period: string;
+  sc: { label: string; bg: string };
+}) {
+  const [flip, setFlip] = useState(false);
+  const badgeRef = useRef<HTMLSpanElement>(null);
+
+  function handleMouseEnter() {
+    if (!badgeRef.current) return;
+    const rect = badgeRef.current.getBoundingClientRect();
+    setFlip(rect.right + 140 > window.innerWidth);
+  }
+
+  return (
+    <span ref={badgeRef} className="relative inline-block group/badge mb-1" onMouseEnter={handleMouseEnter}>
+      <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+        r/{post.subreddit}
+      </span>
+      <span className={`absolute top-0 ${flip ? "right-full mr-1" : "left-full ml-1"} hidden group-hover/badge:flex items-center gap-1.5 bg-white border border-neutral-200 rounded-lg px-2 py-1 text-[10px] text-neutral-500 shadow-sm whitespace-nowrap z-10`}>
+        <span>{rank}/{total}</span>
+        <span className="opacity-30">·</span>
+        <span>{period}</span>
+        {post.pubDate && <>
+          <span className="opacity-30">·</span>
+          <span>{new Date(post.pubDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+        </>}
+      </span>
+    </span>
+  );
+}
 
 const SUB_COLORS = [
   { label: "text-sky-700",     bg: "bg-sky-100"     },
@@ -87,7 +121,7 @@ export default function RedditWidget({
           const url = `https://www.reddit.com/r/${sub.name}/top.rss?t=${sub.period}&limit=${sub.limit}`;
           const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${sub.limit}`);
           if (!res.ok) throw new Error();
-          const items: { title: string; link: string }[] = await res.json();
+          const items: { title: string; link: string; pubDate: string }[] = await res.json();
           return items.map(item => ({ ...item, subreddit: sub.name }));
         })
       );
@@ -260,13 +294,20 @@ export default function RedditWidget({
               </div>
             ) : posts.length ? (
               <ul className="flex flex-col">
-                {posts.map((post, i) => {
-                  const sc = SUB_COLORS[subColorIndex[post.subreddit] ?? 0];
-                  return (
+                {(() => {
+                  const subTotal: Record<string, number> = {};
+                  posts.forEach(p => { subTotal[p.subreddit] = (subTotal[p.subreddit] || 0) + 1; });
+                  const subCount: Record<string, number> = {};
+                  const subPeriodLabel: Record<string, string> = {};
+                  config.subreddits.forEach(s => {
+                    subPeriodLabel[s.name] = PERIODS.find(p => p.value === s.period)?.label ?? s.period;
+                  });
+                  return posts.map((post, i) => {
+                    subCount[post.subreddit] = (subCount[post.subreddit] || 0) + 1;
+                    const sc = SUB_COLORS[subColorIndex[post.subreddit] ?? 0];
+                    return (
                     <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                      <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md mb-1 ${sc.bg} ${sc.label}`}>
-                        r/{post.subreddit}
-                      </span>
+                      <SubredditBadge post={post} rank={subCount[post.subreddit]} total={subTotal[post.subreddit]} period={subPeriodLabel[post.subreddit] ?? ""} sc={sc} />
                       <a
                         href={post.link}
                         target="_blank"
@@ -277,7 +318,8 @@ export default function RedditWidget({
                       </a>
                     </li>
                   );
-                })}
+                  });
+                })()}
               </ul>
             ) : (
               <p className={`text-xs opacity-45 ${c.text}`}>
