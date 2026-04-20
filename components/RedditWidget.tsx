@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, X, RotateCcw, Loader, Plus, ChevronLeft, ExternalLink } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Loader, Plus, ChevronLeft, ExternalLink, Flame } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
@@ -248,9 +248,7 @@ export default function RedditWidget({
 
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
-        <p className={`text-xs font-semibold tracking-widest uppercase ${c.label}`}>
-          {widget.title}
-        </p>
+        <span className={`opacity-50 ${c.label}`}><Flame size={14} /></span>
         {!settingsOpen && (
           <button
             onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}

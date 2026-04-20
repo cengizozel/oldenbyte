@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, X, RotateCcw, Loader } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Loader, Rss } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
@@ -121,9 +121,10 @@ export default function RssWidget({
 
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
-        <p className={`text-xs font-semibold tracking-widest uppercase ${c.label}`}>
-          {widget.title}{config.name ? ` | ${config.name}` : ""}
-        </p>
+        <div className={`flex items-center gap-1.5 ${c.label}`}>
+          <span className="opacity-50"><Rss size={14} /></span>
+          {config.name && <span className="text-xs font-medium opacity-60">{config.name}</span>}
+        </div>
         {!settingsOpen && (
           <button
             onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}

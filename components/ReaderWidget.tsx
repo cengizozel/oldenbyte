@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Pencil, ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2 } from "lucide-react";
+import { Pencil, ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -447,14 +447,10 @@ export default function ReaderWidget({
 
         {/* Header */}
         <div className="flex items-center justify-between mb-3 shrink-0">
-          <div className="flex flex-col min-w-0">
-            <p className={`text-xs font-semibold tracking-widest uppercase truncate ${c.label}`}>
-              {config?.displayName ?? widget.title}
-            </p>
+          <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
+            <span className="opacity-50 shrink-0"><BookOpen size={14} /></span>
             {config && (
-              <span className={`text-xs opacity-40 uppercase tracking-widest ${c.label}`}>
-                {config.fileType}
-              </span>
+              <span className="text-xs font-medium opacity-60 truncate">{config.displayName}</span>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-2">

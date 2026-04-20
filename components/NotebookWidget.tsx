@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { NotebookPen } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
@@ -72,9 +73,9 @@ export default function NotebookWidget({
 
         {/* Left: title + textarea */}
         <div className="flex flex-col flex-1 min-h-0">
-          <p className={`text-xs font-semibold tracking-widest uppercase mb-3 shrink-0 ${c.label}`}>
-            {widget.title}
-          </p>
+          <div className={`mb-3 shrink-0 opacity-50 ${c.label}`}>
+            <NotebookPen size={14} />
+          </div>
           {!isToday && (
             <p className={`text-xs mb-1.5 opacity-50 ${c.label}`}>
               {new Date(viewDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}

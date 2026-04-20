@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Type } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
@@ -151,9 +151,7 @@ export default function TextWidget({
 
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
-        <p className={`text-xs font-semibold tracking-widest uppercase ${c.label}`}>
-          {widget.title}
-        </p>
+        <span className={`opacity-50 ${c.label}`}><Type size={14} /></span>
         {!settingsOpen && (
           <button
             onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
