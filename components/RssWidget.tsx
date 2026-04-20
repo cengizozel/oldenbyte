@@ -217,7 +217,7 @@ export default function RssWidget({
         </div>
       ) : (
         <div className="flex-1 min-h-0 relative">
-          <div ref={scrollRef} className="absolute inset-0 overflow-y-auto" onScroll={e => checkFade(e.currentTarget)}>
+          <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget)}>
             {loading ? (
               <div className="flex items-center justify-center h-full">
                 <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />

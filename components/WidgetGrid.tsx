@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import * as storage from "@/lib/storage";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, GripVertical } from "lucide-react";
 import GridLayout from "react-grid-layout";
 import type { Layout as LayoutItem } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -236,6 +236,8 @@ export default function WidgetGrid({
         className={`fixed z-50 flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-neutral-200 rounded-2xl shadow-lg px-3 py-2.5 select-none cursor-grab active:cursor-grabbing ${shelfPos === null ? "bottom-6 left-1/2 -translate-x-1/2" : ""}`}
         style={shelfPos !== null ? { left: shelfPos.x, top: shelfPos.y } : undefined}
       >
+        <GripVertical size={14} className="text-neutral-300 shrink-0 cursor-grab" />
+        <div className="w-px h-4 bg-neutral-200 mx-0.5" />
         {widgets.map(template => {
           const c = colorMap[template.color];
           return (
