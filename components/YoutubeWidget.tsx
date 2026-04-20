@@ -5,8 +5,8 @@ import { Pencil, Check, X, RotateCcw, Loader, Plus } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
-type YoutubeChannel = { channelId: string; name: string };
-type YoutubeConfig  = { channels: YoutubeChannel[]; limit: number };
+type YoutubeChannel = { channelId: string; name: string; limit: number };
+type YoutubeConfig  = { channels: YoutubeChannel[] };
 type Video          = { title: string; link: string; published: string; channelId: string; channelName: string };
 
 function timeAgo(iso: string): string {
@@ -25,7 +25,7 @@ function timeAgo(iso: string): string {
   return `${Math.floor(d / 365)}y ago`;
 }
 
-const DEFAULT: YoutubeConfig = { channels: [], limit: 5 };
+const DEFAULT: YoutubeConfig = { channels: [] };
 
 const CH_COLORS = [
   { label: "text-rose-600",    bg: "bg-rose-100"    },
@@ -61,34 +61,42 @@ export default function YoutubeWidget({
       if (!saved) return;
       try {
         const parsed: YoutubeConfig = JSON.parse(saved);
+        // migrate old format: channels had no per-channel limit (used top-level limit)
+        const oldLimit = (parsed as unknown as { limit?: number }).limit ?? 5;
+        parsed.channels = parsed.channels.map(ch =>
+          ch.limit == null ? { ...ch, limit: oldLimit } : ch
+        );
         setConfig(parsed);
         setDraft(parsed);
         if (!parsed.channels.length) return;
-        const cacheKey = `${storageKey}-${today}-${parsed.limit}`;
+        const cacheKey = cacheKeyFor(parsed);
         const cached = await storage.getItem(cacheKey);
         if (cached) {
           setVideos(JSON.parse(cached));
         } else {
-          fetchVideos(parsed.channels, parsed.limit, cacheKey);
+          fetchVideos(parsed, cacheKey);
         }
       } catch {}
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
-  async function fetchVideos(channels: YoutubeChannel[], limit: number, cacheKey: string): Promise<boolean> {
+  function cacheKeyFor(cfg: YoutubeConfig) {
+    return `${storageKey}-${today}-${cfg.channels.map(ch => `${ch.channelId}:${ch.limit}`).join(",")}`;
+  }
+
+  async function fetchVideos(cfg: YoutubeConfig, cacheKey: string): Promise<boolean> {
     setLoading(true);
     setError("");
     try {
       const results = await Promise.all(
-        channels.map(async ch => {
-          const res = await fetch(`/api/youtube?channelId=${encodeURIComponent(ch.channelId)}&limit=${limit}`);
+        cfg.channels.map(async ch => {
+          const res = await fetch(`/api/youtube?channelId=${encodeURIComponent(ch.channelId)}&limit=${ch.limit}`);
           if (!res.ok) throw new Error();
           const data: { videos: { title: string; link: string; published: string }[] } = await res.json();
           return data.videos.map(v => ({ ...v, channelId: ch.channelId, channelName: ch.name }));
         })
       );
-      // Interleave across channels
       const interleaved: Video[] = [];
       const maxLen = Math.max(...results.map(r => r.length));
       for (let i = 0; i < maxLen; i++) {
@@ -115,7 +123,7 @@ export default function YoutubeWidget({
       const res = await fetch(`/api/youtube?channel=${encodeURIComponent(input)}&limit=1`);
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error ?? "Failed to resolve channel");
-      const ch: YoutubeChannel = { channelId: data.channelId, name: data.name };
+      const ch: YoutubeChannel = { channelId: data.channelId, name: data.name, limit: 5 };
       if (draft.channels.find(c => c.channelId === ch.channelId)) { setChInput(""); return; }
       setDraft(d => ({ ...d, channels: [...d.channels, ch] }));
       setChInput("");
@@ -126,11 +134,15 @@ export default function YoutubeWidget({
     }
   }
 
+  function setChannelLimit(channelId: string, limit: number) {
+    setDraft(d => ({ ...d, channels: d.channels.map(ch => ch.channelId === channelId ? { ...ch, limit } : ch) }));
+  }
+
   async function handleSave() {
     setError("");
     if (!draft.channels.length) { setError("Add at least one channel."); return; }
-    const cacheKey = `${storageKey}-${today}-${draft.limit}`;
-    const ok = await fetchVideos(draft.channels, draft.limit, cacheKey);
+    const cacheKey = cacheKeyFor(draft);
+    const ok = await fetchVideos(draft, cacheKey);
     if (ok) {
       setConfig(draft);
       await storage.setItem(storageKey, JSON.stringify(draft));
@@ -168,7 +180,8 @@ export default function YoutubeWidget({
       </div>
 
       {settingsOpen ? (
-        <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto">
+        <div className="flex flex-col gap-3 flex-1 min-h-0">
+        <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
 
           {/* Channel input */}
           <div className="flex gap-1">
@@ -190,42 +203,39 @@ export default function YoutubeWidget({
             </button>
           </div>
 
-          {/* Added channels */}
+          {/* Added channels with per-channel limit */}
           {draft.channels.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-col gap-1.5">
               {draft.channels.map((ch, i) => {
                 const sc = CH_COLORS[i % CH_COLORS.length];
                 return (
-                  <span key={ch.channelId} className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium ${sc.bg} ${sc.label}`}>
-                    {ch.name}
+                  <div key={ch.channelId} className={`flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-medium ${sc.bg} ${sc.label}`}>
+                    <span className="flex-1 truncate">{ch.name}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={15}
+                      value={ch.limit}
+                      onChange={e => setChannelLimit(ch.channelId, Math.max(1, Math.min(15, parseInt(e.target.value) || 1)))}
+                      className="w-10 text-center bg-white/60 rounded-md px-1 py-0.5 outline-none border border-current/20 text-xs"
+                    />
+                    <span className="opacity-50 font-normal">videos</span>
                     <button
                       onClick={() => setDraft(d => ({ ...d, channels: d.channels.filter(c => c.channelId !== ch.channelId) }))}
-                      className="opacity-60 hover:opacity-100 leading-none"
+                      className="opacity-60 hover:opacity-100 leading-none ml-1"
                     >
                       ×
                     </button>
-                  </span>
+                  </div>
                 );
               })}
             </div>
           )}
 
-          {/* Videos per channel */}
-          <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-60 shrink-0 ${c.label}`}>Videos per channel</span>
-            <input
-              type="number"
-              min={1}
-              max={15}
-              value={draft.limit}
-              onChange={e => setDraft(d => ({ ...d, limit: Math.max(1, Math.min(15, parseInt(e.target.value) || 1)) }))}
-              className="w-14 text-sm border border-neutral-200 rounded-xl px-2 py-1 outline-none focus:border-neutral-300 text-neutral-700 bg-white text-center"
-            />
-          </div>
-
           {error && <p className="text-red-400 text-xs">{error}</p>}
 
-          <div className="flex items-center justify-between mt-auto pt-1">
+        </div>
+          <div className="flex items-center justify-between shrink-0 pt-1">
             <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset">
               <RotateCcw size={13} />
             </button>
