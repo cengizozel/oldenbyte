@@ -1,0 +1,16 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <!-- Outer square -->
+  <rect x="4" y="4" width="92" height="92" stroke="#1a1a1a" stroke-width="3" rx="3"/>
+
+  <!-- Widget boundary: right side (dashed) -->
+  <line x1="74" y1="4" x2="74" y2="58" stroke="#1a1a1a" stroke-width="2.5" stroke-dasharray="6 4" stroke-linecap="round"/>
+
+  <!-- Rounded corner arc — floats with a small gap on each side -->
+  <path d="M 74 63 A 11 11 0 0 1 63 74" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Widget boundary: bottom side (dashed) -->
+  <line x1="58" y1="74" x2="4" y2="74" stroke="#1a1a1a" stroke-width="2.5" stroke-dasharray="6 4" stroke-linecap="round"/>
+
+  <!-- Terminal > prompt -->
+  <path d="M 14 19 L 27 26 L 14 33" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
