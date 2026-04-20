@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
+function decodeEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
 function extractCdata(str: string): string {
   const m = str.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
-  return m ? m[1].trim() : str.trim();
+  return decodeEntities(m ? m[1].trim() : str.trim());
 }
 
 function extractTag(xml: string, tag: string): string {

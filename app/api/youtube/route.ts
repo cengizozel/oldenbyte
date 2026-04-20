@@ -2,9 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+function decodeEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
 function extractCdata(str: string): string {
   const m = str.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
-  return m ? m[1].trim() : str.trim();
+  return decodeEntities(m ? m[1].trim() : str.trim());
 }
 
 async function resolveChannelId(input: string): Promise<{ channelId: string; name: string }> {
