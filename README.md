@@ -36,6 +36,29 @@ The app runs at `http://localhost:3000`. A local SQLite database is created auto
 
 ## Self-hosting with Docker
 
+**1. Create a `.env` file** next to `docker-compose.yml`:
+
+```
+DASHBOARD_PASSWORD=your-password
+SESSION_SECRET=<random hex string>
+```
+
+Generate a secret with:
+
+```bash
+openssl rand -hex 32
+```
+
+**2. Initialize the data directory:**
+
+```bash
+mkdir -p data
+touch data/db.sqlite
+chmod 666 data/db.sqlite
+```
+
+**3. Start the container:**
+
 ```bash
 docker compose up -d
 ```
