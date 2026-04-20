@@ -10,7 +10,7 @@ import "react-resizable/css/styles.css";
 import type { Widget } from "@/lib/widgets";
 import { colorMap, widgets as widgetDefs } from "@/lib/widgets";
 import WidgetCard from "./WidgetCard";
-import NotebookWidget from "./NotebookWidget";
+import NotebookWidget from "./NotepadWidget";
 import TextWidget from "./TextWidget";
 import RssWidget from "./RssWidget";
 import RedditWidget from "./RedditWidget";
