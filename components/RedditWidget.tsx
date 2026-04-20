@@ -1,14 +1,25 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, X, RotateCcw, Loader, Plus } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Loader, Plus, ChevronLeft, ExternalLink } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
 type Period = "day" | "week" | "month" | "year" | "all";
 type SubEntry = { name: string; limit: number; period: Period };
 type RedditConfig = { subreddits: SubEntry[] };
-type Post = { title: string; link: string; subreddit: string; pubDate: string };
+type Post = { title: string; link: string; subreddit: string; pubDate: string; content: string };
+
+function stripHtml(html: string | undefined): string {
+  if (!html) return "";
+  return html
+    .replace(/<!-- SC_OFF -->[\s\S]*?<!-- SC_ON -->/g, m => m.replace(/<!-- SC_(?:OFF|ON) -->/g, ""))
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+    .replace(/&#\d+;/g, " ")
+    .replace(/\s+/g, " ").trim();
+}
 
 const DEFAULT: RedditConfig = { subreddits: [] };
 const PERIODS: { value: Period; label: string }[] = [
@@ -80,6 +91,7 @@ export default function RedditWidget({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft]               = useState<RedditConfig>(DEFAULT);
   const [subInput, setSubInput]         = useState("");
+  const [selected, setSelected]         = useState<Post | null>(null);
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -121,7 +133,7 @@ export default function RedditWidget({
           const url = `https://www.reddit.com/r/${sub.name}/top.rss?t=${sub.period}&limit=${sub.limit}`;
           const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${sub.limit}`);
           if (!res.ok) throw new Error();
-          const items: { title: string; link: string; pubDate: string }[] = await res.json();
+          const items: { title: string; link: string; pubDate: string; content: string }[] = await res.json();
           return items.map(item => ({ ...item, subreddit: sub.name }));
         })
       );
@@ -286,50 +298,88 @@ export default function RedditWidget({
 
         </div>
       ) : (
-        <div className="flex-1 min-h-0 relative">
-          <div className="absolute inset-0 overflow-y-auto">
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-              </div>
-            ) : posts.length ? (
-              <ul className="flex flex-col">
-                {(() => {
-                  const subTotal: Record<string, number> = {};
-                  posts.forEach(p => { subTotal[p.subreddit] = (subTotal[p.subreddit] || 0) + 1; });
-                  const subCount: Record<string, number> = {};
-                  const subPeriodLabel: Record<string, string> = {};
-                  config.subreddits.forEach(s => {
-                    subPeriodLabel[s.name] = PERIODS.find(p => p.value === s.period)?.label ?? s.period;
-                  });
-                  return posts.map((post, i) => {
-                    subCount[post.subreddit] = (subCount[post.subreddit] || 0) + 1;
-                    const sc = SUB_COLORS[subColorIndex[post.subreddit] ?? 0];
-                    return (
-                    <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                      <SubredditBadge post={post} rank={subCount[post.subreddit]} total={subTotal[post.subreddit]} period={subPeriodLabel[post.subreddit] ?? ""} sc={sc} />
-                      <a
-                        href={post.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`block text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
-                      >
-                        {post.title}
-                      </a>
-                    </li>
-                  );
-                  });
-                })()}
-              </ul>
-            ) : (
-              <p className={`text-xs opacity-45 ${c.text}`}>
-                hover and click the pencil to add subreddits
-              </p>
+        <div className="flex-1 min-h-0 relative overflow-hidden">
+
+          {/* Post list */}
+          <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
+            <div className="absolute inset-0 overflow-y-auto pr-3">
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
+                </div>
+              ) : posts.length ? (
+                <ul className="flex flex-col">
+                  {(() => {
+                    const subTotal: Record<string, number> = {};
+                    posts.forEach(p => { subTotal[p.subreddit] = (subTotal[p.subreddit] || 0) + 1; });
+                    const subCount: Record<string, number> = {};
+                    const subPeriodLabel: Record<string, string> = {};
+                    config.subreddits.forEach(s => {
+                      subPeriodLabel[s.name] = PERIODS.find(p => p.value === s.period)?.label ?? s.period;
+                    });
+                    return posts.map((post, i) => {
+                      subCount[post.subreddit] = (subCount[post.subreddit] || 0) + 1;
+                      const sc = SUB_COLORS[subColorIndex[post.subreddit] ?? 0];
+                      return (
+                        <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                          <SubredditBadge post={post} rank={subCount[post.subreddit]} total={subTotal[post.subreddit]} period={subPeriodLabel[post.subreddit] ?? ""} sc={sc} />
+                          <div className="flex items-start gap-1 group/title">
+                            <button
+                              onClick={() => setSelected(post)}
+                              className={`flex-1 text-left text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                            >
+                              {post.title}
+                            </button>
+                            <a
+                              href={post.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-40 hover:!opacity-80 transition-opacity ${c.label}`}
+                            >
+                              <ExternalLink size={11} />
+                            </a>
+                          </div>
+                        </li>
+                      );
+                    });
+                  })()}
+                </ul>
+              ) : (
+                <p className={`text-xs opacity-45 ${c.text}`}>
+                  hover and click the pencil to add subreddits
+                </p>
+              )}
+            </div>
+            {posts.length > 0 && (
+              <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
             )}
           </div>
-          {posts.length > 0 && (
-            <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
-          )}
+
+          {/* Post detail */}
+          <div className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${selected ? "translate-x-0" : "translate-x-full"}`}>
+            {selected && (
+              <>
+                <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
+                  <button onClick={() => setSelected(null)} className="shrink-0 opacity-60 hover:opacity-100">
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="flex-1 text-xs font-medium truncate opacity-80">{selected.title}</span>
+                  <a href={selected.link} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80">
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  {stripHtml(selected.content) ? (
+                    <p className={`text-sm leading-relaxed ${c.text} opacity-80`}>{stripHtml(selected.content)}</p>
+                  ) : (
+                    <p className={`text-xs opacity-40 ${c.text}`}>No text content — this is a link post.</p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
         </div>
       )}
     </div>

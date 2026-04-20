@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const xml = await res.text();
-    const items: { title: string; link: string; pubDate: string }[] = [];
+    const items: { title: string; link: string; pubDate: string; content: string }[] = [];
 
     // Detect format: Atom uses <entry>, RSS uses <item>
     const isAtom = /<entry[\s>]/i.test(xml);
@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
         ? atomLinkMatch[1]
         : extractTag(block, "link") || extractTag(block, "guid");
       const pubDate = extractTag(block, "pubDate") || extractTag(block, "updated");
-      if (title) items.push({ title, link, pubDate });
+      const content = extractTag(block, "content") || extractTag(block, "description") || extractTag(block, "summary");
+      if (title) items.push({ title, link, pubDate, content });
     }
 
     return NextResponse.json(items);

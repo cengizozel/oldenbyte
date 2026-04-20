@@ -252,7 +252,7 @@ export default function YoutubeWidget({
         </div>
       ) : (
         <div className="flex-1 min-h-0 relative">
-          <div className="absolute inset-0 overflow-y-auto">
+          <div className="absolute inset-0 overflow-y-auto pr-3">
             {loading ? (
               <div className="flex items-center justify-center h-full">
                 <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
