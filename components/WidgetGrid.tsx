@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import * as storage from "@/lib/storage";
-import { RotateCcw, GripVertical } from "lucide-react";
+import { RotateCcw, GripVertical, Download, Upload } from "lucide-react";
 import GridLayout from "react-grid-layout";
 import type { Layout as LayoutItem } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -164,6 +164,35 @@ export default function WidgetGrid({
     storage.removeItem("widget-instances");
   }
 
+  async function handleExport() {
+    const res = await fetch("/api/settings/export");
+    const data = await res.json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `oldenbyte-backup-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const importRef = useRef<HTMLInputElement>(null);
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      await fetch("/api/settings/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      window.location.reload();
+    } catch {}
+    e.target.value = "";
+  }
+
   function removeWidget(instanceId: string) {
     setLayout(l => l.filter(item => item.i !== instanceId));
     setInstances(prev => {
@@ -257,6 +286,22 @@ export default function WidgetGrid({
             </div>
           );
         })}
+        <div className="w-px h-4 bg-neutral-200 mx-1" />
+        <button
+          onClick={handleExport}
+          className="p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+          title="Export backup"
+        >
+          <Download size={13} />
+        </button>
+        <button
+          onClick={() => importRef.current?.click()}
+          className="p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+          title="Import backup"
+        >
+          <Upload size={13} />
+        </button>
+        <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
         <div className="w-px h-4 bg-neutral-200 mx-1" />
         <button
           onClick={reset}
