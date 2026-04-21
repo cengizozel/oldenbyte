@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import * as storage from "@/lib/storage";
+import { widgets as widgetDefs } from "@/lib/widgets";
 
 type TabLayoutItem = { i: string; tabs?: string[] };
 type WidgetInstance = { id: string; type: string; title: string };
@@ -15,9 +16,12 @@ type Entry = {
   link?: string;
 };
 
+type Ref = { n: number; title: string; link: string };
+
 type Section = {
   id: string;
   label: string;
+  type: string;
   entries: Entry[];
 };
 
@@ -56,16 +60,16 @@ function timeAgo(iso: string): string {
 }
 
 export default function DigestPage() {
-  const [mode, setMode]       = useState<"digest" | "full" | "ai">("digest");
+  const [mode] = useState<"digest" | "full" | "ai">("ai");
   const [sections, setSections]   = useState<Section[]>([]);
   const [loading, setLoading]     = useState(true);
-  const [aiKey, setAiKey]         = useState("");
-  const [keyDraft, setKeyDraft]   = useState("");
+  const [aiKey, setAiKey]               = useState("");
+  const [keyDraft, setKeyDraft]         = useState("");
   const [showKeyInput, setShowKeyInput] = useState(false);
-  const [summary, setSummary]     = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError]     = useState("");
-  const summaryRequestedRef       = useRef(false);
+  const [sectionSummaries, setSectionSummaries] = useState<{ label: string; prose: string; refs: Ref[] }[]>([]);
+  const [aiLoading, setAiLoading]       = useState(false);
+  const [aiError, setAiError]           = useState("");
+  const summaryRequestedRef             = useRef(false);
 
   const today = new Date().toISOString().split("T")[0];
   const dateLabel = new Date().toLocaleDateString("en-US", {
@@ -82,10 +86,13 @@ export default function DigestPage() {
 
   // Auto-generate when AI tab is selected, key exists, sections loaded, no summary yet
   useEffect(() => {
-    if (mode !== "ai" || !aiKey || loading || !sections.length || summary || aiLoading) return;
+    if (mode !== "ai" || !aiKey || loading || !sections.length || sectionSummaries.length || aiLoading) return;
     if (summaryRequestedRef.current) return;
-    storage.getItem(`digest-ai-${today}`).then(cached => {
-      if (cached) { setSummary(cached); return; }
+    storage.getItem(`digest-ai-sections-${today}`).then(cached => {
+      if (cached) {
+        setSectionSummaries(JSON.parse(cached));
+        return;
+      }
       generateSummary();
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,20 +104,33 @@ export default function DigestPage() {
     setShowKeyInput(false);
   }
 
-  function buildPromptText(): string {
-    return sections.map(section => {
-      const lines: string[] = [section.label.toUpperCase()];
-      for (const entry of section.entries) {
-        if (entry.text) {
-          lines.push(entry.text);
-        } else {
-          if (entry.title) lines.push(entry.title);
-          if (entry.body)  lines.push(entry.body);
-          if (entry.meta)  lines.push(`(${entry.meta})`);
+  const CITABLE = new Set(["rss", "reddit", "youtube", "arxiv", "hf"]);
+
+  function buildSectionContent(section: Section): { content: string; refs: Ref[] } {
+    const refs: Ref[] = [];
+    let n = 1;
+    const citable = CITABLE.has(section.type);
+    const lines: string[] = [];
+    for (const entry of section.entries) {
+      if (entry.text) {
+        lines.push(entry.text);
+      } else {
+        if (entry.title) {
+          if (citable && entry.link) {
+            refs.push({ n, title: entry.title, link: entry.link });
+            lines.push(`${entry.title} [${n++}]`);
+          } else {
+            lines.push(entry.title);
+          }
         }
+        if (entry.body) lines.push(entry.body);
+        if (entry.meta) lines.push(`(${entry.meta})`);
       }
-      return lines.join("\n");
-    }).join("\n\n---\n\n");
+    }
+    const refBlock = refs.length
+      ? "\n\nREFERENCES\n" + refs.map(r => `[${r.n}] "${r.title}"`).join("\n")
+      : "";
+    return { content: lines.join("\n") + refBlock, refs };
   }
 
   async function generateSummary() {
@@ -118,15 +138,24 @@ export default function DigestPage() {
     setAiLoading(true);
     setAiError("");
     try {
-      const res = await fetch("/api/digest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: aiKey, content: buildPromptText() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Unknown error");
-      setSummary(data.summary);
-      await storage.setItem(`digest-ai-${today}`, data.summary);
+      const results = await Promise.allSettled(
+        sections.map(async section => {
+          const { content, refs } = buildSectionContent(section);
+          const res = await fetch("/api/digest", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: aiKey, content }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? "Unknown error");
+          return { label: section.label, prose: data.summary as string, refs };
+        })
+      );
+      const newSectionSummaries = results
+        .filter(r => r.status === "fulfilled")
+        .map(r => (r as PromiseFulfilledResult<{ label: string; prose: string; refs: Ref[] }>).value);
+      setSectionSummaries(newSectionSummaries);
+      await storage.setItem(`digest-ai-sections-${today}`, JSON.stringify(newSectionSummaries));
     } catch (err) {
       setAiError(String(err));
       summaryRequestedRef.current = false;
@@ -135,34 +164,41 @@ export default function DigestPage() {
     }
   }
 
-  function renderSummary(text: string) {
-    const blocks = text.split(/\n\n+/);
-    return blocks.map((block, i) => {
+  function renderInline(text: string, refList: Ref[]) {
+    // Split on **bold** and [n] citation markers
+    const parts = text.split(/(\*\*[^*]+\*\*|\[\d+\])/g);
+    return parts.map((part, j) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>;
+      }
+      const citMatch = part.match(/^\[(\d+)\]$/);
+      if (citMatch) {
+        const n = parseInt(citMatch[1]);
+        const ref = refList.find(r => r.n === n);
+        return ref ? (
+          <a
+            key={j}
+            href={ref.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={ref.title}
+            className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors align-super text-[10px] ml-0.5"
+          >
+            [{n}]
+          </a>
+        ) : <span key={j}>[{n}]</span>;
+      }
+      return part;
+    });
+  }
+
+  function renderProse(text: string, refList: Ref[]) {
+    return text.split(/\n\n+/).map((block, i) => {
       const trimmed = block.trim();
       if (!trimmed) return null;
-      if (trimmed === "---") {
-        return <hr key={i} className="border-[var(--surface-border)] my-6" />;
-      }
-      if (trimmed.startsWith("## ")) {
-        return (
-          <p key={i} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] mt-8 mb-3 first:mt-0">
-            {trimmed.slice(3)}
-          </p>
-        );
-      }
-      if (trimmed.startsWith("# ")) {
-        return (
-          <p key={i} className="font-[family-name:var(--font-playfair)] text-xl text-[var(--text-primary)] mb-4">
-            {trimmed.slice(2)}
-          </p>
-        );
-      }
-      const parts = trimmed.split(/\*\*(.+?)\*\*/g);
       return (
         <p key={i} className="font-[family-name:var(--font-playfair)] text-base leading-[1.75] text-[var(--text-primary)]">
-          {parts.map((part, j) =>
-            j % 2 === 1 ? <strong key={j} className="font-semibold">{part}</strong> : part
-          )}
+          {renderInline(trimmed, refList)}
         </p>
       );
     });
@@ -186,7 +222,9 @@ export default function DigestPage() {
 
     const filtered = orderedIds.filter(id => {
       const w = instances[id];
-      return w && w.type !== "ebook" && w.type !== "empty";
+      if (!w || w.type === "empty") return false;
+      const def = widgetDefs.find(d => d.type === w.type);
+      return def?.digestable !== false;
     });
 
     const results = await Promise.allSettled(
@@ -201,7 +239,7 @@ export default function DigestPage() {
   async function loadSection(id: string, widget: WidgetInstance): Promise<Section | null> {
     switch (widget.type) {
       case "notebook": return loadNotepad(id, widget);
-      case "text":     return loadText(id);
+      case "text":     return loadText(id, widget);
       case "f1":       return loadF1(widget);
       case "rss":      return loadRss(id, widget);
       case "reddit":   return loadReddit(id, widget);
@@ -220,21 +258,21 @@ export default function DigestPage() {
     const dates: Record<string, string> = rawDates ? JSON.parse(rawDates) : {};
     const text = dates[today];
     if (!text) return null;
-    return { id, label: rawName ?? widget.title, entries: [{ text }] };
+    return { id, label: rawName ?? widget.title, type: "notebook", entries: [{ text }] };
   }
 
-  async function loadText(id: string): Promise<Section | null> {
+  async function loadText(id: string, widget: WidgetInstance): Promise<Section | null> {
     const raw = await storage.getItem(`text-widget-${id}`);
     if (!raw) return null;
     const config: { source: { type: string; value: string } } = JSON.parse(raw);
     if (config.source.type === "text") {
-      return { id, label: "Text", entries: [{ text: config.source.value }] };
+      return { id, label: widget.title, type: "text", entries: [{ text: config.source.value }] };
     }
     try {
       const res = await fetch(`/api/proxy?url=${encodeURIComponent(config.source.value)}`);
       const text = res.ok ? (await res.text()).trim() : null;
       if (!text) return null;
-      return { id, label: "Text", entries: [{ text }] };
+      return { id, label: widget.title, type: "text", entries: [{ text }] };
     } catch {
       return null;
     }
@@ -278,20 +316,29 @@ export default function DigestPage() {
     }
 
     if (!entries.length) return null;
-    return { id: "f1", label: widget.title, entries };
+    return { id: "f1", label: widget.title, type: "f1", entries };
   }
 
   async function loadRss(id: string, widget: WidgetInstance): Promise<Section | null> {
-    const raw = await storage.getItem(`rss-widget-${id}`);
+    const [raw, cached] = await Promise.all([
+      storage.getItem(`rss-widget-${id}`),
+      storage.getItem(`rss-widget-${id}-${today}`),
+    ]);
     if (!raw) return null;
     const config: { url: string; limit: number; name?: string } = JSON.parse(raw);
-    const res = await fetch(`/api/rss?url=${encodeURIComponent(config.url)}&limit=${config.limit}`);
-    if (!res.ok) return null;
-    const items: { title: string; link: string; pubDate?: string; content?: string }[] = await res.json();
+    let items: { title: string; link: string; pubDate?: string; content?: string }[];
+    if (cached) {
+      items = JSON.parse(cached);
+    } else {
+      const res = await fetch(`/api/rss?url=${encodeURIComponent(config.url)}&limit=${config.limit}`);
+      if (!res.ok) return null;
+      items = await res.json();
+    }
     if (!Array.isArray(items) || !items.length) return null;
     return {
       id,
       label: config.name ?? widget.title,
+      type: "rss",
       entries: items.map(item => ({
         title: item.title,
         link: item.link,
@@ -303,77 +350,106 @@ export default function DigestPage() {
   }
 
   async function loadReddit(id: string, widget: WidgetInstance): Promise<Section | null> {
-    const raw = await storage.getItem(`reddit-widget-${id}`);
+    const storageKey = `reddit-widget-${id}`;
+    const raw = await storage.getItem(storageKey);
     if (!raw) return null;
     const config = JSON.parse(raw);
     const subreddits: { name: string; limit: number; period: string }[] = config.subreddits ?? [];
 
-    const results = await Promise.allSettled(
-      subreddits.map(async sub => {
-        const url = `https://www.reddit.com/r/${sub.name}/top.rss?t=${sub.period}&limit=${sub.limit}`;
-        const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${sub.limit}`);
-        if (!res.ok) return [] as Entry[];
-        const items: { title: string; link: string; content?: string }[] = await res.json();
-        if (!Array.isArray(items)) return [] as Entry[];
-        return items.map(item => ({
-          title: item.title,
-          link: item.link,
-          body: item.content
-            ? stripTags(decodeEntities(item.content)).replace(/\s+/g, " ").trim() || undefined
-            : undefined,
-          meta: `r/${sub.name}`,
-        })) as Entry[];
-      })
-    );
+    const cacheKey = `${storageKey}-v2-${today}-${subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
+    const cached = await storage.getItem(cacheKey);
 
-    const lists = results
-      .filter(r => r.status === "fulfilled")
-      .map(r => (r as PromiseFulfilledResult<Entry[]>).value);
+    let entries: Entry[];
+    if (cached) {
+      const posts: { title: string; link: string; subreddit: string; content: string }[] = JSON.parse(cached);
+      entries = posts.map(p => ({
+        title: p.title,
+        link: p.link,
+        body: p.content ? stripTags(decodeEntities(p.content)).replace(/\s+/g, " ").trim() || undefined : undefined,
+        meta: `r/${p.subreddit}`,
+      }));
+    } else {
+      const results = await Promise.allSettled(
+        subreddits.map(async sub => {
+          const url = `https://www.reddit.com/r/${sub.name}/top.rss?t=${sub.period}&limit=${sub.limit}`;
+          const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${sub.limit}`);
+          if (!res.ok) return [] as Entry[];
+          const items: { title: string; link: string; content?: string }[] = await res.json();
+          if (!Array.isArray(items)) return [] as Entry[];
+          return items.map(item => ({
+            title: item.title,
+            link: item.link,
+            body: item.content
+              ? stripTags(decodeEntities(item.content)).replace(/\s+/g, " ").trim() || undefined
+              : undefined,
+            meta: `r/${sub.name}`,
+          })) as Entry[];
+        })
+      );
 
-    const entries: Entry[] = [];
-    const maxLen = Math.max(...lists.map(l => l.length), 0);
-    for (let i = 0; i < maxLen; i++) {
-      for (const list of lists) {
-        if (list[i]) entries.push(list[i]);
+      const lists = results
+        .filter(r => r.status === "fulfilled")
+        .map(r => (r as PromiseFulfilledResult<Entry[]>).value);
+
+      entries = [];
+      const maxLen = Math.max(...lists.map(l => l.length), 0);
+      for (let i = 0; i < maxLen; i++) {
+        for (const list of lists) {
+          if (list[i]) entries.push(list[i]);
+        }
       }
     }
 
     if (!entries.length) return null;
-    return { id, label: widget.title, entries };
+    return { id, label: widget.title, type: "reddit", entries };
   }
 
   async function loadYoutube(id: string, widget: WidgetInstance): Promise<Section | null> {
-    const raw = await storage.getItem(`youtube-widget-${id}`);
+    const storageKey = `youtube-widget-${id}`;
+    const raw = await storage.getItem(storageKey);
     if (!raw) return null;
     const config: { channels: { channelId: string; name: string; limit: number }[] } = JSON.parse(raw);
 
-    const results = await Promise.allSettled(
-      config.channels.map(async ch => {
-        const res = await fetch(`/api/youtube?channelId=${ch.channelId}&limit=${ch.limit}`);
-        if (!res.ok) return [] as Entry[];
-        const data = await res.json();
-        return (data.videos ?? []).map((v: { title: string; link: string; publishedAt: string }) => ({
-          title: v.title,
-          link: v.link,
-          meta: `${ch.name} · ${timeAgo(v.publishedAt)}`,
-        })) as Entry[];
-      })
-    );
+    const cacheKey = `${storageKey}-${today}-${config.channels.map(ch => `${ch.channelId}:${ch.limit}`).join(",")}`;
+    const cached = await storage.getItem(cacheKey);
 
-    const lists = results
-      .filter(r => r.status === "fulfilled")
-      .map(r => (r as PromiseFulfilledResult<Entry[]>).value);
+    let entries: Entry[];
+    if (cached) {
+      const videos: { title: string; link: string; published: string; channelName: string }[] = JSON.parse(cached);
+      entries = videos.map(v => ({
+        title: v.title,
+        link: v.link,
+        meta: `${v.channelName} · ${timeAgo(v.published)}`,
+      }));
+    } else {
+      const results = await Promise.allSettled(
+        config.channels.map(async ch => {
+          const res = await fetch(`/api/youtube?channelId=${ch.channelId}&limit=${ch.limit}`);
+          if (!res.ok) return [] as Entry[];
+          const data = await res.json();
+          return (data.videos ?? []).map((v: { title: string; link: string; publishedAt: string }) => ({
+            title: v.title,
+            link: v.link,
+            meta: `${ch.name} · ${timeAgo(v.publishedAt)}`,
+          })) as Entry[];
+        })
+      );
 
-    const entries: Entry[] = [];
-    const maxLen = Math.max(...lists.map(l => l.length), 0);
-    for (let i = 0; i < maxLen; i++) {
-      for (const list of lists) {
-        if (list[i]) entries.push(list[i]);
+      const lists = results
+        .filter(r => r.status === "fulfilled")
+        .map(r => (r as PromiseFulfilledResult<Entry[]>).value);
+
+      entries = [];
+      const maxLen = Math.max(...lists.map(l => l.length), 0);
+      for (let i = 0; i < maxLen; i++) {
+        for (const list of lists) {
+          if (list[i]) entries.push(list[i]);
+        }
       }
     }
 
     if (!entries.length) return null;
-    return { id, label: widget.title, entries };
+    return { id, label: widget.title, type: "youtube", entries };
   }
 
   async function loadArxiv(id: string, widget: WidgetInstance): Promise<Section | null> {
@@ -397,7 +473,8 @@ export default function DigestPage() {
     }
     return {
       id,
-      label: `${widget.title} — ${category}`,
+      label: widget.title,
+      type: "arxiv",
       entries: papers.map(p => {
         const parsed = parseArxivContent(p.content);
         return {
@@ -434,6 +511,7 @@ export default function DigestPage() {
     return {
       id,
       label: widget.title,
+      type: "hf",
       entries: papers.map(p => ({
         title: p.title,
         link: p.link,
@@ -464,26 +542,10 @@ export default function DigestPage() {
             </h1>
             <p className="text-[var(--text-muted)] text-sm mt-0.5">{dateLabel}</p>
           </div>
-          <div className="flex items-center gap-5 pt-6">
-            {(["digest", "full", "ai"] as const).map(m => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`text-sm font-[family-name:var(--font-dm-mono)] transition-colors ${
-                  mode === m
-                    ? "text-[var(--text-primary)]"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Content */}
-        {mode === "ai" ? (
-          <div>
+        <div>
             {/* Key management */}
             {!aiKey || showKeyInput ? (
               <div className="flex items-center gap-3 mb-10">
@@ -518,9 +580,9 @@ export default function DigestPage() {
                 >
                   edit key
                 </button>
-                {summary && (
+                {sectionSummaries.length > 0 && (
                   <button
-                    onClick={() => { setSummary(""); summaryRequestedRef.current = false; generateSummary(); }}
+                    onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; generateSummary(); }}
                     className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
                   >
                     regenerate
@@ -536,65 +598,21 @@ export default function DigestPage() {
               <p className="text-sm font-[family-name:var(--font-dm-mono)] text-[var(--text-muted)]">generating...</p>
             ) : aiError ? (
               <p className="text-sm text-[var(--text-muted)]">{aiError}</p>
-            ) : summary ? (
-              <div className="flex flex-col gap-5">
-                {renderSummary(summary)}
+            ) : sectionSummaries.length > 0 ? (
+              <div className="flex flex-col">
+                {sectionSummaries.map((s, si) => (
+                  <div key={s.label} className={si > 0 ? "mt-10 pt-10 border-t border-[var(--surface-border)]" : ""}>
+                    <p className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-4">
+                      {s.label}
+                    </p>
+                    <div className="flex flex-col gap-4">
+                      {renderProse(s.prose, s.refs)}
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : null}
           </div>
-        ) : loading ? (
-          <p className="text-[var(--text-muted)] text-sm font-[family-name:var(--font-dm-mono)]">
-            loading...
-          </p>
-        ) : sections.length === 0 ? (
-          <p className="text-[var(--text-muted)] text-sm">nothing to show today.</p>
-        ) : (
-          <div className="flex flex-col">
-            {sections.map((section, si) => (
-              <div key={section.id} className={si > 0 ? "mt-10 pt-10 border-t border-[var(--surface-border)]" : ""}>
-                <p className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-4">
-                  {section.label}
-                </p>
-                <div className="flex flex-col gap-4">
-                  {section.entries.map((entry, i) => (
-                    <div key={i}>
-                      {entry.text ? (
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {entry.text}
-                        </p>
-                      ) : (
-                        <div>
-                          {entry.link ? (
-                            <a
-                              href={entry.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm leading-snug hover:opacity-60 transition-opacity"
-                            >
-                              {entry.title}
-                            </a>
-                          ) : (
-                            <p className="text-sm leading-snug">{entry.title}</p>
-                          )}
-                          {entry.meta && (
-                            <p className="text-xs text-[var(--text-muted)] mt-1">
-                              {entry.meta}
-                            </p>
-                          )}
-                          {mode === "full" && entry.body && (
-                            <p className="text-sm text-[var(--text-secondary)] mt-2 leading-relaxed whitespace-pre-wrap">
-                              {entry.body}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
       </div>
     </div>

@@ -8,6 +8,7 @@ export type Widget = {
   description: string;
   type: WidgetType;
   color: WidgetColor;
+  digestable?: boolean;
 };
 
 export const colorMap: Record<WidgetColor, {
@@ -33,6 +34,7 @@ export const widgets: Widget[] = [
     color: "amber",
     title: "Notepad",
     description: "A simple place for temporary notes.",
+    digestable: false,
   },
   {
     id: "ebook",
@@ -40,6 +42,7 @@ export const widgets: Widget[] = [
     color: "sky",
     title: "Reader",
     description: "Read a PDF or EPUB file.",
+    digestable: false,
   },
   {
     id: "text",

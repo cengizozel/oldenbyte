@@ -20,19 +20,16 @@ export async function POST(request: NextRequest) {
             role: "system",
             content:
               "You are a seasoned newspaper editor crafting a personal morning briefing. " +
-              "Transform a raw content digest into an elegant, well-written newspaper-style summary. " +
-              "Write in flowing prose — no bullet points. Use ## for section headers. Be concise but substantive.",
+              "Write 2–4 sentences of flowing, intelligent prose summarizing the content provided. " +
+              "No bullet points, no headers, no section titles — just prose. " +
+              "When you mention a specific item that has a reference number like [1] in the content, " +
+              "include that number in brackets immediately after. " +
+              "Only cite items that appear in the REFERENCES section.",
           },
           {
             role: "user",
             content:
-              "Below is today's content digest. Write a beautifully structured newspaper-style briefing from it.\n\n" +
-              "Guidelines:\n" +
-              "- Warm, intelligent tone — quality newspaper columnist\n" +
-              "- Group related content under clear ## section headers\n" +
-              "- Flowing prose, not lists\n" +
-              "- Include specific titles, names, and details from the digest\n" +
-              "- Keep each section to 2–4 sentences\n\n" +
+              "Below is today's content from one source. Write a brief newspaper-style paragraph about it.\n\n" +
               "---\n\n" +
               content,
           },
