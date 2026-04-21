@@ -68,6 +68,10 @@ The app is exposed on port `3847`. Data (database and uploaded files) is persist
 
 Watchtower is included and polls for new image versions every 5 minutes, pulling and restarting the container automatically when a new build is pushed.
 
+## Credits
+
+- F1 circuit outlines by [Jules Roy](https://github.com/julesr0y/f1-circuits-svg), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+
 ## Deployment
 
 Pushing to `main` triggers a GitHub Actions workflow that builds and pushes a Docker image to GHCR. Watchtower on the server picks it up automatically.

@@ -14,7 +14,18 @@ export async function GET() {
       standingsRes.json(),
     ]);
 
-    const race = nextRaceData.MRData?.RaceTable?.Races?.[0] ?? null;
+    const raw = nextRaceData.MRData?.RaceTable?.Races?.[0];
+    const race = raw ? {
+      raceName: raw.raceName,
+      round: raw.round,
+      date: raw.date,
+      time: raw.time,
+      Circuit: {
+        circuitId: raw.Circuit.circuitId,
+        circuitName: raw.Circuit.circuitName,
+        Location: raw.Circuit.Location,
+      },
+    } : null;
     const standings = standingsData.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings?.slice(0, 5) ?? [];
 
     return NextResponse.json({ race, standings });

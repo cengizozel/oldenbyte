@@ -8,7 +8,7 @@ import * as storage from "@/lib/storage";
 type Race = {
   raceName: string;
   round: string;
-  Circuit: { circuitName: string; Location: { country: string } };
+  Circuit: { circuitId: string; circuitName: string; Location: { country: string } };
   date: string;
   time?: string;
 };
@@ -107,15 +107,22 @@ export default function F1Widget({
 
               {/* Next race */}
               {data.race ? (
-                <div className="flex flex-col gap-0.5">
-                  <p className={`text-[10px] font-semibold uppercase tracking-widest opacity-50 mb-0.5 ${c.label}`}>
-                    Next Race · Round {data.race.round}
-                  </p>
-                  <p className={`text-sm font-medium leading-snug ${c.text}`}>{data.race.raceName}</p>
-                  <p className={`text-xs opacity-60 ${c.text}`}>{data.race.Circuit.circuitName}</p>
-                  <p className={`text-xs opacity-50 ${c.text}`}>
-                    {formatRaceDate(data.race.date)} · {countdown(data.race.date, data.race.time)}
-                  </p>
+                <div className="flex items-start gap-3">
+                  <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                    <p className={`text-[10px] font-semibold uppercase tracking-widest opacity-50 mb-0.5 ${c.label}`}>
+                      Next Race · Round {data.race.round}
+                    </p>
+                    <p className={`text-sm font-medium leading-snug ${c.text}`}>{data.race.raceName}</p>
+                    <p className={`text-xs opacity-60 ${c.text}`}>{data.race.Circuit.circuitName}</p>
+                    <p className={`text-xs opacity-50 ${c.text}`}>
+                      {formatRaceDate(data.race.date)} · {countdown(data.race.date, data.race.time)}
+                    </p>
+                  </div>
+                  <img
+                    src={`/circuits/${data.race.Circuit.circuitId}.svg`}
+                    alt=""
+                    className="w-16 h-16 shrink-0 opacity-20 dark:opacity-25 dark:invert"
+                  />
                 </div>
               ) : (
                 <p className={`text-xs opacity-50 ${c.text}`}>Season complete</p>
