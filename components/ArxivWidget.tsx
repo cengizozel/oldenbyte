@@ -133,9 +133,6 @@ function findGroup(categoryValue: string): string {
     ?? CATEGORY_GROUPS[0].label;
 }
 
-function allCategories() {
-  return CATEGORY_GROUPS.flatMap(g => g.subs);
-}
 
 type ArxivConfig = { category: string };
 type Paper = { title: string; link: string; pubDate: string; content: string };
