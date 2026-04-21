@@ -380,14 +380,21 @@ export default function TopBar({
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
+    storage.getItem("theme").then(saved => {
+      const isDark = saved ? saved === "dark" : document.documentElement.classList.contains("dark");
+      setDark(isDark);
+      document.documentElement.classList.toggle("dark", isDark);
+      localStorage.setItem("theme", isDark ? "dark" : "light");
+    });
   }, []);
 
   function toggleDark() {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("theme", next ? "dark" : "light");
+    const value = next ? "dark" : "light";
+    localStorage.setItem("theme", value);
+    storage.setItem("theme", value);
   }
 
   return (
