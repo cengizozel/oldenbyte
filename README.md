@@ -13,6 +13,8 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 - **Reddit** - top posts from one or more subreddits, selectable time period and post count, interleaved across subreddits
 - **YouTube** - latest videos from one or more channels, resolved by handle or URL, interleaved with relative upload timestamps
 - **F1** - next race details with countdown and current top 5 driver standings, updated hourly
+- **arXiv** - latest papers from a chosen research field (CS, Math, Physics, and more), cached daily, with abstract view on click
+- **HF Daily** - trending AI papers curated by Hugging Face, sorted by upvotes, cached daily
 
 ## Top bar
 

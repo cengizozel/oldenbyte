@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import * as storage from "@/lib/storage";
-import { RotateCcw, GripVertical, Download, Upload } from "lucide-react";
+import { RotateCcw, GripVertical, Download, Upload, Layers } from "lucide-react";
 import GridLayout from "react-grid-layout";
 import type { Layout as LayoutItem } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -24,7 +24,9 @@ const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 const COLS = 4;
 const GAP = 16;
 
-const initialLayout: LayoutItem[] = [
+type TabLayoutItem = LayoutItem & { tabs?: string[] };
+
+const initialLayout: TabLayoutItem[] = [
   { i: "notebook", x: 0, y: 0, w: 2, h: 2, minW: 1, minH: 1, maxW: 4, maxH: 6 },
   { i: "rss",      x: 0, y: 2, w: 2, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
   { i: "text",     x: 0, y: 6, w: 2, h: 2, minW: 1, minH: 1, maxW: 4, maxH: 6 },
@@ -41,7 +43,7 @@ function renderWidget(widget: Widget) {
   if (widget.type === "youtube")  return <YoutubeWidget  widget={widget} className="h-full" />;
   if (widget.type === "ebook")    return <ReaderWidget   widget={widget} className="h-full" />;
   if (widget.type === "f1")       return <F1Widget       widget={widget} className="h-full" />;
-  if (widget.type === "arxiv")    return <ArxivWidget       widget={widget} className="h-full" />;
+  if (widget.type === "arxiv")    return <ArxivWidget    widget={widget} className="h-full" />;
   if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className="h-full" />;
   return <WidgetCard widget={widget} className="h-full" />;
 }
@@ -56,10 +58,12 @@ export default function WidgetGrid({
   onToggleEdit?: () => void;
 }) {
 
-  const [layout, setLayout] = useState<LayoutItem[]>(initialLayout);
+  const [layout, setLayout] = useState<TabLayoutItem[]>(initialLayout);
   const [instances, setInstances] = useState<Record<string, Widget>>(
     () => Object.fromEntries(widgets.map(w => [w.id, w]))
   );
+  const [groupingSource, setGroupingSource] = useState<string | null>(null);
+  const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
 
   // Load persisted layout from DB after hydration
   useEffect(() => {
@@ -79,8 +83,8 @@ export default function WidgetGrid({
           const validIds = new Set(Object.keys(clean));
           setInstances(clean);
           if (savedLayout) {
-            const parsedLayout = JSON.parse(savedLayout);
-            setLayout(parsedLayout.filter((l: LayoutItem) => validIds.has(l.i)));
+            const parsedLayout: TabLayoutItem[] = JSON.parse(savedLayout);
+            setLayout(parsedLayout.filter((l) => validIds.has(l.i)));
           }
         } else if (savedLayout) {
           setLayout(JSON.parse(savedLayout));
@@ -156,6 +160,11 @@ export default function WidgetGrid({
     storage.setItem("widget-instances", JSON.stringify(instances));
   }, [instances]);
 
+  // Cancel grouping mode when edit mode is turned off
+  useEffect(() => {
+    if (!editing) setGroupingSource(null);
+  }, [editing]);
+
   const isMobile = size.width > 0 && size.width < 600;
 
   const numRows = Math.max(...layout.map(l => l.y + l.h), 1);
@@ -166,6 +175,8 @@ export default function WidgetGrid({
   function reset() {
     setLayout(initialLayout);
     setInstances(Object.fromEntries(widgets.map(w => [w.id, w])));
+    setActiveTabs({});
+    setGroupingSource(null);
     storage.removeItem("widget-layout");
     storage.removeItem("widget-instances");
   }
@@ -200,8 +211,16 @@ export default function WidgetGrid({
   }
 
   function removeWidget(instanceId: string) {
-    setLayout(l => l.filter(item => item.i !== instanceId));
+    const item = layout.find(l => l.i === instanceId) as TabLayoutItem | undefined;
+    const tabsToRemove = item?.tabs ?? [];
+    setLayout(l => l.filter(li => li.i !== instanceId));
     setInstances(prev => {
+      const next = { ...prev };
+      delete next[instanceId];
+      for (const tabId of tabsToRemove) delete next[tabId];
+      return next;
+    });
+    setActiveTabs(prev => {
       const next = { ...prev };
       delete next[instanceId];
       return next;
@@ -221,7 +240,7 @@ export default function WidgetGrid({
   };
 
   function findNextPosition(
-    currentLayout: LayoutItem[],
+    currentLayout: TabLayoutItem[],
     defaultW: number,
     defaultH: number,
   ): { x: number; y: number; w: number; h: number } {
@@ -239,20 +258,16 @@ export default function WidgetGrid({
     const maxY = Math.max(...currentLayout.map(l => l.y + l.h));
     const capW = Math.min(defaultW, COLS);
 
-    // For each empty cell, measure the largest w×h block we can fit starting there,
-    // capped at the widget's default dimensions. Pick the candidate with the most area.
     let best: { x: number; y: number; w: number; h: number; area: number } | null = null;
 
     for (let row = 0; row < maxY; row++) {
       for (let col = 0; col <= COLS - 1; col++) {
         if (occupied.has(`${col},${row}`)) continue;
 
-        // Max width available from this cell (capped at defaultW)
         let availW = 0;
         while (col + availW < COLS && availW < capW && !occupied.has(`${col + availW},${row}`)) availW++;
         if (availW === 0) continue;
 
-        // Max height available across those columns (capped at defaultH)
         let availH = 0;
         outer: while (availH < defaultH) {
           for (let dx = 0; dx < availW; dx++) {
@@ -266,7 +281,6 @@ export default function WidgetGrid({
         if (!best || area > best.area) {
           best = { x: col, y: row, w: availW, h: availH, area };
         }
-        // Perfect fit — no need to keep scanning
         if (availW === capW && availH === defaultH) break;
       }
       if (best?.w === capW && best?.h === defaultH) break;
@@ -274,7 +288,6 @@ export default function WidgetGrid({
 
     if (best) return { x: best.x, y: best.y, w: best.w, h: best.h };
 
-    // No gaps at all — append below at full default size
     return { x: 0, y: maxY, w: defaultW, h: defaultH };
   }
 
@@ -294,6 +307,104 @@ export default function WidgetGrid({
       i: id, x, y, w, h,
       minW: 1, minH: 1, maxW: 4, maxH: 6,
     }]);
+  }
+
+  function handleGroupStart(id: string) {
+    setGroupingSource(prev => prev === id ? null : id);
+  }
+
+  function handleGroupWith(targetId: string) {
+    if (!groupingSource || groupingSource === targetId) {
+      setGroupingSource(null);
+      return;
+    }
+    const sourceId = groupingSource;
+    setLayout(prev =>
+      prev
+        .filter(item => item.i !== sourceId)
+        .map(item =>
+          item.i === targetId
+            ? { ...item, tabs: [...(item.tabs ?? []), sourceId] }
+            : item
+        )
+    );
+    setActiveTabs(prev => ({ ...prev, [targetId]: sourceId }));
+    setGroupingSource(null);
+  }
+
+  function handleUngroupTab(containerId: string, tabId: string) {
+    setLayout(prev => {
+      const updated = prev.map(item =>
+        item.i === containerId
+          ? { ...item, tabs: (item.tabs ?? []).filter(t => t !== tabId) }
+          : item
+      );
+      const widget = instances[tabId];
+      const { w: dw, h: dh } = DEFAULT_SIZE[widget?.type ?? ""] ?? { w: 2, h: 2 };
+      const pos = findNextPosition(updated, dw, dh);
+      return [...updated, { i: tabId, x: pos.x, y: pos.y, w: pos.w, h: pos.h, minW: 1, minH: 1, maxW: 4, maxH: 6 }];
+    });
+    setActiveTabs(prev => {
+      const next = { ...prev };
+      if (next[containerId] === tabId) delete next[containerId];
+      return next;
+    });
+  }
+
+  function renderTabBar(item: TabLayoutItem, isEditMode: boolean) {
+    const allTabIds = [item.i, ...(item.tabs ?? [])];
+    const activeId = activeTabs[item.i] ?? item.i;
+    return (
+      <div className="flex gap-1 px-2 pt-1.5 pb-1 shrink-0 overflow-x-auto">
+        {allTabIds.map(tabId => {
+          const w = instances[tabId];
+          const c = colorMap[w?.color ?? "neutral"];
+          const isActive = tabId === activeId;
+          return (
+            <button
+              key={tabId}
+              onMouseDown={e => e.stopPropagation()}
+              onClick={() => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all border ${
+                isActive
+                  ? `${c.bg} ${c.border} opacity-100`
+                  : "bg-transparent border-transparent opacity-40 hover:opacity-70"
+              }`}
+            >
+              <span className={`${c.label}`}>{w?.title ?? tabId}</span>
+              {isEditMode && tabId !== item.i && (
+                <span
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); handleUngroupTab(item.i, tabId); }}
+                  className="ml-0.5 leading-none text-neutral-400 hover:text-neutral-700"
+                >
+                  ×
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderWithTabs(item: TabLayoutItem, isEditMode: boolean) {
+    const hasTabs = (item.tabs?.length ?? 0) > 0;
+    if (!hasTabs) {
+      const widget = instances[item.i];
+      if (!widget) return null;
+      return renderWidget(widget);
+    }
+    const activeId = activeTabs[item.i] ?? item.i;
+    const activeWidget = instances[activeId];
+    return (
+      <div className="flex flex-col h-full">
+        {renderTabBar(item, isEditMode)}
+        <div className="flex-1 min-h-0">
+          {activeWidget && renderWidget(activeWidget)}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -390,7 +501,18 @@ export default function WidgetGrid({
               width={size.width}
               margin={[GAP, GAP]}
               containerPadding={[0, 0]}
-              onLayoutChange={(l) => setLayout([...l])}
+              onLayoutChange={(newLayout) => {
+                setLayout(prev => {
+                  const tabsMap: Record<string, string[]> = {};
+                  for (const item of prev) {
+                    if (item.tabs?.length) tabsMap[item.i] = item.tabs;
+                  }
+                  return newLayout.map(l => ({
+                    ...l,
+                    ...(tabsMap[l.i] ? { tabs: tabsMap[l.i] } : {}),
+                  }));
+                });
+              }}
               isDraggable
               isResizable
               isDroppable
@@ -407,15 +529,61 @@ export default function WidgetGrid({
               resizeHandles={["se"]}
               compactType="vertical"
             >
-              {layout.map(({ i }) => {
+              {layout.map((item) => {
+                const { i } = item;
                 const widget = instances[i];
                 if (!widget) return <div key={i} />;
+                const isGroupingSource = groupingSource === i;
+                const isGroupingTarget = groupingSource !== null && groupingSource !== i;
                 return (
-                  <div key={i} className="relative rounded-2xl">
-                    <div className="pointer-events-none h-full">
-                      {renderWidget(widget)}
+                  <div key={i} className="relative rounded-2xl flex flex-col h-full">
+                    {(item.tabs?.length ?? 0) > 0 && (
+                      <div
+                        className="shrink-0 relative z-20"
+                        onMouseDown={e => e.stopPropagation()}
+                      >
+                        {renderTabBar(item, true)}
+                      </div>
+                    )}
+                    <div className="pointer-events-none flex-1 min-h-0">
+                      {(() => {
+                        const activeId = activeTabs[item.i] ?? item.i;
+                        const activeWidget = instances[activeId];
+                        return activeWidget ? renderWidget(activeWidget) : null;
+                      })()}
                     </div>
-                    <div className="absolute inset-0 z-10 rounded-2xl border-2 border-dashed border-neutral-300 cursor-grab" />
+                    {/* Border overlay — highlighted when this is the grouping source */}
+                    <div className={`absolute inset-0 z-10 rounded-2xl border-2 cursor-grab transition-colors ${
+                      isGroupingSource
+                        ? "border-blue-400 bg-blue-400/10"
+                        : "border-dashed border-neutral-300"
+                    }`} />
+                    {/* Grouping target overlay */}
+                    {isGroupingTarget && (
+                      <div
+                        onMouseDown={e => e.stopPropagation()}
+                        onClick={() => handleGroupWith(i)}
+                        className="absolute inset-0 z-20 rounded-2xl bg-black/15 flex items-center justify-center cursor-pointer hover:bg-black/25 transition-colors"
+                      >
+                        <div className="bg-white rounded-xl px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm flex items-center gap-1.5 pointer-events-none">
+                          <Layers size={11} />
+                          Add as tab
+                        </div>
+                      </div>
+                    )}
+                    {/* Layers (group) button */}
+                    <button
+                      onMouseDown={e => e.stopPropagation()}
+                      onClick={() => handleGroupStart(i)}
+                      className={`absolute top-2 right-8 z-20 w-5 h-5 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
+                        isGroupingSource
+                          ? "bg-blue-100 border-blue-300 text-blue-600"
+                          : "bg-white border-neutral-200 text-neutral-400 hover:text-neutral-600"
+                      }`}
+                    >
+                      <Layers size={10} />
+                    </button>
+                    {/* Remove button */}
                     <button
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={() => removeWidget(i)}
@@ -437,7 +605,7 @@ export default function WidgetGrid({
                 if (!widget) return null;
                 return (
                   <div key={item.i} className="h-80 shrink-0 overflow-hidden">
-                    {renderWidget(widget)}
+                    {renderWithTabs(item, false)}
                   </div>
                 );
               })}
@@ -462,7 +630,7 @@ export default function WidgetGrid({
                     gridRow: `${item.y + 1} / span ${item.h}`,
                   }}
                 >
-                  {renderWidget(widget)}
+                  {renderWithTabs(item, false)}
                 </div>
               );
             })}

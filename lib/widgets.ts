@@ -86,7 +86,7 @@ export const widgets: Widget[] = [
     id: "hf",
     type: "hf",
     color: "orange",
-    title: "HF Daily Papers",
+    title: "HF Daily",
     description: "Trending AI papers curated by Hugging Face.",
   },
 ];

@@ -110,7 +110,7 @@ export default function HuggingFaceWidget({
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className={`flex items-center gap-1.5 ${c.label}`}>
           <span className="opacity-50"><Sparkles size={14} /></span>
-          <span className="text-xs font-medium opacity-60">HF Daily Papers</span>
+          <span className="text-xs font-medium opacity-60">HF Daily</span>
         </div>
         {!settingsOpen && !selected && (
           <button
