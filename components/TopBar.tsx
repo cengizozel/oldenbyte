@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, Loader, X, RotateCcw, LayoutGrid, Moon, Sun } from "lucide-react";
+import { Pencil, Check, Loader, X, RotateCcw, LayoutGrid, Moon, Sun, Newspaper } from "lucide-react";
 import * as storage from "@/lib/storage";
 
 // ── EditableField ─────────────────────────────────────────────────────────
@@ -409,6 +409,13 @@ export default function TopBar({
           className="text-base md:text-xl text-[var(--text-secondary)] italic leading-none [font-family:var(--font-playfair)]"
           align="right"
         />
+        <a
+          href="/digest"
+          className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+          title="Morning digest"
+        >
+          <Newspaper size={16} />
+        </a>
         <button
           onClick={toggleDark}
           className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
