@@ -197,7 +197,7 @@ export default function DigestPage() {
       const trimmed = block.trim();
       if (!trimmed) return null;
       return (
-        <p key={i} className="font-[family-name:var(--font-playfair)] text-base leading-[1.75] text-[var(--text-primary)]">
+        <p key={i} className="font-[family-name:var(--font-playfair)] text-[17px] leading-[1.8] text-[var(--text-primary)]">
           {renderInline(trimmed, refList)}
         </p>
       );
@@ -526,93 +526,87 @@ export default function DigestPage() {
 
   return (
     <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)]">
-      <div className="max-w-2xl mx-auto px-6 py-10">
+      <div className="max-w-3xl mx-auto px-8 py-10">
 
-        {/* Header */}
-        <div className="flex items-start justify-between mb-12">
-          <div>
+        {/* Masthead */}
+        <header className="mb-1">
+          <div className="flex items-baseline justify-between mb-3">
             <Link
               href="/"
-              className="text-[var(--text-muted)] text-xs hover:text-[var(--text-secondary)] transition-colors"
+              className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
             >
               ← back
             </Link>
-            <h1 className="font-[family-name:var(--font-dm-mono)] text-base font-medium mt-2">
+            <span className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+              {dateLabel}
+            </span>
+          </div>
+          <div className="border-t-4 border-[var(--text-primary)] pt-3 pb-2">
+            <h1 className="font-[family-name:var(--font-playfair)] text-5xl font-bold tracking-tight text-center leading-none">
               oldenbyte
             </h1>
-            <p className="text-[var(--text-muted)] text-sm mt-0.5">{dateLabel}</p>
           </div>
-        </div>
-
-        {/* Content */}
-        <div>
-            {/* Key management */}
+          <div className="border-t border-b border-[var(--text-primary)] py-1.5 flex items-center justify-between">
+            <span className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+              morning briefing
+            </span>
+            {/* Key controls */}
             {!aiKey || showKeyInput ? (
-              <div className="flex items-center gap-3 mb-10">
+              <div className="flex items-center gap-3">
                 <input
                   type="password"
                   value={keyDraft}
                   onChange={e => setKeyDraft(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && saveKey()}
                   placeholder="sk-..."
-                  className="flex-1 text-sm bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-1 text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] font-[family-name:var(--font-dm-mono)]"
+                  className="w-48 text-[11px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] font-[family-name:var(--font-dm-mono)]"
                 />
-                <button
-                  onClick={saveKey}
-                  className="text-xs font-[family-name:var(--font-dm-mono)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-                >
-                  save
-                </button>
-                {aiKey && (
-                  <button
-                    onClick={() => setShowKeyInput(false)}
-                    className="text-xs font-[family-name:var(--font-dm-mono)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-                  >
-                    cancel
-                  </button>
-                )}
+                <button onClick={saveKey} className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">save</button>
+                {aiKey && <button onClick={() => setShowKeyInput(false)} className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">cancel</button>}
               </div>
             ) : (
-              <div className="flex items-center justify-between mb-10">
-                <button
-                  onClick={() => setShowKeyInput(true)}
-                  className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
-                >
-                  edit key
-                </button>
+              <div className="flex items-center gap-4">
+                <button onClick={() => setShowKeyInput(true)} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">edit key</button>
                 {sectionSummaries.length > 0 && (
-                  <button
-                    onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; generateSummary(); }}
-                    className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
-                  >
-                    regenerate
-                  </button>
+                  <button onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; generateSummary(); }} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">regenerate</button>
                 )}
               </div>
             )}
-
-            {/* Summary */}
-            {!aiKey ? (
-              <p className="text-sm text-[var(--text-muted)]">Enter your OpenAI API key above to generate a summary.</p>
-            ) : aiLoading ? (
-              <p className="text-sm font-[family-name:var(--font-dm-mono)] text-[var(--text-muted)]">generating...</p>
-            ) : aiError ? (
-              <p className="text-sm text-[var(--text-muted)]">{aiError}</p>
-            ) : sectionSummaries.length > 0 ? (
-              <div className="flex flex-col">
-                {sectionSummaries.map((s, si) => (
-                  <div key={s.label} className={si > 0 ? "mt-10 pt-10 border-t border-[var(--surface-border)]" : ""}>
-                    <p className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-4">
-                      {s.label}
-                    </p>
-                    <div className="flex flex-col gap-4">
-                      {renderProse(s.prose, s.refs)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
           </div>
+        </header>
+
+        {/* Body */}
+        <main className="mt-8">
+          {!aiKey ? (
+            <p className="font-[family-name:var(--font-playfair)] text-base italic text-[var(--text-muted)] text-center mt-16">
+              Enter your OpenAI API key above to generate today&apos;s briefing.
+            </p>
+          ) : aiLoading ? (
+            <p className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] text-center mt-16 animate-pulse">
+              composing briefing…
+            </p>
+          ) : aiError ? (
+            <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-muted)] text-center mt-16">{aiError}</p>
+          ) : sectionSummaries.length > 0 ? (
+            <div>
+              {sectionSummaries.map((s, si) => (
+                <article key={s.label} className={si > 0 ? "mt-10 pt-8 border-t border-[var(--surface-border)]" : ""}>
+                  {/* Section flag */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="font-[family-name:var(--font-dm-mono)] text-[9px] uppercase tracking-[0.2em] text-[var(--page-bg)] bg-[var(--text-primary)] px-2 py-0.5">
+                      {s.label}
+                    </span>
+                    <div className="flex-1 h-px bg-[var(--surface-border)]" />
+                  </div>
+                  {/* Prose */}
+                  <div className="flex flex-col gap-4">
+                    {renderProse(s.prose, s.refs)}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </main>
 
       </div>
     </div>
