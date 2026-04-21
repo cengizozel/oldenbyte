@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { Zap } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { widgets as widgetDefs } from "@/lib/widgets";
 
@@ -69,6 +70,7 @@ export default function DigestPage() {
   const [sectionSummaries, setSectionSummaries] = useState<{ label: string; prose: string; refs: Ref[] }[]>([]);
   const [aiLoading, setAiLoading]       = useState(false);
   const [aiError, setAiError]           = useState("");
+  const [streamingMode, setStreamingMode] = useState(false);
   const summaryRequestedRef             = useRef(false);
 
   const today = new Date().toISOString().split("T")[0];
@@ -80,6 +82,7 @@ export default function DigestPage() {
     const saved = localStorage.getItem("digest-openai-key") ?? "";
     setAiKey(saved);
     setKeyDraft(saved);
+    setStreamingMode(localStorage.getItem("digest-streaming") === "true");
     loadAll().then(s => { setSections(s); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -137,30 +140,66 @@ export default function DigestPage() {
     summaryRequestedRef.current = true;
     setAiLoading(true);
     setAiError("");
-    try {
-      const results = await Promise.allSettled(
-        sections.map(async section => {
-          const { content, refs } = buildSectionContent(section);
-          const res = await fetch("/api/digest", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ key: aiKey, content }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error ?? "Unknown error");
-          return { label: section.label, prose: data.summary as string, refs };
-        })
-      );
-      const newSectionSummaries = results
-        .filter(r => r.status === "fulfilled")
-        .map(r => (r as PromiseFulfilledResult<{ label: string; prose: string; refs: Ref[] }>).value);
-      setSectionSummaries(newSectionSummaries);
-      await storage.setItem(`digest-ai-sections-${today}`, JSON.stringify(newSectionSummaries));
-    } catch (err) {
-      setAiError(String(err));
-      summaryRequestedRef.current = false;
-    } finally {
+
+    if (streamingMode) {
+      // Pre-populate sections so they appear immediately and fill in real-time
+      const initial = sections.map(s => ({ label: s.label, prose: "", refs: [] as Ref[] }));
+      setSectionSummaries(initial);
       setAiLoading(false);
+
+      const finalSummaries = [...initial];
+
+      await Promise.allSettled(sections.map(async (section, idx) => {
+        const { content, refs } = buildSectionContent(section);
+        const res = await fetch("/api/digest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: aiKey, content, stream: true }),
+        });
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let prose = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          prose += decoder.decode(value, { stream: true });
+          setSectionSummaries(prev => {
+            const updated = [...prev];
+            updated[idx] = { ...updated[idx], prose, refs };
+            return updated;
+          });
+        }
+        finalSummaries[idx] = { label: section.label, prose, refs };
+      }));
+
+      await storage.setItem(`digest-ai-sections-${today}`, JSON.stringify(finalSummaries));
+    } else {
+      try {
+        const results = await Promise.allSettled(
+          sections.map(async section => {
+            const { content, refs } = buildSectionContent(section);
+            const res = await fetch("/api/digest", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ key: aiKey, content }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? "Unknown error");
+            return { label: section.label, prose: data.summary as string, refs };
+          })
+        );
+        const newSectionSummaries = results
+          .filter(r => r.status === "fulfilled")
+          .map(r => (r as PromiseFulfilledResult<{ label: string; prose: string; refs: Ref[] }>).value);
+        setSectionSummaries(newSectionSummaries);
+        await storage.setItem(`digest-ai-sections-${today}`, JSON.stringify(newSectionSummaries));
+      } catch (err) {
+        setAiError(String(err));
+        summaryRequestedRef.current = false;
+      } finally {
+        setAiLoading(false);
+      }
     }
   }
 
@@ -570,6 +609,17 @@ export default function DigestPage() {
                 {sectionSummaries.length > 0 && (
                   <button onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; generateSummary(); }} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">regenerate</button>
                 )}
+                <button
+                  onClick={() => {
+                    const next = !streamingMode;
+                    setStreamingMode(next);
+                    localStorage.setItem("digest-streaming", String(next));
+                  }}
+                  title={streamingMode ? "Streaming on" : "Streaming off"}
+                  className={`transition-colors ${streamingMode ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+                >
+                  <Zap size={12} fill={streamingMode ? "currentColor" : "none"} />
+                </button>
               </div>
             )}
           </div>

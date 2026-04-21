@@ -1,44 +1,92 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const SYSTEM =
+  "You are a seasoned newspaper editor crafting a personal morning briefing. " +
+  "Write flowing, intelligent prose summarizing the content provided. No bullet points, no headers, no section titles — just prose. " +
+  "If the content contains many papers or articles, cover at least 5 of the most significant or groundbreaking ones, " +
+  "giving each 1–2 sentences. Prioritize novelty, impact, and surprise. " +
+  "For smaller or single-item sources, 2–4 sentences total is fine. " +
+  "When you mention a specific item that has a reference number like [1] in the content, " +
+  "include that number in brackets immediately after. " +
+  "Only cite items that appear in the REFERENCES section.";
+
+const USER = (content: string) =>
+  "Below is today's content from one source. Write a brief newspaper-style paragraph about it.\n\n---\n\n" + content;
+
+function buildBody(content: string, stream: boolean) {
+  return JSON.stringify({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: SYSTEM },
+      { role: "user", content: USER(content) },
+    ],
+    max_tokens: 2500,
+    temperature: 0.7,
+    stream,
+  });
+}
+
 export async function POST(request: NextRequest) {
-  const { key, content } = await request.json();
+  const { key, content, stream = false } = await request.json();
   if (!key || !content) {
     return NextResponse.json({ error: "Missing key or content" }, { status: 400 });
+  }
+
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${key}`,
+  };
+
+  if (stream) {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers,
+      body: buildBody(content, true),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      return NextResponse.json(
+        { error: err.error?.message ?? `OpenAI error ${res.status}` },
+        { status: res.status }
+      );
+    }
+
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            for (const line of decoder.decode(value).split("\n")) {
+              if (!line.startsWith("data: ")) continue;
+              const data = line.slice(6).trim();
+              if (data === "[DONE]") continue;
+              try {
+                const delta = JSON.parse(data).choices?.[0]?.delta?.content;
+                if (delta) controller.enqueue(encoder.encode(delta));
+              } catch { /* skip malformed chunks */ }
+            }
+          }
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(readable, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   }
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a seasoned newspaper editor crafting a personal morning briefing. " +
-              "Write flowing, intelligent prose summarizing the content provided. No bullet points, no headers, no section titles — just prose. " +
-              "If the content contains many papers or articles, cover at least 5 of the most significant or groundbreaking ones, " +
-              "giving each 1–2 sentences. Prioritize novelty, impact, and surprise. " +
-              "For smaller or single-item sources, 2–4 sentences total is fine. " +
-              "When you mention a specific item that has a reference number like [1] in the content, " +
-              "include that number in brackets immediately after. " +
-              "Only cite items that appear in the REFERENCES section.",
-          },
-          {
-            role: "user",
-            content:
-              "Below is today's content from one source. Write a brief newspaper-style paragraph about it.\n\n" +
-              "---\n\n" +
-              content,
-          },
-        ],
-        max_tokens: 2500,
-        temperature: 0.7,
-      }),
+      headers,
+      body: buildBody(content, false),
     });
 
     if (!res.ok) {
