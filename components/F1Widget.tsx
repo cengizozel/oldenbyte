@@ -121,7 +121,7 @@ export default function F1Widget({
                   <img
                     src={`/circuits/${data.race.Circuit.circuitId}.svg`}
                     alt=""
-                    className="w-16 h-16 shrink-0 opacity-20 dark:opacity-25 dark:invert"
+                    className="w-16 h-16 shrink-0 opacity-20 dark:opacity-60 dark:invert"
                   />
                 </div>
               ) : (
