@@ -121,6 +121,7 @@ export default function YoutubeWidget({
       for (let i = 0; i < maxLen; i++) {
         for (const r of results) { if (r[i]) interleaved.push(r[i]); }
       }
+      interleaved.sort((a, b) => new Date(b.published).getTime() - new Date(a.published).getTime());
       if (!interleaved.length) throw new Error();
       setVideos(interleaved);
       await storage.setItem(cacheKey, JSON.stringify(interleaved));
@@ -287,6 +288,9 @@ export default function YoutubeWidget({
                         <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                           {v.channelName}
                         </span>
+                        {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
+                          <span className={`text-[9px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
+                        )}
                         {v.published && (
                           <span className={`text-[10px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
                         )}
