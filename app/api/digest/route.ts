@@ -20,8 +20,10 @@ export async function POST(request: NextRequest) {
             role: "system",
             content:
               "You are a seasoned newspaper editor crafting a personal morning briefing. " +
-              "Write 2–4 sentences of flowing, intelligent prose summarizing the content provided. " +
-              "No bullet points, no headers, no section titles — just prose. " +
+              "Write flowing, intelligent prose summarizing the content provided. No bullet points, no headers, no section titles — just prose. " +
+              "If the content contains many papers or articles, cover at least 5 of the most significant or groundbreaking ones, " +
+              "giving each 1–2 sentences. Prioritize novelty, impact, and surprise. " +
+              "For smaller or single-item sources, 2–4 sentences total is fine. " +
               "When you mention a specific item that has a reference number like [1] in the content, " +
               "include that number in brackets immediately after. " +
               "Only cite items that appear in the REFERENCES section.",
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest) {
               content,
           },
         ],
-        max_tokens: 1500,
+        max_tokens: 2500,
         temperature: 0.7,
       }),
     });
