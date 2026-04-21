@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -67,5 +67,12 @@ export const widgets: Widget[] = [
     color: "rose",
     title: "YouTube",
     description: "Latest videos from your chosen channels.",
+  },
+  {
+    id: "f1",
+    type: "f1",
+    color: "rose",
+    title: "F1",
+    description: "Next race and driver standings.",
   },
 ];

@@ -12,6 +12,7 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 - **Feed** - subscribe to any RSS feed, configurable item count, headlines cached daily
 - **Reddit** - top posts from one or more subreddits, selectable time period and post count, interleaved across subreddits
 - **YouTube** - latest videos from one or more channels, resolved by handle or URL, interleaved with relative upload timestamps
+- **F1** - next race details with countdown and current top 5 driver standings, updated hourly
 
 ## Top bar
 
