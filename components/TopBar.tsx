@@ -391,7 +391,7 @@ export default function TopBar({
   }
 
   return (
-    <div className="grid grid-cols-3 items-stretch h-12 md:h-14">
+    <div className="grid grid-cols-3 items-center min-h-14 md:min-h-16">
       <div className="flex items-center">
         <EditableField
           storageKey="topbar-phrase"
@@ -399,37 +399,39 @@ export default function TopBar({
           className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none [font-family:var(--font-playfair)]"
         />
       </div>
-      <div className="flex justify-center items-center">
+      <div className="flex flex-col items-center justify-center gap-1.5">
         <DateDisplay />
+        <div className="flex items-center gap-3">
+          <a
+            href="/digest"
+            className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            title="Morning digest"
+          >
+            <Newspaper size={14} />
+          </a>
+          <button
+            onClick={toggleDark}
+            className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            title={dark ? "Light mode" : "Dark mode"}
+          >
+            {dark ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+          <button
+            onClick={onToggleEdit}
+            className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            title={editing ? "Done editing" : "Edit layout"}
+          >
+            {editing ? <Check size={14} /> : <LayoutGrid size={14} />}
+          </button>
+        </div>
       </div>
-      <div className="flex justify-end items-center gap-2 group/right">
+      <div className="flex justify-end items-center group/right">
         <EditableField
           storageKey="topbar-mood"
           defaultValue="feeling quiet"
-          className="text-base md:text-xl text-[var(--text-secondary)] italic leading-none [font-family:var(--font-playfair)]"
+          className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none [font-family:var(--font-playfair)]"
           align="right"
         />
-        <a
-          href="/digest"
-          className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-          title="Morning digest"
-        >
-          <Newspaper size={16} />
-        </a>
-        <button
-          onClick={toggleDark}
-          className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-          title={dark ? "Light mode" : "Dark mode"}
-        >
-          {dark ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
-        <button
-          onClick={onToggleEdit}
-          className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-          title={editing ? "Done editing" : "Edit layout"}
-        >
-          {editing ? <Check size={16} /> : <LayoutGrid size={16} />}
-        </button>
       </div>
     </div>
   );
