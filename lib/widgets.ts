@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -74,5 +74,19 @@ export const widgets: Widget[] = [
     color: "rose",
     title: "F1",
     description: "Next race and driver standings.",
+  },
+  {
+    id: "arxiv",
+    type: "arxiv",
+    color: "sky",
+    title: "arXiv",
+    description: "Latest papers from a chosen research field.",
+  },
+  {
+    id: "hf",
+    type: "hf",
+    color: "orange",
+    title: "HF Daily Papers",
+    description: "Trending AI papers curated by Hugging Face.",
   },
 ];

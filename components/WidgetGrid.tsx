@@ -16,6 +16,8 @@ import RssWidget from "./RssWidget";
 import RedditWidget from "./RedditWidget";
 import YoutubeWidget from "./YoutubeWidget";
 import F1Widget from "./F1Widget";
+import ArxivWidget from "./ArxivWidget";
+import HuggingFaceWidget from "./HuggingFaceWidget";
 import dynamic from "next/dynamic";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 
@@ -39,6 +41,8 @@ function renderWidget(widget: Widget) {
   if (widget.type === "youtube")  return <YoutubeWidget  widget={widget} className="h-full" />;
   if (widget.type === "ebook")    return <ReaderWidget   widget={widget} className="h-full" />;
   if (widget.type === "f1")       return <F1Widget       widget={widget} className="h-full" />;
+  if (widget.type === "arxiv")    return <ArxivWidget       widget={widget} className="h-full" />;
+  if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className="h-full" />;
   return <WidgetCard widget={widget} className="h-full" />;
 }
 
@@ -204,10 +208,25 @@ export default function WidgetGrid({
     });
   }
 
-  function findNextPosition(currentLayout: LayoutItem[]): { x: number; y: number } {
-    if (currentLayout.length === 0) return { x: 0, y: 0 };
+  const DEFAULT_SIZE: Partial<Record<string, { w: number; h: number }>> = {
+    notebook: { w: 2, h: 2 },
+    ebook:    { w: 2, h: 3 },
+    text:     { w: 2, h: 1 },
+    rss:      { w: 2, h: 3 },
+    reddit:   { w: 1, h: 3 },
+    youtube:  { w: 1, h: 3 },
+    f1:       { w: 1, h: 2 },
+    arxiv:    { w: 2, h: 3 },
+    hf:       { w: 2, h: 3 },
+  };
 
-    // Build a set of occupied cells
+  function findNextPosition(
+    currentLayout: LayoutItem[],
+    defaultW: number,
+    defaultH: number,
+  ): { x: number; y: number; w: number; h: number } {
+    if (currentLayout.length === 0) return { x: 0, y: 0, w: defaultW, h: defaultH };
+
     const occupied = new Set<string>();
     for (const item of currentLayout) {
       for (let row = item.y; row < item.y + item.h; row++) {
@@ -217,25 +236,53 @@ export default function WidgetGrid({
       }
     }
 
-    // Scan left-to-right, top-to-bottom for the first empty 1×1 cell
     const maxY = Math.max(...currentLayout.map(l => l.y + l.h));
-    for (let row = 0; row <= maxY; row++) {
-      for (let col = 0; col < COLS; col++) {
-        if (!occupied.has(`${col},${row}`)) {
-          return { x: col, y: row };
+    const capW = Math.min(defaultW, COLS);
+
+    // For each empty cell, measure the largest w×h block we can fit starting there,
+    // capped at the widget's default dimensions. Pick the candidate with the most area.
+    let best: { x: number; y: number; w: number; h: number; area: number } | null = null;
+
+    for (let row = 0; row < maxY; row++) {
+      for (let col = 0; col <= COLS - 1; col++) {
+        if (occupied.has(`${col},${row}`)) continue;
+
+        // Max width available from this cell (capped at defaultW)
+        let availW = 0;
+        while (col + availW < COLS && availW < capW && !occupied.has(`${col + availW},${row}`)) availW++;
+        if (availW === 0) continue;
+
+        // Max height available across those columns (capped at defaultH)
+        let availH = 0;
+        outer: while (availH < defaultH) {
+          for (let dx = 0; dx < availW; dx++) {
+            if (occupied.has(`${col + dx},${row + availH}`)) break outer;
+          }
+          availH++;
         }
+        if (availH === 0) continue;
+
+        const area = availW * availH;
+        if (!best || area > best.area) {
+          best = { x: col, y: row, w: availW, h: availH, area };
+        }
+        // Perfect fit — no need to keep scanning
+        if (availW === capW && availH === defaultH) break;
       }
+      if (best?.w === capW && best?.h === defaultH) break;
     }
 
-    // Grid is fully packed — append a new row
-    return { x: 0, y: maxY };
+    if (best) return { x: best.x, y: best.y, w: best.w, h: best.h };
+
+    // No gaps at all — append below at full default size
+    return { x: 0, y: maxY, w: defaultW, h: defaultH };
   }
 
   function addWidget(template: Widget, instanceId?: string) {
     const id = instanceId ?? `${template.id}-${Date.now()}`;
-    const { x, y } = findNextPosition(layout);
+    const { w: dw, h: dh } = DEFAULT_SIZE[template.type] ?? { w: 2, h: 2 };
+    const { x, y, w, h } = findNextPosition(layout, dw, dh);
 
-    // Only count instances that are actually placed in the layout
     const layoutIds = new Set(layout.map(l => l.i));
     const sameType = Object.values(instances).filter(w => w.type === template.type && layoutIds.has(w.id));
     const title = sameType.length === 0
@@ -244,7 +291,7 @@ export default function WidgetGrid({
 
     setInstances(prev => ({ ...prev, [id]: { ...template, id, title } }));
     setLayout(l => [...l, {
-      i: id, x, y, w: 2, h: 1,
+      i: id, x, y, w, h,
       minW: 1, minH: 1, maxW: 4, maxH: 6,
     }]);
   }
