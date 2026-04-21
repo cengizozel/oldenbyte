@@ -27,13 +27,25 @@ const GAP = 16;
 type TabLayoutItem = LayoutItem & { tabs?: string[] };
 
 const initialLayout: TabLayoutItem[] = [
-  { i: "notebook", x: 0, y: 0, w: 2, h: 2, minW: 1, minH: 1, maxW: 4, maxH: 6 },
-  { i: "rss",      x: 0, y: 2, w: 2, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
-  { i: "text",     x: 0, y: 6, w: 2, h: 2, minW: 1, minH: 1, maxW: 4, maxH: 6 },
-  { i: "ebook",    x: 2, y: 0, w: 2, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
-  { i: "reddit",   x: 2, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
-  { i: "youtube",  x: 3, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "notebook",            x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "arxiv-default",       x: 1, y: 0, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6, tabs: ["hf-default"] },
+  { i: "ebook",               x: 2, y: 0, w: 2, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "rss",                 x: 0, y: 3, w: 1, h: 5, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "f1-default",          x: 1, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "reddit",              x: 2, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "youtube",             x: 3, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
 ];
+
+const initialInstances: Record<string, Widget> = {
+  "notebook":      { id: "notebook",      type: "notebook", color: "amber",  title: "Notepad",  description: "A simple place for temporary notes." },
+  "ebook":         { id: "ebook",         type: "ebook",    color: "sky",    title: "Reader",   description: "Read a PDF or EPUB file." },
+  "rss":           { id: "rss",           type: "rss",      color: "teal",   title: "Feed",     description: "Headlines from any RSS feed." },
+  "reddit":        { id: "reddit",        type: "reddit",   color: "orange", title: "Reddit",   description: "Top posts from your chosen subreddits." },
+  "youtube":       { id: "youtube",       type: "youtube",  color: "rose",   title: "YouTube",  description: "Latest videos from your chosen channels." },
+  "f1-default":    { id: "f1-default",    type: "f1",       color: "rose",   title: "F1",       description: "Next race and driver standings." },
+  "arxiv-default": { id: "arxiv-default", type: "arxiv",    color: "sky",    title: "arXiv",    description: "Latest papers from a chosen research field." },
+  "hf-default":    { id: "hf-default",    type: "hf",       color: "orange", title: "HF Daily", description: "Trending AI papers curated by Hugging Face." },
+};
 
 function renderWidget(widget: Widget) {
   if (widget.type === "notebook") return <NotebookWidget widget={widget} className="h-full" />;
@@ -59,9 +71,7 @@ export default function WidgetGrid({
 }) {
 
   const [layout, setLayout] = useState<TabLayoutItem[]>(initialLayout);
-  const [instances, setInstances] = useState<Record<string, Widget>>(
-    () => Object.fromEntries(widgets.map(w => [w.id, w]))
-  );
+  const [instances, setInstances] = useState<Record<string, Widget>>(initialInstances);
   const [groupingSource, setGroupingSource] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
 
@@ -174,7 +184,7 @@ export default function WidgetGrid({
 
   function reset() {
     setLayout(initialLayout);
-    setInstances(Object.fromEntries(widgets.map(w => [w.id, w])));
+    setInstances(initialInstances);
     setActiveTabs({});
     setGroupingSource(null);
     storage.removeItem("widget-layout");
