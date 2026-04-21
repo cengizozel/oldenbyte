@@ -10,15 +10,18 @@ All widget types are defined in `lib/widgets.ts`:
 
 ```ts
 type Widget = {
-  id: string;        // unique instance ID (e.g. "notebook", "rss-1776129788318")
-  type: WidgetType;  // "notebook" | "ebook" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf"
-  color: WidgetColor; // "amber" | "sky" | "neutral" | "rose" | "teal" | "orange"
+  id: string;           // unique instance ID (e.g. "notebook", "rss-1776129788318")
+  type: WidgetType;     // "notebook" | "ebook" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf"
+  color: WidgetColor;   // "amber" | "sky" | "neutral" | "rose" | "teal" | "orange"
   title: string;
   description: string;
+  digestable?: boolean; // whether this widget appears in /digest (default: true)
 };
 ```
 
-The `colorMap` in `lib/widgets.ts` maps each color to a set of Tailwind CSS variable classes (`bg`, `border`, `label`, `text`, `fade`) that all widget components consume.
+`digestable` defaults to `true` — widgets appear in the digest unless explicitly set to `false`. Currently `notebook` and `ebook` are `false`. The `/digest` page looks up each widget's definition at runtime to apply this filter.
+
+The `colorMap` in `lib/widgets.ts` maps each color to a set of Tailwind CSS variable classes (`bg`, `border`, `label`, `text`, `fade`, `glow`) that all widget components consume.
 
 ## Layout Persistence
 

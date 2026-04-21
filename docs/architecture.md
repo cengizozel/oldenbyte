@@ -2,7 +2,7 @@
 
 ## Overview
 
-oldenbyte is a single-user personal dashboard built with the Next.js App Router. All state lives in a SQLite database on the server. The browser never uses `localStorage` or `IndexedDB` — every read and write goes through the `/api/settings` endpoint, which gives the dashboard consistent state across browsers and devices.
+oldenbyte is a single-user personal dashboard built with the Next.js App Router. All widget state lives in a SQLite database on the server and is read/written through the `/api/settings` endpoint. Two exceptions use `localStorage` directly: the theme preference (dark/light) and the OpenAI API key used by the `/digest` page.
 
 ## Stack
 
@@ -24,10 +24,11 @@ oldenbyte is a single-user personal dashboard built with the Next.js App Router.
 app/
   api/                  # API route handlers
     auth/               # Session login/logout
+    digest/             # OpenAI proxy for /digest — supports streaming and non-streaming
     f1/                 # F1 race data proxy
     files/[filename]/   # Serve uploaded files
+    hf/                 # Hugging Face daily papers proxy
     proxy/              # Server-side URL fetch proxy (curl UA)
-    reddit/             # Reddit top posts proxy
     rss/                # RSS/Atom feed parser
     settings/           # Key-value store CRUD + export/import
     upload/             # File upload handler
@@ -36,6 +37,7 @@ app/
   globals.css           # CSS variable theming system
   layout.tsx            # Root layout, fonts, FOUC prevention
   login/page.tsx        # Password login page
+  digest/page.tsx       # Morning briefing page — AI summary of today's widget content
   page.tsx              # Main dashboard page
 
 components/
@@ -77,6 +79,8 @@ All widget configuration, layout, and content is stored as JSON strings in the `
 
 ## Theming
 
-Dark/light mode is implemented via CSS custom properties on `:root` and `.dark`. The `.dark` class is toggled on `<html>` by the TopBar button and persisted in `localStorage` (the one exception to the no-localStorage rule, since theme preference is a client concern). A `suppressHydrationWarning` attribute on `<html>` and an inline script in `<head>` prevent FOUC.
+Dark/light mode is implemented via CSS custom properties on `:root` and `.dark`. The `.dark` class is toggled on `<html>` by the TopBar button and persisted in `localStorage`. A `suppressHydrationWarning` attribute on `<html>` and an inline script in `<head>` prevent FOUC.
+
+Tailwind v4 `dark:` utility variants are configured with `@variant dark (&:where(.dark, .dark *))` in `globals.css`, binding them to the `.dark` class rather than the default `prefers-color-scheme` media query.
 
 See [globals.css](../app/globals.css) for the full variable list.

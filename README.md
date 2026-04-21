@@ -16,9 +16,13 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 - **arXiv** - latest papers from a chosen research field (CS, Math, Physics, and more), cached daily, with abstract view on click
 - **HF Daily** - trending AI papers curated by Hugging Face, sorted by upvotes, cached daily
 
+## Morning digest
+
+`/digest` is a separate page that reads today's cached widget data and generates a newspaper-style AI briefing using OpenAI's `gpt-4o-mini`. Each widget section gets its own API call, running in parallel. A streaming mode toggle streams each section's text in real-time as it's generated. The OpenAI API key is stored in `localStorage`. Accessible from the main dashboard via the newspaper icon in the top bar.
+
 ## Top bar
 
-The left and right text fields are editable and can display either a static string or a live value fetched from any URL that returns plain text (for example a weather or IP address endpoint). The center shows a configurable date or clock. The top right corner holds the dark mode toggle and the layout edit button.
+The left and right text fields are editable and can display either a static string or a live value fetched from any URL that returns plain text (for example a weather or IP address endpoint). The center shows a configurable date or clock. The top right corner holds the newspaper icon (digest), dark mode toggle, and the layout edit button.
 
 ## Stack
 

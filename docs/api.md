@@ -48,6 +48,25 @@ Clears the session cookie (logout).
 
 ---
 
+## Digest
+
+### `POST /api/digest`
+Proxies a request to OpenAI's chat completions API (`gpt-4o-mini`) for the `/digest` page. The API key is provided by the client and never stored server-side.
+
+Request:
+```json
+{ "key": "sk-...", "content": "...", "stream": false }
+```
+
+Non-streaming response:
+```json
+{ "summary": "..." }
+```
+
+Streaming response (`stream: true`): returns a `text/plain` stream of token deltas, suitable for reading with a `ReadableStreamDefaultReader`.
+
+---
+
 ## RSS
 
 ### `GET /api/rss?url=<feed-url>&limit=<n>`
