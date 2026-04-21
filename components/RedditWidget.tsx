@@ -244,7 +244,7 @@ export default function RedditWidget({
   config.subreddits.forEach((s, i) => { subColorIndex[s.name] = i % SUB_COLORS.length; });
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${className}`}>
+    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">

@@ -15,7 +15,7 @@ export default function WidgetCard({
       className={`
         rounded-2xl border p-5
         flex flex-col h-full
-        ${c.bg} ${c.border}
+        ${c.bg} ${c.border} ${c.glow}
         ${muted ? "opacity-40" : ""}
         ${className}
       `}

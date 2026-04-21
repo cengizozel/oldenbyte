@@ -604,7 +604,7 @@ export default function WidgetGrid({
                 const widget = instances[item.i];
                 if (!widget) return null;
                 return (
-                  <div key={item.i} className="h-80 shrink-0 overflow-hidden">
+                  <div key={item.i} className="h-80 shrink-0">
                     {renderWithTabs(item, false)}
                   </div>
                 );
@@ -624,7 +624,7 @@ export default function WidgetGrid({
               return (
                 <div
                   key={item.i}
-                  className="min-h-0 overflow-hidden"
+                  className="min-h-0"
                   style={{
                     gridColumn: `${item.x + 1} / span ${item.w}`,
                     gridRow: `${item.y + 1} / span ${item.h}`,

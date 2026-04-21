@@ -124,7 +124,7 @@ export default function NotebookWidget({
   }
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${className}`}>
+    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
 
       <div className="flex gap-3 flex-1 min-h-0">
 

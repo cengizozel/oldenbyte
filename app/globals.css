@@ -66,32 +66,32 @@
   --text-placeholder:   #4a4a4a;
 
   --w-amber-bg:         #1a1100;
-  --w-amber-border:     #261800;
+  --w-amber-border:     rgba(252, 211, 77, 0.55);
   --w-amber-label:      #fcd34d;
   --w-amber-text:       #fef3c7;
 
   --w-sky-bg:           #04111e;
-  --w-sky-border:       #071828;
+  --w-sky-border:       rgba(125, 211, 252, 0.55);
   --w-sky-label:        #7dd3fc;
   --w-sky-text:         #e0f2fe;
 
   --w-neutral-bg:       #161616;
-  --w-neutral-border:   #262626;
+  --w-neutral-border:   rgba(212, 212, 212, 0.4);
   --w-neutral-label:    #d4d4d4;
   --w-neutral-text:     #f5f5f5;
 
   --w-rose-bg:          #180610;
-  --w-rose-border:      #220a17;
+  --w-rose-border:      rgba(253, 164, 175, 0.55);
   --w-rose-label:       #fda4af;
   --w-rose-text:        #ffe4e6;
 
   --w-teal-bg:          #041613;
-  --w-teal-border:      #07201c;
+  --w-teal-border:      rgba(94, 234, 212, 0.55);
   --w-teal-label:       #5eead4;
   --w-teal-text:        #ccfbf1;
 
   --w-orange-bg:        #180c00;
-  --w-orange-border:    #221200;
+  --w-orange-border:    rgba(253, 186, 116, 0.55);
   --w-orange-label:     #fdba74;
   --w-orange-text:      #ffedd5;
 }
@@ -116,6 +116,15 @@ body {
 .dark textarea::placeholder {
   color: var(--text-placeholder);
 }
+
+/* ── Widget neon glow (dark mode only) ────────────────────────────────────── */
+
+.dark .w-amber-glow  { box-shadow: 0 0 6px rgba(252,211,77,0.9),  0 0 20px rgba(252,211,77,0.55),  0 0 55px rgba(252,211,77,0.22);  }
+.dark .w-sky-glow    { box-shadow: 0 0 6px rgba(125,211,252,0.9), 0 0 20px rgba(125,211,252,0.55), 0 0 55px rgba(125,211,252,0.22); }
+.dark .w-neutral-glow{ box-shadow: 0 0 6px rgba(212,212,212,0.7), 0 0 20px rgba(212,212,212,0.35), 0 0 55px rgba(212,212,212,0.14); }
+.dark .w-rose-glow   { box-shadow: 0 0 6px rgba(253,164,175,0.9), 0 0 20px rgba(253,164,175,0.55), 0 0 55px rgba(253,164,175,0.22); }
+.dark .w-teal-glow   { box-shadow: 0 0 6px rgba(94,234,212,0.9),  0 0 20px rgba(94,234,212,0.55),  0 0 55px rgba(94,234,212,0.22);  }
+.dark .w-orange-glow { box-shadow: 0 0 6px rgba(253,186,116,0.9), 0 0 20px rgba(253,186,116,0.55), 0 0 55px rgba(253,186,116,0.22); }
 
 /* ── react-grid-layout ────────────────────────────────────────────────────── */
 

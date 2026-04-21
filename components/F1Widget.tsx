@@ -84,7 +84,7 @@ export default function F1Widget({
   }, []);
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${className}`}>
+    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
 
       {/* Header */}
       <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.label}`}>
