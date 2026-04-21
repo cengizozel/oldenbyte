@@ -66,7 +66,7 @@ export default function TextWidget({
 
   async function fetchAndSet(url: string): Promise<string | null> {
     try {
-      const res = await fetch(url);
+      const res = await fetch(`/api/proxy?url=${encodeURIComponent(url)}`);
       if (!res.ok) throw new Error();
       const text = (await res.text()).trim().slice(0, 300);
       if (!text) throw new Error();
