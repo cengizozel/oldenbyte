@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import * as storage from "@/lib/storage";
 
@@ -56,9 +56,16 @@ function timeAgo(iso: string): string {
 }
 
 export default function DigestPage() {
-  const [mode, setMode]       = useState<"digest" | "full">("digest");
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [mode, setMode]       = useState<"digest" | "full" | "ai">("digest");
+  const [sections, setSections]   = useState<Section[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [aiKey, setAiKey]         = useState("");
+  const [keyDraft, setKeyDraft]   = useState("");
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [summary, setSummary]     = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError]     = useState("");
+  const summaryRequestedRef       = useRef(false);
 
   const today = new Date().toISOString().split("T")[0];
   const dateLabel = new Date().toLocaleDateString("en-US", {
@@ -66,9 +73,100 @@ export default function DigestPage() {
   });
 
   useEffect(() => {
+    const saved = localStorage.getItem("digest-openai-key") ?? "";
+    setAiKey(saved);
+    setKeyDraft(saved);
     loadAll().then(s => { setSections(s); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-generate when AI tab is selected, key exists, sections loaded, no summary yet
+  useEffect(() => {
+    if (mode !== "ai" || !aiKey || loading || !sections.length || summary || aiLoading) return;
+    if (summaryRequestedRef.current) return;
+    storage.getItem(`digest-ai-${today}`).then(cached => {
+      if (cached) { setSummary(cached); return; }
+      generateSummary();
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, aiKey, loading, sections]);
+
+  function saveKey() {
+    localStorage.setItem("digest-openai-key", keyDraft);
+    setAiKey(keyDraft);
+    setShowKeyInput(false);
+  }
+
+  function buildPromptText(): string {
+    return sections.map(section => {
+      const lines: string[] = [section.label.toUpperCase()];
+      for (const entry of section.entries) {
+        if (entry.text) {
+          lines.push(entry.text);
+        } else {
+          if (entry.title) lines.push(entry.title);
+          if (entry.body)  lines.push(entry.body);
+          if (entry.meta)  lines.push(`(${entry.meta})`);
+        }
+      }
+      return lines.join("\n");
+    }).join("\n\n---\n\n");
+  }
+
+  async function generateSummary() {
+    summaryRequestedRef.current = true;
+    setAiLoading(true);
+    setAiError("");
+    try {
+      const res = await fetch("/api/digest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: aiKey, content: buildPromptText() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unknown error");
+      setSummary(data.summary);
+      await storage.setItem(`digest-ai-${today}`, data.summary);
+    } catch (err) {
+      setAiError(String(err));
+      summaryRequestedRef.current = false;
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function renderSummary(text: string) {
+    const blocks = text.split(/\n\n+/);
+    return blocks.map((block, i) => {
+      const trimmed = block.trim();
+      if (!trimmed) return null;
+      if (trimmed === "---") {
+        return <hr key={i} className="border-[var(--surface-border)] my-6" />;
+      }
+      if (trimmed.startsWith("## ")) {
+        return (
+          <p key={i} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] mt-8 mb-3 first:mt-0">
+            {trimmed.slice(3)}
+          </p>
+        );
+      }
+      if (trimmed.startsWith("# ")) {
+        return (
+          <p key={i} className="font-[family-name:var(--font-playfair)] text-xl text-[var(--text-primary)] mb-4">
+            {trimmed.slice(2)}
+          </p>
+        );
+      }
+      const parts = trimmed.split(/\*\*(.+?)\*\*/g);
+      return (
+        <p key={i} className="font-[family-name:var(--font-playfair)] text-base leading-[1.75] text-[var(--text-primary)]">
+          {parts.map((part, j) =>
+            j % 2 === 1 ? <strong key={j} className="font-semibold">{part}</strong> : part
+          )}
+        </p>
+      );
+    });
+  }
 
   async function loadAll(): Promise<Section[]> {
     const [rawLayout, rawInstances] = await Promise.all([
@@ -367,31 +465,84 @@ export default function DigestPage() {
             <p className="text-[var(--text-muted)] text-sm mt-0.5">{dateLabel}</p>
           </div>
           <div className="flex items-center gap-5 pt-6">
-            <button
-              onClick={() => setMode("digest")}
-              className={`text-sm font-[family-name:var(--font-dm-mono)] transition-colors ${
-                mode === "digest"
-                  ? "text-[var(--text-primary)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              }`}
-            >
-              digest
-            </button>
-            <button
-              onClick={() => setMode("full")}
-              className={`text-sm font-[family-name:var(--font-dm-mono)] transition-colors ${
-                mode === "full"
-                  ? "text-[var(--text-primary)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              }`}
-            >
-              full
-            </button>
+            {(["digest", "full", "ai"] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`text-sm font-[family-name:var(--font-dm-mono)] transition-colors ${
+                  mode === m
+                    ? "text-[var(--text-primary)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Content */}
-        {loading ? (
+        {mode === "ai" ? (
+          <div>
+            {/* Key management */}
+            {!aiKey || showKeyInput ? (
+              <div className="flex items-center gap-3 mb-10">
+                <input
+                  type="password"
+                  value={keyDraft}
+                  onChange={e => setKeyDraft(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && saveKey()}
+                  placeholder="sk-..."
+                  className="flex-1 text-sm bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-1 text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] font-[family-name:var(--font-dm-mono)]"
+                />
+                <button
+                  onClick={saveKey}
+                  className="text-xs font-[family-name:var(--font-dm-mono)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  save
+                </button>
+                {aiKey && (
+                  <button
+                    onClick={() => setShowKeyInput(false)}
+                    className="text-xs font-[family-name:var(--font-dm-mono)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    cancel
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between mb-10">
+                <button
+                  onClick={() => setShowKeyInput(true)}
+                  className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                >
+                  edit key
+                </button>
+                {summary && (
+                  <button
+                    onClick={() => { setSummary(""); summaryRequestedRef.current = false; generateSummary(); }}
+                    className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                  >
+                    regenerate
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Summary */}
+            {!aiKey ? (
+              <p className="text-sm text-[var(--text-muted)]">Enter your OpenAI API key above to generate a summary.</p>
+            ) : aiLoading ? (
+              <p className="text-sm font-[family-name:var(--font-dm-mono)] text-[var(--text-muted)]">generating...</p>
+            ) : aiError ? (
+              <p className="text-sm text-[var(--text-muted)]">{aiError}</p>
+            ) : summary ? (
+              <div className="flex flex-col gap-5">
+                {renderSummary(summary)}
+              </div>
+            ) : null}
+          </div>
+        ) : loading ? (
           <p className="text-[var(--text-muted)] text-sm font-[family-name:var(--font-dm-mono)]">
             loading...
           </p>
