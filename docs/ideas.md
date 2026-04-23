@@ -88,3 +88,31 @@ Each primitive is a React component that already understands the color system an
 ### Growth model
 
 Every time a community widget needs something that can't be expressed with existing primitives, that's a signal to add a new one. The library grows organically from real use cases rather than being designed upfront. Widget configs that use an unknown component name just skip that block gracefully.
+
+---
+
+## Hosted Service + Open Source Model
+
+Open source the core so anyone can self-host. Run a hosted version at a proper domain for people who don't want to manage infrastructure. Standard model (Plausible, Gitea, Umami).
+
+### The hosted service
+
+- **Landing page** — explains the concept, shows the dashboard in action, clear call to action
+- **Smart onboarding** — instead of dropping users into a blank grid, ask 3–5 questions (interests, field of work, content sources) and auto-generate a sensible starting layout from the widget bank. Eliminates the blank canvas problem and demonstrates the product immediately
+- **Account system** — OAuth (Google, GitHub) for low-friction signup, persistent layouts and settings tied to account
+- **Free tier** — core dashboard, limited widgets, no AI digest
+- **Paid tier** — full widget count, AI digest (no need to bring your own OpenAI key), widget bank access, possibly custom domain
+
+### The moat
+
+The code being public doesn't undermine the hosted service. Self-hosters still have to manage a server, a database, Docker, and their own OpenAI key. The hosted version's value is convenience + the onboarding experience + managed AI features. That's a real differentiator even with an identical codebase.
+
+### Smart onboarding detail
+
+User picks interests from a tag list or types free-form. The system maps those to widget presets from the bank and generates a layout config — either rule-based (interest tags → widget types) or AI-assisted. This is also a strong marketing moment: the dashboard looks immediately useful on first load rather than requiring 20 minutes of configuration.
+
+### Revenue model
+
+- Free tier drives adoption and open source credibility
+- Paid tier covers hosting costs and funds continued development
+- Widget bank grows the ecosystem and makes the product more valuable for everyone
