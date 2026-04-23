@@ -76,7 +76,7 @@ export default function HuggingFaceWidget({
       setDraft(cfg);
       const cacheKey = `hf-papers-${cfg.limit}-${today}`;
       const cached = await storage.getItem(cacheKey);
-      if (cached) { setPapers(JSON.parse(cached)); return; }
+      if (cached) setPapers(JSON.parse(cached));
       fetchPapers(cfg);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps

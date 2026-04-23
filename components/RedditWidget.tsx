@@ -141,11 +141,8 @@ export default function RedditWidget({
         if (!parsed.subreddits.length) return;
         const cacheKey = cacheKeyFor(parsed);
         const cached = await storage.getItem(cacheKey);
-        if (cached) {
-          setPosts(JSON.parse(cached));
-        } else {
-          fetchPosts(parsed, cacheKey);
-        }
+        if (cached) setPosts(JSON.parse(cached));
+        fetchPosts(parsed, cacheKey);
       } catch {}
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps

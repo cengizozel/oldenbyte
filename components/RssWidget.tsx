@@ -65,11 +65,8 @@ export default function RssWidget({
 
         const cacheKey = `${storageKey}-${today}`;
         const cached = await storage.getItem(cacheKey);
-        if (cached) {
-          setItems(JSON.parse(cached));
-        } else {
-          fetchFeed(parsed.url, parsed.limit, cacheKey);
-        }
+        if (cached) setItems(JSON.parse(cached));
+        fetchFeed(parsed.url, parsed.limit, cacheKey);
       } catch {}
     });
   }, [storageKey]);

@@ -213,7 +213,7 @@ export default function ArxivWidget({
       const cachedRaw = await storage.getItem(cacheKey);
       if (cachedRaw) {
         const parsed: Cache = JSON.parse(cachedRaw);
-        if (parsed.papers?.length) { setCache(parsed); return; }
+        if (parsed.papers?.length) setCache(parsed);
       }
       fetchPapers(cfg);
     });

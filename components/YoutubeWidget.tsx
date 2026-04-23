@@ -80,11 +80,8 @@ export default function YoutubeWidget({
         if (!parsed.channels.length) return;
         const cacheKey = cacheKeyFor(parsed);
         const cached = await storage.getItem(cacheKey);
-        if (cached) {
-          setVideos(JSON.parse(cached));
-        } else {
-          fetchVideos(parsed, cacheKey);
-        }
+        if (cached) setVideos(JSON.parse(cached));
+        fetchVideos(parsed, cacheKey);
       } catch {}
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
