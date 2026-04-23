@@ -116,3 +116,26 @@ User picks interests from a tag list or types free-form. The system maps those t
 - Free tier drives adoption and open source credibility
 - Paid tier covers hosting costs and funds continued development
 - Widget bank grows the ecosystem and makes the product more valuable for everyone
+
+---
+
+## Academic Research Angle
+
+The productivity angle could support an academic paper, primarily in **Human-Computer Interaction (HCI)** — specifically Personal Information Management (PIM) and ambient information displays. Natural venues: CHI or CSCW.
+
+### Research questions worth pursuing
+
+- Does a unified information surface reduce context-switching and improve focus vs. a fragmented multi-tab workflow?
+- How do people's information consumption patterns change when content is passively surfaced vs. actively sought?
+- What widget compositions correlate with sustained daily engagement vs. abandonment?
+
+### What a conference-worthy study needs
+
+- **Participants** — 16–24 for a controlled study, 8–12 for qualitative
+- **Longitudinal design** — days or weeks, not a one-hour lab session; CHI reviewers weight this heavily
+- **Measurable outcomes** — tab switch count, NASA-TLX cognitive load scale, time-on-task, information recall, daily active use over time
+- **Qualitative component** — semi-structured interviews to explain the "why" behind numbers
+- **IRB approval** — required before collecting any data
+- **A counterintuitive finding** — something that changes how people think about the design space (e.g. unified display increases source diversity, not reduces it; more customization correlates with higher abandonment). Confirming the obvious doesn't get accepted.
+
+Realistic timeline from study design to publication: 12–18 months. UIST or IMWUT are slightly more accessible venues for a first paper in this space.
