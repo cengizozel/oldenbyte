@@ -18,6 +18,8 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 
 ## Morning digest
 
+![digest](public/digest.gif)
+
 `/digest` is a separate page that reads today's cached widget data and generates a newspaper-style AI briefing using OpenAI's `gpt-4o-mini`. Each widget section gets its own API call, running in parallel. A streaming mode toggle streams each section's text in real-time as it's generated. The OpenAI API key is stored in `localStorage`. Accessible from the main dashboard via the newspaper icon in the top bar.
 
 ## Top bar

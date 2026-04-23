@@ -6,9 +6,11 @@ const SYSTEM =
   "If the content contains many papers or articles, cover at least 5 of the most significant or groundbreaking ones, " +
   "giving each 1–2 sentences. Prioritize novelty, impact, and surprise. " +
   "For smaller or single-item sources, 2–4 sentences total is fine. " +
-  "When you mention a specific item that has a reference number like [1] in the content, " +
-  "include that number in brackets immediately after. " +
-  "Only cite items that appear in the REFERENCES section.";
+  "Citation rules — follow these exactly: " +
+  "(1) When you mention a specific item that has a reference number in the REFERENCES block, write that number in square brackets immediately after the mention, like [1] or [2]. " +
+  "(2) Always write both the opening bracket, the number, and the closing bracket — never leave brackets empty like [] and never leave them unclosed like [3. " +
+  "(3) Only use reference numbers that actually appear in the REFERENCES block. Do not invent numbers. " +
+  "(4) If an item has no reference number, do not add brackets at all.";
 
 const USER = (content: string) =>
   "Below is today's content from one source. Write a brief newspaper-style paragraph about it.\n\n---\n\n" + content;
