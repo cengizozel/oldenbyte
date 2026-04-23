@@ -52,6 +52,13 @@
   --w-orange-border:    #ffedd5;
   --w-orange-label:     #c2410c;
   --w-orange-text:      #7c2d12;
+
+  /* Analog clock */
+  --clock-face:         #d4d4d4;
+  --clock-hour:         #404040;
+  --clock-minute:       #525252;
+  --clock-second:       #a3a3a3;
+  --clock-center:       #404040;
 }
 
 .dark {
@@ -95,6 +102,13 @@
   --w-orange-border:    rgba(253, 186, 116, 0.55);
   --w-orange-label:     #fdba74;
   --w-orange-text:      #ffedd5;
+
+  /* Analog clock */
+  --clock-face:         #22d3ee;
+  --clock-hour:         #e879f9;
+  --clock-minute:       #4ade80;
+  --clock-second:       #fb923c;
+  --clock-center:       #e879f9;
 }
 
 /* ── Base ─────────────────────────────────────────────────────────────────── */

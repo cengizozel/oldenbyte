@@ -242,21 +242,17 @@ function AnalogClock({ time, size }: { time: Date; size: number }) {
 
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} className="shrink-0">
-      {/* Face */}
-      <circle cx={cx} cy={cy} r={46} fill="none" stroke="#d4d4d4" strokeWidth="4" />
-      {/* Hour marks */}
+      <circle cx={cx} cy={cy} r={46} fill="none" style={{ stroke: "var(--clock-face)" }} strokeWidth="4" />
       {Array.from({ length: 12 }).map((_, i) => {
         const a = (i / 12) * 360 - 90;
         const [x1, y1] = pt(a, i % 3 === 0 ? 34 : 39);
         const [x2, y2] = pt(a, 44);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#d4d4d4" strokeWidth={i % 3 === 0 ? 4 : 2} strokeLinecap="round" />;
+        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} style={{ stroke: "var(--clock-face)" }} strokeWidth={i % 3 === 0 ? 4 : 2} strokeLinecap="round" />;
       })}
-      {/* Hands */}
-      <line x1={cx} y1={cy} x2={hx} y2={hy} stroke="#404040" strokeWidth="7" strokeLinecap="round" />
-      <line x1={cx} y1={cy} x2={mx} y2={my} stroke="#525252" strokeWidth="5" strokeLinecap="round" />
-      <line x1={cx} y1={cy} x2={sx} y2={sy} stroke="#a3a3a3" strokeWidth="2" strokeLinecap="round" />
-      {/* Center dot */}
-      <circle cx={cx} cy={cy} r={5} fill="#404040" />
+      <line x1={cx} y1={cy} x2={hx} y2={hy} style={{ stroke: "var(--clock-hour)" }} strokeWidth="7" strokeLinecap="round" />
+      <line x1={cx} y1={cy} x2={mx} y2={my} style={{ stroke: "var(--clock-minute)" }} strokeWidth="5" strokeLinecap="round" />
+      <line x1={cx} y1={cy} x2={sx} y2={sy} style={{ stroke: "var(--clock-second)" }} strokeWidth="2" strokeLinecap="round" />
+      <circle cx={cx} cy={cy} r={5} style={{ fill: "var(--clock-center)" }} />
     </svg>
   );
 }
