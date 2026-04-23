@@ -492,7 +492,7 @@ export default function ReaderWidget({
                 {config && (
                   <button
                     onClick={() => setFullscreen(true)}
-                    className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
+                    className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
                     title="Open full view"
                   >
                     <Maximize2 size={12} />
@@ -500,7 +500,7 @@ export default function ReaderWidget({
                 )}
                 <button
                   onClick={() => { setSettingsOpen(true); setError(""); }}
-                  className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
+                  className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
                   title="Settings"
                 >
                   <Pencil size={12} />

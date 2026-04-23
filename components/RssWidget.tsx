@@ -131,7 +131,7 @@ export default function RssWidget({
             </div>
             <button
               onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
-              className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
+              className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
             >
               <Pencil size={12} />
             </button>
