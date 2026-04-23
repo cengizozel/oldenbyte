@@ -402,8 +402,16 @@ export default function WidgetGrid({
             );
           })}
         </div>
-        <div className="flex-1 min-h-0">
-          {activeWidget && renderWidget(activeWidget, "!rounded-none !border-0 !shadow-none")}
+        <div className="flex-1 min-h-0 relative">
+          {[item.i, ...(item.tabs ?? [])].map(tabId => {
+            const w = instances[tabId];
+            if (!w) return null;
+            return (
+              <div key={tabId} className="absolute inset-0" style={{ display: tabId === activeId ? "block" : "none" }}>
+                {renderWidget(w, "!rounded-none !border-0 !shadow-none")}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -581,12 +589,23 @@ export default function WidgetGrid({
                         })()}
                       </div>
                     )}
-                    <div className="pointer-events-none flex-1 min-h-0">
+                    <div className="pointer-events-none flex-1 min-h-0 relative">
                       {(() => {
                         const activeId = activeTabs[item.i] ?? item.i;
-                        const activeWidget = instances[activeId];
                         const hasTabs = (item.tabs?.length ?? 0) > 0;
-                        return activeWidget ? renderWidget(activeWidget, hasTabs ? "!rounded-none !border-0 !shadow-none" : "") : null;
+                        if (!hasTabs) {
+                          const w = instances[item.i];
+                          return w ? renderWidget(w) : null;
+                        }
+                        return [item.i, ...(item.tabs ?? [])].map(tabId => {
+                          const w = instances[tabId];
+                          if (!w) return null;
+                          return (
+                            <div key={tabId} className="absolute inset-0" style={{ display: tabId === activeId ? "block" : "none" }}>
+                              {renderWidget(w, "!rounded-none !border-0 !shadow-none")}
+                            </div>
+                          );
+                        });
                       })()}
                     </div>
                     {/* Border overlay — highlighted when this is the grouping source */}
