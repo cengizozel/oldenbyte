@@ -107,7 +107,11 @@ async function fetchViaChannelPage(channelId: string, limit: number): Promise<{ 
     published: relToIso(vr.publishedTimeText?.simpleText ?? ""),
     isMembersOnly: (vr.badges ?? []).some(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (b: any) => b?.metadataBadgeRenderer?.style === "BADGE_STYLE_TYPE_MEMBERS_ONLY"
+      (b: any) => {
+        const r = b?.metadataBadgeRenderer;
+        return r?.style === "BADGE_STYLE_TYPE_MEMBERS_ONLY" ||
+               r?.label?.toLowerCase().includes("members");
+      }
     ),
   })).filter(v => v.title);
 
@@ -168,17 +172,22 @@ export async function GET(request: NextRequest) {
     let name: string;
     let videos: Video[];
 
-    try {
-      const result = await fetchViaRss(resolvedId, fetchLimit);
-      name = result.name;
-      videos = result.videos;
-    } catch {
+    if (filterMembers) {
+      // Channel page exposes members-only badges; RSS does not
       const result = await fetchViaChannelPage(resolvedId, fetchLimit);
       name = result.name;
-      videos = result.videos;
+      videos = result.videos.filter(v => !v.isMembersOnly).slice(0, limit);
+    } else {
+      try {
+        const result = await fetchViaRss(resolvedId, fetchLimit);
+        name = result.name;
+        videos = result.videos;
+      } catch {
+        const result = await fetchViaChannelPage(resolvedId, fetchLimit);
+        name = result.name;
+        videos = result.videos;
+      }
     }
-
-    if (filterMembers) videos = videos.filter(v => !v.isMembersOnly).slice(0, limit);
 
     return NextResponse.json({ channelId: resolvedId, name: resolvedName || name, videos });
   } catch (err) {

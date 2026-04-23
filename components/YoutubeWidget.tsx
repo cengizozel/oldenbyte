@@ -297,6 +297,7 @@ export default function YoutubeWidget({
                           ×
                         </button>
                       </div>
+                      {/* filter members-only toggle — revisit later
                       <label className="flex items-center gap-1.5 cursor-pointer select-none">
                         <input
                           type="checkbox"
@@ -306,6 +307,7 @@ export default function YoutubeWidget({
                         />
                         <span className="opacity-60 font-normal">filter members-only</span>
                       </label>
+                      */}
                     </div>
                   );
                 })}
