@@ -9,12 +9,12 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 - **Notepad** - a daily notepad with a built-in calendar to browse past entries; multiple instances each get a numbered tab when browsing a past date; renameable
 - **Reader** - upload and read PDF or EPUB files, with full-screen view, saved position, and a Kindle-style progress bar
 - **Text** - display any static text or a live string fetched from a URL endpoint
-- **Feed** - subscribe to any RSS feed, configurable item count, headlines cached daily
-- **Reddit** - top posts from one or more subreddits, selectable time period and post count, interleaved across subreddits
-- **YouTube** - latest videos from one or more channels, resolved by handle or URL, interleaved with relative upload timestamps
+- **Feed** - subscribe to any RSS feed, configurable item count, refetches on every page load
+- **Reddit** - top posts from one or more subreddits, selectable time period and post count, interleaved across subreddits, refetches on every page load
+- **YouTube** - latest videos from one or more channels, sorted newest-first with a "new" badge for uploads under 24 hours, refetches on every page load
 - **F1** - next race details with countdown and current top 5 driver standings, updated hourly
-- **arXiv** - latest papers from a chosen research field (CS, Math, Physics, and more), cached daily, with abstract view on click
-- **HF Daily** - trending AI papers curated by Hugging Face, sorted by upvotes, cached daily
+- **arXiv** - latest papers from a chosen research field (CS, Math, Physics, and more), with abstract view on click, refetches on every page load
+- **HF Daily** - trending AI papers curated by Hugging Face, sorted by upvotes, refetches on every page load
 
 ## Morning digest
 
@@ -22,7 +22,7 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 
 ## Top bar
 
-The left and right text fields are editable and can display either a static string or a live value fetched from any URL that returns plain text (for example a weather or IP address endpoint). The center shows a configurable date or clock. The top right corner holds the newspaper icon (digest), dark mode toggle, and the layout edit button.
+The left and right text fields are editable and can display either a static string or a live value fetched from any URL that returns plain text (for example a weather or IP address endpoint). The center shows a configurable date or clock with the action buttons (digest, dark mode, layout edit) grouped below it. Dark mode preference is persisted to the database.
 
 ## Stack
 
