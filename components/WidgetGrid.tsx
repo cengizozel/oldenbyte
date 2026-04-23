@@ -47,17 +47,18 @@ const initialInstances: Record<string, Widget> = {
   "hf-default":    { id: "hf-default",    type: "hf",       color: "orange", title: "HF Daily", description: "Trending AI papers curated by Hugging Face." },
 };
 
-function renderWidget(widget: Widget) {
-  if (widget.type === "notebook") return <NotebookWidget widget={widget} className="h-full" />;
-  if (widget.type === "text")     return <TextWidget     widget={widget} className="h-full" />;
-  if (widget.type === "rss")      return <RssWidget      widget={widget} className="h-full" />;
-  if (widget.type === "reddit")   return <RedditWidget   widget={widget} className="h-full" />;
-  if (widget.type === "youtube")  return <YoutubeWidget  widget={widget} className="h-full" />;
-  if (widget.type === "ebook")    return <ReaderWidget   widget={widget} className="h-full" />;
-  if (widget.type === "f1")       return <F1Widget       widget={widget} className="h-full" />;
-  if (widget.type === "arxiv")    return <ArxivWidget    widget={widget} className="h-full" />;
-  if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className="h-full" />;
-  return <WidgetCard widget={widget} className="h-full" />;
+function renderWidget(widget: Widget, extraClass = "") {
+  const cls = `h-full ${extraClass}`;
+  if (widget.type === "notebook") return <NotebookWidget widget={widget} className={cls} />;
+  if (widget.type === "text")     return <TextWidget     widget={widget} className={cls} />;
+  if (widget.type === "rss")      return <RssWidget      widget={widget} className={cls} />;
+  if (widget.type === "reddit")   return <RedditWidget   widget={widget} className={cls} />;
+  if (widget.type === "youtube")  return <YoutubeWidget  widget={widget} className={cls} />;
+  if (widget.type === "ebook")    return <ReaderWidget   widget={widget} className={cls} />;
+  if (widget.type === "f1")       return <F1Widget       widget={widget} className={cls} />;
+  if (widget.type === "arxiv")    return <ArxivWidget    widget={widget} className={cls} />;
+  if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className={cls} />;
+  return <WidgetCard widget={widget} className={cls} />;
 }
 
 export default function WidgetGrid({
@@ -361,43 +362,6 @@ export default function WidgetGrid({
     });
   }
 
-  function renderTabBar(item: TabLayoutItem, isEditMode: boolean) {
-    const allTabIds = [item.i, ...(item.tabs ?? [])];
-    const activeId = activeTabs[item.i] ?? item.i;
-    return (
-      <div className="flex gap-1 px-2 pt-1.5 pb-1 shrink-0 overflow-x-auto">
-        {allTabIds.map(tabId => {
-          const w = instances[tabId];
-          const c = colorMap[w?.color ?? "neutral"];
-          const isActive = tabId === activeId;
-          return (
-            <button
-              key={tabId}
-              onMouseDown={e => e.stopPropagation()}
-              onClick={() => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all border ${
-                isActive
-                  ? `${c.bg} ${c.border} opacity-100`
-                  : "bg-transparent border-transparent opacity-40 hover:opacity-70"
-              }`}
-            >
-              <span className={`${c.label}`}>{w?.title ?? tabId}</span>
-              {isEditMode && tabId !== item.i && (
-                <span
-                  onMouseDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); handleUngroupTab(item.i, tabId); }}
-                  className="ml-0.5 leading-none text-neutral-400 hover:text-neutral-700"
-                >
-                  ×
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
-
   function renderWithTabs(item: TabLayoutItem, isEditMode: boolean) {
     const hasTabs = (item.tabs?.length ?? 0) > 0;
     if (!hasTabs) {
@@ -407,11 +371,39 @@ export default function WidgetGrid({
     }
     const activeId = activeTabs[item.i] ?? item.i;
     const activeWidget = instances[activeId];
+    const activeC = colorMap[activeWidget?.color ?? "neutral"];
     return (
-      <div className="flex flex-col h-full">
-        {renderTabBar(item, isEditMode)}
+      <div className={`flex flex-col h-full rounded-2xl overflow-hidden border ${activeC.border} ${activeC.bg} ${activeC.glow}`}>
+        <div className={`shrink-0 flex gap-1 px-2 pt-1.5 pb-1 overflow-x-auto border-b ${activeC.border}`}>
+          {[item.i, ...(item.tabs ?? [])].map(tabId => {
+            const w = instances[tabId];
+            const c = colorMap[w?.color ?? "neutral"];
+            const isActive = tabId === activeId;
+            return (
+              <button
+                key={tabId}
+                onMouseDown={e => e.stopPropagation()}
+                onClick={() => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all border ${
+                  isActive
+                    ? `${c.bg} ${c.border} opacity-100`
+                    : "bg-transparent border-transparent opacity-40 hover:opacity-70"
+                }`}
+              >
+                <span className={`${c.label}`}>{w?.title ?? tabId}</span>
+                {isEditMode && tabId !== item.i && (
+                  <span
+                    onMouseDown={e => e.stopPropagation()}
+                    onClick={e => { e.stopPropagation(); handleUngroupTab(item.i, tabId); }}
+                    className="ml-0.5 leading-none text-neutral-400 hover:text-neutral-700"
+                  >×</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
         <div className="flex-1 min-h-0">
-          {activeWidget && renderWidget(activeWidget)}
+          {activeWidget && renderWidget(activeWidget, "!rounded-none !border-0 !shadow-none")}
         </div>
       </div>
     );
@@ -546,20 +538,55 @@ export default function WidgetGrid({
                 const isGroupingSource = groupingSource === i;
                 const isGroupingTarget = groupingSource !== null && groupingSource !== i;
                 return (
-                  <div key={i} className="relative rounded-2xl flex flex-col h-full">
+                  <div key={i} className="relative rounded-2xl overflow-hidden flex flex-col h-full">
                     {(item.tabs?.length ?? 0) > 0 && (
                       <div
                         className="shrink-0 relative z-20"
                         onMouseDown={e => e.stopPropagation()}
                       >
-                        {renderTabBar(item, true)}
+                        {(() => {
+                          const activeId = activeTabs[item.i] ?? item.i;
+                          const activeWidget = instances[activeId];
+                          const activeC = colorMap[activeWidget?.color ?? "neutral"];
+                          return (
+                            <div className={`flex gap-1 px-2 pt-1.5 pb-1 overflow-x-auto ${activeC.bg} border-b ${activeC.border}`}>
+                              {[item.i, ...(item.tabs ?? [])].map(tabId => {
+                                const w = instances[tabId];
+                                const c = colorMap[w?.color ?? "neutral"];
+                                const isActive = tabId === activeId;
+                                return (
+                                  <button
+                                    key={tabId}
+                                    onMouseDown={e => e.stopPropagation()}
+                                    onClick={() => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
+                                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all border ${
+                                      isActive
+                                        ? `${c.bg} ${c.border} opacity-100`
+                                        : "bg-transparent border-transparent opacity-40 hover:opacity-70"
+                                    }`}
+                                  >
+                                    <span className={`${c.label}`}>{w?.title ?? tabId}</span>
+                                    {tabId !== item.i && (
+                                      <span
+                                        onMouseDown={e => e.stopPropagation()}
+                                        onClick={e => { e.stopPropagation(); handleUngroupTab(item.i, tabId); }}
+                                        className="ml-0.5 leading-none text-neutral-400 hover:text-neutral-700"
+                                      >×</span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                     <div className="pointer-events-none flex-1 min-h-0">
                       {(() => {
                         const activeId = activeTabs[item.i] ?? item.i;
                         const activeWidget = instances[activeId];
-                        return activeWidget ? renderWidget(activeWidget) : null;
+                        const hasTabs = (item.tabs?.length ?? 0) > 0;
+                        return activeWidget ? renderWidget(activeWidget, hasTabs ? "!rounded-none !border-0 !shadow-none" : "") : null;
                       })()}
                     </div>
                     {/* Border overlay — highlighted when this is the grouping source */}
