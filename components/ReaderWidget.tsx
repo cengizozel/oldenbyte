@@ -471,40 +471,72 @@ export default function ReaderWidget({
 
   return (
     <>
-      <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
+      <div
+        className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
+        style={{ perspective: "1200px" }}
+      >
+        <div
+          className="relative w-full h-full transition-transform duration-300 ease-in-out"
+          style={{ transformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
+        >
+          {/* Front */}
+          <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-hidden ${c.bg}`} style={{ backfaceVisibility: "hidden" }}>
+            <div className="flex items-center justify-between mb-3 shrink-0">
+              <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
+                <span className="opacity-50 shrink-0"><BookOpen size={14} /></span>
+                {config && (
+                  <span className="text-xs font-medium opacity-60 truncate">{config.displayName}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                {config && (
+                  <button
+                    onClick={() => setFullscreen(true)}
+                    className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
+                    title="Open full view"
+                  >
+                    <Maximize2 size={12} />
+                  </button>
+                )}
+                <button
+                  onClick={() => { setSettingsOpen(true); setError(""); }}
+                  className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
+                  title="Settings"
+                >
+                  <Pencil size={12} />
+                </button>
+              </div>
+            </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3 shrink-0">
-          <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-            <span className="opacity-50 shrink-0"><BookOpen size={14} /></span>
-            {config && (
-              <span className="text-xs font-medium opacity-60 truncate">{config.displayName}</span>
+            {config ? (
+              fullscreen ? (
+                <div className="flex-1 min-h-0 flex items-center justify-center">
+                  <p className={`text-xs opacity-30 ${c.text}`}>reading in full view</p>
+                </div>
+              ) : (
+                <div className="flex flex-col flex-1 min-h-0">
+                  {config.fileType === "pdf" ? (
+                    <PdfViewer
+                      filename={config.filename}
+                      page={parseInt(position) || 1}
+                      onPageChange={p => savePosition(String(p))}
+                    />
+                  ) : (
+                    <EpubViewer
+                      filename={config.filename}
+                      cfi={position}
+                      onLocationChange={savePosition}
+                    />
+                  )}
+                </div>
+              )
+            ) : (
+              uploadZone()
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0 ml-2">
-            {config && !settingsOpen && (
-              <button
-                onClick={() => setFullscreen(true)}
-                className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
-                title="Open full view"
-              >
-                <Maximize2 size={12} />
-              </button>
-            )}
-            {!settingsOpen && (
-              <button
-                onClick={() => { setSettingsOpen(true); setError(""); }}
-                className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
-                title="Settings"
-              >
-                <Pencil size={12} />
-              </button>
-            )}
-          </div>
-        </div>
 
-        {settingsOpen ? (
-          <div className="flex flex-col gap-3 flex-1 min-h-0">
+          {/* Back (settings) */}
+          <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-hidden ${c.bg}`} style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
             {uploadZone(true)}
             <div className="flex items-center justify-between mt-auto">
               <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Remove file">
@@ -519,32 +551,7 @@ export default function ReaderWidget({
               </button>
             </div>
           </div>
-        ) : config ? (
-          // In fullscreen mode, show a minimal placeholder in the widget
-          fullscreen ? (
-            <div className="flex-1 min-h-0 flex items-center justify-center">
-              <p className={`text-xs opacity-30 ${c.text}`}>reading in full view</p>
-            </div>
-          ) : (
-            <div className="flex flex-col flex-1 min-h-0">
-              {config.fileType === "pdf" ? (
-                <PdfViewer
-                  filename={config.filename}
-                  page={parseInt(position) || 1}
-                  onPageChange={p => savePosition(String(p))}
-                />
-              ) : (
-                <EpubViewer
-                  filename={config.filename}
-                  cfi={position}
-                  onLocationChange={savePosition}
-                />
-              )}
-            </div>
-          )
-        ) : (
-          uploadZone()
-        )}
+        </div>
       </div>
 
       {fullscreen && config && (

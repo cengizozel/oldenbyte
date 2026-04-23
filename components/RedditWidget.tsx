@@ -241,114 +241,32 @@ export default function RedditWidget({
   config.subreddits.forEach((s, i) => { subColorIndex[s.name] = i % SUB_COLORS.length; });
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
+    <div
+      className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
+      style={{ perspective: "1200px" }}
+    >
+      {/* Flipper */}
+      <div
+        className="relative w-full h-full transition-transform duration-300 ease-in-out"
+        style={{ transformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
+      >
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 ${c.label}`}>
-          <span className="opacity-50"><Flame size={14} /></span>
-          <span className="text-xs font-medium opacity-60">Reddit</span>
-        </div>
-        {!settingsOpen && (
+      {/* Front face */}
+      <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-hidden ${c.bg}`} style={{ backfaceVisibility: "hidden" }}>
+        <div className="flex items-center justify-between mb-3 shrink-0">
+          <div className={`flex items-center gap-1.5 ${c.label}`}>
+            <span className="opacity-50"><Flame size={14} /></span>
+            <span className="text-xs font-medium opacity-60">Reddit</span>
+          </div>
           <button
             onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
             className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
           >
             <Pencil size={12} />
           </button>
-        )}
-      </div>
-
-      {settingsOpen ? (
-        <div className="flex flex-col gap-3 flex-1 min-h-0">
-        <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-
-          {/* Subreddit input */}
-          <div className="flex gap-1">
-            <input
-              autoFocus
-              type="text"
-              value={subInput}
-              onChange={e => setSubInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addSub()}
-              placeholder="subreddit name"
-              className="flex-1 text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
-            />
-            <button
-              onClick={addSub}
-              className="px-3 rounded-xl border border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-
-          {/* Selected subreddits with per-sub limit and period */}
-          {draft.subreddits.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {draft.subreddits.map((sub, i) => {
-                const sc = SUB_COLORS[i % SUB_COLORS.length];
-                return (
-                  <div key={sub.name} className={`flex flex-col gap-1.5 px-2 py-1.5 rounded-lg ${sc.bg} ${sc.label}`}>
-                    <div className="flex items-center gap-2 text-xs font-medium">
-                      <span className="flex-1">r/{sub.name}</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={25}
-                        value={sub.limit}
-                        onChange={e => setSubLimit(sub.name, Math.max(1, Math.min(25, parseInt(e.target.value) || 1)))}
-                        className="w-10 text-center bg-white/60 rounded-md px-1 py-0.5 outline-none border border-current/20 text-xs"
-                      />
-                      <span className="opacity-50 font-normal">posts</span>
-                      <button
-                        onClick={() => setDraft(d => ({ ...d, subreddits: d.subreddits.filter(s => s.name !== sub.name) }))}
-                        className="opacity-60 hover:opacity-100 leading-none ml-1"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <div className="flex gap-1 flex-wrap">
-                      {PERIODS.map(p => (
-                        <button
-                          key={p.value}
-                          onClick={() => setSubPeriod(sub.name, p.value)}
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors ${
-                            sub.period === p.value
-                              ? "bg-white/80 shadow-sm"
-                              : "opacity-40 hover:opacity-70"
-                          }`}
-                        >
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {error && <p className="text-red-400 text-xs">{error}</p>}
-
         </div>
-          <div className="flex items-center justify-between shrink-0 pt-1">
-            <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset">
-              <RotateCcw size={13} />
-            </button>
-            <div className="flex gap-3">
-              <button onClick={() => { setSettingsOpen(false); setError(""); }} className="text-neutral-400 hover:text-neutral-600">
-                <X size={14} />
-              </button>
-              <button onClick={handleSave} disabled={loading} className="text-neutral-600 hover:text-neutral-900 disabled:opacity-40">
-                {loading ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
-              </button>
-            </div>
-          </div>
 
-        </div>
-      ) : (
         <div className="flex-1 min-h-0 relative overflow-hidden">
-
           {/* Post list */}
           <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
             <div ref={listScrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget, setListShowFade, setListShowTopFade)}>
@@ -400,12 +318,8 @@ export default function RedditWidget({
                 </p>
               )}
             </div>
-            {listShowTopFade && (
-              <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
-            )}
-            {listShowFade && (
-              <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
-            )}
+            {listShowTopFade && <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
+            {listShowFade && <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
           </div>
 
           {/* Post detail */}
@@ -440,18 +354,106 @@ export default function RedditWidget({
                     <p className={`text-xs opacity-40 ${c.text}`}>No text content — this is a link post.</p>
                   )}
                 </div>
-                {detailShowTopFade && (
-                  <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
-                )}
-                {detailShowFade && (
-                  <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
-                )}
+                {detailShowTopFade && <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
+                {detailShowFade && <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
               </>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Back face (settings) */}
+      <div
+        className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-hidden ${c.bg}`}
+        style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+      >
+        <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
+
+          {/* Subreddit input */}
+          <div className="flex gap-1">
+            <input
+              autoFocus
+              type="text"
+              value={subInput}
+              onChange={e => setSubInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addSub()}
+              placeholder="subreddit name"
+              className="flex-1 text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
+            />
+            <button
+              onClick={addSub}
+              className="px-3 rounded-xl border border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+
+          {/* Selected subreddits with per-sub limit and period */}
+          {draft.subreddits.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {draft.subreddits.map((sub, i) => {
+                const sc = SUB_COLORS[i % SUB_COLORS.length];
+                return (
+                  <div key={sub.name} className={`flex flex-col gap-1.5 px-2 py-1.5 rounded-lg ${sc.bg} ${sc.label}`}>
+                    <div className="flex items-center gap-2 text-xs font-medium">
+                      <span className="flex-1">r/{sub.name}</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={25}
+                        value={sub.limit}
+                        onChange={e => setSubLimit(sub.name, Math.max(1, Math.min(25, parseInt(e.target.value) || 1)))}
+                        className="w-10 text-center bg-white/60 rounded-md px-1 py-0.5 outline-none border border-current/20 text-xs"
+                      />
+                      <span className="opacity-50 font-normal">posts</span>
+                      <button
+                        onClick={() => setDraft(d => ({ ...d, subreddits: d.subreddits.filter(s => s.name !== sub.name) }))}
+                        className="opacity-60 hover:opacity-100 leading-none ml-1"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="flex gap-1 flex-wrap justify-center">
+                      {PERIODS.map(p => (
+                        <button
+                          key={p.value}
+                          onClick={() => setSubPeriod(sub.name, p.value)}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors ${
+                            sub.period === p.value
+                              ? "bg-white/80 shadow-sm"
+                              : "opacity-40 hover:opacity-70"
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {error && <p className="text-red-400 text-xs">{error}</p>}
 
         </div>
-      )}
+          <div className="flex items-center justify-between shrink-0 pt-1">
+            <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset">
+              <RotateCcw size={13} />
+            </button>
+            <div className="flex gap-3">
+              <button onClick={() => { setSettingsOpen(false); setError(""); }} className="text-neutral-400 hover:text-neutral-600">
+                <X size={14} />
+              </button>
+              <button onClick={handleSave} disabled={loading} className="text-neutral-600 hover:text-neutral-900 disabled:opacity-40">
+                {loading ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
     </div>
   );
 }

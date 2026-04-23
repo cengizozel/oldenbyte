@@ -114,36 +114,62 @@ export default function RssWidget({
   }
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 ${c.label}`}>
-          <span className="opacity-50"><Rss size={14} /></span>
-          {config.name && <span className="text-xs font-medium opacity-60">{config.name}</span>}
+    <div
+      className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
+      style={{ perspective: "1200px" }}
+    >
+      <div
+        className="relative w-full h-full transition-transform duration-300 ease-in-out"
+        style={{ transformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
+      >
+        {/* Front */}
+        <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-hidden ${c.bg}`} style={{ backfaceVisibility: "hidden" }}>
+          <div className="flex items-center justify-between mb-3 shrink-0">
+            <div className={`flex items-center gap-1.5 ${c.label}`}>
+              <span className="opacity-50"><Rss size={14} /></span>
+              {config.name && <span className="text-xs font-medium opacity-60">{config.name}</span>}
+            </div>
+            <button
+              onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
+              className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
+            >
+              <Pencil size={12} />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 relative">
+            <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget)}>
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
+                </div>
+              ) : items.length ? (
+                <ul className="flex flex-col">
+                  {items.map((item, i) => (
+                    <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                      <a href={item.link} target="_blank" rel="noopener noreferrer" className={`text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}>
+                        {item.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className={`text-xs opacity-45 ${c.text}`}>hover and click the pencil to add an RSS feed URL</p>
+              )}
+            </div>
+            {showTopFade && <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
+            {showBottomFade && <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
+          </div>
         </div>
-        {!settingsOpen && (
-          <button
-            onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
-            className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
-          >
-            <Pencil size={12} />
-          </button>
-        )}
-      </div>
 
-      {settingsOpen ? (
-        <div className="flex flex-col gap-3 flex-1 min-h-0">
-
+        {/* Back (settings) */}
+        <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-hidden ${c.bg}`} style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
           <input
-            autoFocus
             type="text"
             value={draft.name ?? ""}
             onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
             placeholder="Name (e.g. BBC, Reddit…)"
             className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
           />
-
           <input
             type="url"
             value={draft.url}
@@ -152,100 +178,35 @@ export default function RssWidget({
             placeholder="https://feeds.bbci.co.uk/news/rss.xml"
             className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
           />
-
           <div className="flex flex-col gap-0.5">
             {RSS_EXAMPLES.map(ex => (
-              <button
-                key={ex.url}
-                onClick={() => setDraft(d => ({ ...d, url: ex.url }))}
-                className={`text-left px-2 py-1 rounded-lg text-xs transition-colors ${
-                  draft.url === ex.url
-                    ? `${c.label} font-medium opacity-100`
-                    : `${c.text} opacity-50 hover:opacity-80`
-                }`}
-              >
+              <button key={ex.url} onClick={() => setDraft(d => ({ ...d, url: ex.url }))}
+                className={`text-left px-2 py-1 rounded-lg text-xs transition-colors ${draft.url === ex.url ? `${c.label} font-medium opacity-100` : `${c.text} opacity-50 hover:opacity-80`}`}>
                 {ex.label}
               </button>
             ))}
           </div>
-
           <div className="flex items-center gap-2">
             <span className={`text-xs opacity-60 ${c.label}`}>Items</span>
             {LIMITS.map(n => (
-              <button
-                key={n}
-                onClick={() => setDraft(d => ({ ...d, limit: n }))}
-                className={`w-7 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  draft.limit === n
-                    ? "bg-white text-neutral-700 shadow-sm border border-neutral-200"
-                    : `${c.text} opacity-50 hover:opacity-80`
-                }`}
-              >
+              <button key={n} onClick={() => setDraft(d => ({ ...d, limit: n }))}
+                className={`w-7 py-1 rounded-lg text-xs font-medium transition-colors ${draft.limit === n ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}>
                 {n}
               </button>
             ))}
           </div>
-
           {error && <p className="text-red-400 text-xs">{error}</p>}
-
           <div className="flex items-center justify-between mt-auto">
-            <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset">
-              <RotateCcw size={13} />
-            </button>
+            <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset"><RotateCcw size={13} /></button>
             <div className="flex gap-3">
-              <button
-                onClick={() => { setSettingsOpen(false); setError(""); }}
-                className="text-neutral-400 hover:text-neutral-600"
-                title="Cancel"
-              >
-                <X size={14} />
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className="text-neutral-600 hover:text-neutral-900 disabled:opacity-40"
-                title="Save"
-              >
+              <button onClick={() => { setSettingsOpen(false); setError(""); }} className="text-neutral-400 hover:text-neutral-600"><X size={14} /></button>
+              <button onClick={handleSave} disabled={loading} className="text-neutral-600 hover:text-neutral-900 disabled:opacity-40">
                 {loading ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
               </button>
             </div>
           </div>
-
         </div>
-      ) : (
-        <div className="flex-1 min-h-0 relative">
-          <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget)}>
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-              </div>
-            ) : items.length ? (
-              <ul className="flex flex-col">
-                {items.map((item, i) => (
-                  <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                    <a
-                      href={item.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
-                    >
-                      {item.title}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className={`text-xs opacity-45 ${c.text}`}>hover and click the pencil to add an RSS feed URL</p>
-            )}
-          </div>
-          {showTopFade && (
-            <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
-          )}
-          {showBottomFade && (
-            <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

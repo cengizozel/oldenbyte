@@ -179,32 +179,82 @@ export default function YoutubeWidget({
   config.channels.forEach((ch, i) => { chColorIndex[ch.channelId] = i % CH_COLORS.length; });
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 ${c.label}`}>
-          <span className="opacity-50"><PlaySquare size={14} /></span>
-          <span className="text-xs font-medium opacity-60">YouTube</span>
+    <div
+      className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
+      style={{ perspective: "1200px" }}
+    >
+      <div
+        className="relative w-full h-full transition-transform duration-300 ease-in-out"
+        style={{ transformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
+      >
+        {/* Front */}
+        <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-hidden ${c.bg}`} style={{ backfaceVisibility: "hidden" }}>
+          <div className="flex items-center justify-between mb-3 shrink-0">
+            <div className={`flex items-center gap-1.5 ${c.label}`}>
+              <span className="opacity-50"><PlaySquare size={14} /></span>
+              <span className="text-xs font-medium opacity-60">YouTube</span>
+            </div>
+            <button
+              onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
+              className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
+            >
+              <Pencil size={12} />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 relative">
+            <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget)}>
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
+                </div>
+              ) : videos.length ? (
+                <ul className="flex flex-col">
+                  {videos.map((v, i) => {
+                    const sc = CH_COLORS[chColorIndex[v.channelId] ?? 0];
+                    return (
+                      <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                        <span className="flex items-center gap-1.5 mb-1">
+                          <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                            {v.channelName}
+                          </span>
+                          {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
+                            <span className={`text-[9px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
+                          )}
+                          {v.published && (
+                            <span className={`text-[10px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
+                          )}
+                        </span>
+                        <a
+                          href={v.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`block text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                        >
+                          {v.title}
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className={`text-xs opacity-45 ${c.text}`}>
+                  hover and click the pencil to add YouTube channels
+                </p>
+              )}
+            </div>
+            {showTopFade && (
+              <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
+            )}
+            {showBottomFade && (
+              <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
+            )}
+          </div>
         </div>
-        {!settingsOpen && (
-          <button
-            onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
-            className={`opacity-0 group-hover:opacity-40 hover:!opacity-80 ${c.label}`}
-          >
-            <Pencil size={12} />
-          </button>
-        )}
-      </div>
 
-      {settingsOpen ? (
-        <div className="flex flex-col gap-3 flex-1 min-h-0">
-        <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-
-          {/* Channel input */}
+        {/* Back (settings) */}
+        <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-hidden ${c.bg}`} style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
           <div className="flex gap-1">
             <input
-              autoFocus
               type="text"
               value={chInput}
               onChange={e => setChInput(e.target.value)}
@@ -220,8 +270,6 @@ export default function YoutubeWidget({
               {resolving ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
             </button>
           </div>
-
-          {/* Added channels with per-channel limit */}
           {draft.channels.length > 0 && (
             <div className="flex flex-col gap-1.5">
               {draft.channels.map((ch, i) => {
@@ -249,11 +297,8 @@ export default function YoutubeWidget({
               })}
             </div>
           )}
-
           {error && <p className="text-red-400 text-xs">{error}</p>}
-
-        </div>
-          <div className="flex items-center justify-between shrink-0 pt-1">
+          <div className="flex items-center justify-between mt-auto">
             <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset">
               <RotateCcw size={13} />
             </button>
@@ -266,58 +311,8 @@ export default function YoutubeWidget({
               </button>
             </div>
           </div>
-
         </div>
-      ) : (
-        <div className="flex-1 min-h-0 relative">
-          <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget)}>
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-              </div>
-            ) : videos.length ? (
-              <ul className="flex flex-col">
-                {videos.map((v, i) => {
-                  const sc = CH_COLORS[chColorIndex[v.channelId] ?? 0];
-                  return (
-                    <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                      <span className="flex items-center gap-1.5 mb-1">
-                        <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
-                          {v.channelName}
-                        </span>
-                        {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
-                          <span className={`text-[9px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
-                        )}
-                        {v.published && (
-                          <span className={`text-[10px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
-                        )}
-                      </span>
-                      <a
-                        href={v.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`block text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
-                      >
-                        {v.title}
-                      </a>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className={`text-xs opacity-45 ${c.text}`}>
-                hover and click the pencil to add YouTube channels
-              </p>
-            )}
-          </div>
-          {showTopFade && (
-            <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
-          )}
-          {showBottomFade && (
-            <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
