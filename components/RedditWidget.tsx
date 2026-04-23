@@ -8,7 +8,23 @@ import * as storage from "@/lib/storage";
 type Period = "day" | "week" | "month" | "year" | "all";
 type SubEntry = { name: string; limit: number; period: Period };
 type RedditConfig = { subreddits: SubEntry[] };
-type Post = { title: string; link: string; subreddit: string; pubDate: string; content: string };
+type Post = { title: string; link: string; subreddit: string; pubDate: string; content: string; score: number };
+
+function timeAgo(iso: string): string {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 60)  return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24)  return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7)   return `${d}d ago`;
+  const w = Math.floor(d / 7);
+  if (w < 5)   return `${w}w ago`;
+  const mo = Math.floor(d / 30);
+  if (mo < 12) return `${mo}mo ago`;
+  return `${Math.floor(d / 365)}y ago`;
+}
 
 function sanitizeRedditHtml(raw: string | undefined): string {
   if (!raw) return "";
@@ -49,39 +65,6 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: "all",   label: "All" },
 ];
 
-function SubredditBadge({ post, rank, total, period, sc }: {
-  post: Post;
-  rank: number;
-  total: number;
-  period: string;
-  sc: { label: string; bg: string };
-}) {
-  const [flip, setFlip] = useState(false);
-  const badgeRef = useRef<HTMLSpanElement>(null);
-
-  function handleMouseEnter() {
-    if (!badgeRef.current) return;
-    const rect = badgeRef.current.getBoundingClientRect();
-    setFlip(rect.right + 140 > window.innerWidth);
-  }
-
-  return (
-    <span ref={badgeRef} className="relative inline-block group/badge mb-1" onMouseEnter={handleMouseEnter}>
-      <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
-        r/{post.subreddit}
-      </span>
-      <span className={`absolute top-0 ${flip ? "right-full mr-1" : "left-full ml-1"} hidden group-hover/badge:flex items-center gap-1.5 bg-white border border-neutral-200 rounded-lg px-2 py-1 text-[10px] text-neutral-500 shadow-sm whitespace-nowrap z-10`}>
-        <span>{rank}/{total}</span>
-        <span className="opacity-30">·</span>
-        <span>{period}</span>
-        {post.pubDate && <>
-          <span className="opacity-30">·</span>
-          <span>{new Date(post.pubDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-        </>}
-      </span>
-    </span>
-  );
-}
 
 const SUB_COLORS = [
   { label: "text-sky-700",     bg: "bg-sky-100"     },
@@ -169,7 +152,7 @@ export default function RedditWidget({
   }, [selected]);
 
   function cacheKeyFor(cfg: RedditConfig) {
-    return `${storageKey}-v2-${today}-${cfg.subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
+    return `${storageKey}-v3-${today}-${cfg.subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
   }
 
   async function fetchPosts(cfg: RedditConfig, cacheKey: string): Promise<boolean> {
@@ -178,21 +161,18 @@ export default function RedditWidget({
     try {
       const results = await Promise.all(
         cfg.subreddits.map(async sub => {
-          const url = `https://www.reddit.com/r/${sub.name}/top.rss?t=${sub.period}&limit=${sub.limit}`;
-          const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${sub.limit}`);
+          const params = new URLSearchParams({ subreddit: sub.name, period: sub.period, limit: String(sub.limit) });
+          const res = await fetch(`/api/reddit?${params}`);
           if (!res.ok) throw new Error();
-          const items: { title: string; link: string; pubDate: string; content: string }[] = await res.json();
-          return items.map(item => ({ ...item, subreddit: sub.name }));
+          const items: Post[] = await res.json();
+          return items;
         })
       );
-      const interleaved: Post[] = [];
-      const maxLen = Math.max(...results.map(r => r.length));
-      for (let i = 0; i < maxLen; i++) {
-        for (const r of results) { if (r[i]) interleaved.push(r[i]); }
-      }
-      if (!interleaved.length) throw new Error();
-      setPosts(interleaved);
-      await storage.setItem(cacheKey, JSON.stringify(interleaved));
+      const all: Post[] = results.flat();
+      all.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+      if (!all.length) throw new Error();
+      setPosts(all);
+      await storage.setItem(cacheKey, JSON.stringify(all));
       return true;
     } catch {
       setError("Failed to load posts. Check the subreddit names.");
@@ -276,41 +256,41 @@ export default function RedditWidget({
                 </div>
               ) : posts.length ? (
                 <ul className="flex flex-col">
-                  {(() => {
-                    const subTotal: Record<string, number> = {};
-                    posts.forEach(p => { subTotal[p.subreddit] = (subTotal[p.subreddit] || 0) + 1; });
-                    const subCount: Record<string, number> = {};
-                    const subPeriodLabel: Record<string, string> = {};
-                    config.subreddits.forEach(s => {
-                      subPeriodLabel[s.name] = PERIODS.find(p => p.value === s.period)?.label ?? s.period;
-                    });
-                    return posts.map((post, i) => {
-                      subCount[post.subreddit] = (subCount[post.subreddit] || 0) + 1;
-                      const sc = SUB_COLORS[subColorIndex[post.subreddit] ?? 0];
-                      return (
-                        <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                          <SubredditBadge post={post} rank={subCount[post.subreddit]} total={subTotal[post.subreddit]} period={subPeriodLabel[post.subreddit] ?? ""} sc={sc} />
-                          <div className="flex items-start gap-1 group/title">
-                            <button
-                              onClick={() => setSelected(post)}
-                              className={`flex-1 text-left text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
-                            >
-                              {post.title}
-                            </button>
-                            <a
-                              href={post.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-40 hover:!opacity-80 transition-opacity ${c.label}`}
-                            >
-                              <ExternalLink size={11} />
-                            </a>
-                          </div>
-                        </li>
-                      );
-                    });
-                  })()}
+                  {posts.map((post, i) => {
+                    const sc = SUB_COLORS[subColorIndex[post.subreddit] ?? 0];
+                    return (
+                      <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                        <span className="flex items-center gap-1.5 mb-1">
+                          <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                            r/{post.subreddit}
+                          </span>
+                          {post.pubDate && (
+                            <span className={`text-[10px] opacity-40 ${c.text}`}>{timeAgo(post.pubDate)}</span>
+                          )}
+                          {post.score > 0 && (
+                            <span className={`text-[10px] opacity-40 ${c.text}`}>▲ {post.score >= 1000 ? `${(post.score / 1000).toFixed(1)}k` : post.score}</span>
+                          )}
+                        </span>
+                        <div className="flex items-start gap-1 group/title">
+                          <button
+                            onClick={() => setSelected(post)}
+                            className={`flex-1 text-left text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                          >
+                            {post.title}
+                          </button>
+                          <a
+                            href={post.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-40 hover:!opacity-80 transition-opacity ${c.label}`}
+                          >
+                            <ExternalLink size={11} />
+                          </a>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <p className={`text-xs opacity-45 ${c.text}`}>
