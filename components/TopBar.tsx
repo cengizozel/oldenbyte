@@ -315,18 +315,18 @@ function DateDisplay() {
   }
 
   return (
-    <div ref={ref} className="relative flex items-center justify-center gap-1 group">
+    <div ref={ref} className="relative flex items-center justify-center group">
       <button
         onClick={() => { setDraft(format); setOpen(o => !o); }}
-        className="flex items-center gap-1 cursor-pointer"
+        className="flex items-center cursor-pointer"
         title="Change format"
       >
         {format === "analog"
           ? <AnalogClock time={now} size={48} />
           : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center [font-family:var(--font-dm-mono)]" suppressHydrationWarning>{fmt(now, format)}</span>
         }
-        <Pencil size={12} className="opacity-0 group-hover:opacity-30 text-neutral-400 transition-opacity" />
       </button>
+      <Pencil size={12} className="absolute -right-4 opacity-0 group-hover:opacity-30 text-neutral-400 transition-opacity pointer-events-none" />
 
       {open && (
         <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-lg p-3 w-52">
