@@ -30,6 +30,7 @@ function PdfViewer({
   const [numPages, setNumPages] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [fitMode, setFitMode] = useState<"height" | "width">("height");
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -54,22 +55,29 @@ function PdfViewer({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-2">
-      <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden flex items-center justify-center">
-        {size.width > 0 && size.height > 0 && (
-          <Document
-            file={`/api/files/${filename}`}
-            onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-            loading={<Loader size={16} className="animate-spin opacity-40" />}
-          >
-            <Page
-              pageNumber={page}
-              height={size.height}
-              width={undefined}
-              renderAnnotationLayer={false}
-              renderTextLayer={false}
-            />
-          </Document>
-        )}
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 overflow-auto cursor-pointer"
+        onClick={() => setFitMode(m => m === "height" ? "width" : "height")}
+        title={fitMode === "height" ? "Click for fit to width" : "Click for fit to height"}
+      >
+        <div className="min-h-full flex items-center justify-center">
+          {size.width > 0 && size.height > 0 && (
+            <Document
+              file={`/api/files/${filename}`}
+              onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+              loading={<Loader size={16} className="animate-spin opacity-40" />}
+            >
+              <Page
+                pageNumber={page}
+                height={fitMode === "height" ? size.height : undefined}
+                width={fitMode === "width" ? size.width : undefined}
+                renderAnnotationLayer={false}
+                renderTextLayer={false}
+              />
+            </Document>
+          )}
+        </div>
       </div>
       <div className="flex flex-col gap-1.5 shrink-0">
         <div className="flex items-center justify-center gap-4">
@@ -518,11 +526,7 @@ export default function ReaderWidget({
               <p className={`text-xs opacity-30 ${c.text}`}>reading in full view</p>
             </div>
           ) : (
-            <div
-              className="flex flex-col flex-1 min-h-0 cursor-pointer"
-              onClick={() => setFullscreen(true)}
-              title="Click to open full view"
-            >
+            <div className="flex flex-col flex-1 min-h-0">
               {config.fileType === "pdf" ? (
                 <PdfViewer
                   filename={config.filename}
