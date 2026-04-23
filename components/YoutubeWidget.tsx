@@ -5,7 +5,7 @@ import { Pencil, Check, X, RotateCcw, Loader, Plus, PlaySquare } from "lucide-re
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
-type YoutubeChannel = { channelId: string; name: string; limit: number };
+type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean };
 type YoutubeConfig  = { channels: YoutubeChannel[] };
 type Video          = { title: string; link: string; published: string; channelId: string; channelName: string };
 
@@ -98,7 +98,7 @@ export default function YoutubeWidget({
   }, [videos]);
 
   function cacheKeyFor(cfg: YoutubeConfig) {
-    return `${storageKey}-${today}-${cfg.channels.map(ch => `${ch.channelId}:${ch.limit}`).join(",")}`;
+    return `${storageKey}-${today}-${cfg.channels.map(ch => `${ch.channelId}:${ch.limit}:${ch.filterMembers ? 1 : 0}`).join(",")}`;
   }
 
   async function fetchVideos(cfg: YoutubeConfig, cacheKey: string): Promise<boolean> {
@@ -107,7 +107,9 @@ export default function YoutubeWidget({
     try {
       const results = await Promise.all(
         cfg.channels.map(async ch => {
-          const res = await fetch(`/api/youtube?channelId=${encodeURIComponent(ch.channelId)}&limit=${ch.limit}`);
+          const params = new URLSearchParams({ channelId: ch.channelId, limit: String(ch.limit) });
+          if (ch.filterMembers) params.set("filterMembers", "true");
+          const res = await fetch(`/api/youtube?${params}`);
           if (!res.ok) throw new Error();
           const data: { videos: { title: string; link: string; published: string }[] } = await res.json();
           return data.videos.map(v => ({ ...v, channelId: ch.channelId, channelName: ch.name }));
@@ -188,7 +190,7 @@ export default function YoutubeWidget({
         style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
       >
         {/* Front */}
-        <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-hidden ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}>
+        <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", pointerEvents: settingsOpen ? "none" : "auto" }}>
           <div className="flex items-center justify-between mb-3 shrink-0">
             <div className={`flex items-center gap-1.5 ${c.label}`}>
               <span className="opacity-50"><PlaySquare size={14} /></span>
@@ -252,53 +254,66 @@ export default function YoutubeWidget({
         </div>
 
         {/* Back (settings) */}
-        <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-hidden ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
-          <div className="flex gap-1">
-            <input
-              type="text"
-              value={chInput}
-              onChange={e => setChInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addChannel()}
-              placeholder="@handle or channel URL"
-              className="flex-1 text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
-            />
-            <button
-              onClick={addChannel}
-              disabled={resolving}
-              className="px-3 rounded-xl border border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800 disabled:opacity-40"
-            >
-              {resolving ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-            </button>
-          </div>
-          {draft.channels.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              {draft.channels.map((ch, i) => {
-                const sc = CH_COLORS[i % CH_COLORS.length];
-                return (
-                  <div key={ch.channelId} className={`flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-medium ${sc.bg} ${sc.label}`}>
-                    <span className="flex-1 truncate">{ch.name}</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={15}
-                      value={ch.limit}
-                      onChange={e => setChannelLimit(ch.channelId, Math.max(1, Math.min(15, parseInt(e.target.value) || 1)))}
-                      className="w-10 text-center bg-white/60 rounded-md px-1 py-0.5 outline-none border border-current/20 text-xs"
-                    />
-                    <span className="opacity-50 font-normal">videos</span>
-                    <button
-                      onClick={() => setDraft(d => ({ ...d, channels: d.channels.filter(c => c.channelId !== ch.channelId) }))}
-                      className="opacity-60 hover:opacity-100 leading-none ml-1"
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
+        <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", pointerEvents: settingsOpen ? "auto" : "none" }}>
+          <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
+            <div className="flex gap-1">
+              <input
+                type="text"
+                value={chInput}
+                onChange={e => setChInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && addChannel()}
+                placeholder="@handle or channel URL"
+                className="flex-1 text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
+              />
+              <button
+                onClick={addChannel}
+                disabled={resolving}
+                className="px-3 rounded-xl border border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800 disabled:opacity-40"
+              >
+                {resolving ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
+              </button>
             </div>
-          )}
-          {error && <p className="text-red-400 text-xs">{error}</p>}
-          <div className="flex items-center justify-between mt-auto">
+            {draft.channels.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                {draft.channels.map((ch, i) => {
+                  const sc = CH_COLORS[i % CH_COLORS.length];
+                  return (
+                    <div key={ch.channelId} className={`flex flex-col gap-1 px-2 py-1.5 rounded-lg text-xs font-medium ${sc.bg} ${sc.label}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="flex-1 truncate">{ch.name}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={15}
+                          value={ch.limit}
+                          onChange={e => setChannelLimit(ch.channelId, Math.max(1, Math.min(15, parseInt(e.target.value) || 1)))}
+                          className="w-10 text-center bg-white/60 rounded-md px-1 py-0.5 outline-none border border-current/20 text-xs"
+                        />
+                        <span className="opacity-50 font-normal">videos</span>
+                        <button
+                          onClick={() => setDraft(d => ({ ...d, channels: d.channels.filter(c => c.channelId !== ch.channelId) }))}
+                          className="opacity-60 hover:opacity-100 leading-none ml-1"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!!ch.filterMembers}
+                          onChange={e => setDraft(d => ({ ...d, channels: d.channels.map(c => c.channelId === ch.channelId ? { ...c, filterMembers: e.target.checked } : c) }))}
+                          className="w-3 h-3 rounded accent-current"
+                        />
+                        <span className="opacity-60 font-normal">filter members-only</span>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+          </div>
+          <div className="flex items-center justify-between shrink-0">
             <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset">
               <RotateCcw size={13} />
             </button>

@@ -18,7 +18,7 @@ function extractCdata(str: string): string {
   return decodeEntities(m ? m[1].trim() : str.trim());
 }
 
-type Video = { title: string; link: string; published: string };
+type Video = { title: string; link: string; published: string; isMembersOnly: boolean };
 
 // Convert relative YouTube time ("2 days ago") to approximate ISO string
 function relToIso(rel: string): string {
@@ -51,7 +51,7 @@ async function fetchViaRss(channelId: string, limit: number): Promise<{ name: st
     const title = extractCdata(rawTitle);
     const linkMatch = block.match(/<link[^>]+href="([^"]+)"/i);
     const published = block.match(/<published>([^<]+)<\/published>/)?.[1] ?? "";
-    if (title && linkMatch) videos.push({ title, link: linkMatch[1], published });
+    if (title && linkMatch) videos.push({ title, link: linkMatch[1], published, isMembersOnly: false });
   }
   return { name, videos };
 }
@@ -105,6 +105,10 @@ async function fetchViaChannelPage(channelId: string, limit: number): Promise<{ 
     title: vr.title?.runs?.[0]?.text ?? vr.title?.simpleText ?? "",
     link: `https://www.youtube.com/watch?v=${vr.videoId}`,
     published: relToIso(vr.publishedTimeText?.simpleText ?? ""),
+    isMembersOnly: (vr.badges ?? []).some(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (b: any) => b?.metadataBadgeRenderer?.style === "BADGE_STYLE_TYPE_MEMBERS_ONLY"
+    ),
   })).filter(v => v.title);
 
   return { name, videos };
@@ -138,9 +142,11 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; nam
 }
 
 export async function GET(request: NextRequest) {
-  const channel   = request.nextUrl.searchParams.get("channel");
-  const channelId = request.nextUrl.searchParams.get("channelId");
+  const channel       = request.nextUrl.searchParams.get("channel");
+  const channelId     = request.nextUrl.searchParams.get("channelId");
+  const filterMembers = request.nextUrl.searchParams.get("filterMembers") === "true";
   const limit = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "5"), 15);
+  const fetchLimit = filterMembers ? Math.min(limit * 4, 30) : limit;
 
   if (!channel && !channelId) {
     return NextResponse.json({ error: "Missing channel or channelId" }, { status: 400 });
@@ -163,14 +169,16 @@ export async function GET(request: NextRequest) {
     let videos: Video[];
 
     try {
-      const result = await fetchViaRss(resolvedId, limit);
+      const result = await fetchViaRss(resolvedId, fetchLimit);
       name = result.name;
       videos = result.videos;
     } catch {
-      const result = await fetchViaChannelPage(resolvedId, limit);
+      const result = await fetchViaChannelPage(resolvedId, fetchLimit);
       name = result.name;
       videos = result.videos;
     }
+
+    if (filterMembers) videos = videos.filter(v => !v.isMembersOnly).slice(0, limit);
 
     return NextResponse.json({ channelId: resolvedId, name: resolvedName || name, videos });
   } catch (err) {
