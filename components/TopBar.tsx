@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, Loader, X, RotateCcw, LayoutGrid, Moon, Sun, Newspaper } from "lucide-react";
+import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings } from "lucide-react";
 import * as storage from "@/lib/storage";
 
 // ── EditableField ─────────────────────────────────────────────────────────
@@ -97,21 +97,13 @@ function EditableField({
   }
 
   return (
-    <div className="relative flex items-center gap-1 group" ref={popoverRef}>
+    <div className="relative" ref={popoverRef}>
       <span
         className={`${className} cursor-pointer`}
         onClick={() => { setDraft(config); setOpen(o => !o); setError(""); }}
       >
         {display}
       </span>
-
-      <button
-        onClick={() => { setDraft(config); setOpen(o => !o); setError(""); }}
-        className="opacity-0 group-hover:opacity-30 text-neutral-400 transition-opacity"
-        title="Edit"
-      >
-        <Pencil size={12} />
-      </button>
 
       {open && (
         <div className={`absolute top-full mt-2 z-50 bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-lg p-4 w-64 ${align === "right" ? "right-0" : "left-0"}`}>
@@ -311,7 +303,7 @@ function DateDisplay() {
   }
 
   return (
-    <div ref={ref} className="relative flex items-center justify-center group">
+    <div ref={ref} className="relative flex items-center justify-center">
       <button
         onClick={() => { setDraft(format); setOpen(o => !o); }}
         className="flex items-center cursor-pointer"
@@ -322,7 +314,6 @@ function DateDisplay() {
           : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center [font-family:var(--font-dm-mono)]" suppressHydrationWarning>{fmt(now, format)}</span>
         }
       </button>
-      <Pencil size={12} className="absolute -right-4 opacity-0 group-hover:opacity-30 text-neutral-400 transition-opacity pointer-events-none" />
 
       {open && (
         <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-lg p-3 w-52">
@@ -364,6 +355,61 @@ function DateDisplay() {
   );
 }
 
+// ── SettingsPanel ──────────────────────────────────────────────────────────
+
+function SettingsPanel({
+  open,
+  onClose,
+  dark,
+  onToggleDark,
+}: {
+  open: boolean;
+  onClose: () => void;
+  dark: boolean;
+  onToggleDark: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  return (
+    <>
+      <div
+        className={`fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px] transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        onClick={onClose}
+      />
+      <div
+        className={`fixed top-0 right-0 h-full w-72 z-50 bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${open ? "translate-x-0" : "translate-x-full"}`}
+      >
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[var(--surface-border)]">
+          <span className="text-sm font-medium text-[var(--text-primary)]">Settings</span>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-6">
+          <section className="flex flex-col gap-3">
+            <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Appearance</span>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[var(--text-secondary)]">Dark mode</span>
+              <button
+                onClick={onToggleDark}
+                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${dark ? "bg-[var(--text-muted)]" : "bg-[var(--surface-border-focus)]"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${dark ? "translate-x-4" : "translate-x-0"}`} />
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── TopBar ─────────────────────────────────────────────────────────────────
 
 export default function TopBar({
@@ -374,6 +420,7 @@ export default function TopBar({
   onToggleEdit?: () => void;
 }) {
   const [dark, setDark] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     storage.getItem("theme").then(saved => {
@@ -394,6 +441,7 @@ export default function TopBar({
   }
 
   return (
+    <>
     <div className="grid grid-cols-3 items-center min-h-14 md:min-h-16">
       <div className="flex items-center">
         <EditableField
@@ -413,18 +461,18 @@ export default function TopBar({
             <Newspaper size={14} />
           </a>
           <button
-            onClick={toggleDark}
-            className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-            title={dark ? "Light mode" : "Dark mode"}
-          >
-            {dark ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-          <button
             onClick={onToggleEdit}
             className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             title={editing ? "Done editing" : "Edit layout"}
           >
             {editing ? <Check size={14} /> : <LayoutGrid size={14} />}
+          </button>
+          <button
+            onClick={() => setSettingsOpen(o => !o)}
+            className="transition-colors text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            title="Settings"
+          >
+            <Settings size={14} />
           </button>
         </div>
       </div>
@@ -437,5 +485,12 @@ export default function TopBar({
         />
       </div>
     </div>
+    <SettingsPanel
+      open={settingsOpen}
+      onClose={() => setSettingsOpen(false)}
+      dark={dark}
+      onToggleDark={toggleDark}
+    />
+    </>
   );
 }
