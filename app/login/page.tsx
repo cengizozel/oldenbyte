@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Loader } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,6 +15,7 @@ export default function LoginPage() {
     try {
       const res = await fetch("/api/auth", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
@@ -24,7 +23,7 @@ export default function LoginPage() {
         setError("Incorrect password.");
         return;
       }
-      router.replace("/");
+      window.location.replace("/");
     } catch {
       setError("Something went wrong.");
     } finally {
