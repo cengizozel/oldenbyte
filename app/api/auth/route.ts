@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   const res = NextResponse.json({ ok: true });
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     // No maxAge = session cookie (expires when browser closes)
   });
