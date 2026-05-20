@@ -10,7 +10,7 @@ services:
       - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD}
       - SESSION_SECRET=${SESSION_SECRET}
     volumes:
-      - ./data:/app/data
+      - /opt/docker/appdata/oldenbyte/data:/app/data
 
   watchtower:
     image: containrrr/watchtower
