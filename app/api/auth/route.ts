@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     httpOnly: true,
     sameSite: "strict",
     path: "/",
-    // No maxAge = session cookie (expires when browser closes)
+    maxAge: 60 * 60 * 24 * 30,
   });
   return res;
 }
