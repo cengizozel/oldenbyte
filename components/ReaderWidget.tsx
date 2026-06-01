@@ -444,7 +444,7 @@ export default function ReaderWidget({
         <>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-neutral-200 bg-white text-neutral-600 hover:text-neutral-900 hover:border-neutral-300"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--surface-border-focus)]"
           >
             <Upload size={13} />
             {compact ? "Upload new file" : "Upload PDF or EPUB"}

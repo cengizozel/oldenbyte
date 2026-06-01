@@ -227,7 +227,7 @@ export default function TextWidget({
           <div className="flex items-center justify-end gap-3 shrink-0">
             <button
               onClick={() => { setSettingsOpen(false); setError(""); }}
-              className="text-neutral-400 hover:text-neutral-600"
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
               title="Cancel"
             >
               <X size={14} />
@@ -235,7 +235,7 @@ export default function TextWidget({
             <button
               onClick={handleSave}
               disabled={testing}
-              className="text-neutral-600 hover:text-neutral-900 disabled:opacity-40"
+              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
               title={draft.source.type === "url" ? "Test & Save" : "Save"}
             >
               {testing ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}

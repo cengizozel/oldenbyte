@@ -249,10 +249,10 @@ export default function HuggingFaceWidget({
             </div>
           </div>
           <div className="flex items-center justify-end gap-3 mt-auto">
-            <button onClick={() => setSettingsOpen(false)} className="text-neutral-400 hover:text-neutral-600">
+            <button onClick={() => setSettingsOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
               <X size={14} />
             </button>
-            <button onClick={handleSave} className="text-neutral-600 hover:text-neutral-900">
+            <button onClick={handleSave} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
               <Check size={14} />
             </button>
           </div>

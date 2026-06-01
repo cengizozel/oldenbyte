@@ -199,8 +199,8 @@ export default function RssWidget({
           <div className="flex items-center justify-between mt-auto">
             <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset"><RotateCcw size={13} /></button>
             <div className="flex gap-3">
-              <button onClick={() => { setSettingsOpen(false); setError(""); }} className="text-neutral-400 hover:text-neutral-600"><X size={14} /></button>
-              <button onClick={handleSave} disabled={loading} className="text-neutral-600 hover:text-neutral-900 disabled:opacity-40">
+              <button onClick={() => { setSettingsOpen(false); setError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={14} /></button>
+              <button onClick={handleSave} disabled={loading} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40">
                 {loading ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
               </button>
             </div>

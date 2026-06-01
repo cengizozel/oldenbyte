@@ -161,13 +161,13 @@ function EditableField({
               <RotateCcw size={13} />
             </button>
             <div className="flex gap-3">
-              <button onClick={() => { setOpen(false); setError(""); }} className="text-neutral-400 hover:text-neutral-600" title="Cancel">
+              <button onClick={() => { setOpen(false); setError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Cancel">
                 <X size={14} />
               </button>
               <button
                 onClick={handleSave}
                 disabled={testing}
-                className="text-neutral-600 hover:text-neutral-900 disabled:opacity-40"
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
                 title={draft.type === "url" ? "Test & Save" : "Save"}
               >
                 {testing ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
@@ -341,10 +341,10 @@ function DateDisplay() {
               <RotateCcw size={13} />
             </button>
             <div className="flex gap-3">
-              <button onClick={() => setOpen(false)} className="text-neutral-400 hover:text-neutral-600" title="Cancel">
+              <button onClick={() => setOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Cancel">
                 <X size={14} />
               </button>
-              <button onClick={handleSave} className="text-neutral-600 hover:text-neutral-900" title="Save">
+              <button onClick={handleSave} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Save">
                 <Check size={14} />
               </button>
             </div>

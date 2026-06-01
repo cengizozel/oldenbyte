@@ -363,8 +363,8 @@ export default function NotebookWidget({
                 placeholder="Name this notepad…"
                 className="flex-1 text-xs border border-neutral-200 rounded-lg px-2 py-1 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white min-w-0"
               />
-              <button onClick={() => setRenaming(false)} className="text-neutral-400 hover:text-neutral-600 shrink-0"><X size={13} /></button>
-              <button onClick={saveName} className="text-neutral-600 hover:text-neutral-900 shrink-0"><Check size={13} /></button>
+              <button onClick={() => setRenaming(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0"><X size={13} /></button>
+              <button onClick={saveName} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0"><Check size={13} /></button>
             </div>
           ) : (
             <div className="flex items-center justify-between mb-3 shrink-0">
