@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Flag, Loader } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Flag, Loader, RotateCcw } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
@@ -48,6 +48,7 @@ export default function F1Widget({
 
   const [data, setData] = useState<F1Data | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const [showTopFade, setShowTopFade] = useState(false);
   const [showBottomFade, setShowBottomFade] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -67,21 +68,28 @@ export default function F1Widget({
     return () => ro.disconnect();
   }, [data]);
 
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await fetch("/api/f1");
+      if (!res.ok) throw new Error();
+      const json: F1Data = await res.json();
+      setData(json);
+      await storage.setItem(cacheKey, JSON.stringify(json));
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [cacheKey]);
+
   useEffect(() => {
-    storage.getItem(cacheKey).then(async cached => {
+    storage.getItem(cacheKey).then(cached => {
       if (cached) { setData(JSON.parse(cached)); return; }
-      setLoading(true);
-      try {
-        const res = await fetch("/api/f1");
-        if (!res.ok) throw new Error();
-        const json: F1Data = await res.json();
-        setData(json);
-        await storage.setItem(cacheKey, JSON.stringify(json));
-      } catch {}
-      finally { setLoading(false); }
+      load();
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cacheKey, load]);
 
   return (
     <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
@@ -151,6 +159,16 @@ export default function F1Widget({
                 </>
               )}
 
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center gap-2 h-full text-center">
+              <p className={`text-xs opacity-50 ${c.text}`}>Couldn&apos;t load F1 data.</p>
+              <button
+                onClick={load}
+                className={`flex items-center gap-1 text-xs opacity-60 hover:opacity-90 ${c.label}`}
+              >
+                <RotateCcw size={12} /> Retry
+              </button>
             </div>
           ) : (
             <div className="flex items-center justify-center h-full">
