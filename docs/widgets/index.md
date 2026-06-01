@@ -11,7 +11,7 @@ All widget types are defined in `lib/widgets.ts`:
 ```ts
 type Widget = {
   id: string;           // unique instance ID (e.g. "notebook", "rss-1776129788318")
-  type: WidgetType;     // "notebook" | "ebook" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker"
+  type: WidgetType;     // "notebook" | "ebook" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess"
   color: WidgetColor;   // "amber" | "sky" | "neutral" | "rose" | "teal" | "orange"
   title: string;
   description: string;
@@ -19,7 +19,7 @@ type Widget = {
 };
 ```
 
-`digestable` defaults to `true` — widgets appear in the digest unless explicitly set to `false`. Currently `notebook`, `ebook`, and `tracker` are `false`. The `/digest` page looks up each widget's definition at runtime to apply this filter.
+`digestable` defaults to `true` — widgets appear in the digest unless explicitly set to `false`. Currently `notebook`, `ebook`, `tracker`, and `chess` are `false`. The `/digest` page looks up each widget's definition at runtime to apply this filter.
 
 The `colorMap` in `lib/widgets.ts` maps each color to a set of Tailwind CSS variable classes (`bg`, `border`, `label`, `text`, `fade`, `glow`) that all widget components consume.
 
@@ -55,6 +55,7 @@ Default sizes per type:
 | arxiv | 2 | 3 |
 | hf | 2 | 3 |
 | tracker | 1 | 3 |
+| chess | 2 | 4 |
 
 ## Tab Grouping
 

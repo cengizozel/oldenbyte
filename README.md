@@ -15,6 +15,8 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 - **F1** - next race details with countdown and current top 5 driver standings, updated hourly
 - **arXiv** - latest papers from a chosen research field (CS, Math, Physics, and more), with abstract view on click, refetches on every page load
 - **HF Daily** - trending AI papers curated by Hugging Face, sorted by upvotes, refetches on every page load
+- **Tracker** - time how long you spend on each activity with a one-tap stopwatch (only one runs at a time) and a donut chart of the breakdown; resets daily
+- **Chess** - play an ongoing game against the Stockfish engine with an adjustable Elo difficulty; the game persists between visits
 
 ## Morning digest
 
@@ -33,6 +35,7 @@ The left and right text fields are editable and can display either a static stri
 - **Prisma + SQLite** for persistent storage
 - **react-grid-layout** for drag and drop widget management
 - **react-pdf** and **epubjs** for document rendering
+- **chess.js** and **react-chessboard** with **Stockfish** (WebAssembly) for the chess widget
 
 ## Development
 
@@ -79,6 +82,7 @@ Watchtower is included and polls for new image versions every 5 minutes, pulling
 ## Credits
 
 - F1 circuit outlines by [Jules Roy](https://github.com/julesr0y/f1-circuits-svg), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- Chess engine: [Stockfish](https://stockfishchess.org/) compiled to WebAssembly via [stockfish.js](https://github.com/nmrugg/stockfish.js), licensed under [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html)
 
 ## Deployment
 

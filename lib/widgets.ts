@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -99,6 +99,14 @@ export const widgets: Widget[] = [
     color: "teal",
     title: "Tracker",
     description: "Time how long you spend on each activity.",
+    digestable: false,
+  },
+  {
+    id: "chess",
+    type: "chess",
+    color: "neutral",
+    title: "Chess",
+    description: "Play an ongoing game against Stockfish.",
     digestable: false,
   },
 ];

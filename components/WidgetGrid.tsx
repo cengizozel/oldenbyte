@@ -21,6 +21,7 @@ import HuggingFaceWidget from "./HuggingFaceWidget";
 import TrackerWidget from "./TrackerWidget";
 import dynamic from "next/dynamic";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
+const ChessWidget = dynamic(() => import("./ChessWidget"), { ssr: false });
 
 const COLS = 4;
 const GAP = 16;
@@ -60,6 +61,7 @@ function renderWidget(widget: Widget, extraClass = "") {
   if (widget.type === "arxiv")    return <ArxivWidget    widget={widget} className={cls} />;
   if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className={cls} />;
   if (widget.type === "tracker")  return <TrackerWidget   widget={widget} className={cls} />;
+  if (widget.type === "chess")    return <ChessWidget     widget={widget} className={cls} />;
   return <WidgetCard widget={widget} className={cls} />;
 }
 
@@ -264,6 +266,7 @@ export default function WidgetGrid({
     arxiv:    { w: 2, h: 3 },
     hf:       { w: 2, h: 3 },
     tracker:  { w: 1, h: 3 },
+    chess:    { w: 2, h: 4 },
   };
 
   function findNextPosition(
