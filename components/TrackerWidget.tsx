@@ -200,7 +200,7 @@ export default function TrackerWidget({
               <div className="shrink-0 flex justify-center">
                 <div className="relative w-28 h-28">
                   <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                    <circle cx={50} cy={50} r={R} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={STROKE} />
+                    <circle cx={50} cy={50} r={R} fill="none" strokeWidth={STROKE} className="stroke-black/[0.07] dark:stroke-white/10" />
                     {total > 0 && rows.filter(r => r.secs > 0).map(r => {
                       const len = (r.secs / total) * CIRC;
                       const seg = (
@@ -234,7 +234,7 @@ export default function TrackerWidget({
                       <button
                         onClick={() => select(r.id)}
                         className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
-                          isActive ? "bg-white/70" : "hover:bg-white/40"
+                          isActive ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"
                         }`}
                       >
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
@@ -266,7 +266,7 @@ export default function TrackerWidget({
               />
               <button
                 onClick={addItem}
-                className="px-3 rounded-xl border border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800"
+                className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
                 <Plus size={14} />
               </button>
@@ -274,16 +274,16 @@ export default function TrackerWidget({
             {draft.length > 0 && (
               <div className="flex flex-col gap-1.5">
                 {draft.map((it, i) => (
-                  <div key={it.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/60">
+                  <div key={it.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-black/5 dark:bg-white/10">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PALETTE[i % PALETTE.length] }} />
                     <input
                       value={it.name}
                       onChange={e => setDraft(d => d.map(x => x.id === it.id ? { ...x, name: e.target.value } : x))}
-                      className="flex-1 min-w-0 bg-transparent text-sm text-neutral-700 outline-none"
+                      className="flex-1 min-w-0 bg-transparent dark:!bg-transparent text-sm text-neutral-700 outline-none"
                     />
                     <button
                       onClick={() => setDraft(d => d.filter(x => x.id !== it.id))}
-                      className="opacity-50 hover:opacity-100 leading-none text-neutral-600"
+                      className={`opacity-50 hover:opacity-100 leading-none ${c.label}`}
                     >
                       ×
                     </button>
@@ -297,10 +297,10 @@ export default function TrackerWidget({
               <RotateCcw size={13} /> times
             </button>
             <div className="flex gap-3">
-              <button onClick={() => { setDraft(items); setSettingsOpen(false); }} className="text-neutral-400 hover:text-neutral-600">
+              <button onClick={() => { setDraft(items); setSettingsOpen(false); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                 <X size={14} />
               </button>
-              <button onClick={handleSave} className="text-neutral-600 hover:text-neutral-900">
+              <button onClick={handleSave} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                 <Check size={14} />
               </button>
             </div>
