@@ -40,13 +40,13 @@ res.cookies.set(SESSION_COOKIE, token, {
   httpOnly: true,   // not accessible via JS
   sameSite: "strict",
   path: "/",
-  // no maxAge → session cookie, expires on browser close
+  maxAge: 60 * 60 * 24 * 30,  // persists for 30 days
 });
 ```
 
 ## Middleware
 
-`middleware.ts` runs on every request except `/login` and `/api/auth`. The matcher explicitly excludes Next.js static assets, images, and favicon:
+`proxy.ts` runs on every request except `/login` and `/api/auth`. The matcher explicitly excludes Next.js static assets, images, and favicon:
 
 ```ts
 matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.png$).*)"]

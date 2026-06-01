@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { NotebookPen, Pencil, Check, X } from "lucide-react";
+import { NotebookPen, Pencil, Check, X, Bold, Italic, Underline, List } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
@@ -9,6 +9,162 @@ const REGISTRY_KEY = "notepad-registry";
 
 function toDateStr(date: Date) {
   return date.toISOString().split("T")[0];
+}
+
+// Rich text helpers — notes are stored as HTML. Older notes were saved as plain
+// text; those are detected and converted on display, then re-saved as HTML on edit.
+function isHtml(s: string) {
+  return /<\/?[a-z][\s\S]*>/i.test(s);
+}
+
+function plainToHtml(s: string) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+}
+
+// Treat content with no visible text (only formatting tags / breaks) as empty,
+// so the calendar dot and placeholder behave like the old plain-text version.
+function normalizeHtml(html: string) {
+  const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/gi, " ").trim();
+  return text === "" ? "" : html;
+}
+
+const FORMATS = [
+  { cmd: "bold", Icon: Bold, label: "Bold" },
+  { cmd: "italic", Icon: Italic, label: "Italic" },
+  { cmd: "underline", Icon: Underline, label: "Underline" },
+  { cmd: "insertUnorderedList", Icon: List, label: "Bullet list" },
+];
+
+function RichTextEditor({
+  docKey,
+  html,
+  editable,
+  placeholder,
+  onChange,
+  textClass,
+  labelClass,
+}: {
+  docKey: string;
+  html: string;
+  editable: boolean;
+  placeholder: string;
+  onChange: (value: string) => void;
+  textClass: string;
+  labelClass: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Sync DOM from props when the document identity or stored value changes, but
+  // never while the user is actively typing (that would reset the caret).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || document.activeElement === el) return;
+    const next = isHtml(html) ? html : plainToHtml(html);
+    if (el.innerHTML !== next) el.innerHTML = next;
+  }, [html, docKey]);
+
+  function emit() {
+    if (ref.current) onChange(normalizeHtml(ref.current.innerHTML));
+  }
+
+  function applyFormat(cmd: string) {
+    document.execCommand(cmd, false);
+    ref.current?.focus();
+    emit();
+  }
+
+  function closestLi(node: Node | null): HTMLLIElement | null {
+    let n: Node | null = node;
+    while (n && n !== ref.current) {
+      if (n.nodeName === "LI") return n as HTMLLIElement;
+      n = n.parentNode;
+    }
+    return null;
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    // ⌘/Ctrl + B / I / U
+    if (e.metaKey || e.ctrlKey) {
+      const k = e.key.toLowerCase();
+      if (k === "b" || k === "i" || k === "u") {
+        e.preventDefault();
+        applyFormat(k === "b" ? "bold" : k === "i" ? "italic" : "underline");
+        return;
+      }
+    }
+
+    const sel = window.getSelection();
+    if (!sel || !sel.isCollapsed || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+
+    // Enter on an empty list item exits the list
+    if (e.key === "Enter") {
+      const li = closestLi(range.startContainer);
+      if (li && (li.textContent ?? "").trim() === "") {
+        e.preventDefault();
+        const ordered = li.parentElement?.nodeName === "OL";
+        document.execCommand(ordered ? "insertOrderedList" : "insertUnorderedList", false);
+        emit();
+      }
+      return;
+    }
+
+    // Typing "- ", "* " or "1. " at the start of a line starts a list
+    if (e.key === " ") {
+      const node = range.startContainer;
+      const before = node.nodeType === Node.TEXT_NODE
+        ? (node.textContent ?? "").slice(0, range.startOffset)
+        : "";
+      const ordered = before === "1.";
+      if (before === "-" || before === "*" || ordered) {
+        e.preventDefault();
+        const del = document.createRange();
+        del.setStart(node, 0);
+        del.setEnd(node, range.startOffset);
+        del.deleteContents();
+        document.execCommand(ordered ? "insertOrderedList" : "insertUnorderedList", false);
+        emit();
+      }
+    }
+  }
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      {editable && (
+        <div className="flex items-center gap-0.5 mb-1.5 shrink-0">
+          {FORMATS.map(({ cmd, Icon, label }) => (
+            <button
+              key={cmd}
+              title={label}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => applyFormat(cmd)}
+              className={`p-1 rounded opacity-40 hover:opacity-90 hover:bg-white/40 transition-opacity ${labelClass}`}
+            >
+              <Icon size={13} />
+            </button>
+          ))}
+        </div>
+      )}
+      <div
+        ref={ref}
+        contentEditable={editable}
+        suppressContentEditableWarning
+        data-ph={placeholder}
+        onInput={emit}
+        onKeyDown={handleKeyDown}
+        onPaste={e => {
+          if (!editable) return;
+          e.preventDefault();
+          document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+        }}
+        className={`flex-1 min-h-0 overflow-y-auto outline-none text-sm leading-relaxed ${textClass} ${editable ? "" : "opacity-60"} empty:before:content-[attr(data-ph)] empty:before:opacity-50 empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4`}
+      />
+    </div>
+  );
 }
 
 function getDaysInMonth(year: number, month: number) {
@@ -87,8 +243,8 @@ export default function NotebookWidget({
   }, [viewDate]);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const updated = { ...notesByDate, [today]: e.target.value };
+  function handleChange(value: string) {
+    const updated = { ...notesByDate, [today]: value };
     setNotesByDate(updated);
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
@@ -186,12 +342,14 @@ export default function NotebookWidget({
             </div>
           )}
 
-          <textarea
-            value={currentNote}
-            onChange={handleChange}
-            disabled={!isToday}
+          <RichTextEditor
+            docKey={isToday ? "today" : `${activeTabId}-${viewDate}`}
+            html={currentNote}
+            editable={isToday}
             placeholder={isToday ? "write anything..." : "nothing written."}
-            className={`flex-1 resize-none outline-none text-sm !bg-transparent leading-relaxed ${c.text} placeholder:opacity-50 disabled:opacity-60 disabled:cursor-default`}
+            onChange={handleChange}
+            textClass={c.text}
+            labelClass={c.label}
           />
         </div>
 

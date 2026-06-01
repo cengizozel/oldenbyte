@@ -58,7 +58,7 @@ lib/
   storage.ts            # Client-side storage API wrapper
   widgets.ts            # Widget type definitions and color map
 
-middleware.ts           # Auth gate — redirects to /login if no valid session
+proxy.ts                # Auth gate — redirects to /login if no valid session
 prisma/
   schema.prisma         # Single `Setting` model (key/value store)
 public/
