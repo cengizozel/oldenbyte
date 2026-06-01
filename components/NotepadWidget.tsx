@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { NotebookPen, Pencil, Check, X, Bold, Italic, Underline, List } from "lucide-react";
+import { NotebookPen, Pencil, Check, X, Bold, Italic, Underline, List, History, Trash2 } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
@@ -30,6 +30,22 @@ function plainToHtml(s: string) {
 function normalizeHtml(html: string) {
   const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/gi, " ").trim();
   return text === "" ? "" : html;
+}
+
+// Plain-text preview of a note's HTML, for the history list.
+function stripHtml(html: string) {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function fmtDate(date: string) {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 const FORMATS = [
@@ -279,6 +295,56 @@ export default function NotebookWidget({
     setCalMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
   }
 
+  // History: every dated note across all registered notepads (a date can hold
+  // several, one per notepad instance), newest first.
+  type HistoryEntry = { id: string; name: string; date: string; snippet: string };
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  async function openHistory() {
+    setHistoryOpen(true);
+    const reg = await storage.getItem(REGISTRY_KEY);
+    const ids: string[] = reg ? JSON.parse(reg) : [widget.id];
+    const perId = await Promise.all(
+      ids.map(async (id, i) => {
+        const [datesRaw, nameRaw] = await Promise.all([
+          storage.getItem(`notebook-${id}-dates`),
+          storage.getItem(`notebook-${id}-name`),
+        ]);
+        const dates: Record<string, string> = datesRaw ? JSON.parse(datesRaw) : {};
+        const name = nameRaw && nameRaw.trim() ? nameRaw.trim() : `Notepad ${i + 1}`;
+        return { id, name, dates };
+      })
+    );
+    const entries: HistoryEntry[] = [];
+    for (const { id, name, dates } of perId) {
+      for (const [date, html] of Object.entries(dates)) {
+        const text = stripHtml(html);
+        if (!text) continue;
+        entries.push({ id, name, date, snippet: text.slice(0, 80) });
+      }
+    }
+    entries.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
+    setHistory(entries);
+  }
+
+  async function deleteEntry(id: string, date: string) {
+    const raw = await storage.getItem(`notebook-${id}-dates`);
+    const dates: Record<string, string> = raw ? JSON.parse(raw) : {};
+    delete dates[date];
+    await storage.setItem(`notebook-${id}-dates`, JSON.stringify(dates));
+    if (id === widget.id) {
+      setNotesByDate(prev => { const n = { ...prev }; delete n[date]; return n; });
+    }
+    setHistory(prev => prev.filter(e => !(e.id === id && e.date === date)));
+  }
+
+  function openDate(date: string) {
+    setViewDate(date);
+    setCalMonth(new Date(`${date}T12:00:00`));
+    setHistoryOpen(false);
+  }
+
   return (
     <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
 
@@ -306,12 +372,22 @@ export default function NotebookWidget({
                 <span className="opacity-50"><NotebookPen size={14} /></span>
                 {customName && <span className="text-xs font-medium opacity-60">{customName}</span>}
               </div>
-              <button
-                onClick={() => { setDraftName(customName); setRenaming(true); }}
-                className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
-              >
-                <Pencil size={12} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={openHistory}
+                  title="All notes"
+                  className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+                >
+                  <History size={12} />
+                </button>
+                <button
+                  onClick={() => { setDraftName(customName); setRenaming(true); }}
+                  title="Rename"
+                  className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+                >
+                  <Pencil size={12} />
+                </button>
+              </div>
             </div>
           )}
 
@@ -400,6 +476,43 @@ export default function NotebookWidget({
 
         </div>
       </div>
+
+      {/* History overlay: all dated notes across every notepad */}
+      {historyOpen && (
+        <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
+          <div className="flex items-center justify-between mb-3 shrink-0">
+            <div className={`flex items-center gap-1.5 ${c.label}`}>
+              <span className="opacity-50"><History size={14} /></span>
+              <span className="text-xs font-medium opacity-60">All notes</span>
+            </div>
+            <button onClick={() => setHistoryOpen(false)} className={`opacity-50 hover:opacity-90 ${c.label}`} title="Close">
+              <X size={14} />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-1">
+            {history.length === 0 ? (
+              <p className={`text-xs opacity-45 ${c.text}`}>no notes yet</p>
+            ) : history.map(e => (
+              <div key={`${e.id}-${e.date}`} className="flex items-start gap-2 px-2 py-1.5 rounded-lg hover:bg-white/40 transition-colors">
+                <button onClick={() => openDate(e.date)} className="flex-1 min-w-0 text-left">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-medium shrink-0 ${c.label}`}>{fmtDate(e.date)}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full bg-white/50 truncate ${c.label} opacity-70`}>{e.name}</span>
+                  </div>
+                  <p className={`text-xs opacity-50 truncate mt-0.5 ${c.text}`}>{e.snippet}</p>
+                </button>
+                <button
+                  onClick={() => deleteEntry(e.id, e.date)}
+                  title="Delete note"
+                  className={`shrink-0 mt-0.5 opacity-40 hover:opacity-100 hover:text-red-500 ${c.label}`}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
