@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -92,5 +92,13 @@ export const widgets: Widget[] = [
     color: "orange",
     title: "HF Daily",
     description: "Trending AI papers curated by Hugging Face.",
+  },
+  {
+    id: "tracker",
+    type: "tracker",
+    color: "teal",
+    title: "Tracker",
+    description: "Time how long you spend on each activity.",
+    digestable: false,
   },
 ];
