@@ -18,7 +18,7 @@ function extractCdata(str: string): string {
   return decodeEntities(m ? m[1].trim() : str.trim());
 }
 
-type Video = { title: string; link: string; published: string; isMembersOnly: boolean };
+type Video = { title: string; link: string; published: string; isMembersOnly: boolean; isShort: boolean };
 
 // Convert relative YouTube time ("2 days ago") to approximate ISO string
 function relToIso(rel: string): string {
@@ -51,7 +51,7 @@ async function fetchViaRss(channelId: string, limit: number): Promise<{ name: st
     const title = extractCdata(rawTitle);
     const linkMatch = block.match(/<link[^>]+href="([^"]+)"/i);
     const published = block.match(/<published>([^<]+)<\/published>/)?.[1] ?? "";
-    if (title && linkMatch) videos.push({ title, link: linkMatch[1], published, isMembersOnly: false });
+    if (title && linkMatch) videos.push({ title, link: linkMatch[1], published, isMembersOnly: false, isShort: false });
   }
   return { name, videos };
 }
@@ -86,8 +86,10 @@ async function fetchViaChannelPage(channelId: string, limit: number): Promise<{ 
 
   // Navigate to video grid items
   const tabs: unknown[] = dig(data, "contents", "twoColumnBrowseResultsRenderer", "tabs") ?? [];
+  // Collect grid items. YouTube currently wraps each entry in a `lockupViewModel`;
+  // older responses used `videoRenderer`. Both are handled below.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let renderers: any[] = [];
+  let items: any[] = [];
 
   for (const tab of tabs) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,25 +97,63 @@ async function fetchViaChannelPage(channelId: string, limit: number): Promise<{ 
       dig(tab, "tabRenderer", "content", "richGridRenderer", "contents") ??
       dig(tab, "tabRenderer", "content", "sectionListRenderer", "contents") ?? [];
     for (const item of contents) {
-      const vr = dig(item, "richItemRenderer", "content", "videoRenderer");
-      if (vr?.videoId) renderers.push(vr);
+      const content = dig(item, "richItemRenderer", "content");
+      if (content?.videoRenderer?.videoId || content?.lockupViewModel?.contentId) {
+        items.push(content);
+      }
     }
-    if (renderers.length > 0) break;
+    if (items.length > 0) break;
   }
 
-  const videos: Video[] = renderers.slice(0, limit).map(vr => ({
-    title: vr.title?.runs?.[0]?.text ?? vr.title?.simpleText ?? "",
-    link: `https://www.youtube.com/watch?v=${vr.videoId}`,
-    published: relToIso(vr.publishedTimeText?.simpleText ?? ""),
-    isMembersOnly: (vr.badges ?? []).some(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parse = (content: any): Video => {
+    // Legacy videoRenderer format
+    if (content.videoRenderer) {
+      const vr = content.videoRenderer;
+      return {
+        title: vr.title?.runs?.[0]?.text ?? vr.title?.simpleText ?? "",
+        link: `https://www.youtube.com/watch?v=${vr.videoId}`,
+        published: relToIso(vr.publishedTimeText?.simpleText ?? ""),
+        isMembersOnly: (vr.badges ?? []).some(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (b: any) => {
+            const r = b?.metadataBadgeRenderer;
+            return r?.style === "BADGE_STYLE_TYPE_MEMBERS_ONLY" ||
+                   r?.label?.toLowerCase().includes("members");
+          }
+        ),
+        isShort: !!dig(vr, "navigationEndpoint", "reelWatchEndpoint") ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (vr.thumbnailOverlays ?? []).some((o: any) =>
+            o?.thumbnailOverlayTimeStatusRenderer?.style === "SHORTS"
+          ),
+      };
+    }
+
+    // Current lockupViewModel format
+    const lvm = content.lockupViewModel;
+    const meta = dig(lvm, "metadata", "lockupMetadataViewModel");
+    const rows = dig(meta, "metadata", "contentMetadataViewModel", "metadataRows") ?? [];
+    let published = "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const row of rows as any[]) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (b: any) => {
-        const r = b?.metadataBadgeRenderer;
-        return r?.style === "BADGE_STYLE_TYPE_MEMBERS_ONLY" ||
-               r?.label?.toLowerCase().includes("members");
+      for (const part of (row.metadataParts ?? []) as any[]) {
+        const t = part?.text?.content ?? "";
+        if (/\bago\b/i.test(t)) { published = t; break; }
       }
-    ),
-  })).filter(v => v.title);
+      if (published) break;
+    }
+    return {
+      title: dig(meta, "title", "content") ?? "",
+      link: `https://www.youtube.com/watch?v=${lvm.contentId}`,
+      published: relToIso(published),
+      isMembersOnly: false,
+      isShort: lvm.contentType === "LOCKUP_CONTENT_TYPE_SHORTS",
+    };
+  };
+
+  const videos: Video[] = items.slice(0, limit).map(parse).filter(v => v.title);
 
   return { name, videos };
 }
@@ -149,8 +189,13 @@ export async function GET(request: NextRequest) {
   const channel       = request.nextUrl.searchParams.get("channel");
   const channelId     = request.nextUrl.searchParams.get("channelId");
   const filterMembers = request.nextUrl.searchParams.get("filterMembers") === "true";
+  const includeShorts = request.nextUrl.searchParams.get("includeShorts") === "true";
   const limit = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "5"), 15);
-  const fetchLimit = filterMembers ? Math.min(limit * 4, 30) : limit;
+  // The RSS feed includes Shorts and exposes no members-only flag; only the
+  // channel-page scraper can filter either, so route through it (over-fetching
+  // to compensate for filtered-out items) whenever filtering is requested.
+  const useChannelPage = filterMembers || !includeShorts;
+  const fetchLimit = useChannelPage ? Math.min(limit * 4, 30) : limit;
 
   if (!channel && !channelId) {
     return NextResponse.json({ error: "Missing channel or channelId" }, { status: 400 });
@@ -172,11 +217,14 @@ export async function GET(request: NextRequest) {
     let name: string;
     let videos: Video[];
 
-    if (filterMembers) {
-      // Channel page exposes members-only badges; RSS does not
+    if (useChannelPage) {
+      // Channel page exposes members-only badges and excludes Shorts; RSS does neither
       const result = await fetchViaChannelPage(resolvedId, fetchLimit);
       name = result.name;
-      videos = result.videos.filter(v => !v.isMembersOnly).slice(0, limit);
+      videos = result.videos
+        .filter(v => !filterMembers || !v.isMembersOnly)
+        .filter(v => includeShorts || !v.isShort)
+        .slice(0, limit);
     } else {
       try {
         const result = await fetchViaRss(resolvedId, fetchLimit);

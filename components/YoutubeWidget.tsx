@@ -5,7 +5,7 @@ import { Pencil, Check, X, RotateCcw, Loader, Plus, PlaySquare } from "lucide-re
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
-type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean };
+type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean };
 type YoutubeConfig  = { channels: YoutubeChannel[] };
 type Video          = { title: string; link: string; published: string; channelId: string; channelName: string };
 
@@ -98,7 +98,7 @@ export default function YoutubeWidget({
   }, [videos]);
 
   function cacheKeyFor(cfg: YoutubeConfig) {
-    return `${storageKey}-${today}-${cfg.channels.map(ch => `${ch.channelId}:${ch.limit}:${ch.filterMembers ? 1 : 0}`).join(",")}`;
+    return `${storageKey}-${today}-${cfg.channels.map(ch => `${ch.channelId}:${ch.limit}:${ch.filterMembers ? 1 : 0}:${ch.includeShorts ? 1 : 0}`).join(",")}`;
   }
 
   async function fetchVideos(cfg: YoutubeConfig, cacheKey: string): Promise<boolean> {
@@ -109,6 +109,7 @@ export default function YoutubeWidget({
         cfg.channels.map(async ch => {
           const params = new URLSearchParams({ channelId: ch.channelId, limit: String(ch.limit) });
           if (ch.filterMembers) params.set("filterMembers", "true");
+          if (ch.includeShorts) params.set("includeShorts", "true");
           const res = await fetch(`/api/youtube?${params}`);
           if (!res.ok) throw new Error();
           const data: { videos: { title: string; link: string; published: string }[] } = await res.json();
@@ -297,6 +298,15 @@ export default function YoutubeWidget({
                           ×
                         </button>
                       </div>
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!!ch.includeShorts}
+                          onChange={e => setDraft(d => ({ ...d, channels: d.channels.map(c => c.channelId === ch.channelId ? { ...c, includeShorts: e.target.checked } : c) }))}
+                          className="w-3 h-3 rounded accent-current"
+                        />
+                        <span className="opacity-60 font-normal">include Shorts</span>
+                      </label>
                       {/* filter members-only toggle — revisit later
                       <label className="flex items-center gap-1.5 cursor-pointer select-none">
                         <input
