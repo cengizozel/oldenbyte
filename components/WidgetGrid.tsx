@@ -333,16 +333,24 @@ export default function WidgetGrid({
       return;
     }
     const sourceId = groupingSource;
-    setLayout(prev =>
-      prev
+    setLayout(prev => {
+      // If the source is itself a tab group, carry its tabs into the target
+      // instead of dropping them (the source cell is removed below).
+      const sourceTabs = prev.find(item => item.i === sourceId)?.tabs ?? [];
+      return prev
         .filter(item => item.i !== sourceId)
         .map(item =>
           item.i === targetId
-            ? { ...item, tabs: [...(item.tabs ?? []), sourceId] }
+            ? { ...item, tabs: [...(item.tabs ?? []), sourceId, ...sourceTabs] }
             : item
-        )
-    );
-    setActiveTabs(prev => ({ ...prev, [targetId]: sourceId }));
+        );
+    });
+    setActiveTabs(prev => {
+      const next = { ...prev };
+      delete next[sourceId]; // source is no longer a container
+      next[targetId] = sourceId;
+      return next;
+    });
     setGroupingSource(null);
   }
 
