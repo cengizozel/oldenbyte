@@ -76,6 +76,7 @@ export default function WidgetGrid({
   const [layout, setLayout] = useState<TabLayoutItem[]>(initialLayout);
   const [instances, setInstances] = useState<Record<string, Widget>>(initialInstances);
   const [loaded, setLoaded] = useState(false);
+  const [gridReady, setGridReady] = useState(false);
   const [groupingSource, setGroupingSource] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
 
@@ -179,6 +180,15 @@ export default function WidgetGrid({
   // Cancel grouping mode when edit mode is turned off
   useEffect(() => {
     if (!editing) setGroupingSource(null);
+  }, [editing]);
+
+  // react-grid-layout mounts each tile at the origin and transitions it into
+  // place; suppress that one-time entrance animation, then re-enable transitions
+  // so drag/resize still animate smoothly.
+  useEffect(() => {
+    if (!editing) { setGridReady(false); return; }
+    const id = setTimeout(() => setGridReady(true), 250);
+    return () => clearTimeout(id);
   }, [editing]);
 
   const isMobile = size.width > 0 && size.width < 600;
@@ -500,7 +510,7 @@ export default function WidgetGrid({
     <div className={`flex flex-col gap-2 ${isMobile ? "" : "flex-1 min-h-0"}`}>
 
       {/* Grid */}
-      <div ref={containerRef} className={`relative ${isMobile ? "" : "flex-1 min-h-0"}`}>
+      <div ref={containerRef} className={`relative ${isMobile ? "" : "flex-1 min-h-0"} ${editing && !gridReady ? "[&_.react-grid-item]:!transition-none" : ""}`}>
         {editing && size.width > 0 && (
           <div
             className="absolute inset-0 pointer-events-none z-0"
