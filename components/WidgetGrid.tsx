@@ -75,6 +75,7 @@ export default function WidgetGrid({
 
   const [layout, setLayout] = useState<TabLayoutItem[]>(initialLayout);
   const [instances, setInstances] = useState<Record<string, Widget>>(initialInstances);
+  const [loaded, setLoaded] = useState(false);
   const [groupingSource, setGroupingSource] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
 
@@ -103,7 +104,7 @@ export default function WidgetGrid({
           setLayout(JSON.parse(savedLayout));
         }
       } catch {}
-    });
+    }).finally(() => setLoaded(true));
   }, []);
 
   const [droppingId, setDroppingId] = useState<string | null>(null);
@@ -166,12 +167,14 @@ export default function WidgetGrid({
   }, []);
 
   useEffect(() => {
+    if (!loaded) return;
     storage.setItem("widget-layout", JSON.stringify(layout));
-  }, [layout]);
+  }, [layout, loaded]);
 
   useEffect(() => {
+    if (!loaded) return;
     storage.setItem("widget-instances", JSON.stringify(instances));
-  }, [instances]);
+  }, [instances, loaded]);
 
   // Cancel grouping mode when edit mode is turned off
   useEffect(() => {
@@ -513,7 +516,7 @@ export default function WidgetGrid({
             ))}
           </div>
         )}
-        {editing ? (
+        {!loaded ? null : editing ? (
           size.width > 0 && (
             <GridLayout
               layout={layout}
