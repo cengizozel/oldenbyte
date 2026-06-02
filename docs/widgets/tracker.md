@@ -1,20 +1,20 @@
 # Tracker Widget
 
-Times how long you spend on each of a set of named activities. Only one activity runs at a time: clicking an activity starts (or resumes) its stopwatch and pauses whichever was running. A donut chart shows the proportion of time spent on each activity. Times reset daily.
+Times how long you spend on each of a set of named activities. Only one activity runs at a time: clicking an activity starts (or resumes) its stopwatch and pauses whichever was running. A donut chart shows the proportion of time spent on each activity, and a history log breaks down past days. Times reset daily.
 
 ## Storage Keys
 
 | Key | Value |
 |---|---|
 | `tracker-config-{id}` | JSON: `{ items: Item[]; activeId: string \| null; since: number \| null }` |
-| `tracker-day-{id}-{YYYY-MM-DD}` | JSON: `{ elapsed: Record<itemId, seconds> }` |
+| `tracker-days-{id}` | JSON: `Record<YYYY-MM-DD, Record<itemId, seconds>>` |
 
 `Item` is `{ id: string; name: string }`.
 
 Two keys with different lifetimes:
 
 - **`tracker-config-{id}`** — the activity list plus the "what's running" pointer (`activeId` + `since`, an epoch-ms timestamp). This persists across days, so a stopwatch left running keeps running into the next day.
-- **`tracker-day-{id}-{date}`** — the accumulated seconds per activity for one day. A new day starts with an empty bucket, which is how the daily reset happens (old days' data is simply left untouched under their own date keys).
+- **`tracker-days-{id}`** — every day's accumulated seconds per activity, keyed by date. `today`'s slice is the live bucket (mirrored in the `elapsed` state); a new day simply starts with no entry, which is the daily reset. Past days are retained — that's what the history log reads. *(An earlier version stored one key per day, `tracker-day-{id}-{date}`; on load that today-key is migrated into this consolidated store.)*
 
 ## Timing Model
 
@@ -48,9 +48,17 @@ So today's bucket only ever accrues time from midnight onward. (Day boundaries u
 
 Hand-rolled SVG (no chart library). Each activity with non-zero live time is drawn as an arc on a shared `<circle>` using `stroke-dasharray`/`stroke-dashoffset`, accumulating an offset so the segments sit end to end. A faint full-circle track sits behind them, and the day's total time is shown in the center. Colors come from a fixed 12-entry palette indexed by the activity's position; the same palette colors the legend dots and the settings rows.
 
+**Hover:** hovering a segment dims the others and replaces the center text with that activity's name and its share (`%`); with no hover the center shows the day's total. The center overlay is `pointer-events-none` so hovers reach the arcs beneath it.
+
 ## Settings
 
-The card flips (the same `rotateY` flip used by the YouTube/RSS widgets) to a settings panel where activities are added (text field + `Plus`), renamed inline, and removed (`×`). Edits are staged in a `draft` list and applied on save (`Check`). On save, `elapsed` entries for removed activities are dropped, and if the running activity was removed the stopwatch is stopped.
+The card flips (the same `rotateY` flip used by the YouTube/RSS widgets) to a settings panel where activities are added (text field + `Plus`), renamed inline, and removed (`×`). Edits are staged in a `draft` list and applied on save (`Check`). On save, removed activities are dropped from *today's* bucket and the active list (the stopwatch stops if the running activity was removed) — but their **past-day history is kept** (it's keyed by id), so removing an activity never erases its record.
+
+## History
+
+The header's `History` (clock) button opens an overlay listing every past day that has tracked time, newest first. Each day shows its total plus a per-activity breakdown (color dot, name, time, sorted by time), with a `Trash2` button to delete that day.
+
+Per-day time is keyed by activity **id**, not name. So renaming an activity keeps its history intact, and a removed activity's past time still appears (labeled `(removed)`, with a neutral dot). Persistent ids with mutable names keep historical data stable for future statistics.
 
 ## Reset
 

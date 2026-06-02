@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Timer, Pencil, Check, X, Plus, RotateCcw, Play, Pause } from "lucide-react";
+import { Timer, Pencil, Check, X, Plus, RotateCcw, Play, Pause, History, Trash2 } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
 type Item = { id: string; name: string };
+// All days of tracked time: date (YYYY-MM-DD) → activity id → seconds.
+type Days = Record<string, Record<string, number>>;
 
 // Distinct colors for the donut segments + legend dots (used as inline SVG/CSS colors)
 const PALETTE = [
@@ -27,6 +29,12 @@ function fmt(secs: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }
 
+function fmtDate(date: string) {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+type HistoryDay = { date: string; total: number; rows: { id: string; name: string; color: string; secs: number }[] };
+
 export default function TrackerWidget({
   widget,
   className = "",
@@ -39,10 +47,11 @@ export default function TrackerWidget({
   const todayStartMs = Date.parse(`${today}T00:00:00Z`);
 
   const configKey = `tracker-config-${widget.id}`;
-  const dayKey = `tracker-day-${widget.id}-${today}`;
+  const daysKey = `tracker-days-${widget.id}`;
+  const legacyDayKey = `tracker-day-${widget.id}-${today}`; // pre-history single-day format
 
   // Item list + the "what's running" pointer persist across days (config key).
-  // Accumulated seconds reset daily (day key).
+  // Per-day accumulated seconds live in `daysKey`; `elapsed` mirrors today's.
   const [items, setItems]       = useState<Item[]>([]);
   const [elapsed, setElapsed]   = useState<Record<string, number>>({});
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -54,8 +63,19 @@ export default function TrackerWidget({
   const [draft, setDraft]               = useState<Item[]>([]);
   const [nameInput, setNameInput]       = useState("");
 
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory]         = useState<HistoryDay[]>([]);
+  const [hovered, setHovered]         = useState<string | null>(null);
+
+  // Full multi-day store; `elapsed` is always days[today].
+  const daysRef = useRef<Days>({});
+
   useEffect(() => {
-    Promise.all([storage.getItem(configKey), storage.getItem(dayKey)]).then(([cfgRaw, dayRaw]) => {
+    Promise.all([
+      storage.getItem(configKey),
+      storage.getItem(daysKey),
+      storage.getItem(legacyDayKey),
+    ]).then(([cfgRaw, daysRaw, legacyRaw]) => {
       try {
         if (cfgRaw) {
           const cfg = JSON.parse(cfgRaw) as { items?: Item[]; activeId?: string | null; since?: number | null };
@@ -64,10 +84,17 @@ export default function TrackerWidget({
           setActiveId(cfg.activeId ?? null);
           setSince(cfg.since ?? null);
         }
-        if (dayRaw) {
-          const d = JSON.parse(dayRaw) as { elapsed?: Record<string, number> };
-          setElapsed(d.elapsed ?? {});
+        let days: Days = {};
+        if (daysRaw) {
+          days = (JSON.parse(daysRaw) as Days) ?? {};
+        } else if (legacyRaw) {
+          // Migrate the old one-key-per-day format (only today's key is reachable).
+          const d = JSON.parse(legacyRaw) as { elapsed?: Record<string, number> };
+          if (d.elapsed) days[today] = d.elapsed;
+          storage.setItem(daysKey, JSON.stringify(days));
         }
+        daysRef.current = days;
+        setElapsed(days[today] ?? {});
       } catch {}
       setNow(Date.now());
       setLoaded(true);
@@ -86,8 +113,11 @@ export default function TrackerWidget({
   function persistConfig(nextItems: Item[], nextActive: string | null, nextSince: number | null) {
     storage.setItem(configKey, JSON.stringify({ items: nextItems, activeId: nextActive, since: nextSince }));
   }
-  function persistDay(nextElapsed: Record<string, number>) {
-    storage.setItem(dayKey, JSON.stringify({ elapsed: nextElapsed }));
+  // Write today's elapsed into the multi-day store (preserving every other day).
+  function persistDays(todayElapsed: Record<string, number>) {
+    const next: Days = { ...daysRef.current, [today]: todayElapsed };
+    daysRef.current = next;
+    storage.setItem(daysKey, JSON.stringify(next));
   }
 
   // Seconds run by the active item since its segment started (clamped to today's
@@ -109,7 +139,7 @@ export default function TrackerWidget({
   function select(id: string) {
     const committed = commit();
     setElapsed(committed);
-    persistDay(committed);
+    persistDays(committed);
     if (activeId === id) {
       setActiveId(null);
       setSince(null);
@@ -126,7 +156,7 @@ export default function TrackerWidget({
     setElapsed({});
     const s = activeId ? Date.now() : null;
     setSince(s);
-    persistDay({});
+    persistDays({});
     persistConfig(items, activeId, s);
   }
 
@@ -139,6 +169,8 @@ export default function TrackerWidget({
 
   function handleSave() {
     const validIds = new Set(draft.map(i => i.id));
+    // Drop removed items from today only; past days keep their data (kept by id
+    // so history and future stats survive renames/removals).
     const nextElapsed = Object.fromEntries(Object.entries(elapsed).filter(([k]) => validIds.has(k)));
     let nextActive = activeId;
     let nextSince = since;
@@ -148,8 +180,43 @@ export default function TrackerWidget({
     setActiveId(nextActive);
     setSince(nextSince);
     persistConfig(draft, nextActive, nextSince);
-    persistDay(nextElapsed);
+    persistDays(nextElapsed);
     setSettingsOpen(false);
+  }
+
+  function openHistory() {
+    const meta = new Map(items.map((it, i) => [it.id, { name: it.name, color: PALETTE[i % PALETTE.length] }]));
+    const entries: HistoryDay[] = Object.entries(daysRef.current)
+      .map(([date, map]) => {
+        const rows = Object.entries(map)
+          .filter(([, s]) => s > 0)
+          .map(([id, secs]) => ({
+            id,
+            secs,
+            name: meta.get(id)?.name ?? "(removed)",
+            color: meta.get(id)?.color ?? "#9ca3af",
+          }))
+          .sort((a, b) => b.secs - a.secs);
+        return { date, total: rows.reduce((a, b) => a + b.secs, 0), rows };
+      })
+      .filter(e => e.total > 0)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    setHistory(entries);
+    setHistoryOpen(true);
+  }
+
+  function deleteDay(date: string) {
+    const next = { ...daysRef.current };
+    delete next[date];
+    daysRef.current = next;
+    storage.setItem(daysKey, JSON.stringify(next));
+    if (date === today) {
+      setElapsed({});
+      const s = activeId ? Date.now() : null;
+      setSince(s);
+      persistConfig(items, activeId, s);
+    }
+    setHistory(h => h.filter(e => e.date !== date));
   }
 
   // Live per-item seconds (committed + current running segment)
@@ -159,6 +226,9 @@ export default function TrackerWidget({
     secs: (elapsed[it.id] ?? 0) + (it.id === activeId ? runningSecs() : 0),
   }));
   const total = rows.reduce((a, b) => a + b.secs, 0);
+
+  const hoveredRow = hovered != null ? rows.find(r => r.id === hovered) : undefined;
+  const hoveredPct = hoveredRow && total > 0 ? Math.round((hoveredRow.secs / total) * 100) : 0;
 
   // Donut geometry
   const R = 42;
@@ -182,12 +252,22 @@ export default function TrackerWidget({
               <span className="opacity-50"><Timer size={14} /></span>
               <span className="text-xs font-medium opacity-60">Tracker</span>
             </div>
-            <button
-              onClick={() => { setDraft(items); setSettingsOpen(true); }}
-              className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
-            >
-              <Pencil size={12} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openHistory}
+                title="History"
+                className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+              >
+                <History size={12} />
+              </button>
+              <button
+                onClick={() => { setDraft(items); setSettingsOpen(true); }}
+                title="Edit"
+                className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+              >
+                <Pencil size={12} />
+              </button>
+            </div>
           </div>
 
           {!loaded ? null : items.length === 0 ? (
@@ -212,15 +292,27 @@ export default function TrackerWidget({
                           strokeWidth={STROKE}
                           strokeDasharray={`${len} ${CIRC - len}`}
                           strokeDashoffset={-acc}
+                          style={{ cursor: "pointer", opacity: hovered && hovered !== r.id ? 0.4 : 1 }}
+                          onMouseEnter={() => setHovered(r.id)}
+                          onMouseLeave={() => setHovered(null)}
                         />
                       );
                       acc += len;
                       return seg;
                     })}
                   </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className={`text-sm font-semibold tabular-nums ${c.text}`}>{fmt(total)}</span>
-                    <span className={`text-[10px] uppercase tracking-widest opacity-40 ${c.label}`}>total</span>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-3 text-center">
+                    {hoveredRow ? (
+                      <>
+                        <span className={`text-sm font-semibold tabular-nums ${c.text}`}>{hoveredPct}%</span>
+                        <span className={`text-[10px] leading-tight line-clamp-2 ${c.label} opacity-60`}>{hoveredRow.name}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className={`text-sm font-semibold tabular-nums ${c.text}`}>{fmt(total)}</span>
+                        <span className={`text-[10px] uppercase tracking-widest opacity-40 ${c.label}`}>total</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -307,6 +399,47 @@ export default function TrackerWidget({
           </div>
         </div>
       </div>
+
+      {/* History overlay: time per activity, grouped by day (newest first) */}
+      {historyOpen && (
+        <div className={`absolute inset-0 z-40 p-5 flex flex-col rounded-2xl ${c.bg}`}>
+          <div className="flex items-center justify-between mb-3 shrink-0">
+            <div className={`flex items-center gap-1.5 ${c.label}`}>
+              <span className="opacity-50"><History size={14} /></span>
+              <span className="text-xs font-medium opacity-60">History</span>
+            </div>
+            <button onClick={() => setHistoryOpen(false)} className={`opacity-50 hover:opacity-90 ${c.label}`} title="Close">
+              <X size={14} />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-3">
+            {history.length === 0 ? (
+              <p className={`text-xs opacity-45 ${c.text}`}>no history yet</p>
+            ) : history.map(day => (
+              <div key={day.date} className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-medium ${c.label}`}>{fmtDate(day.date)}{day.date === today && " · today"}</span>
+                  <span className={`text-xs tabular-nums opacity-50 ${c.text}`}>{fmt(day.total)}</span>
+                  <button
+                    onClick={() => deleteDay(day.date)}
+                    title="Delete day"
+                    className={`ml-auto shrink-0 opacity-40 hover:opacity-100 hover:text-red-500 ${c.label}`}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+                {day.rows.map(r => (
+                  <div key={r.id} className="flex items-center gap-2 pl-1">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+                    <span className={`flex-1 truncate text-xs opacity-80 ${c.text}`}>{r.name}</span>
+                    <span className={`text-xs tabular-nums opacity-50 ${c.text}`}>{fmt(r.secs)}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
