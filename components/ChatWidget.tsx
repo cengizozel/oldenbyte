@@ -21,6 +21,15 @@ type ChatConfig = {
   length: Length;    // response-style preset: brevity instruction + suggested cap
 };
 
+// Always-on identity so the assistant knows who and where it is, even when the
+// dashboard-data toggle is off (otherwise the underlying model answers as its
+// generic self).
+const BASE_IDENTITY =
+  "You are the assistant built into oldenbyte — a personal dashboard the user self-hosts. " +
+  "You live in a Chat widget alongside their other widgets: notes, RSS/Reddit/YouTube/arXiv/Hugging Face feeds, an F1 panel, an activity tracker, a reader, and more. " +
+  "Your purpose is to be a helpful, grounded companion on this dashboard — answer questions, think things through, and, when the user enables it, help them make sense of their own dashboard data (their notes and the feeds they follow). " +
+  "Keep replies clear and to the point, and if you don't know something, say so rather than making it up.";
+
 // Each style appends a brevity hint to the system prompt and suggests a token
 // cap. The cap is just a starting point — the Max-tokens field can override it.
 const LENGTH_PRESETS: Record<Length, { label: string; cap: number; instruction: string }> = {
@@ -194,16 +203,23 @@ export default function ChatWidget({
   // toggle is on, so the model can answer questions about the user's own notes
   // and feeds.
   function buildSystemContent(dash: typeof ctx): string {
-    const parts: string[] = [];
+    const parts: string[] = [BASE_IDENTITY];
     if (config.system.trim()) parts.push(config.system.trim());
     const styleHint = LENGTH_PRESETS[config.length].instruction;
     if (styleHint) parts.push(styleHint);
     if (config.useDashboard && dash?.text) {
       const todayStr = new Date().toISOString().split("T")[0];
       parts.push(
-        `You have access to the user's personal dashboard below (their notes, feeds, papers, videos, schedule, and tracked time). ` +
-        `Use it to answer questions about their data, citing dates and titles where relevant. ` +
-        `If something is not present in the data, say so rather than guessing. Today is ${todayStr}.\n\n` +
+        `The user has turned on dashboard access. Inside <dashboard> below is a live snapshot of their dashboard, captured just now. Today is ${todayStr}.\n\n` +
+        `Each section is headed by its source and type in parentheses, and means:\n` +
+        `- "Notes": the user's own notepad entries, grouped by date, newest first — their personal writing and memory. Quote them faithfully.\n` +
+        `- "Feed", "Reddit", "YouTube", "arXiv", "HF Daily": the latest items from external sources the user follows, newest first, usually with links — the material for "what's new" questions.\n` +
+        `- "F1": the upcoming race and current driver standings.\n` +
+        `- "Tracker (time spent)": how much time the user has logged per activity, by date.\n` +
+        `- "Text": a small custom value the user pinned.\n\n` +
+        `Your job is to help the user make sense of their own dashboard: answer questions about their notes and the things they follow, recall what they wrote on a given date, summarize or highlight what's new or notable, and connect related items. ` +
+        `Refer to specific dates, titles, and links from the data when relevant. ` +
+        `This snapshot is everything you can see — if the answer isn't in it, say so plainly rather than guessing or inventing entries, and don't assume anything beyond what's shown.\n\n` +
         `<dashboard>\n${dash.text}\n</dashboard>`
       );
     }
@@ -361,13 +377,14 @@ export default function ChatWidget({
         </div>
       )}
 
-      {/* Context viewer overlay — the raw text injected as the <dashboard> block */}
+      {/* Context viewer overlay — the full system message sent to the model
+          (framing + system prompt + style hint + the <dashboard> data block) */}
       {showContext && (
         <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
           <div className={`flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b ${c.border}`}>
             <span className={`flex items-center gap-1.5 text-xs font-medium opacity-70 ${c.label}`}>
               <Database size={13} />
-              Dashboard context{ctx ? ` · ${ctx.sections} section${ctx.sections === 1 ? "" : "s"} · ~${Math.round(ctx.chars / 1000)}k chars` : ""}
+              Context sent to the model{ctx ? ` · ${ctx.sections} section${ctx.sections === 1 ? "" : "s"} · ~${Math.round(ctx.chars / 1000)}k chars` : ""}
             </span>
             <button onClick={() => setShowContext(false)} title="Close" className={`opacity-50 hover:opacity-90 ${c.label}`}>
               <X size={14} />
@@ -375,7 +392,7 @@ export default function ChatWidget({
           </div>
           <div className="flex-1 min-h-0 overflow-auto p-4">
             <pre className={`text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono ${c.text} opacity-90`}>
-              {ctx?.text || "No context gathered."}
+              {buildSystemContent(ctx) || "No context gathered."}
             </pre>
           </div>
         </div>
