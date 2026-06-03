@@ -60,13 +60,23 @@ function timeAgo(iso: string): string {
   return `${Math.floor(d / 7)}w ago`;
 }
 
+// OpenAI's /models endpoint needs a key and is noisy, so offer a curated list.
+const OPENAI_MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "o4-mini"];
+const defaultModelsFor = (url: string) => (/openai\.com/i.test(url) ? OPENAI_MODELS : []);
+
 export default function DigestPage() {
   const [mode] = useState<"digest" | "full" | "ai">("ai");
   const [sections, setSections]   = useState<Section[]>([]);
   const [loading, setLoading]     = useState(true);
-  const [aiKey, setAiKey]               = useState("");
-  const [keyDraft, setKeyDraft]         = useState("");
-  const [showKeyInput, setShowKeyInput] = useState(false);
+  // Any OpenAI-compatible endpoint (local Ollama/LM Studio/llama.cpp or a hosted
+  // provider). Stored in localStorage, like the original key was.
+  const [baseUrl, setBaseUrl]   = useState("https://api.openai.com/v1");
+  const [model, setModel]       = useState("gpt-4o-mini");
+  const [apiKey, setApiKey]     = useState("");
+  const [draft, setDraft]       = useState({ baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", apiKey: "" });
+  const [showSettings, setShowSettings] = useState(false);
+  const [models, setModels]     = useState<string[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [sectionSummaries, setSectionSummaries] = useState<{ label: string; prose: string; refs: Ref[] }[]>([]);
   const [aiLoading, setAiLoading]       = useState(false);
   const [aiError, setAiError]           = useState("");
@@ -79,17 +89,24 @@ export default function DigestPage() {
   });
 
   useEffect(() => {
-    const saved = localStorage.getItem("digest-openai-key") ?? "";
-    setAiKey(saved);
-    setKeyDraft(saved);
+    const savedUrl = localStorage.getItem("digest-base-url") || "https://api.openai.com/v1";
+    const savedModel = localStorage.getItem("digest-model") || "gpt-4o-mini";
+    const savedKey = localStorage.getItem("digest-openai-key") ?? "";
+    setBaseUrl(savedUrl); setModel(savedModel); setApiKey(savedKey);
+    setDraft({ baseUrl: savedUrl, model: savedModel, apiKey: savedKey });
+    setModels(defaultModelsFor(savedUrl));
     setStreamingMode(localStorage.getItem("digest-streaming") === "true");
     loadAll().then(s => { setSections(s); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-generate when AI tab is selected, key exists, sections loaded, no summary yet
+  // Hosted providers need a key; local servers don't.
+  const NEEDS_KEY = /(openai|anthropic|googleapis)\.com/i;
+  const configured = Boolean(baseUrl && model && (apiKey || !NEEDS_KEY.test(baseUrl)));
+
+  // Auto-generate when AI tab is selected, configured, sections loaded, no summary yet
   useEffect(() => {
-    if (mode !== "ai" || !aiKey || loading || !sections.length || sectionSummaries.length || aiLoading) return;
+    if (mode !== "ai" || !configured || loading || !sections.length || sectionSummaries.length || aiLoading) return;
     if (summaryRequestedRef.current) return;
     storage.getItem(`digest-ai-sections-${today}`).then(cached => {
       if (cached) {
@@ -99,13 +116,63 @@ export default function DigestPage() {
       generateSummary();
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, aiKey, loading, sections]);
+  }, [mode, configured, loading, sections]);
 
-  function saveKey() {
-    localStorage.setItem("digest-openai-key", keyDraft);
-    setAiKey(keyDraft);
-    setShowKeyInput(false);
+  // Fetch an endpoint's models and select the first. OpenAI uses a curated list
+  // (its /models needs a key); local servers are queried live. While searching,
+  // the model is cleared so the field shows empty/loading rather than stale data.
+  async function loadModelsFor(url: string, key: string) {
+    if (!url) { setModels([]); return; }
+    if (/openai\.com/i.test(url)) {
+      setModels(OPENAI_MODELS);
+      setDraft(d => ({ ...d, model: OPENAI_MODELS[0] }));
+      return;
+    }
+    setLoadingModels(true);
+    setModels([]);
+    setDraft(d => ({ ...d, model: "" }));
+    try {
+      const params = new URLSearchParams({ baseUrl: url });
+      if (key) params.set("apiKey", key);
+      const res = await fetch(`/api/chat?${params.toString()}`);
+      const data = await res.json();
+      const list: string[] = res.ok && Array.isArray(data.models) ? data.models : [];
+      setModels(list);
+      setDraft(d => ({ ...d, model: list[0] ?? "" }));
+    } catch {
+      setModels([]);
+      setDraft(d => ({ ...d, model: "" }));
+    } finally {
+      setLoadingModels(false);
+    }
   }
+
+  // Switching endpoint (preset) auto-loads that server's models and picks the first.
+  function setEndpoint(url: string) {
+    setDraft(d => ({ ...d, baseUrl: url, model: "" }));
+    loadModelsFor(url, draft.apiKey);
+  }
+
+  function openSettings() {
+    setDraft({ baseUrl, model, apiKey });
+    setModels(defaultModelsFor(baseUrl));
+    setShowSettings(true);
+  }
+
+  function saveSettings() {
+    const next = { baseUrl: draft.baseUrl.trim(), model: draft.model.trim(), apiKey: draft.apiKey.trim() };
+    setBaseUrl(next.baseUrl); setModel(next.model); setApiKey(next.apiKey);
+    localStorage.setItem("digest-base-url", next.baseUrl);
+    localStorage.setItem("digest-model", next.model);
+    localStorage.setItem("digest-openai-key", next.apiKey);
+    setShowSettings(false);
+  }
+
+  const PRESETS = [
+    { label: "OpenAI", url: "https://api.openai.com/v1" },
+    { label: "Ollama", url: "http://localhost:11434/v1" },
+    { label: "LM Studio", url: "http://localhost:1234/v1" },
+  ];
 
   const CITABLE = new Set(["rss", "reddit", "youtube", "arxiv", "hf"]);
 
@@ -154,7 +221,7 @@ export default function DigestPage() {
         const res = await fetch("/api/digest", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: aiKey, content, stream: true }),
+          body: JSON.stringify({ baseUrl, apiKey, model, content, stream: true }),
         });
         if (!res.ok || !res.body) return;
         const reader = res.body.getReader();
@@ -182,7 +249,7 @@ export default function DigestPage() {
             const res = await fetch("/api/digest", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ key: aiKey, content }),
+              body: JSON.stringify({ baseUrl, apiKey, model, content }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error ?? "Unknown error");
@@ -576,7 +643,7 @@ export default function DigestPage() {
             >
               ← back
             </Link>
-            <span className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+            <span suppressHydrationWarning className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
               {dateLabel}
             </span>
           </div>
@@ -589,47 +656,78 @@ export default function DigestPage() {
             <span className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
               morning briefing
             </span>
-            {/* Key controls */}
-            {!aiKey || showKeyInput ? (
-              <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
+              <button onClick={() => (showSettings ? setShowSettings(false) : openSettings())} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">{showSettings ? "close" : "model"}</button>
+              {configured && sectionSummaries.length > 0 && (
+                <button onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; generateSummary(); }} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">regenerate</button>
+              )}
+              <button
+                onClick={() => {
+                  const next = !streamingMode;
+                  setStreamingMode(next);
+                  localStorage.setItem("digest-streaming", String(next));
+                }}
+                title={streamingMode ? "Streaming on" : "Streaming off"}
+                className={`transition-colors ${streamingMode ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+              >
+                <Zap size={12} fill={streamingMode ? "currentColor" : "none"} />
+              </button>
+            </div>
+          </div>
+
+          {/* Model config — base URL + model (+ optional key) */}
+          {(showSettings || !configured) && (
+            <div className="border-b border-[var(--surface-border)] py-3 flex flex-col gap-2.5 text-[var(--text-primary)]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] w-20 shrink-0">endpoint</span>
+                <input
+                  value={draft.baseUrl}
+                  onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, baseUrl: v })); setModels(defaultModelsFor(v)); }}
+                  placeholder="http://localhost:11434/v1"
+                  className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-[family-name:var(--font-dm-mono)]"
+                />
+                {PRESETS.map(p => (
+                  <button key={p.label} onClick={() => setEndpoint(p.url)} className="text-[9px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)]">{p.label}</button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] w-20 shrink-0">model</span>
+                {loadingModels ? (
+                  <span className="flex-1 min-w-[12rem] text-[12px] italic text-[var(--text-muted)] py-0.5 font-[family-name:var(--font-dm-mono)] animate-pulse">searching models…</span>
+                ) : models.length > 0 ? (
+                  <select value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 font-[family-name:var(--font-dm-mono)]">
+                    <option value="" disabled>select a model…</option>
+                    {draft.model && !models.includes(draft.model) && <option value={draft.model}>{draft.model}</option>}
+                    {models.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                ) : (
+                  <input value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} placeholder="e.g. gpt-4o-mini or llama3.2" className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-[family-name:var(--font-dm-mono)]" />
+                )}
+                {!loadingModels && (
+                  <button onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey)} className="text-[9px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)]">load models</button>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] w-20 shrink-0">api key</span>
                 <input
                   type="password"
-                  value={keyDraft}
-                  onChange={e => setKeyDraft(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && saveKey()}
-                  placeholder="sk-..."
-                  className="w-48 text-[11px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] font-[family-name:var(--font-dm-mono)]"
+                  value={draft.apiKey}
+                  onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
+                  onKeyDown={e => e.key === "Enter" && saveSettings()}
+                  placeholder="optional — blank for local"
+                  className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-[family-name:var(--font-dm-mono)]"
                 />
-                <button onClick={saveKey} className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">save</button>
-                {aiKey && <button onClick={() => setShowKeyInput(false)} className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">cancel</button>}
+                <button onClick={saveSettings} className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)]">save</button>
               </div>
-            ) : (
-              <div className="flex items-center gap-4">
-                <button onClick={() => setShowKeyInput(true)} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">edit key</button>
-                {sectionSummaries.length > 0 && (
-                  <button onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; generateSummary(); }} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">regenerate</button>
-                )}
-                <button
-                  onClick={() => {
-                    const next = !streamingMode;
-                    setStreamingMode(next);
-                    localStorage.setItem("digest-streaming", String(next));
-                  }}
-                  title={streamingMode ? "Streaming on" : "Streaming off"}
-                  className={`transition-colors ${streamingMode ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
-                >
-                  <Zap size={12} fill={streamingMode ? "currentColor" : "none"} />
-                </button>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </header>
 
         {/* Body */}
         <main className="mt-8">
-          {!aiKey ? (
+          {!configured ? (
             <p className="font-[family-name:var(--font-playfair)] text-base italic text-[var(--text-muted)] text-center mt-16">
-              Enter your OpenAI API key above to generate today&apos;s briefing.
+              Set a model above to generate today&apos;s briefing — a local one (Ollama, LM Studio) or a hosted provider with an API key.
             </p>
           ) : aiLoading ? (
             <p className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] text-center mt-16 animate-pulse">

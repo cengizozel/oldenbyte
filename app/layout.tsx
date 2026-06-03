@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Playfair_Display, DM_Mono } from "next/font/google";
+import Script from "next/script";
+import ThemeHotkey from "@/components/ThemeHotkey";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -26,12 +28,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${playfair.variable} ${dmMono.variable}`} suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html:
-          `(function(){try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}})()`
-        }} />
-      </head>
-      <body>{children}</body>
+      <body>
+        {/* Apply the saved theme before paint to avoid a flash of the wrong mode. */}
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`(function(){try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}})()`}
+        </Script>
+        <ThemeHotkey />
+        {children}
+      </body>
     </html>
   );
 }

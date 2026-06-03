@@ -15,9 +15,13 @@ const SYSTEM =
 const USER = (content: string) =>
   "Below is today's content from one source. Write a brief newspaper-style paragraph about it.\n\n---\n\n" + content;
 
-function buildBody(content: string, stream: boolean) {
+function normalizeBase(baseUrl: string) {
+  return baseUrl.trim().replace(/\/+$/, "");
+}
+
+function buildBody(content: string, stream: boolean, model: string) {
   return JSON.stringify({
-    model: "gpt-4o-mini",
+    model,
     messages: [
       { role: "system", content: SYSTEM },
       { role: "user", content: USER(content) },
@@ -29,27 +33,38 @@ function buildBody(content: string, stream: boolean) {
 }
 
 export async function POST(request: NextRequest) {
-  const { key, content, stream = false } = await request.json();
-  if (!key || !content) {
-    return NextResponse.json({ error: "Missing key or content" }, { status: 400 });
+  // Works with any OpenAI-compatible endpoint (local Ollama/LM Studio/llama.cpp
+  // or a hosted provider). Defaults to OpenAI for backward compatibility; `key`
+  // is accepted as a legacy alias for `apiKey`.
+  const {
+    content,
+    stream = false,
+    baseUrl = "https://api.openai.com/v1",
+    model = "gpt-4o-mini",
+    apiKey,
+    key,
+  } = await request.json();
+
+  if (!content) {
+    return NextResponse.json({ error: "Missing content" }, { status: 400 });
   }
 
-  const headers = {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${key}`,
-  };
+  const url = `${normalizeBase(baseUrl)}/chat/completions`;
+  const finalKey = apiKey ?? key ?? "";
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (finalKey) headers["Authorization"] = `Bearer ${finalKey}`;
 
   if (stream) {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetch(url, {
       method: "POST",
       headers,
-      body: buildBody(content, true),
+      body: buildBody(content, true, model),
     });
 
     if (!res.ok) {
       const err = await res.json();
       return NextResponse.json(
-        { error: err.error?.message ?? `OpenAI error ${res.status}` },
+        { error: err.error?.message ?? err.error ?? `Upstream error ${res.status}` },
         { status: res.status }
       );
     }
@@ -85,16 +100,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetch(url, {
       method: "POST",
       headers,
-      body: buildBody(content, false),
+      body: buildBody(content, false, model),
     });
 
     if (!res.ok) {
       const err = await res.json();
       return NextResponse.json(
-        { error: err.error?.message ?? `OpenAI error ${res.status}` },
+        { error: err.error?.message ?? err.error ?? `Upstream error ${res.status}` },
         { status: res.status }
       );
     }

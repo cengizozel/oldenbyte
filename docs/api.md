@@ -51,11 +51,11 @@ Clears the session cookie (logout).
 ## Digest
 
 ### `POST /api/digest`
-Proxies a request to OpenAI's chat completions API (`gpt-4o-mini`) for the `/digest` page. The API key is provided by the client and never stored server-side.
+Proxies a request to any OpenAI-compatible `/chat/completions` endpoint for the `/digest` page (local or hosted). `baseUrl` and `model` default to OpenAI's `gpt-4o-mini` for backward compatibility; `key` is accepted as a legacy alias for `apiKey`. The digest's newspaper-editor system prompt is applied server-side, and reasoning-model `<think>` output is naturally excluded (only `content` deltas are forwarded).
 
 Request:
 ```json
-{ "key": "sk-...", "content": "...", "stream": false }
+{ "baseUrl": "http://localhost:11434/v1", "model": "llama3.2", "apiKey": "", "content": "...", "stream": false }
 ```
 
 Non-streaming response:

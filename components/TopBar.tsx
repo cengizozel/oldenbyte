@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings } from "lucide-react";
 import * as storage from "@/lib/storage";
+import { isDark, toggleTheme, THEME_EVENT } from "@/lib/theme";
 
 // ── EditableField ─────────────────────────────────────────────────────────
 
@@ -426,55 +427,26 @@ export default function TopBar({
   const [dark, setDark] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Resolve the initial theme (DB wins, else whatever the FOUC script set) and
+  // keep DB ↔ localStorage ↔ DOM consistent.
   useEffect(() => {
     storage.getItem("theme").then(saved => {
-      const isDark = saved ? saved === "dark" : document.documentElement.classList.contains("dark");
-      setDark(isDark);
-      document.documentElement.classList.toggle("dark", isDark);
-      localStorage.setItem("theme", isDark ? "dark" : "light");
+      const startDark = saved ? saved === "dark" : isDark();
+      setDark(startDark);
+      document.documentElement.classList.toggle("dark", startDark);
+      try { localStorage.setItem("theme", startDark ? "dark" : "light"); } catch {}
     });
   }, []);
 
-  function applyTheme(next: boolean) {
-    setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-
-    // Firefox doesn't repaint an SVG's `currentColor` when it isn't being painted
-    // — our action icons sit at opacity:0 until hover, so after a theme toggle the
-    // non-hovered ones keep the old color until something forces a redraw. Nudge
-    // every lucide icon (display none → reflow → restore) so they recolor live.
-    // Done in the same synchronous turn, so the browser never paints the hidden
-    // state — no flicker, and scroll positions are untouched.
-    document.querySelectorAll<SVGElement>("svg.lucide").forEach(svg => {
-      svg.style.display = "none";
-      void svg.getBoundingClientRect();
-      svg.style.display = "";
-    });
-
-    const value = next ? "dark" : "light";
-    localStorage.setItem("theme", value);
-    storage.setItem("theme", value);
-  }
-
-  // Read the live DOM class as the source of truth so this stays correct even
-  // when called from a key handler bound once (no stale React state).
-  function toggleDark() {
-    applyTheme(!document.documentElement.classList.contains("dark"));
-  }
-
-  // Shift+D toggles the theme, unless the user is typing in a field.
+  // Theme can be toggled from here or the global Shift+D hotkey — sync the switch
+  // UI from the shared `themechange` event.
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || !e.shiftKey || e.code !== "KeyD") return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
-      e.preventDefault();
-      toggleDark();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const onChange = (e: Event) => setDark(!!(e as CustomEvent).detail);
+    window.addEventListener(THEME_EVENT, onChange);
+    return () => window.removeEventListener(THEME_EVENT, onChange);
   }, []);
+
+  const toggleDark = toggleTheme;
 
   return (
     <>

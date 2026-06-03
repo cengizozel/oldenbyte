@@ -23,7 +23,7 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 
 <img src="public/digest.gif" width="400" />
 
-`/digest` is a separate page that reads today's cached widget data and generates a newspaper-style AI briefing using OpenAI's `gpt-4o-mini`. Each widget section gets its own API call, running in parallel. A streaming mode toggle streams each section's text in real-time as it's generated. The OpenAI API key is stored in `localStorage`. Accessible from the main dashboard via the newspaper icon in the top bar.
+`/digest` is a separate page that reads today's cached widget data and generates a newspaper-style AI briefing using any OpenAI-compatible model — a local one (Ollama, LM Studio, llama.cpp) or a hosted provider. Set the endpoint URL, model, and optional API key via the **model** control in the masthead (stored in `localStorage`). Each widget section gets its own API call, running in parallel. A streaming mode toggle streams each section's text in real-time as it's generated. Accessible from the main dashboard via the newspaper icon in the top bar.
 
 ## Top bar
 
