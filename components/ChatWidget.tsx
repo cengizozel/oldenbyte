@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus } from "lucide-react";
+import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherDashboardContext } from "@/lib/dashboardContext";
@@ -34,7 +34,73 @@ function timeAgo(ms: number): string {
   return d < 7 ? `${d}d ago` : `${Math.floor(d / 7)}w ago`;
 }
 
+// Reasoning models (qwen3, deepseek-r1, …) stream their chain-of-thought inline
+// as <think>…</think>. Split it out so it can be shown in a collapsible block
+// rather than mixed into the answer. Handles <thinking> too, and an unclosed
+// trailing <think> mid-stream.
+type ThinkSeg = { type: "text" | "think"; content: string; open?: boolean };
+function splitThinking(raw: string): ThinkSeg[] {
+  const content = raw.replace(/<thinking>/gi, "<think>").replace(/<\/thinking>/gi, "</think>");
+  const lower = content.toLowerCase();
+  const segs: ThinkSeg[] = [];
+  let i = 0;
+  while (i < content.length) {
+    const start = lower.indexOf("<think>", i);
+    if (start === -1) { segs.push({ type: "text", content: content.slice(i) }); break; }
+    if (start > i) segs.push({ type: "text", content: content.slice(i, start) });
+    const afterOpen = start + 7;
+    const end = lower.indexOf("</think>", afterOpen);
+    if (end === -1) { segs.push({ type: "think", content: content.slice(afterOpen), open: true }); break; }
+    segs.push({ type: "think", content: content.slice(afterOpen, end) });
+    i = end + 8;
+  }
+  return segs;
+}
+
+// Collapsible reasoning block — auto-expands while the model is actively
+// thinking, then collapses once the answer starts (unless the user toggled it).
+function ThinkBlock({ content, active, labelClass }: { content: string; active: boolean; labelClass: string }) {
+  const [open, setOpen] = useState(active);
+  const toggled = useRef(false);
+  useEffect(() => { if (!toggled.current) setOpen(active); }, [active]);
+  if (!content.trim() && !active) return null;
+  return (
+    <div className="my-1">
+      <button
+        onClick={() => { toggled.current = true; setOpen(o => !o); }}
+        className={`flex items-center gap-1 text-[11px] ${labelClass} opacity-50 hover:opacity-80`}
+      >
+        <ChevronRight size={11} className={`transition-transform ${open ? "rotate-90" : ""}`} />
+        {active ? "Thinking…" : "Thinking"}
+      </button>
+      {open && (
+        <div className="mt-1 ml-1 pl-3 border-l-2 border-black/15 dark:border-white/20 text-[12px] opacity-60">
+          <Markdown text={content} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function renderAssistant(content: string, inProgress: boolean, labelClass: string) {
+  return splitThinking(content).map((seg, i) =>
+    seg.type === "think"
+      ? <ThinkBlock key={i} content={seg.content} active={!!seg.open && inProgress} labelClass={labelClass} />
+      : (seg.content.trim() ? <Markdown key={i} text={seg.content} /> : null)
+  );
+}
+
 type Length = "default" | "concise" | "balanced" | "detailed";
+// Reasoning-model thinking budget, sent as OpenAI `reasoning_effort`.
+// "default" omits the field; "none" turns thinking off (fast).
+type Effort = "default" | "none" | "low" | "medium" | "high";
+const EFFORT_OPTIONS: { value: Effort; label: string }[] = [
+  { value: "default", label: "Default" },
+  { value: "none", label: "Off" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
 
 type ChatConfig = {
   baseUrl: string;
@@ -44,6 +110,7 @@ type ChatConfig = {
   useDashboard: boolean;
   maxTokens: number; // cap on response length; 0 = no limit (server default)
   length: Length;    // response-style preset: brevity instruction + suggested cap
+  effort: Effort;    // reasoning-model thinking budget
 };
 
 // Always-on identity so the assistant knows who and where it is, even when the
@@ -79,6 +146,7 @@ const DEFAULT_CONFIG: ChatConfig = {
   useDashboard: false,
   maxTokens: 0,
   length: "default",
+  effort: "default",
 };
 
 // Common local OpenAI-compatible servers, shown as quick-fill hints.
@@ -130,6 +198,13 @@ export default function ChatWidget({
   const [editDraft, setEditDraft] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Follow the stream only while the user is near the bottom; if they scroll up
+  // (e.g. to read while it's still thinking), stop auto-scrolling.
+  const atBottomRef = useRef(true);
+  function onMessagesScroll() {
+    const el = scrollRef.current;
+    if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+  }
   const abortRef = useRef<AbortController | null>(null);
 
   // Live status timing while a response streams.
@@ -216,10 +291,21 @@ export default function ChatWidget({
     storage.setItem(storageKey, JSON.stringify({ config: cfg, conversations: convs, activeId: active }));
   }, [storageKey]);
 
-  // Keep the view pinned to the latest message
+  // Keep the view pinned to the latest message — but only if the user hasn't
+  // scrolled up to read earlier content.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    if (atBottomRef.current) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, streaming]);
+
+  // Leaving the settings panel remounts the message list at the top — snap back
+  // to the latest message.
+  useEffect(() => {
+    if (settingsOpen) return;
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) { el.scrollTo({ top: el.scrollHeight }); atBottomRef.current = true; }
+    });
+  }, [settingsOpen]);
 
   // Abort any in-flight stream on unmount
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -318,6 +404,7 @@ export default function ChatWidget({
     setStreaming(false);
     setEditingIndex(null);
     setError("");
+    atBottomRef.current = true;
     setConversations(list);
     setActiveId(id);
     activeIdRef.current = id;
@@ -391,6 +478,7 @@ export default function ChatWidget({
 
     const history: ChatMessage[] = [...messages, { role: "user", content: text }];
     timingRef.current = { start: performance.now(), first: null };
+    atBottomRef.current = true; // follow the new turn
     setStreaming(true);
 
     // Make sure dashboard data is gathered before we build the prompt (cached
@@ -400,9 +488,14 @@ export default function ChatWidget({
     // Assistant placeholder we stream tokens into
     setMessages([...history, { role: "assistant", content: "" }]);
 
-    // Only role/content go upstream (strip any per-message stats).
+    // Only role/content go upstream. Strip prior assistant <think>…</think>
+    // reasoning — replaying it wastes the context window (and reasoning models
+    // expect history without it), which otherwise crowds out the conversation.
     const systemContent = buildSystemContent(dash);
-    const cleanHistory = history.map(m => ({ role: m.role, content: m.content }));
+    const cleanHistory = history.map(m => ({
+      role: m.role,
+      content: m.role === "assistant" ? m.content.replace(/<think>[\s\S]*?<\/think>\s*/gi, "").trim() : m.content,
+    }));
     const payload = systemContent
       ? [{ role: "system", content: systemContent }, ...cleanHistory]
       : cleanHistory;
@@ -420,6 +513,7 @@ export default function ChatWidget({
           model: config.model,
           messages: payload,
           maxTokens: config.maxTokens,
+          reasoningEffort: config.effort === "default" ? "" : config.effort,
           stream: true,
         }),
         signal: controller.signal,
@@ -668,35 +762,26 @@ export default function ChatWidget({
                   Load models
                 </button>
               </div>
-              <input
-                type="text"
-                value={draft.model}
-                onChange={e => setDraft(d => ({ ...d, model: e.target.value }))}
-                placeholder="e.g. llama3.2"
-                list={`models-${widget.id}`}
-                className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
-              />
-              {models.length > 0 && (
-                <datalist id={`models-${widget.id}`}>
-                  {models.map(m => <option key={m} value={m} />)}
-                </datalist>
-              )}
-              {models.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {models.slice(0, 8).map(m => (
-                    <button
-                      key={m}
-                      onClick={() => setDraft(d => ({ ...d, model: m }))}
-                      className={`px-2 py-0.5 rounded-full text-[10px] border transition-colors ${
-                        draft.model === m
-                          ? "border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)]"
-                          : "border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--surface-border-focus)]"
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
+              {models.length > 0 ? (
+                <select
+                  value={draft.model}
+                  onChange={e => setDraft(d => ({ ...d, model: e.target.value }))}
+                  className="w-full text-sm border border-neutral-200 rounded-xl px-2.5 py-2 outline-none focus:border-neutral-300 text-neutral-700 bg-white"
+                >
+                  <option value="" disabled>Select a model…</option>
+                  {draft.model && !models.includes(draft.model) && (
+                    <option value={draft.model}>{draft.model} (custom)</option>
+                  )}
+                  {models.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={draft.model}
+                  onChange={e => setDraft(d => ({ ...d, model: e.target.value }))}
+                  placeholder="e.g. llama3.2 — or click Load models"
+                  className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
+                />
               )}
               {modelsError && <p className="text-red-400 text-[11px] mt-1">{modelsError}</p>}
             </div>
@@ -727,6 +812,26 @@ export default function ChatWidget({
                     }`}
                   >
                     {LENGTH_PRESETS[key].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Thinking <span className="opacity-60">(reasoning models)</span></p>
+              <div className="flex flex-wrap gap-1">
+                {EFFORT_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setDraft(d => ({ ...d, effort: opt.value }))}
+                    title={opt.value === "none" ? "Disable the model's chain-of-thought — fastest" : opt.value === "default" ? "Use the model's default" : `reasoning_effort: ${opt.value}`}
+                    className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
+                      draft.effort === opt.value
+                        ? "border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)]"
+                        : "border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--surface-border-focus)]"
+                    }`}
+                  >
+                    {opt.label}
                   </button>
                 ))}
               </div>
@@ -784,7 +889,7 @@ export default function ChatWidget({
       ) : (
         /* Chat view */
         <>
-          <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+          <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-3">
             {!configured ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 px-4">
                 <Bot size={20} className={`opacity-40 ${c.text}`} />
@@ -831,13 +936,15 @@ export default function ChatWidget({
                     >
                       {m.role === "assistant"
                         ? (m.content
-                            ? <Markdown text={m.content} />
+                            ? renderAssistant(m.content, inProgress, c.label)
                             : (inProgress ? <span className="inline-block w-2 h-2 rounded-full bg-current opacity-50 animate-pulse" /> : null))
                         : m.content}
                     </div>
                     {inProgress && (
                       <span className={`px-1 text-[10px] ${c.text} opacity-45`}>
-                        {m.content ? "generating" : (secs >= 3 ? "loading model / thinking" : "thinking")}… {secs.toFixed(1)}s
+                        {m.content
+                          ? (m.content.lastIndexOf("<think>") > m.content.lastIndexOf("</think>") ? "thinking" : "generating")
+                          : (secs >= 3 ? "loading model / thinking" : "thinking")}… {secs.toFixed(1)}s
                       </span>
                     )}
                     <div className="flex items-center gap-2 px-1">

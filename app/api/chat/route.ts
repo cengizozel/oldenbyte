@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { baseUrl, apiKey = "", model, messages, stream = true, maxTokens = 0 } = await request.json();
+  const { baseUrl, apiKey = "", model, messages, stream = true, maxTokens = 0, reasoningEffort = "" } = await request.json();
 
   if (!baseUrl || !/^https?:\/\//.test(baseUrl) || !model || !Array.isArray(messages)) {
     return NextResponse.json({ error: "Missing baseUrl, model, or messages" }, { status: 400 });
@@ -58,6 +58,9 @@ export async function POST(request: NextRequest) {
     // Cap the reply when the client asked for one; omit otherwise so the server
     // uses its own default. max_tokens is the OpenAI-compatible field name.
     ...(Number(maxTokens) > 0 ? { max_tokens: Math.floor(Number(maxTokens)) } : {}),
+    // Control reasoning-model thinking. "none" disables it (fast); low/medium/high
+    // scale it. Standard OpenAI field; servers that don't support it ignore it.
+    ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
   });
 
   let upstream: Response;
@@ -96,9 +99,13 @@ export async function POST(request: NextRequest) {
       const decoder = new TextDecoder();
       let buffer = "";
       // Count generated tokens by counting per-token deltas (exact for local
-      // servers that stream one token per chunk); prefer upstream usage when the
-      // server reports it.
+      // servers that stream one token per chunk).
       let tokens = 0;
+      // Reasoning models (qwen3, deepseek-r1) stream their chain-of-thought in a
+      // separate `delta.reasoning` field (empty `content`). Re-wrap it as
+      // <think>…</think> inline so the client can show it as a collapsible block.
+      let thinkOpen = false;
+      const emit = (s: string) => controller.enqueue(encoder.encode(s));
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -112,17 +119,26 @@ export async function POST(request: NextRequest) {
             const payload = trimmed.slice(5).trim();
             if (payload === "[DONE]") continue;
             try {
-              const obj = JSON.parse(payload);
-              const delta = obj.choices?.[0]?.delta?.content;
-              if (delta) { controller.enqueue(encoder.encode(delta)); tokens++; }
-              const reported = obj.usage?.completion_tokens;
-              if (typeof reported === "number") tokens = reported;
+              const delta = JSON.parse(payload).choices?.[0]?.delta;
+              const reasoning = delta?.reasoning ?? delta?.reasoning_content;
+              const content = delta?.content;
+              if (reasoning) {
+                if (!thinkOpen) { emit("<think>"); thinkOpen = true; }
+                emit(reasoning);
+                tokens++;
+              }
+              if (content) {
+                if (thinkOpen) { emit("</think>\n\n"); thinkOpen = false; }
+                emit(content);
+                tokens++;
+              }
             } catch { /* skip malformed chunks */ }
           }
         }
+        if (thinkOpen) emit("</think>");
         // Trailer: a record-separator (\x1e, never present in model text)
         // followed by JSON stats. The client splits it off the response body.
-        controller.enqueue(encoder.encode("\x1e" + JSON.stringify({ tokens })));
+        emit("\x1e" + JSON.stringify({ tokens }));
       } finally {
         controller.close();
       }

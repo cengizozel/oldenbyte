@@ -19,6 +19,7 @@ The legacy single-conversation shape (`{ config, messages }`) is migrated to one
 - `useDashboard` — when `true`, a snapshot of your dashboard data is injected as context so the model can answer questions about it (see below).
 - `maxTokens` — caps the reply length, sent upstream as `max_tokens`. `0` omits the field so the server uses its own default.
 - `length` — response-style preset (`default` / `concise` / `balanced` / `detailed`). Each appends a brevity instruction to the system prompt and, when selected, fills `maxTokens` with a suggested cap (which can then be edited). `concise` ≈ 2-3 sentences (256 tokens), `balanced` ≈ a paragraph or two (768), `detailed` is thorough with no cap.
+- `effort` — thinking budget for reasoning models (qwen3, deepseek-r1, …), sent as OpenAI `reasoning_effort`. `default` omits the field; **`none` turns chain-of-thought off** (much faster for simple chats); `low`/`medium`/`high` scale it up. Servers/models without reasoning ignore it.
 - `messages` — the full conversation, persisted after each completed turn.
 
 ## Configuration
@@ -30,6 +31,7 @@ Save is disabled until both an API URL and a model are set.
 ## Behaviour
 
 - **Streaming** — replies stream in real-time via `POST /api/chat` with `stream: true`. The **Stop** button aborts the in-flight request and keeps whatever streamed so far.
+- **Thinking** — reasoning models (qwen3, deepseek-r1, …) stream their chain-of-thought in a separate `delta.reasoning` field (with empty `content`). The `/api/chat` route re-wraps it inline as `<think>…</think>`, and the client (`splitThinking`/`ThinkBlock` in `ChatWidget.tsx`) shows it as a collapsible "Thinking" block that auto-expands while the model is thinking, then collapses once the answer begins.
 - **Markdown** — assistant replies are rendered as Markdown (headings, bold/italic, lists, inline code, fenced code blocks, blockquotes, links) by a small in-house renderer in `components/Markdown.tsx` — no external dependency. User messages stay plain text.
 - **Live status** — while waiting, a caption under the reply shows `thinking… {s}s` (switching to `loading model / thinking…` past 3s, since a cold model load shows up as latency before the first token), then `generating… {s}s`.
 - **Stats** — once a reply finishes, a footer reports `{tok/s} · {tokens} tokens · {total time} · {time to first token}`. Timings are measured client-side; the token count comes from a `\x1e`-delimited trailer the `/api/chat` route appends (it counts per-token deltas, exact for local servers that stream one token per chunk).
