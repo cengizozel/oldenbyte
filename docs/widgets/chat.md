@@ -8,10 +8,12 @@ Responses stream token-by-token and the conversation is saved.
 
 | Key | Value |
 |---|---|
-| `chat-widget-{id}` | JSON: `{ config: { baseUrl, apiKey, model, system, useDashboard, maxTokens, length }, messages: [{ role, content }] }` |
+| `chat-widget-{id}` | JSON: `{ config: { baseUrl, apiKey, model, system, useDashboard, maxTokens, length }, conversations: [{ id, title, messages: [{ role, content }], updatedAt }], activeId }` |
+
+The legacy single-conversation shape (`{ config, messages }`) is migrated to one conversation on load.
 
 - `baseUrl` — the API base, e.g. `http://localhost:11434/v1`. `/chat/completions` and `/models` are appended to it.
-- `apiKey` — optional; sent as `Authorization: Bearer <key>`. Leave blank for local servers that don't require auth.
+- `apiKey` — sent as `Authorization: Bearer <key>` when set. The settings field is **currently hidden** (local-only mode), so this is always empty and no key is stored. Re-add the field in `ChatWidget.tsx` (and stop forcing `apiKey: ""` in `saveSettings`) to use hosted providers.
 - `model` — the model id, e.g. `llama3.2`. The settings panel can **Load models** from `{baseUrl}/models` to populate a picker.
 - `system` — optional system prompt prepended to every request.
 - `useDashboard` — when `true`, a snapshot of your dashboard data is injected as context so the model can answer questions about it (see below).
@@ -32,7 +34,7 @@ Save is disabled until both an API URL and a model are set.
 - **Live status** — while waiting, a caption under the reply shows `thinking… {s}s` (switching to `loading model / thinking…` past 3s, since a cold model load shows up as latency before the first token), then `generating… {s}s`.
 - **Stats** — once a reply finishes, a footer reports `{tok/s} · {tokens} tokens · {total time} · {time to first token}`. Timings are measured client-side; the token count comes from a `\x1e`-delimited trailer the `/api/chat` route appends (it counts per-token deltas, exact for local servers that stream one token per chunk).
 - **Edit a reply** — hover an assistant message and click the pencil to edit its raw Markdown in place (Save/Esc-to-cancel). Since the conversation is persisted and fed back as context, edits let you curate what the model sees on later turns. Editing clears that message's stats footer.
-- **Clear** — the reset icon (visible on hover once a conversation exists) wipes the history.
+- **Multiple conversations** — the **chats icon** in the header switches the widget to a list of saved conversations (newest first); click one to open it, the **+** to start a new chat, or the **×** to delete one. Conversations are auto-titled from their first message. **Clear** wipes only the open conversation.
 - **Send** — `Enter` sends, `Shift+Enter` inserts a newline.
 
 ## Ask about your dashboard data
@@ -62,6 +64,8 @@ mind. Reader and Chess widgets are not included (no useful text).
 Requests go through [`/api/chat`](../api.md#chat) rather than directly from the
 browser. This avoids CORS restrictions and HTTPS mixed-content blocking when the
 dashboard is served over HTTPS but the model runs on plain `http://localhost`.
-The API key is forwarded per-request and never stored server-side.
+In local-only mode no API key is involved. (If the key field is re-enabled, the
+key would be saved with the rest of the config in the database — move it to
+`localStorage` first if that matters.)
 
 This widget is not `digestable`.

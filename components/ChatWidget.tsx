@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye } from "lucide-react";
+import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherDashboardContext } from "@/lib/dashboardContext";
@@ -10,6 +10,29 @@ import Markdown from "./Markdown";
 type Role = "user" | "assistant";
 type MsgStats = { tps: number; tokens: number; total: number; ttft: number };
 type ChatMessage = { role: Role; content: string; stats?: MsgStats };
+type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number };
+
+function newId() {
+  return `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+}
+
+// Auto-title a conversation from its first user message.
+function titleFrom(messages: ChatMessage[]): string {
+  const first = messages.find(m => m.role === "user")?.content.trim().replace(/\s+/g, " ");
+  if (!first) return "New chat";
+  return first.length > 40 ? first.slice(0, 40) + "…" : first;
+}
+
+function timeAgo(ms: number): string {
+  if (!ms) return "";
+  const m = Math.floor((Date.now() - ms) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return d < 7 ? `${d}d ago` : `${Math.floor(d / 7)}w ago`;
+}
 
 type Length = "default" | "concise" | "balanced" | "detailed";
 
@@ -43,7 +66,9 @@ const LENGTH_PRESETS: Record<Length, { label: string; cap: number; instruction: 
 
 type ChatState = {
   config: ChatConfig;
-  messages: ChatMessage[];
+  conversations?: Conversation[];
+  activeId?: string;
+  messages?: ChatMessage[]; // legacy single-conversation format
 };
 
 const DEFAULT_CONFIG: ChatConfig = {
@@ -75,6 +100,12 @@ export default function ChatWidget({
 
   const [config, setConfig] = useState<ChatConfig>(DEFAULT_CONFIG);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Saved conversations; `messages` above is the working copy of the active one.
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeId, setActiveId] = useState("");
+  const activeIdRef = useRef("");
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
@@ -127,24 +158,62 @@ export default function ChatWidget({
     }
   }, []);
 
-  // Load persisted config + conversation
+  // Load persisted config + conversations (migrating the old single-chat format)
   useEffect(() => {
     storage.getItem(storageKey).then(saved => {
+      let convs: Conversation[] = [];
+      let active = "";
       if (saved) {
         try {
           const parsed: ChatState = JSON.parse(saved);
-          const cfg = { ...DEFAULT_CONFIG, ...parsed.config };
-          setConfig(cfg);
-          setMessages(parsed.messages ?? []);
-          if (cfg.useDashboard) refreshContext();
+          setConfig({ ...DEFAULT_CONFIG, ...parsed.config });
+          if (parsed.conversations?.length) {
+            convs = parsed.conversations;
+            active = parsed.activeId && convs.some(c => c.id === parsed.activeId) ? parsed.activeId : convs[0].id;
+          } else {
+            // Legacy: a single { messages } — wrap it as one conversation.
+            const legacy = parsed.messages ?? [];
+            const id = newId();
+            convs = [{ id, title: titleFrom(legacy), messages: legacy, updatedAt: Date.now() }];
+            active = id;
+          }
+          if (parsed.config?.useDashboard) refreshContext();
         } catch {}
       }
+      if (!convs.length) {
+        const id = newId();
+        convs = [{ id, title: "New chat", messages: [], updatedAt: Date.now() }];
+        active = id;
+      }
+      setConversations(convs);
+      setActiveId(active);
+      activeIdRef.current = active;
+      setMessages(convs.find(c => c.id === active)?.messages ?? []);
       setLoaded(true);
     });
   }, [storageKey, refreshContext]);
 
+  // Persist config + all conversations, syncing the active conversation's
+  // messages from the working copy. (Signature unchanged so existing callers —
+  // send, edit, clear, settings — keep working.)
   const persist = useCallback((cfg: ChatConfig, msgs: ChatMessage[]) => {
-    storage.setItem(storageKey, JSON.stringify({ config: cfg, messages: msgs }));
+    const active = activeIdRef.current;
+    setConversations(prev => {
+      let found = false;
+      const merged = prev.map(cv => {
+        if (cv.id !== active) return cv;
+        found = true;
+        return { ...cv, messages: msgs, title: titleFrom(msgs), updatedAt: Date.now() };
+      });
+      if (!found) merged.push({ id: active || newId(), title: titleFrom(msgs), messages: msgs, updatedAt: Date.now() });
+      storage.setItem(storageKey, JSON.stringify({ config: cfg, conversations: merged, activeId: active || merged[merged.length - 1].id }));
+      return merged;
+    });
+  }, [storageKey]);
+
+  // Write the current conversation list to storage as-is.
+  const persistConversations = useCallback((cfg: ChatConfig, convs: Conversation[], active: string) => {
+    storage.setItem(storageKey, JSON.stringify({ config: cfg, conversations: convs, activeId: active }));
   }, [storageKey]);
 
   // Keep the view pinned to the latest message
@@ -194,7 +263,7 @@ export default function ChatWidget({
       ...draft,
       baseUrl: draft.baseUrl.trim(),
       model: draft.model.trim(),
-      apiKey: draft.apiKey.trim(),
+      apiKey: "", // local-only for now; no key is stored (re-enable the field to use hosted providers)
       maxTokens: Math.max(0, Math.floor(draft.maxTokens || 0)),
     };
     setConfig(next);
@@ -234,6 +303,56 @@ export default function ChatWidget({
     setMessages(next);
     persist(config, next);
     cancelEdit();
+  }
+
+  // ── Conversations ──────────────────────────────────────────────────────────
+  // Snapshot the active conversation's current working messages back into the list.
+  function syncActive(list: Conversation[]): Conversation[] {
+    return list.map(cv =>
+      cv.id === activeIdRef.current ? { ...cv, messages, title: titleFrom(messages), updatedAt: Date.now() } : cv
+    );
+  }
+
+  function switchTo(id: string, list: Conversation[]) {
+    abortRef.current?.abort();
+    setStreaming(false);
+    setEditingIndex(null);
+    setError("");
+    setConversations(list);
+    setActiveId(id);
+    activeIdRef.current = id;
+    setMessages(list.find(c => c.id === id)?.messages ?? []);
+    persistConversations(config, list, id);
+    setHistoryOpen(false);
+  }
+
+  function newChat() {
+    const id = newId();
+    const conv: Conversation = { id, title: "New chat", messages: [], updatedAt: Date.now() };
+    switchTo(id, [conv, ...syncActive(conversations)]);
+  }
+
+  function selectChat(id: string) {
+    if (id === activeIdRef.current) { setHistoryOpen(false); return; }
+    switchTo(id, syncActive(conversations));
+  }
+
+  function deleteChat(id: string) {
+    const remaining = syncActive(conversations).filter(c => c.id !== id);
+    if (id !== activeIdRef.current) {
+      // Deleting a background chat — keep the open one.
+      setConversations(remaining);
+      persistConversations(config, remaining, activeIdRef.current);
+      return;
+    }
+    // Deleted the open chat — fall back to the most recent, or a fresh empty one.
+    if (remaining.length === 0) {
+      const conv: Conversation = { id: newId(), title: "New chat", messages: [], updatedAt: Date.now() };
+      switchTo(conv.id, [conv]);
+    } else {
+      const next = [...remaining].sort((a, b) => b.updatedAt - a.updatedAt);
+      switchTo(next[0].id, next);
+    }
   }
 
   // Combine the user's system prompt with a snapshot of dashboard data when the
@@ -350,7 +469,7 @@ export default function ChatWidget({
         // Keep whatever streamed so far; drop a trailing empty assistant turn.
         setMessages(prev => {
           const next = prev[prev.length - 1]?.content === "" ? prev.slice(0, -1) : prev;
-          persist(config, next);
+          queueMicrotask(() => persist(config, next));
           return next;
         });
       } else {
@@ -411,10 +530,13 @@ export default function ChatWidget({
               </button>
             )}
             {messages.length > 0 && (
-              <button onClick={clearChat} title="Clear conversation" className={actionCls}>
+              <button onClick={clearChat} title="Clear this conversation" className={actionCls}>
                 <RotateCcw size={14} />
               </button>
             )}
+            <button onClick={() => setHistoryOpen(true)} title="Chats" className={actionCls}>
+              <MessageSquare size={14} />
+            </button>
             <button onClick={openSettings} title="Settings" className={actionCls}>
               <Pencil size={14} />
             </button>
@@ -430,6 +552,57 @@ export default function ChatWidget({
             : ctx?.sections
               ? `using your dashboard · ${ctx.sections} section${ctx.sections === 1 ? "" : "s"} · ~${Math.round(ctx.chars / 1000)}k chars`
               : "using your dashboard · no data found"}
+        </div>
+      )}
+
+      {/* Chats list — switches the whole widget to a list of saved conversations */}
+      {historyOpen && (
+        <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
+          <div className={`flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b ${c.border}`}>
+            <span className={`flex items-center gap-1.5 text-xs font-medium opacity-70 ${c.label}`}>
+              <MessageSquare size={13} />
+              Chats
+            </span>
+            <div className="flex items-center gap-3">
+              <button onClick={newChat} title="New chat" className={`opacity-60 hover:opacity-100 ${c.label}`}>
+                <Plus size={15} />
+              </button>
+              <button onClick={() => setHistoryOpen(false)} title="Close" className={`opacity-50 hover:opacity-90 ${c.label}`}>
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto p-2 flex flex-col gap-1">
+            {[...conversations].sort((a, b) => b.updatedAt - a.updatedAt).map(cv => {
+              const isActive = cv.id === activeId;
+              // The active chat's live title/time come from the working copy.
+              const title = isActive ? titleFrom(messages) : cv.title;
+              const count = isActive ? messages.length : cv.messages.length;
+              return (
+                <div
+                  key={cv.id}
+                  onClick={() => selectChat(cv.id)}
+                  className={`group/row flex items-start gap-2 px-3 py-2 rounded-xl cursor-pointer transition-colors ${
+                    isActive ? `${c.bg} ring-1 ring-[var(--surface-border-focus)]` : "hover:bg-black/5 dark:hover:bg-white/5"
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm truncate ${c.text} ${isActive ? "font-medium" : "opacity-80"}`}>{title}</p>
+                    <p className={`text-[10px] ${c.label} opacity-45`}>
+                      {count} message{count === 1 ? "" : "s"}{cv.updatedAt ? ` · ${timeAgo(cv.updatedAt)}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteChat(cv.id); }}
+                    title="Delete chat"
+                    className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-50 hover:!opacity-90 ${c.label}`}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -480,17 +653,6 @@ export default function ChatWidget({
                   </button>
                 ))}
               </div>
-            </div>
-
-            <div>
-              <p className={`text-xs mb-1 opacity-50 ${c.label}`}>API key <span className="opacity-60">(optional)</span></p>
-              <input
-                type="password"
-                value={draft.apiKey}
-                onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
-                placeholder="leave blank for local servers"
-                className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
-              />
             </div>
 
             <div>
