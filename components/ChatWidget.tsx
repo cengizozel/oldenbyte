@@ -295,77 +295,69 @@ export default function ChatWidget({
     abortRef.current?.abort();
   }
 
+  // Hover-revealed header action icon (matches the other widgets).
+  const actionCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`;
+  // Dashboard controls stay visible (at a steady opacity) while the mode is on.
+  const dashCtrlCls = `${c.icon} opacity-55 hover:opacity-100 transition-opacity`;
+
   return (
     <div className={`rounded-2xl border flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
 
-      {/* Header */}
-      <div className={`flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b ${c.border}`}>
-        <span className={`flex items-center gap-1.5 text-xs font-medium opacity-70 ${c.label}`}>
-          <Bot size={14} />
-          {config.model ? <span className="truncate max-w-[10rem]">{config.model}</span> : "Chat"}
+      {/* Header — single row, no divider (a border here reads like a tab bar) */}
+      <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2 shrink-0">
+        <span className={`flex items-center gap-1.5 text-xs font-medium opacity-60 min-w-0 ${c.label}`}>
+          <Bot size={14} className="shrink-0" />
+          <span className="truncate">{config.model || "Chat"}</span>
         </span>
         {!settingsOpen && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={toggleDashboard}
               title={config.useDashboard ? "Using dashboard data — click to turn off" : "Answer using my dashboard data"}
-              className={
-                config.useDashboard
-                  ? `opacity-90 ${c.label}`
-                  : `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`
-              }
+              className={config.useDashboard ? `opacity-90 ${c.label}` : actionCls}
             >
               <Database size={14} />
             </button>
-            {messages.length > 0 && (
+            {config.useDashboard && (
               <button
-                onClick={clearChat}
-                title="Clear conversation"
-                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
+                onClick={() => setShowContext(true)}
+                disabled={!ctx?.text}
+                title="View the data sent to the model"
+                className={`${dashCtrlCls} disabled:!opacity-25`}
               >
+                <Eye size={14} />
+              </button>
+            )}
+            {config.useDashboard && (
+              <button
+                onClick={() => refreshContext()}
+                disabled={gathering}
+                title="Refresh dashboard data"
+                className={dashCtrlCls}
+              >
+                <RefreshCw size={14} className={gathering ? "animate-spin" : ""} />
+              </button>
+            )}
+            {messages.length > 0 && (
+              <button onClick={clearChat} title="Clear conversation" className={actionCls}>
                 <RotateCcw size={14} />
               </button>
             )}
-            <button
-              onClick={openSettings}
-              title="Settings"
-              className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-            >
+            <button onClick={openSettings} title="Settings" className={actionCls}>
               <Pencil size={14} />
             </button>
           </div>
         )}
       </div>
 
-      {/* Dashboard-data status bar */}
+      {/* Dashboard-data status — quiet borderless subtitle */}
       {!settingsOpen && config.useDashboard && (
-        <div className={`shrink-0 flex items-center justify-between gap-2 px-4 py-1 text-[10px] border-b ${c.border} ${c.label} opacity-70`}>
-          <span className="flex items-center gap-1 truncate">
-            <Database size={9} />
-            {gathering
-              ? "gathering dashboard data…"
-              : ctx
-                ? `${ctx.sections} section${ctx.sections === 1 ? "" : "s"} · ~${Math.round(ctx.chars / 1000)}k chars`
-                : "no data yet"}
-          </span>
-          <span className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setShowContext(true)}
-              disabled={!ctx?.text}
-              title="View the exact data sent to the model"
-              className="hover:opacity-100 disabled:opacity-30"
-            >
-              <Eye size={10} />
-            </button>
-            <button
-              onClick={() => refreshContext()}
-              disabled={gathering}
-              title="Refresh dashboard data"
-              className="hover:opacity-100 disabled:opacity-40"
-            >
-              <RefreshCw size={9} className={gathering ? "animate-spin" : ""} />
-            </button>
-          </span>
+        <div className={`shrink-0 px-4 pb-1.5 text-[10px] truncate ${c.label} opacity-45`}>
+          {gathering
+            ? "gathering your dashboard data…"
+            : ctx?.sections
+              ? `using your dashboard · ${ctx.sections} section${ctx.sections === 1 ? "" : "s"} · ~${Math.round(ctx.chars / 1000)}k chars`
+              : "using your dashboard · no data found"}
         </div>
       )}
 

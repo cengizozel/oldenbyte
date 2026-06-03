@@ -438,6 +438,19 @@ export default function TopBar({
   function applyTheme(next: boolean) {
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
+
+    // Firefox doesn't repaint an SVG's `currentColor` when it isn't being painted
+    // — our action icons sit at opacity:0 until hover, so after a theme toggle the
+    // non-hovered ones keep the old color until something forces a redraw. Nudge
+    // every lucide icon (display none → reflow → restore) so they recolor live.
+    // Done in the same synchronous turn, so the browser never paints the hidden
+    // state — no flicker, and scroll positions are untouched.
+    document.querySelectorAll<SVGElement>("svg.lucide").forEach(svg => {
+      svg.style.display = "none";
+      void svg.getBoundingClientRect();
+      svg.style.display = "";
+    });
+
     const value = next ? "dark" : "light";
     localStorage.setItem("theme", value);
     storage.setItem("theme", value);

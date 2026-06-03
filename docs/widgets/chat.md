@@ -46,9 +46,9 @@ What gets gathered (by [`lib/dashboardContext.ts`](../../lib/dashboardContext.ts
 - **Tracker** — time spent per activity for the most recent days that have entries.
 
 The snapshot is gathered when the toggle is turned on (and cached for the
-session); the **refresh** button in the status bar re-gathers it, and the **eye**
-button opens an overlay showing the exact text that gets injected as the
-`<dashboard>` block, so you can see precisely what the model was fed. Larger
+session). While the mode is active the header shows a **refresh** icon (re-gathers)
+and an **eye** icon (opens an overlay with the exact text injected as the
+`<dashboard>` block), and a subtitle reports how much was gathered. Larger
 dashboards produce more context — keep your local model's context window in
 mind. Reader and Chess widgets are not included (no useful text).
 

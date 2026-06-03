@@ -20,10 +20,11 @@ export const colorMap: Record<WidgetColor, {
   glow: string;
   icon: string;
 }> = {
-  // `icon` is the color for small action icons (pencil, history, settings…). It
-  // uses each palette's `text` tone, which is the higher-contrast-against-bg
-  // shade in BOTH modes (darker than `label` in light mode, lighter in dark),
-  // so icons stay clearly visible on every widget regardless of hue.
+  // `icon` is the color for small action icons (pencil, history, settings…),
+  // using each palette's `text` tone — the higher-contrast-against-bg shade in
+  // both modes. (Firefox doesn't repaint these icons' SVG `currentColor` on a
+  // theme toggle while they sit at opacity:0; applyTheme() in TopBar nudges them
+  // to re-render so the color updates live.)
   amber:   { bg: "bg-[var(--w-amber-bg)]",   border: "border-[var(--w-amber-border)]",   label: "text-[var(--w-amber-label)]",   text: "text-[var(--w-amber-text)]",   fade: "from-[var(--w-amber-bg)]",   glow: "w-amber-glow",   icon: "text-[var(--w-amber-text)]"   },
   sky:     { bg: "bg-[var(--w-sky-bg)]",     border: "border-[var(--w-sky-border)]",     label: "text-[var(--w-sky-label)]",     text: "text-[var(--w-sky-text)]",     fade: "from-[var(--w-sky-bg)]",     glow: "w-sky-glow",     icon: "text-[var(--w-sky-text)]"     },
   neutral: { bg: "bg-[var(--w-neutral-bg)]", border: "border-[var(--w-neutral-border)]", label: "text-[var(--w-neutral-label)]", text: "text-[var(--w-neutral-text)]", fade: "from-[var(--w-neutral-bg)]", glow: "w-neutral-glow", icon: "text-[var(--w-neutral-text)]" },
