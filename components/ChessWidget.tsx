@@ -287,7 +287,7 @@ export default function ChessWidget({
           >
             as Black
           </button>
-          <RotateCcw size={12} className={`opacity-30 ${c.label} ml-auto`} />
+          <RotateCcw size={14} className={`opacity-30 ${c.label} ml-auto`} />
         </div>
       </div>
     </div>

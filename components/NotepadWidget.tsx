@@ -376,16 +376,16 @@ export default function NotebookWidget({
                 <button
                   onClick={openHistory}
                   title="All notes"
-                  className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+                  className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
                 >
-                  <History size={12} />
+                  <History size={14} />
                 </button>
                 <button
                   onClick={() => { setDraftName(customName); setRenaming(true); }}
                   title="Rename"
-                  className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+                  className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
                 >
-                  <Pencil size={12} />
+                  <Pencil size={14} />
                 </button>
               </div>
             </div>

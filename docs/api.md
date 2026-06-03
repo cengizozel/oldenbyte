@@ -67,6 +67,36 @@ Streaming response (`stream: true`): returns a `text/plain` stream of token delt
 
 ---
 
+## Chat
+
+Proxies an **OpenAI-compatible** chat endpoint for the Chat widget. Used for
+locally hosted models (Ollama, LM Studio, llama.cpp, vLLM) or any hosted
+provider. The base URL and API key are supplied by the client per-request and
+never stored server-side. `/chat/completions` and `/models` are appended to the
+provided `baseUrl`.
+
+### `GET /api/chat?baseUrl=<url>&apiKey=<key>`
+Lists available models from `{baseUrl}/models`. Accepts both OpenAI-style
+(`{ data: [{ id }] }`) and Ollama-style (`{ models: [{ name }] }`) responses.
+
+```json
+{ "models": ["llama3.2", "qwen2.5-coder", "..."] }
+```
+
+### `POST /api/chat`
+Sends a chat completion request to `{baseUrl}/chat/completions`.
+
+```json
+{ "baseUrl": "http://localhost:11434/v1", "apiKey": "", "model": "llama3.2", "messages": [{ "role": "user", "content": "..." }], "stream": true }
+```
+
+With `stream: true` (default), returns a `text/plain` stream of token deltas,
+read with a `ReadableStreamDefaultReader`. With `stream: false`, returns
+`{ "content": "..." }`. Upstream errors are surfaced as
+`{ "error": "..." }` with the upstream status code (or `502` if unreachable).
+
+---
+
 ## RSS
 
 ### `GET /api/rss?url=<feed-url>&limit=<n>`

@@ -492,18 +492,18 @@ export default function ReaderWidget({
                 {config && (
                   <button
                     onClick={() => setFullscreen(true)}
-                    className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+                    className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
                     title="Open full view"
                   >
-                    <Maximize2 size={12} />
+                    <Maximize2 size={14} />
                   </button>
                 )}
                 <button
                   onClick={() => { setSettingsOpen(true); setError(""); }}
-                  className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+                  className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
                   title="Settings"
                 >
-                  <Pencil size={12} />
+                  <Pencil size={14} />
                 </button>
               </div>
             </div>

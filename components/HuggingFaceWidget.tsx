@@ -122,9 +122,9 @@ export default function HuggingFaceWidget({
             {!selected && (
               <button
                 onClick={() => { setDraft(config); setSettingsOpen(true); }}
-                className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
               >
-                <Pencil size={12} />
+                <Pencil size={14} />
               </button>
             )}
           </div>
@@ -157,7 +157,7 @@ export default function HuggingFaceWidget({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
-                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-40 hover:!opacity-80 transition-opacity ${c.label}`}
+                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
                           >
                             <ExternalLink size={11} />
                           </a>

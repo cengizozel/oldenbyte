@@ -256,16 +256,16 @@ export default function TrackerWidget({
               <button
                 onClick={openHistory}
                 title="History"
-                className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
               >
-                <History size={12} />
+                <History size={14} />
               </button>
               <button
                 onClick={() => { setDraft(items); setSettingsOpen(true); }}
                 title="Edit"
-                className={`opacity-0 group-hover:opacity-40 [@media(hover:none)]:!opacity-40 hover:!opacity-80 ${c.label}`}
+                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
               >
-                <Pencil size={12} />
+                <Pencil size={14} />
               </button>
             </div>
           </div>
@@ -333,7 +333,7 @@ export default function TrackerWidget({
                         <span className={`flex-1 truncate text-sm ${c.text}`}>{r.name}</span>
                         <span className={`text-xs tabular-nums ${isActive ? c.label : `opacity-50 ${c.text}`}`}>{fmt(r.secs)}</span>
                         <span className={isActive ? c.label : `opacity-30 ${c.label}`}>
-                          {isActive ? <Pause size={12} /> : <Play size={12} />}
+                          {isActive ? <Pause size={14} /> : <Play size={14} />}
                         </span>
                       </button>
                     </li>
@@ -425,7 +425,7 @@ export default function TrackerWidget({
                     title="Delete day"
                     className={`ml-auto shrink-0 opacity-40 hover:opacity-100 hover:text-red-500 ${c.label}`}
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
                 {day.rows.map(r => (

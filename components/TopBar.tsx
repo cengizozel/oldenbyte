@@ -395,9 +395,13 @@ function SettingsPanel({
           <section className="flex flex-col gap-3">
             <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Appearance</span>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[var(--text-secondary)]">Dark mode</span>
+              <span className="text-sm text-[var(--text-secondary)]">
+                Dark mode
+                <kbd className="ml-2 px-1.5 py-0.5 rounded border border-[var(--surface-border)] text-[10px] text-[var(--text-muted)] align-middle">⇧D</kbd>
+              </span>
               <button
                 onClick={onToggleDark}
+                title="Toggle dark mode (Shift+D)"
                 className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${dark ? "bg-[var(--text-muted)]" : "bg-[var(--surface-border-focus)]"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${dark ? "translate-x-4" : "translate-x-0"}`} />
@@ -431,14 +435,33 @@ export default function TopBar({
     });
   }, []);
 
-  function toggleDark() {
-    const next = !dark;
+  function applyTheme(next: boolean) {
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
     const value = next ? "dark" : "light";
     localStorage.setItem("theme", value);
     storage.setItem("theme", value);
   }
+
+  // Read the live DOM class as the source of truth so this stays correct even
+  // when called from a key handler bound once (no stale React state).
+  function toggleDark() {
+    applyTheme(!document.documentElement.classList.contains("dark"));
+  }
+
+  // Shift+D toggles the theme, unless the user is typing in a field.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || !e.shiftKey || e.code !== "KeyD") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
+      e.preventDefault();
+      toggleDark();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

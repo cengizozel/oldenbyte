@@ -20,6 +20,7 @@ import ArxivWidget from "./ArxivWidget";
 import HuggingFaceWidget from "./HuggingFaceWidget";
 import TrackerWidget from "./TrackerWidget";
 import dynamic from "next/dynamic";
+import ChatWidget from "./ChatWidget";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 const ChessWidget = dynamic(() => import("./ChessWidget"), { ssr: false });
 
@@ -62,6 +63,7 @@ function renderWidget(widget: Widget, extraClass = "") {
   if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className={cls} />;
   if (widget.type === "tracker")  return <TrackerWidget   widget={widget} className={cls} />;
   if (widget.type === "chess")    return <ChessWidget     widget={widget} className={cls} />;
+  if (widget.type === "chat")     return <ChatWidget      widget={widget} className={cls} />;
   return <WidgetCard widget={widget} className={cls} />;
 }
 
@@ -267,6 +269,7 @@ export default function WidgetGrid({
     hf:       { w: 2, h: 3 },
     tracker:  { w: 1, h: 3 },
     chess:    { w: 2, h: 4 },
+    chat:     { w: 1, h: 4 },
   };
 
   function findNextPosition(

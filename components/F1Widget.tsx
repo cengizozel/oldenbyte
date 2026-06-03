@@ -167,7 +167,7 @@ export default function F1Widget({
                 onClick={load}
                 className={`flex items-center gap-1 text-xs opacity-60 hover:opacity-90 ${c.label}`}
               >
-                <RotateCcw size={12} /> Retry
+                <RotateCcw size={14} /> Retry
               </button>
             </div>
           ) : (
