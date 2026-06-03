@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { Zap, ChevronRight } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { widgets as widgetDefs } from "@/lib/widgets";
 
@@ -83,6 +83,7 @@ export default function DigestPage() {
   const [aiError, setAiError]           = useState("");
   const [streamingMode, setStreamingMode] = useState(false);
   const summaryRequestedRef             = useRef(false);
+  const [collapsed, setCollapsed]       = useState<Record<string, boolean>>({}); // section label → collapsed
   // Aborts the in-flight compose when a new one starts or the page unmounts.
   const composeAbortRef                 = useRef<AbortController | null>(null);
   useEffect(() => () => composeAbortRef.current?.abort(), []);
@@ -783,22 +784,28 @@ export default function DigestPage() {
           ) : sectionSummaries.length > 0 ? (
             <div>
               {sectionSummaries.map((s, si) => (
-                <article key={s.label} className={si > 0 ? "mt-10 pt-8 border-t border-[var(--surface-border)]" : ""}>
-                  {/* Section flag */}
-                  <div className="flex items-center gap-3 mb-4">
+                <article key={s.label} className={si > 0 ? "mt-10" : ""}>
+                  {/* Section flag — click to collapse/expand */}
+                  <button
+                    onClick={() => setCollapsed(c => ({ ...c, [s.label]: !c[s.label] }))}
+                    className="w-full flex items-center gap-3 mb-4 group"
+                  >
                     <span className="font-[family-name:var(--font-dm-mono)] text-[9px] uppercase tracking-[0.2em] text-[var(--page-bg)] bg-[var(--text-primary)] px-2 py-0.5">
                       {s.label}
                     </span>
                     <div className="flex-1 h-px bg-[var(--surface-border)]" />
-                  </div>
+                    <ChevronRight size={14} className={`text-[var(--text-muted)] transition-transform ${collapsed[s.label] ? "" : "rotate-90"}`} />
+                  </button>
                   {/* Prose — or a per-section composing indicator while it streams in */}
-                  <div className="flex flex-col gap-4">
-                    {s.prose
-                      ? renderProse(s.prose, s.refs)
-                      : generating
-                        ? <p className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] animate-pulse">composing…</p>
-                        : <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-muted)]">no content.</p>}
-                  </div>
+                  {!collapsed[s.label] && (
+                    <div className="flex flex-col gap-4">
+                      {s.prose
+                        ? renderProse(s.prose, s.refs)
+                        : generating
+                          ? <p className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] animate-pulse">composing…</p>
+                          : <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-muted)]">no content.</p>}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
