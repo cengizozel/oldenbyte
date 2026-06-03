@@ -93,6 +93,11 @@ export default function ChatWidget({
   const [gathering, setGathering] = useState(false);
   const [showContext, setShowContext] = useState(false);
 
+  // Inline editing of an assistant reply (the persisted conversation is fed back
+  // as context, so edits let you curate it).
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -210,6 +215,25 @@ export default function ChatWidget({
     setConfig(next);
     persist(next, messages);
     if (next.useDashboard && !ctx) refreshContext();
+  }
+
+  function startEdit(i: number) {
+    setEditingIndex(i);
+    setEditDraft(messages[i].content);
+  }
+  function cancelEdit() {
+    setEditingIndex(null);
+    setEditDraft("");
+  }
+  function saveEdit() {
+    if (editingIndex === null) return;
+    // Drop stats — the token count/timing no longer describe the edited text.
+    const next = messages.map((m, idx) =>
+      idx === editingIndex ? { ...m, content: editDraft, stats: undefined } : m
+    );
+    setMessages(next);
+    persist(config, next);
+    cancelEdit();
   }
 
   // Combine the user's system prompt with a snapshot of dashboard data when the
@@ -614,8 +638,28 @@ export default function ChatWidget({
               messages.map((m, i) => {
                 const inProgress = streaming && i === messages.length - 1 && m.role === "assistant";
                 const secs = elapsedMs / 1000;
+                const editing = editingIndex === i;
+                const canEdit = !streaming && m.role === "assistant" && !!m.content;
+                if (editing) {
+                  return (
+                    <div key={i} className="flex flex-col gap-1 w-full">
+                      <textarea
+                        autoFocus
+                        value={editDraft}
+                        onChange={e => setEditDraft(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Escape") cancelEdit(); }}
+                        rows={Math.min(12, Math.max(3, editDraft.split("\n").length))}
+                        className="w-full text-sm border border-[var(--surface-border)] rounded-xl px-3 py-2 outline-none focus:border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)] font-mono resize-y"
+                      />
+                      <div className="flex items-center justify-end gap-3">
+                        <button onClick={cancelEdit} title="Cancel" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={14} /></button>
+                        <button onClick={saveEdit} title="Save" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Check size={14} /></button>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
-                  <div key={i} className={`flex flex-col gap-0.5 ${m.role === "user" ? "items-end" : "items-start"}`}>
+                  <div key={i} className={`flex flex-col gap-0.5 group/msg ${m.role === "user" ? "items-end" : "items-start"}`}>
                     <div
                       className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${
                         m.role === "user"
@@ -634,12 +678,23 @@ export default function ChatWidget({
                         {m.content ? "generating" : (secs >= 3 ? "loading model / thinking" : "thinking")}… {secs.toFixed(1)}s
                       </span>
                     )}
-                    {!inProgress && m.role === "assistant" && m.stats && m.stats.tokens > 0 && (
-                      <span className={`px-1 text-[10px] ${c.text} opacity-40`}>
-                        {m.stats.tps.toFixed(1)} tok/s · {m.stats.tokens} tokens · {m.stats.total.toFixed(1)}s
-                        {m.stats.ttft >= 0.05 ? ` · ${m.stats.ttft.toFixed(1)}s to first` : ""}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 px-1">
+                      {!inProgress && m.role === "assistant" && m.stats && m.stats.tokens > 0 && (
+                        <span className={`text-[10px] ${c.text} opacity-40`}>
+                          {m.stats.tps.toFixed(1)} tok/s · {m.stats.tokens} tokens · {m.stats.total.toFixed(1)}s
+                          {m.stats.ttft >= 0.05 ? ` · ${m.stats.ttft.toFixed(1)}s to first` : ""}
+                        </span>
+                      )}
+                      {canEdit && (
+                        <button
+                          onClick={() => startEdit(i)}
+                          title="Edit reply"
+                          className={`opacity-0 group-hover/msg:opacity-50 [@media(hover:none)]:!opacity-50 hover:!opacity-90 ${c.icon}`}
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })
