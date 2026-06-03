@@ -95,6 +95,10 @@ export async function POST(request: NextRequest) {
       const reader = upstream.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      // Count generated tokens by counting per-token deltas (exact for local
+      // servers that stream one token per chunk); prefer upstream usage when the
+      // server reports it.
+      let tokens = 0;
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -108,11 +112,17 @@ export async function POST(request: NextRequest) {
             const payload = trimmed.slice(5).trim();
             if (payload === "[DONE]") continue;
             try {
-              const delta = JSON.parse(payload).choices?.[0]?.delta?.content;
-              if (delta) controller.enqueue(encoder.encode(delta));
+              const obj = JSON.parse(payload);
+              const delta = obj.choices?.[0]?.delta?.content;
+              if (delta) { controller.enqueue(encoder.encode(delta)); tokens++; }
+              const reported = obj.usage?.completion_tokens;
+              if (typeof reported === "number") tokens = reported;
             } catch { /* skip malformed chunks */ }
           }
         }
+        // Trailer: a record-separator (\x1e, never present in model text)
+        // followed by JSON stats. The client splits it off the response body.
+        controller.enqueue(encoder.encode("\x1e" + JSON.stringify({ tokens })));
       } finally {
         controller.close();
       }

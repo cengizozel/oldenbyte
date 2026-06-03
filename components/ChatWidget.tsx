@@ -5,9 +5,11 @@ import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Data
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherDashboardContext } from "@/lib/dashboardContext";
+import Markdown from "./Markdown";
 
 type Role = "user" | "assistant";
-type ChatMessage = { role: Role; content: string };
+type MsgStats = { tps: number; tokens: number; total: number; ttft: number };
+type ChatMessage = { role: Role; content: string; stats?: MsgStats };
 
 type Length = "default" | "concise" | "balanced" | "detailed";
 
@@ -93,6 +95,17 @@ export default function ChatWidget({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Live status timing while a response streams.
+  const timingRef = useRef<{ start: number; first: number | null }>({ start: 0, first: null });
+  const [elapsedMs, setElapsedMs] = useState(0);
+  useEffect(() => {
+    if (!streaming) { setElapsedMs(0); return; }
+    const tick = () => setElapsedMs(performance.now() - timingRef.current.start);
+    tick();
+    const id = setInterval(tick, 150);
+    return () => clearInterval(id);
+  }, [streaming]);
 
   const refreshContext = useCallback(async () => {
     setGathering(true);
@@ -234,6 +247,7 @@ export default function ChatWidget({
     setInput("");
 
     const history: ChatMessage[] = [...messages, { role: "user", content: text }];
+    timingRef.current = { start: performance.now(), first: null };
     setStreaming(true);
 
     // Make sure dashboard data is gathered before we build the prompt (cached
@@ -243,10 +257,12 @@ export default function ChatWidget({
     // Assistant placeholder we stream tokens into
     setMessages([...history, { role: "assistant", content: "" }]);
 
+    // Only role/content go upstream (strip any per-message stats).
     const systemContent = buildSystemContent(dash);
+    const cleanHistory = history.map(m => ({ role: m.role, content: m.content }));
     const payload = systemContent
-      ? [{ role: "system", content: systemContent }, ...history]
-      : history;
+      ? [{ role: "system", content: systemContent }, ...cleanHistory]
+      : cleanHistory;
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -275,18 +291,34 @@ export default function ChatWidget({
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let acc = "";
+      // Visible reply is everything before the \x1e stats trailer.
+      const bodyOf = (s: string) => { const i = s.indexOf("\x1e"); return i === -1 ? s : s.slice(0, i); };
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
+        const body = bodyOf(acc);
+        if (body && timingRef.current.first == null) timingRef.current.first = performance.now();
         setMessages(prev => {
           const next = [...prev];
-          next[next.length - 1] = { role: "assistant", content: acc };
+          next[next.length - 1] = { role: "assistant", content: body };
           return next;
         });
       }
 
-      const finalMessages: ChatMessage[] = [...history, { role: "assistant", content: acc }];
+      const body = bodyOf(acc);
+      const sep = acc.indexOf("\x1e");
+      let tokens = 0;
+      if (sep !== -1) { try { tokens = JSON.parse(acc.slice(sep + 1)).tokens ?? 0; } catch {} }
+      const end = performance.now();
+      const { start, first } = timingRef.current;
+      const ttft = first ? (first - start) / 1000 : 0;
+      const genS = first ? (end - first) / 1000 : (end - start) / 1000;
+      const stats: MsgStats | undefined = tokens > 0
+        ? { tokens, ttft, total: (end - start) / 1000, tps: genS > 0 ? tokens / genS : 0 }
+        : undefined;
+
+      const finalMessages: ChatMessage[] = [...history, { role: "assistant", content: body, stats }];
       setMessages(finalMessages);
       persist(config, finalMessages);
     } catch (err) {
@@ -579,21 +611,38 @@ export default function ChatWidget({
                 <p className={`text-xs opacity-40 ${c.text}`}>Ask anything…</p>
               </div>
             ) : (
-              messages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${
-                      m.role === "user"
-                        ? "bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-primary)] shadow-sm"
-                        : `${c.text} opacity-90`
-                    }`}
-                  >
-                    {m.content || (streaming && i === messages.length - 1
-                      ? <span className="inline-block w-2 h-2 rounded-full bg-current opacity-50 animate-pulse" />
-                      : "")}
+              messages.map((m, i) => {
+                const inProgress = streaming && i === messages.length - 1 && m.role === "assistant";
+                const secs = elapsedMs / 1000;
+                return (
+                  <div key={i} className={`flex flex-col gap-0.5 ${m.role === "user" ? "items-end" : "items-start"}`}>
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${
+                        m.role === "user"
+                          ? "whitespace-pre-wrap bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-primary)] shadow-sm"
+                          : `${c.text} opacity-90`
+                      }`}
+                    >
+                      {m.role === "assistant"
+                        ? (m.content
+                            ? <Markdown text={m.content} />
+                            : (inProgress ? <span className="inline-block w-2 h-2 rounded-full bg-current opacity-50 animate-pulse" /> : null))
+                        : m.content}
+                    </div>
+                    {inProgress && (
+                      <span className={`px-1 text-[10px] ${c.text} opacity-45`}>
+                        {m.content ? "generating" : (secs >= 3 ? "loading model / thinking" : "thinking")}… {secs.toFixed(1)}s
+                      </span>
+                    )}
+                    {!inProgress && m.role === "assistant" && m.stats && m.stats.tokens > 0 && (
+                      <span className={`px-1 text-[10px] ${c.text} opacity-40`}>
+                        {m.stats.tps.toFixed(1)} tok/s · {m.stats.tokens} tokens · {m.stats.total.toFixed(1)}s
+                        {m.stats.ttft >= 0.05 ? ` · ${m.stats.ttft.toFixed(1)}s to first` : ""}
+                      </span>
+                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
             {error && <p className="text-red-400 text-xs">{error}</p>}
           </div>

@@ -28,6 +28,9 @@ Save is disabled until both an API URL and a model are set.
 ## Behaviour
 
 - **Streaming** — replies stream in real-time via `POST /api/chat` with `stream: true`. The **Stop** button aborts the in-flight request and keeps whatever streamed so far.
+- **Markdown** — assistant replies are rendered as Markdown (headings, bold/italic, lists, inline code, fenced code blocks, blockquotes, links) by a small in-house renderer in `components/Markdown.tsx` — no external dependency. User messages stay plain text.
+- **Live status** — while waiting, a caption under the reply shows `thinking… {s}s` (switching to `loading model / thinking…` past 3s, since a cold model load shows up as latency before the first token), then `generating… {s}s`.
+- **Stats** — once a reply finishes, a footer reports `{tok/s} · {tokens} tokens · {total time} · {time to first token}`. Timings are measured client-side; the token count comes from a `\x1e`-delimited trailer the `/api/chat` route appends (it counts per-token deltas, exact for local servers that stream one token per chunk).
 - **Clear** — the reset icon (visible on hover once a conversation exists) wipes the history.
 - **Send** — `Enter` sends, `Shift+Enter` inserts a newline.
 
