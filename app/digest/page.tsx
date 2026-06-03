@@ -79,9 +79,13 @@ export default function DigestPage() {
   const [loadingModels, setLoadingModels] = useState(false);
   const [sectionSummaries, setSectionSummaries] = useState<{ label: string; prose: string; refs: Ref[] }[]>([]);
   const [aiLoading, setAiLoading]       = useState(false);
+  const [generating, setGenerating]     = useState(false); // true while sections stream in
   const [aiError, setAiError]           = useState("");
   const [streamingMode, setStreamingMode] = useState(false);
   const summaryRequestedRef             = useRef(false);
+  // Aborts the in-flight compose when a new one starts or the page unmounts.
+  const composeAbortRef                 = useRef<AbortController | null>(null);
+  useEffect(() => () => composeAbortRef.current?.abort(), []);
 
   const today = new Date().toISOString().split("T")[0];
   const dateLabel = new Date().toLocaleDateString("en-US", {
@@ -118,19 +122,20 @@ export default function DigestPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, configured, loading, sections]);
 
-  // Fetch an endpoint's models and select the first. OpenAI uses a curated list
-  // (its /models needs a key); local servers are queried live. While searching,
-  // the model is cleared so the field shows empty/loading rather than stale data.
-  async function loadModelsFor(url: string, key: string) {
+  // Load an endpoint's models, then select `preferred` if it's in the list,
+  // otherwise the first. OpenAI uses a curated list (its /models needs a key).
+  // While searching, the model is cleared so the field shows empty/loading.
+  async function loadModelsFor(url: string, key: string, preferred: string) {
     if (!url) { setModels([]); return; }
+    const pick = (list: string[]) => (list.includes(preferred) ? preferred : (list[0] ?? ""));
     if (/openai\.com/i.test(url)) {
       setModels(OPENAI_MODELS);
-      setDraft(d => ({ ...d, model: OPENAI_MODELS[0] }));
+      setDraft(d => ({ ...d, model: pick(OPENAI_MODELS) }));
       return;
     }
     setLoadingModels(true);
     setModels([]);
-    setDraft(d => ({ ...d, model: "" }));
+    setDraft(d => ({ ...d, model: "" })); // empty while searching
     try {
       const params = new URLSearchParams({ baseUrl: url });
       if (key) params.set("apiKey", key);
@@ -138,7 +143,7 @@ export default function DigestPage() {
       const data = await res.json();
       const list: string[] = res.ok && Array.isArray(data.models) ? data.models : [];
       setModels(list);
-      setDraft(d => ({ ...d, model: list[0] ?? "" }));
+      setDraft(d => ({ ...d, model: pick(list) }));
     } catch {
       setModels([]);
       setDraft(d => ({ ...d, model: "" }));
@@ -147,25 +152,34 @@ export default function DigestPage() {
     }
   }
 
-  // Switching endpoint (preset) auto-loads that server's models and picks the first.
+  // Switching endpoint (preset) auto-loads its models, keeping your saved model
+  // if that server has it, else the first.
   function setEndpoint(url: string) {
     setDraft(d => ({ ...d, baseUrl: url, model: "" }));
-    loadModelsFor(url, draft.apiKey);
+    loadModelsFor(url, draft.apiKey, model);
   }
 
   function openSettings() {
     setDraft({ baseUrl, model, apiKey });
-    setModels(defaultModelsFor(baseUrl));
     setShowSettings(true);
+    loadModelsFor(baseUrl, apiKey, model); // re-list for the saved endpoint, keep your model
   }
 
-  function saveSettings() {
+  function saveSettings(recompose = false) {
     const next = { baseUrl: draft.baseUrl.trim(), model: draft.model.trim(), apiKey: draft.apiKey.trim() };
     setBaseUrl(next.baseUrl); setModel(next.model); setApiKey(next.apiKey);
     localStorage.setItem("digest-base-url", next.baseUrl);
     localStorage.setItem("digest-model", next.model);
     localStorage.setItem("digest-openai-key", next.apiKey);
     setShowSettings(false);
+
+    const nowConfigured = Boolean(next.baseUrl && next.model && (next.apiKey || !NEEDS_KEY.test(next.baseUrl)));
+    if (recompose && nowConfigured) {
+      setSectionSummaries([]);
+      summaryRequestedRef.current = false;
+      storage.removeItem(`digest-ai-sections-${today}`);
+      generateSummary(next);
+    }
   }
 
   const PRESETS = [
@@ -203,9 +217,23 @@ export default function DigestPage() {
     return { content: lines.join("\n") + refBlock, refs };
   }
 
-  async function generateSummary() {
+  // `cfg` lets a caller pass freshly-saved settings (state updates are async, so
+  // we can't rely on the baseUrl/model/apiKey state right after setting them).
+  async function generateSummary(cfg?: { baseUrl: string; apiKey: string; model: string }) {
+    const ep = cfg ?? { baseUrl, apiKey, model };
+
+    // Cancel any compose already running, then own the new one. `active()` is
+    // true only while this run is the latest — so a superseded run never writes
+    // state or persists stale results over the newer one.
+    composeAbortRef.current?.abort();
+    const controller = new AbortController();
+    composeAbortRef.current = controller;
+    const signal = controller.signal;
+    const active = () => composeAbortRef.current === controller && !signal.aborted;
+
     summaryRequestedRef.current = true;
     setAiLoading(true);
+    setGenerating(true);
     setAiError("");
 
     if (streamingMode) {
@@ -218,29 +246,35 @@ export default function DigestPage() {
 
       await Promise.allSettled(sections.map(async (section, idx) => {
         const { content, refs } = buildSectionContent(section);
-        const res = await fetch("/api/digest", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ baseUrl, apiKey, model, content, stream: true }),
-        });
-        if (!res.ok || !res.body) return;
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let prose = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          prose += decoder.decode(value, { stream: true });
-          setSectionSummaries(prev => {
-            const updated = [...prev];
-            updated[idx] = { ...updated[idx], prose, refs };
-            return updated;
+        try {
+          const res = await fetch("/api/digest", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ baseUrl: ep.baseUrl, apiKey: ep.apiKey, model: ep.model, content, stream: true }),
+            signal,
           });
-        }
-        finalSummaries[idx] = { label: section.label, prose, refs };
+          if (!res.ok || !res.body) return;
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let prose = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            prose += decoder.decode(value, { stream: true });
+            if (active()) setSectionSummaries(prev => {
+              const updated = [...prev];
+              updated[idx] = { ...updated[idx], prose, refs };
+              return updated;
+            });
+          }
+          finalSummaries[idx] = { label: section.label, prose, refs };
+        } catch { /* aborted or failed — leave this section as-is */ }
       }));
 
-      await storage.setItem(`digest-ai-sections-${today}`, JSON.stringify(finalSummaries));
+      if (active()) {
+        await storage.setItem(`digest-ai-sections-${today}`, JSON.stringify(finalSummaries));
+        setGenerating(false);
+      }
     } else {
       try {
         const results = await Promise.allSettled(
@@ -249,23 +283,26 @@ export default function DigestPage() {
             const res = await fetch("/api/digest", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ baseUrl, apiKey, model, content }),
+              body: JSON.stringify({ baseUrl: ep.baseUrl, apiKey: ep.apiKey, model: ep.model, content }),
+              signal,
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error ?? "Unknown error");
             return { label: section.label, prose: data.summary as string, refs };
           })
         );
+        if (!active()) return;
         const newSectionSummaries = results
           .filter(r => r.status === "fulfilled")
           .map(r => (r as PromiseFulfilledResult<{ label: string; prose: string; refs: Ref[] }>).value);
         setSectionSummaries(newSectionSummaries);
         await storage.setItem(`digest-ai-sections-${today}`, JSON.stringify(newSectionSummaries));
       } catch (err) {
+        if (!active()) return;
         setAiError(String(err));
         summaryRequestedRef.current = false;
       } finally {
-        setAiLoading(false);
+        if (active()) { setAiLoading(false); setGenerating(false); }
       }
     }
   }
@@ -658,8 +695,8 @@ export default function DigestPage() {
             </span>
             <div className="flex items-center gap-4">
               <button onClick={() => (showSettings ? setShowSettings(false) : openSettings())} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">{showSettings ? "close" : "model"}</button>
-              {configured && sectionSummaries.length > 0 && (
-                <button onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; generateSummary(); }} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">regenerate</button>
+              {configured && !aiLoading && !generating && (
+                <button onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; storage.removeItem(`digest-ai-sections-${today}`); generateSummary(); }} className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">regenerate</button>
               )}
               <button
                 onClick={() => {
@@ -704,20 +741,28 @@ export default function DigestPage() {
                   <input value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} placeholder="e.g. gpt-4o-mini or llama3.2" className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-[family-name:var(--font-dm-mono)]" />
                 )}
                 {!loadingModels && (
-                  <button onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey)} className="text-[9px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)]">load models</button>
+                  <button onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey, draft.model || model)} className="text-[9px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)]">load models</button>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] w-20 shrink-0">api key</span>
-                <input
-                  type="password"
-                  value={draft.apiKey}
-                  onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
-                  onKeyDown={e => e.key === "Enter" && saveSettings()}
-                  placeholder="optional — blank for local"
-                  className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-[family-name:var(--font-dm-mono)]"
-                />
-                <button onClick={saveSettings} className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)]">save</button>
+              {/* API key — only for hosted providers that need one */}
+              {NEEDS_KEY.test(draft.baseUrl) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] w-20 shrink-0">api key</span>
+                  <input
+                    type="password"
+                    value={draft.apiKey}
+                    onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
+                    onKeyDown={e => e.key === "Enter" && saveSettings(false)}
+                    placeholder="sk-..."
+                    className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-[family-name:var(--font-dm-mono)]"
+                  />
+                </div>
+              )}
+              <div className="flex justify-end gap-4">
+                {Boolean(draft.baseUrl && draft.model && (draft.apiKey || !NEEDS_KEY.test(draft.baseUrl))) && (
+                  <button onClick={() => saveSettings(true)} className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)]">save &amp; recompose</button>
+                )}
+                <button onClick={() => saveSettings(false)} className="text-[10px] font-[family-name:var(--font-dm-mono)] uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)]">save</button>
               </div>
             </div>
           )}
@@ -746,9 +791,13 @@ export default function DigestPage() {
                     </span>
                     <div className="flex-1 h-px bg-[var(--surface-border)]" />
                   </div>
-                  {/* Prose */}
+                  {/* Prose — or a per-section composing indicator while it streams in */}
                   <div className="flex flex-col gap-4">
-                    {renderProse(s.prose, s.refs)}
+                    {s.prose
+                      ? renderProse(s.prose, s.refs)
+                      : generating
+                        ? <p className="font-[family-name:var(--font-dm-mono)] text-[10px] uppercase tracking-widest text-[var(--text-muted)] animate-pulse">composing…</p>
+                        : <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-muted)]">no content.</p>}
                   </div>
                 </article>
               ))}

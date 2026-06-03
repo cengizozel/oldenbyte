@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers,
       body: buildBody(content, true, model),
+      signal: request.signal, // cancel the upstream LLM call if the client disconnects
     });
 
     if (!res.ok) {
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers,
       body: buildBody(content, false, model),
+      signal: request.signal, // cancel the upstream LLM call if the client disconnects
     });
 
     if (!res.ok) {

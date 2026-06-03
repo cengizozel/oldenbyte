@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders(apiKey) },
       body,
+      signal: request.signal, // cancel the upstream LLM call if the client disconnects
     });
   } catch (err) {
     return NextResponse.json({ error: `Could not reach ${url}: ${String(err)}` }, { status: 502 });
