@@ -1,13 +1,26 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, X, RotateCcw, Loader, Plus, PlaySquare } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Loader, Plus, PlaySquare, ExternalLink, ChevronLeft } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
 type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean };
 type YoutubeConfig  = { channels: YoutubeChannel[] };
 type Video          = { title: string; link: string; published: string; channelId: string; channelName: string };
+type VideoDetails   = { title: string; author: string; description: string; lengthSeconds: number; viewCount: number };
+
+function fmtDuration(s: number): string {
+  if (!s) return "";
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`;
+}
+function fmtViews(n: number): string {
+  if (!n) return "";
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M views`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K views`;
+  return `${n} views`;
+}
 
 function timeAgo(iso: string): string {
   if (!iso) return "";
@@ -64,6 +77,34 @@ export default function YoutubeWidget({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft]               = useState<YoutubeConfig>(DEFAULT);
   const [chInput, setChInput]           = useState("");
+
+  // Inline video detail (slides over the list, like the arXiv widget).
+  const [selected, setSelected]         = useState<Video | null>(null);
+  const [details, setDetails]           = useState<VideoDetails | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
+  const detailsAbort                    = useRef<AbortController | null>(null);
+
+  async function openVideo(v: Video) {
+    setSelected(v);
+    setDetails(null);
+    setDetailsError("");
+    setLoadingDetails(true);
+    detailsAbort.current?.abort();
+    const ctrl = new AbortController();
+    detailsAbort.current = ctrl;
+    try {
+      const res = await fetch(`/api/youtube?video=${encodeURIComponent(v.link)}`, { signal: ctrl.signal });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setDetails(data);
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setDetailsError(String((e as Error).message ?? e));
+    } finally {
+      if (detailsAbort.current === ctrl) setLoadingDetails(false);
+    }
+  }
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -164,6 +205,7 @@ export default function YoutubeWidget({
     const cacheKey = cacheKeyFor(draft);
     const ok = await fetchVideos(draft, cacheKey);
     if (ok) {
+      setSelected(null);
       setConfig(draft);
       await storage.setItem(storageKey, JSON.stringify(draft));
       setSettingsOpen(false);
@@ -197,60 +239,115 @@ export default function YoutubeWidget({
               <span className="opacity-50"><PlaySquare size={14} /></span>
               <span className="text-xs font-medium opacity-60">YouTube</span>
             </div>
-            <button
-              onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
-              className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-            >
-              <Pencil size={14} />
-            </button>
+            {!selected && (
+              <button
+                onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
+                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
+              >
+                <Pencil size={14} />
+              </button>
+            )}
           </div>
-          <div className="flex-1 min-h-0 relative">
-            <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget)}>
-              {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                </div>
-              ) : videos.length ? (
-                <ul className="flex flex-col">
-                  {videos.map((v, i) => {
-                    const sc = CH_COLORS[chColorIndex[v.channelId] ?? 0];
-                    return (
-                      <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                        <span className="flex items-center gap-1.5 mb-1">
-                          <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
-                            {v.channelName}
+          <div className="flex-1 min-h-0 relative overflow-hidden">
+            {/* Video list */}
+            <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
+              <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget)}>
+                {loading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
+                  </div>
+                ) : videos.length ? (
+                  <ul className="flex flex-col">
+                    {videos.map((v, i) => {
+                      const sc = CH_COLORS[chColorIndex[v.channelId] ?? 0];
+                      return (
+                        <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                          <span className="flex items-center gap-1.5 mb-1">
+                            <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                              {v.channelName}
+                            </span>
+                            {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
+                              <span className={`text-[9px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
+                            )}
+                            {v.published && (
+                              <span className={`text-[10px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
+                            )}
                           </span>
-                          {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
-                            <span className={`text-[9px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
-                          )}
-                          {v.published && (
-                            <span className={`text-[10px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
-                          )}
-                        </span>
-                        <a
-                          href={v.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`block text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
-                        >
-                          {v.title}
-                        </a>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className={`text-xs opacity-45 ${c.text}`}>
-                  hover and click the pencil to add YouTube channels
-                </p>
+                          <div className="flex items-start gap-1 group/title">
+                            <button
+                              onClick={() => openVideo(v)}
+                              className={`flex-1 text-left block text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                            >
+                              {v.title}
+                            </button>
+                            <a
+                              href={v.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                            >
+                              <ExternalLink size={11} />
+                            </a>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className={`text-xs opacity-45 ${c.text}`}>
+                    hover and click the pencil to add YouTube channels
+                  </p>
+                )}
+              </div>
+              {showTopFade && (
+                <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
+              )}
+              {showBottomFade && (
+                <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
               )}
             </div>
-            {showTopFade && (
-              <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
-            )}
-            {showBottomFade && (
-              <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
-            )}
+
+            {/* Video detail */}
+            <div className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${selected ? "translate-x-0" : "translate-x-full"}`}>
+              {selected && (
+                <>
+                  <div className={`flex items-center gap-1.5 mb-2 shrink-0 ${c.text}`}>
+                    <button onClick={() => setSelected(null)} className="shrink-0 opacity-60 hover:opacity-100">
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="flex-1 text-xs font-medium truncate opacity-80">{selected.title}</span>
+                    <a href={selected.link} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80" title="Watch on YouTube">
+                      <ExternalLink size={11} />
+                    </a>
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto pr-3">
+                    {loadingDetails ? (
+                      <div className="flex items-center justify-center h-full">
+                        <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
+                      </div>
+                    ) : detailsError ? (
+                      <p className="text-red-400 text-xs">{detailsError}</p>
+                    ) : details ? (
+                      <div className="flex flex-col gap-2">
+                        <p className={`text-sm font-medium leading-snug ${c.text}`}>{details.title || selected.title}</p>
+                        <p className={`text-[11px] opacity-50 ${c.text}`}>
+                          {[details.author, fmtViews(details.viewCount), fmtDuration(details.lengthSeconds)].filter(Boolean).join(" · ")}
+                        </p>
+                        {details.description ? (
+                          <>
+                            <div className="border-t border-black/5" />
+                            <p className={`text-xs leading-relaxed opacity-75 whitespace-pre-line ${c.text}`}>{details.description}</p>
+                          </>
+                        ) : (
+                          <p className={`text-xs opacity-45 ${c.text}`}>No description.</p>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

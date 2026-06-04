@@ -393,9 +393,21 @@ export default function ChatWidget({
   }
   function saveEdit() {
     if (editingIndex === null) return;
+    const i = editingIndex;
+    const text = editDraft;
+    if (messages[i].role === "user") {
+      // Editing a past message rewinds the conversation: keep everything up to
+      // it (with the new text), drop the rest, and regenerate from that point.
+      if (streaming || !configured || !text.trim()) return;
+      cancelEdit();
+      setError("");
+      generate([...messages.slice(0, i), { role: "user", content: text }]);
+      return;
+    }
+    // Editing an assistant reply just rewrites its text in place.
     // Drop stats — the token count/timing no longer describe the edited text.
     const next = messages.map((m, idx) =>
-      idx === editingIndex ? { ...m, content: editDraft, stats: undefined } : m
+      idx === i ? { ...m, content: text, stats: undefined } : m
     );
     setMessages(next);
     persist(config, next);
@@ -497,11 +509,14 @@ export default function ChatWidget({
   async function send() {
     const text = input.trim();
     if (!text || streaming || !configured) return;
-
     setError("");
     setInput("");
+    await generate([...messages, { role: "user", content: text }]);
+  }
 
-    const history: ChatMessage[] = [...messages, { role: "user", content: text }];
+  // Stream an assistant reply for a history ending in a user message. Shared by
+  // send() and by editing a user message (which truncates, then regenerates).
+  async function generate(history: ChatMessage[]) {
     timingRef.current = { start: performance.now(), first: null };
     atBottomRef.current = true; // follow the new turn
     setStreaming(true);
@@ -957,7 +972,7 @@ export default function ChatWidget({
                 const inProgress = streaming && i === messages.length - 1 && m.role === "assistant";
                 const secs = elapsedMs / 1000;
                 const editing = editingIndex === i;
-                const canEdit = !streaming && m.role === "assistant" && !!m.content;
+                const canEdit = !streaming && !!m.content;
                 if (editing) {
                   return (
                     <div key={i} className="flex flex-col gap-1 w-full">
@@ -1008,7 +1023,7 @@ export default function ChatWidget({
                       {canEdit && (
                         <button
                           onClick={() => startEdit(i)}
-                          title="Edit reply"
+                          title={m.role === "user" ? "Edit message (reruns from here)" : "Edit reply"}
                           className={`opacity-0 group-hover/msg:opacity-50 [@media(hover:none)]:!opacity-50 hover:!opacity-90 ${c.icon}`}
                         >
                           <Pencil size={12} />

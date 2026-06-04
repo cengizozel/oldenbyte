@@ -158,6 +158,64 @@ async function fetchViaChannelPage(channelId: string, limit: number): Promise<{ 
   return { name, videos };
 }
 
+// Pull a video id out of a watch URL, youtu.be link, or a bare id.
+function extractVideoId(input: string): string {
+  const t = input.trim();
+  return (
+    t.match(/[?&]v=([\w-]{11})/)?.[1] ??
+    t.match(/youtu\.be\/([\w-]{11})/)?.[1] ??
+    t.match(/\/(?:shorts|embed)\/([\w-]{11})/)?.[1] ??
+    (/^[\w-]{11}$/.test(t) ? t : "")
+  );
+}
+
+// Scan balanced braces from the first "{" after `marker` so descriptions
+// containing "};" don't truncate the JSON.
+function extractJsonAfter(html: string, marker: string): string | null {
+  const at = html.indexOf(marker);
+  if (at === -1) return null;
+  const start = html.indexOf("{", at);
+  if (start === -1) return null;
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < html.length; i++) {
+    const ch = html[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+    } else if (ch === '"') inStr = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}") { depth--; if (depth === 0) return html.slice(start, i + 1); }
+  }
+  return null;
+}
+
+type VideoDetails = {
+  title: string;
+  author: string;
+  description: string;
+  lengthSeconds: number;
+  viewCount: number;
+};
+
+async function fetchVideoDetails(videoId: string): Promise<VideoDetails> {
+  const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    headers: { "User-Agent": UA, "Accept-Language": "en-US,en;q=0.9" },
+  });
+  if (!res.ok) throw new Error(`Watch page ${res.status}`);
+  const html = await res.text();
+  const raw = extractJsonAfter(html, "ytInitialPlayerResponse =");
+  if (!raw) throw new Error("Could not find video details");
+  const vd = JSON.parse(raw).videoDetails ?? {};
+  return {
+    title: vd.title ?? "",
+    author: vd.author ?? "",
+    description: (vd.shortDescription ?? "").slice(0, 4000),
+    lengthSeconds: Number(vd.lengthSeconds) || 0,
+    viewCount: Number(vd.viewCount) || 0,
+  };
+}
+
 async function resolveChannelId(input: string): Promise<{ channelId: string; name: string }> {
   const trimmed = input.trim();
 
@@ -186,6 +244,18 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; nam
 }
 
 export async function GET(request: NextRequest) {
+  // Single-video detail mode (description + metadata) for the widget's click view.
+  const video = request.nextUrl.searchParams.get("video");
+  if (video) {
+    const id = extractVideoId(video);
+    if (!id) return NextResponse.json({ error: "Invalid video URL or id" }, { status: 400 });
+    try {
+      return NextResponse.json(await fetchVideoDetails(id));
+    } catch (err) {
+      return NextResponse.json({ error: String(err) }, { status: 502 });
+    }
+  }
+
   const channel       = request.nextUrl.searchParams.get("channel");
   const channelId     = request.nextUrl.searchParams.get("channelId");
   const filterMembers = request.nextUrl.searchParams.get("filterMembers") === "true";
