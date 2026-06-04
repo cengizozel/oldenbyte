@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -121,6 +121,14 @@ export const widgets: Widget[] = [
     color: "sky",
     title: "Chat",
     description: "Chat with a local or OpenAI-compatible model.",
+    digestable: false,
+  },
+  {
+    id: "kiwix",
+    type: "kiwix",
+    color: "teal",
+    title: "Kiwix",
+    description: "Search an offline Kiwix library (Wikipedia, etc.).",
     digestable: false,
   },
 ];

@@ -17,6 +17,7 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 - **HF Daily** - trending AI papers curated by Hugging Face, sorted by upvotes, refetches on every page load
 - **Tracker** - time how long you spend on each activity with a one-tap stopwatch (only one runs at a time) and a donut chart of the breakdown; resets daily
 - **Chess** - play an ongoing game against the Stockfish engine with an adjustable Elo difficulty; the game persists between visits
+- **Kiwix** - search an offline [Kiwix](https://kiwix.org/) library (Wikipedia, WikiHow, …) running on your network; enter the server URL, pick a book, and full-text search results link straight to the article
 - **Chat** - chat with any OpenAI-compatible model (Ollama, LM Studio, llama.cpp, vLLM, OpenAI, …) by entering the API URL and model name; responses stream in real-time and the conversation persists. A toggle feeds your dashboard data (full note history, latest feeds, tracked time) to the model so you can ask things like "what's new on arXiv?" or "what did I note last Tuesday?"
 
 ## Morning digest

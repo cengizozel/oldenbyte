@@ -191,6 +191,8 @@ export default function ChatWidget({
   const [ctx, setCtx] = useState<{ text: string; chars: number; sections: number } | null>(null);
   const [gathering, setGathering] = useState(false);
   const [showContext, setShowContext] = useState(false);
+  // Dashboard tools (data toggle / view / refresh) tuck behind a "+" by the send button.
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   // Inline editing of an assistant reply (the persisted conversation is fed back
   // as context, so edits let you curate it).
@@ -596,33 +598,6 @@ export default function ChatWidget({
         </span>
         {!settingsOpen && (
           <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              onClick={toggleDashboard}
-              title={config.useDashboard ? "Using dashboard data — click to turn off" : "Answer using my dashboard data"}
-              className={config.useDashboard ? `opacity-90 ${c.label}` : actionCls}
-            >
-              <Database size={14} />
-            </button>
-            {config.useDashboard && (
-              <button
-                onClick={() => setShowContext(true)}
-                disabled={!ctx?.text}
-                title="View the data sent to the model"
-                className={`${dashCtrlCls} disabled:!opacity-25`}
-              >
-                <Eye size={14} />
-              </button>
-            )}
-            {config.useDashboard && (
-              <button
-                onClick={() => refreshContext()}
-                disabled={gathering}
-                title="Refresh dashboard data"
-                className={dashCtrlCls}
-              >
-                <RefreshCw size={14} className={gathering ? "animate-spin" : ""} />
-              </button>
-            )}
             {messages.length > 0 && (
               <button onClick={clearChat} title="Clear this conversation" className={actionCls}>
                 <RotateCcw size={14} />
@@ -988,6 +963,45 @@ export default function ChatWidget({
                 placeholder={configured ? "Message…" : "Configure a model first"}
                 className="flex-1 resize-none max-h-24 text-sm outline-none text-neutral-700 placeholder:text-neutral-300 bg-transparent py-1 disabled:opacity-50"
               />
+              {/* Dashboard tools, revealed by the "+" toggle */}
+              {toolsOpen && (
+                <div className="flex items-center shrink-0">
+                  <button
+                    onClick={toggleDashboard}
+                    title={config.useDashboard ? "Using dashboard data — click to turn off" : "Answer using my dashboard data"}
+                    className={`p-1.5 rounded-full ${config.useDashboard ? `opacity-90 ${c.label}` : dashCtrlCls}`}
+                  >
+                    <Database size={14} />
+                  </button>
+                  {config.useDashboard && (
+                    <button
+                      onClick={() => setShowContext(true)}
+                      disabled={!ctx?.text}
+                      title="View the data sent to the model"
+                      className={`p-1.5 rounded-full ${dashCtrlCls} disabled:!opacity-25`}
+                    >
+                      <Eye size={14} />
+                    </button>
+                  )}
+                  {config.useDashboard && (
+                    <button
+                      onClick={() => refreshContext()}
+                      disabled={gathering}
+                      title="Refresh dashboard data"
+                      className={`p-1.5 rounded-full ${dashCtrlCls}`}
+                    >
+                      <RefreshCw size={14} className={gathering ? "animate-spin" : ""} />
+                    </button>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={() => setToolsOpen(o => !o)}
+                title={toolsOpen ? "Hide data tools" : "Data tools"}
+                className={`shrink-0 p-1.5 rounded-full transition-transform ${toolsOpen ? `rotate-45 ${dashCtrlCls}` : config.useDashboard ? `opacity-90 ${c.label}` : dashCtrlCls}`}
+              >
+                <Plus size={14} />
+              </button>
               {streaming ? (
                 <button
                   onClick={stop}

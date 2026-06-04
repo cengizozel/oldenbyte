@@ -97,6 +97,37 @@ read with a `ReadableStreamDefaultReader`. With `stream: false`, returns
 
 ---
 
+## Kiwix
+
+Server-side proxy to a [kiwix-serve](https://github.com/kiwix/kiwix-tools) instance for the Kiwix widget. Running it server-side avoids CORS and mixed-content blocking when the dashboard is served over HTTPS but kiwix-serve runs on plain http on the LAN/Tailnet. kiwix-serve only returns XML for full-text search, so the route parses it and hands the client clean JSON. The base URL is supplied by the client per-request and never stored server-side.
+
+A **source** is a ZIM (Wikipedia, WikiHow, …); its `id` is the content-route name kiwix uses internally.
+
+### `GET /api/kiwix?baseUrl=<url>`
+Lists the sources (ZIMs) from the OPDS catalog (`{baseUrl}/catalog/v2/entries`).
+
+```json
+{ "sources": [{ "title": "Wikipedia", "id": "wikipedia_en_all_maxi_2024-01" }] }
+```
+
+### `GET /api/kiwix?baseUrl=<url>&source=<id>&q=<query>&limit=<n>`
+Full-text search within one source (`{baseUrl}/search?content=<id>&pattern=<query>&format=xml`). `limit` is clamped to 1–20 (default 8). Each result's `url` is an absolute link to the article HTML.
+
+```json
+{ "results": [{ "title": "Isaac Newton", "url": "http://host:3702/content/<id>/A/Isaac_Newton", "snippet": "..." }] }
+```
+
+### `GET /api/kiwix?baseUrl=<url>&article=<articleUrl>`
+Fetches one article and returns a plain-text extract of its lead paragraphs (tags, inline styles, and citation markers stripped). `articleUrl` must be within the configured `baseUrl`.
+
+```json
+{ "extract": "Isaac Newton was an English mathematician..." }
+```
+
+Upstream errors (e.g. a ZIM that can't be read) are surfaced as `{ "error": "..." }` with a `502` status.
+
+---
+
 ## RSS
 
 ### `GET /api/rss?url=<feed-url>&limit=<n>`

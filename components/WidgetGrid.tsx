@@ -21,6 +21,7 @@ import HuggingFaceWidget from "./HuggingFaceWidget";
 import TrackerWidget from "./TrackerWidget";
 import dynamic from "next/dynamic";
 import ChatWidget from "./ChatWidget";
+import KiwixWidget from "./KiwixWidget";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 const ChessWidget = dynamic(() => import("./ChessWidget"), { ssr: false });
 
@@ -64,6 +65,7 @@ function renderWidget(widget: Widget, extraClass = "") {
   if (widget.type === "tracker")  return <TrackerWidget   widget={widget} className={cls} />;
   if (widget.type === "chess")    return <ChessWidget     widget={widget} className={cls} />;
   if (widget.type === "chat")     return <ChatWidget      widget={widget} className={cls} />;
+  if (widget.type === "kiwix")    return <KiwixWidget     widget={widget} className={cls} />;
   return <WidgetCard widget={widget} className={cls} />;
 }
 
