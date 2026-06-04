@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Library, Search, Pencil, Check, X, RotateCcw, Loader, ExternalLink, ChevronLeft } from "lucide-react";
+import { Library, Search, Pencil, Check, X, RotateCcw, Loader, ExternalLink, ChevronLeft, Home } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 
@@ -136,6 +136,17 @@ export default function KiwixWidget({
     }
   }
 
+  // Return to the clean search view (clear query, results, and any open article).
+  function goHome() {
+    searchAbort.current?.abort();
+    articleAbort.current?.abort();
+    setSelected(null);
+    setResults([]);
+    setQuery("");
+    setSearched(false);
+    setError("");
+  }
+
   async function handleSave() {
     setError("");
     if (!draft.baseUrl.startsWith("http")) {
@@ -192,14 +203,25 @@ export default function KiwixWidget({
               <span className="opacity-50 shrink-0"><Library size={14} /></span>
               {config.sourceTitle && <span className="text-xs font-medium opacity-60 truncate">{config.sourceTitle}</span>}
             </div>
-            {!selected && (
-              <button
-                onClick={openSettings}
-                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-              >
-                <Pencil size={14} />
-              </button>
-            )}
+            <div className="flex items-center gap-2.5 shrink-0">
+              {(selected || searched || query || results.length > 0) && (
+                <button
+                  onClick={goHome}
+                  title="Back to search home"
+                  className={`opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}
+                >
+                  <Home size={14} />
+                </button>
+              )}
+              {!selected && (
+                <button
+                  onClick={openSettings}
+                  className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+            </div>
           </div>
 
           {config.source ? (
