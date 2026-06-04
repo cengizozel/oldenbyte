@@ -189,10 +189,24 @@ async function gatherYoutube(id: string, title: string): Promise<string | null> 
       const res = await fetch(`/api/youtube?channelId=${ch.channelId}&limit=${ch.limit}`);
       if (!res.ok) return [];
       const data = await res.json();
-      return (data.videos ?? []).map((v: { title: string; link: string; published?: string; publishedAt?: string }) => ({
-        title: v.title,
-        link: v.link,
-        meta: `${ch.name} · ${timeAgo(v.published ?? v.publishedAt ?? "")}`,
+      const videos: { title: string; link: string; published?: string; publishedAt?: string }[] = data.videos ?? [];
+      // Pull each video's description so the model knows what it's about, not
+      // just its title. Best-effort and in parallel; missing ones just omit it.
+      return Promise.all(videos.map(async v => {
+        let body: string | undefined;
+        try {
+          const dRes = await fetch(`/api/youtube?video=${encodeURIComponent(v.link)}`);
+          if (dRes.ok) {
+            const desc: string = (await dRes.json()).description ?? "";
+            body = desc.replace(/\s+/g, " ").trim() || undefined;
+          }
+        } catch { /* leave description off */ }
+        return {
+          title: v.title,
+          link: v.link,
+          meta: `${ch.name} · ${timeAgo(v.published ?? v.publishedAt ?? "")}`,
+          body,
+        };
       }));
     })
   );

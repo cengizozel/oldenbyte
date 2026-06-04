@@ -95,6 +95,20 @@ read with a `ReadableStreamDefaultReader`. With `stream: false`, returns
 `{ "content": "..." }`. Upstream errors are surfaced as
 `{ "error": "..." }` with the upstream status code (or `502` if unreachable).
 
+**Kiwix tool calls (agentic lookup).** Pass an optional `kiwix` object to let the
+model search the offline Kiwix library mid-conversation:
+
+```json
+{ "...": "...", "kiwix": { "baseUrl": "http://host:3702", "source": "wikipedia_en_all_maxi_2024-01", "sourceTitle": "Wikipedia" } }
+```
+
+When present, the model is given `search_kiwix(query)` and `get_article(url)`
+tools. The route runs an agentic loop (up to 5 rounds): it streams the model's
+turn, and whenever the model calls a tool, executes it against `/api/kiwix`,
+feeds the result back, and continues until the model answers. Tool progress is
+streamed inside `<think>…</think>` so the client renders it as a collapsible
+trail. Requires a tool-calling-capable model (e.g. qwen, llama3.1+).
+
 ---
 
 ## Kiwix

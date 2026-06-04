@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight } from "lucide-react";
+import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherDashboardContext } from "@/lib/dashboardContext";
@@ -111,6 +111,10 @@ type ChatConfig = {
   maxTokens: number; // cap on response length; 0 = no limit (server default)
   length: Length;    // response-style preset: brevity instruction + suggested cap
   effort: Effort;    // reasoning-model thinking budget
+  useKiwix: boolean;       // let the model search the Kiwix library via tools
+  kiwixUrl: string;        // kiwix-serve base URL
+  kiwixSource: string;     // selected ZIM content-route id
+  kiwixSourceTitle: string;
 };
 
 // Always-on identity so the assistant knows who and where it is, even when the
@@ -147,6 +151,10 @@ const DEFAULT_CONFIG: ChatConfig = {
   maxTokens: 0,
   length: "default",
   effort: "default",
+  useKiwix: false,
+  kiwixUrl: "",
+  kiwixSource: "",
+  kiwixSourceTitle: "",
 };
 
 // Common local OpenAI-compatible servers, shown as quick-fill hints.
@@ -185,6 +193,9 @@ export default function ChatWidget({
   const [models, setModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [modelsError, setModelsError] = useState("");
+  const [kiwixSources, setKiwixSources] = useState<{ title: string; id: string }[]>([]);
+  const [loadingKiwix, setLoadingKiwix] = useState(false);
+  const [kiwixError, setKiwixError] = useState("");
 
   // Dashboard context — gathered snapshot of the user's notes/feeds, injected
   // when `config.useDashboard` is on. Cached so we don't re-fetch every message.
@@ -346,13 +357,37 @@ export default function ChatWidget({
     }
   }
 
+  async function loadKiwixSources(kiwixUrl: string, preferred: string) {
+    if (!kiwixUrl.startsWith("http")) return;
+    setLoadingKiwix(true);
+    setKiwixError("");
+    setKiwixSources([]);
+    try {
+      const res = await fetch(`/api/kiwix?baseUrl=${encodeURIComponent(kiwixUrl)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      const list: { title: string; id: string }[] = data.sources ?? [];
+      setKiwixSources(list);
+      const keep = list.find(s => s.id === preferred);
+      const pick = keep ?? list[0];
+      if (pick) setDraft(d => ({ ...d, kiwixSource: pick.id, kiwixSourceTitle: pick.title }));
+    } catch (e) {
+      setKiwixError(String((e as Error).message ?? e));
+    } finally {
+      setLoadingKiwix(false);
+    }
+  }
+
   function openSettings() {
     setDraft(config);
     setModels([]);
     setModelsError("");
+    setKiwixSources([]);
+    setKiwixError("");
     setSettingsOpen(true);
     // Auto-load the model list so the dropdown is ready (keeps the chosen model).
     if (config.baseUrl) fetchModels(config);
+    if (config.kiwixUrl) loadKiwixSources(config.kiwixUrl, config.kiwixSource);
   }
 
   function saveSettings() {
@@ -362,6 +397,7 @@ export default function ChatWidget({
       model: draft.model.trim(),
       apiKey: "", // local-only for now; no key is stored (re-enable the field to use hosted providers)
       maxTokens: Math.max(0, Math.floor(draft.maxTokens || 0)),
+      kiwixUrl: draft.kiwixUrl.trim(),
     };
     setConfig(next);
     persist(next, messages);
@@ -381,6 +417,12 @@ export default function ChatWidget({
     setConfig(next);
     persist(next, messages);
     if (next.useDashboard && !ctx) refreshContext();
+  }
+
+  function toggleKiwix() {
+    const next = { ...config, useKiwix: !config.useKiwix };
+    setConfig(next);
+    persist(next, messages);
   }
 
   function startEdit(i: number) {
@@ -503,6 +545,15 @@ export default function ChatWidget({
         `<dashboard>\n${dash.text}\n</dashboard>`
       );
     }
+    if (config.useKiwix && config.kiwixUrl && config.kiwixSource) {
+      parts.push(
+        `You have access to the user's offline Kiwix reference library${config.kiwixSourceTitle ? ` (${config.kiwixSourceTitle})` : ""} through the search_kiwix and get_article tools. ` +
+        `When a question calls for factual, encyclopedic, or how-to knowledge — including when the user asks you to look something up or verify it — use the tools rather than guessing. ` +
+        `Kiwix is a KEYWORD index: search the entity or article name (e.g. "Lionel Messi"), not a full question or filler words like "born"/"when"/"birth date" — those worsen the results. ` +
+        `Then open the most relevant result with get_article, read it, answer from it, and cite the article title. If the first query misses, retry with a simpler/shorter keyword, not a longer one. ` +
+        `For casual conversation or things you already know well, just answer directly without searching.`
+      );
+    }
     return parts.join("\n\n");
   }
 
@@ -555,6 +606,9 @@ export default function ChatWidget({
           maxTokens: config.maxTokens,
           reasoningEffort: config.effort === "default" ? "" : config.effort,
           stream: true,
+          kiwix: config.useKiwix && config.kiwixUrl && config.kiwixSource
+            ? { baseUrl: config.kiwixUrl, source: config.kiwixSource, sourceTitle: config.kiwixSourceTitle }
+            : null,
         }),
         signal: controller.signal,
       });
@@ -864,6 +918,42 @@ export default function ChatWidget({
             </div>
 
             <div>
+              <div className="flex items-center justify-between mb-1">
+                <p className={`text-xs opacity-50 ${c.label}`}>Kiwix lookup <span className="opacity-60">(optional)</span></p>
+                <button
+                  onClick={() => loadKiwixSources(draft.kiwixUrl, draft.kiwixSource)}
+                  disabled={loadingKiwix || !draft.kiwixUrl.startsWith("http")}
+                  className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-neutral-600 disabled:opacity-40"
+                  title="Load libraries from the Kiwix server"
+                >
+                  {loadingKiwix ? <Loader size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                  Load sources
+                </button>
+              </div>
+              <input
+                type="url"
+                value={draft.kiwixUrl}
+                onChange={e => setDraft(d => ({ ...d, kiwixUrl: e.target.value }))}
+                placeholder="Kiwix URL — e.g. http://192.168.1.24:3702"
+                className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
+              />
+              {kiwixSources.length > 0 && (
+                <select
+                  value={draft.kiwixSource}
+                  onChange={e => {
+                    const s = kiwixSources.find(x => x.id === e.target.value);
+                    setDraft(d => ({ ...d, kiwixSource: e.target.value, kiwixSourceTitle: s?.title ?? "" }));
+                  }}
+                  className="w-full mt-1.5 text-sm border border-neutral-200 rounded-xl px-2.5 py-2 outline-none focus:border-neutral-300 text-neutral-700 bg-white"
+                >
+                  {kiwixSources.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+                </select>
+              )}
+              {kiwixError && <p className="text-red-400 text-[11px] mt-1">{kiwixError}</p>}
+              <p className="text-[10px] text-neutral-400 mt-1">Turn lookup on with the library icon by the send button.</p>
+            </div>
+
+            <div>
               <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Response style</p>
               <div className="flex flex-wrap gap-1">
                 {(Object.keys(LENGTH_PRESETS) as Length[]).map(key => (
@@ -1084,12 +1174,25 @@ export default function ChatWidget({
                       <RefreshCw size={14} className={gathering ? "animate-spin" : ""} />
                     </button>
                   )}
+                  <button
+                    onClick={() => (config.kiwixUrl && config.kiwixSource ? toggleKiwix() : openSettings())}
+                    title={
+                      !config.kiwixUrl || !config.kiwixSource
+                        ? "Set up Kiwix lookup in settings"
+                        : config.useKiwix
+                          ? `Kiwix lookup on (${config.kiwixSourceTitle || "library"}) — click to turn off`
+                          : "Let me look things up in your Kiwix library"
+                    }
+                    className={`p-1.5 rounded-full ${config.useKiwix ? `opacity-90 ${c.label}` : dashCtrlCls} ${(!config.kiwixUrl || !config.kiwixSource) ? "opacity-30" : ""}`}
+                  >
+                    <Library size={14} />
+                  </button>
                 </div>
               )}
               <button
                 onClick={() => setToolsOpen(o => !o)}
                 title={toolsOpen ? "Hide data tools" : "Data tools"}
-                className={`shrink-0 p-1.5 rounded-full transition-transform ${toolsOpen ? `rotate-45 ${dashCtrlCls}` : config.useDashboard ? `opacity-90 ${c.label}` : dashCtrlCls}`}
+                className={`shrink-0 p-1.5 rounded-full transition-transform ${toolsOpen ? `rotate-45 ${dashCtrlCls}` : (config.useDashboard || config.useKiwix) ? `opacity-90 ${c.label}` : dashCtrlCls}`}
               >
                 <Plus size={14} />
               </button>
