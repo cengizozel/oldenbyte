@@ -10,7 +10,7 @@ import Markdown from "./Markdown";
 type Role = "user" | "assistant";
 type MsgStats = { tps: number; tokens: number; total: number; ttft: number };
 type ChatMessage = { role: Role; content: string; stats?: MsgStats };
-type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number };
+type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number; renamed?: boolean };
 
 function newId() {
   return `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -193,6 +193,12 @@ export default function ChatWidget({
   const [showContext, setShowContext] = useState(false);
   // Dashboard tools (data toggle / view / refresh) tuck behind a "+" by the send button.
   const [toolsOpen, setToolsOpen] = useState(false);
+  // Inline rename of the active conversation's title in the header.
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  // Inline rename of a row in the Chats list.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
 
   // Inline editing of an assistant reply (the persisted conversation is fed back
   // as context, so edits let you curate it).
@@ -280,7 +286,7 @@ export default function ChatWidget({
       const merged = prev.map(cv => {
         if (cv.id !== active) return cv;
         found = true;
-        return { ...cv, messages: msgs, title: titleFrom(msgs), updatedAt: Date.now() };
+        return { ...cv, messages: msgs, title: cv.renamed ? cv.title : titleFrom(msgs), updatedAt: Date.now() };
       });
       if (!found) merged.push({ id: active || newId(), title: titleFrom(msgs), messages: msgs, updatedAt: Date.now() });
       storage.setItem(storageKey, JSON.stringify({ config: cfg, conversations: merged, activeId: active || merged[merged.length - 1].id }));
@@ -327,10 +333,11 @@ export default function ChatWidget({
       const res = await fetch(`/api/chat?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to list models");
-      setModels(data.models ?? []);
-      if ((data.models ?? []).length === 0) setModelsError("No models reported by this server.");
-      // Auto-select the first model if none chosen yet
-      if (!draft.model && data.models?.[0]) setDraft(d => ({ ...d, model: data.models[0] }));
+      const list: string[] = data.models ?? [];
+      setModels(list);
+      if (list.length === 0) setModelsError("No models reported by this server.");
+      // Keep the configured model if it's still offered; otherwise fall back to the first.
+      else setDraft(d => ({ ...d, model: list.includes(d.model) ? d.model : list[0] }));
     } catch (err) {
       setModels([]);
       setModelsError(String(err instanceof Error ? err.message : err));
@@ -344,6 +351,8 @@ export default function ChatWidget({
     setModels([]);
     setModelsError("");
     setSettingsOpen(true);
+    // Auto-load the model list so the dropdown is ready (keeps the chosen model).
+    if (config.baseUrl) fetchModels(config);
   }
 
   function saveSettings() {
@@ -397,8 +406,22 @@ export default function ChatWidget({
   // Snapshot the active conversation's current working messages back into the list.
   function syncActive(list: Conversation[]): Conversation[] {
     return list.map(cv =>
-      cv.id === activeIdRef.current ? { ...cv, messages, title: titleFrom(messages), updatedAt: Date.now() } : cv
+      cv.id === activeIdRef.current ? { ...cv, messages, title: cv.renamed ? cv.title : titleFrom(messages), updatedAt: Date.now() } : cv
     );
+  }
+
+  // Manually rename a conversation. An empty name reverts to auto-titling.
+  function renameChat(id: string, name: string) {
+    const t = name.trim();
+    setConversations(prev => {
+      const list = prev.map(cv => {
+        if (cv.id !== id) return cv;
+        const msgs = cv.id === activeIdRef.current ? messages : cv.messages;
+        return { ...cv, title: t || titleFrom(msgs), renamed: t.length > 0, updatedAt: Date.now() };
+      });
+      persistConversations(config, list, activeIdRef.current);
+      return list;
+    });
   }
 
   function switchTo(id: string, list: Conversation[]) {
@@ -582,6 +605,11 @@ export default function ChatWidget({
     abortRef.current?.abort();
   }
 
+  // Active conversation's display title — its manual name, or one auto-derived
+  // from the first message.
+  const activeConv = conversations.find(cv => cv.id === activeId);
+  const chatTitle = activeConv?.renamed ? activeConv.title : titleFrom(messages);
+
   // Hover-revealed header action icon (matches the other widgets).
   const actionCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`;
   // Dashboard controls stay visible (at a steady opacity) while the mode is on.
@@ -592,9 +620,33 @@ export default function ChatWidget({
 
       {/* Header — single row, no divider (a border here reads like a tab bar) */}
       <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2 shrink-0">
-        <span className={`flex items-center gap-1.5 text-xs font-medium opacity-60 min-w-0 ${c.label}`}>
-          <Bot size={14} className="shrink-0" />
-          <span className="truncate">{config.model || "Chat"}</span>
+        <span className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
+          <Bot size={14} className="shrink-0 opacity-60" />
+          <span className="flex flex-col min-w-0 leading-tight">
+            {editingTitle ? (
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={e => setTitleDraft(e.target.value)}
+                onBlur={() => { renameChat(activeId, titleDraft); setEditingTitle(false); }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") { renameChat(activeId, titleDraft); setEditingTitle(false); }
+                  if (e.key === "Escape") setEditingTitle(false);
+                }}
+                placeholder={titleFrom(messages)}
+                className="text-xs font-medium bg-transparent outline-none border-b border-current/30 min-w-0 w-32"
+              />
+            ) : (
+              <button
+                onClick={() => { setTitleDraft(activeConv?.renamed ? activeConv.title : ""); setEditingTitle(true); }}
+                title="Rename chat"
+                className="text-xs font-medium truncate text-left hover:opacity-80"
+              >
+                {chatTitle}
+              </button>
+            )}
+            {config.model && <span className="text-[10px] opacity-45 truncate">{config.model}</span>}
+          </span>
         </span>
         {!settingsOpen && (
           <div className="flex items-center gap-2.5 shrink-0">
@@ -645,22 +697,46 @@ export default function ChatWidget({
             {[...conversations].sort((a, b) => b.updatedAt - a.updatedAt).map(cv => {
               const isActive = cv.id === activeId;
               // The active chat's live title/time come from the working copy.
-              const title = isActive ? titleFrom(messages) : cv.title;
+              const title = isActive ? chatTitle : cv.title;
               const count = isActive ? messages.length : cv.messages.length;
+              const renaming = renamingId === cv.id;
               return (
                 <div
                   key={cv.id}
-                  onClick={() => selectChat(cv.id)}
+                  onClick={() => { if (!renaming) selectChat(cv.id); }}
                   className={`group/row flex items-start gap-2 px-3 py-2 rounded-xl cursor-pointer transition-colors ${
                     isActive ? `${c.bg} ring-1 ring-[var(--surface-border-focus)]` : "hover:bg-black/5 dark:hover:bg-white/5"
                   }`}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm truncate ${c.text} ${isActive ? "font-medium" : "opacity-80"}`}>{title}</p>
+                    {renaming ? (
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        onClick={e => e.stopPropagation()}
+                        onChange={e => setRenameDraft(e.target.value)}
+                        onBlur={() => { renameChat(cv.id, renameDraft); setRenamingId(null); }}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") { renameChat(cv.id, renameDraft); setRenamingId(null); }
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        placeholder={titleFrom(isActive ? messages : cv.messages)}
+                        className={`w-full text-sm bg-transparent outline-none border-b border-current/30 ${c.text}`}
+                      />
+                    ) : (
+                      <p className={`text-sm truncate ${c.text} ${isActive ? "font-medium" : "opacity-80"}`}>{title}</p>
+                    )}
                     <p className={`text-[10px] ${c.label} opacity-45`}>
                       {count} message{count === 1 ? "" : "s"}{cv.updatedAt ? ` · ${timeAgo(cv.updatedAt)}` : ""}
                     </p>
                   </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); setRenameDraft(cv.renamed ? cv.title : ""); setRenamingId(cv.id); }}
+                    title="Rename chat"
+                    className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-50 hover:!opacity-90 ${c.label}`}
+                  >
+                    <Pencil size={12} />
+                  </button>
                   <button
                     onClick={e => { e.stopPropagation(); deleteChat(cv.id); }}
                     title="Delete chat"
