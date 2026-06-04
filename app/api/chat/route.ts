@@ -187,6 +187,8 @@ export async function POST(request: NextRequest) {
           return n;
         };
         let finalAnswer = "";
+        let searched = false; // model has run at least one search_kiwix
+        let nudges = 0;       // times we've bounced a snippet-only answer
 
         try {
           for (let iter = 0; iter < MAX_ITERS; iter++) {
@@ -204,7 +206,8 @@ export async function POST(request: NextRequest) {
               break;
             }
 
-            // Parse this round's SSE: emit content/reasoning live, buffer tool calls.
+            // Parse this round's SSE: stream reasoning live, but BUFFER content so a
+            // snippet-only answer can be intercepted by the gate before the user sees it.
             const reader = upstream.body!.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
@@ -228,7 +231,7 @@ export async function POST(request: NextRequest) {
                 if (!delta) continue;
                 const reasoning = delta.reasoning ?? delta.reasoning_content;
                 if (reasoning) { openThink(); emit(reasoning); totalTokens++; }
-                if (delta.content) { closeThink(); emit(delta.content); assistantContent += delta.content; totalTokens++; }
+                if (delta.content) { assistantContent += delta.content; totalTokens++; }
                 if (delta.tool_calls) {
                   for (const tc of delta.tool_calls) {
                     const idx = tc.index ?? 0;
@@ -242,7 +245,28 @@ export async function POST(request: NextRequest) {
             }
 
             const made = calls.filter(Boolean).filter((c) => c.name);
-            if (!made.length) { finalAnswer = assistantContent; break; } // no tools → answer
+            if (!made.length) {
+              // GATE: if the model searched but never opened an article, it's about to
+              // answer from search snippets. Don't allow it — bounce it back to read the
+              // most relevant result first. (Direct answers with no search are fine.)
+              if (searched && opened.size === 0 && nudges < 2) {
+                nudges++;
+                if (assistantContent.trim()) { openThink(); emit(assistantContent.trim() + "\n"); }
+                convo.push({ role: "assistant", content: assistantContent });
+                convo.push({
+                  role: "user",
+                  content:
+                    "You searched but did not open any article, so you'd be answering from search " +
+                    "snippets — that is not allowed. Call get_article on the most relevant result, read " +
+                    "it, then answer from its text.",
+                });
+                continue;
+              }
+              closeThink();
+              emit(assistantContent);
+              finalAnswer = assistantContent;
+              break;
+            }
 
             // Record the assistant's tool-call turn, then run each tool.
             convo.push({
@@ -265,6 +289,7 @@ export async function POST(request: NextRequest) {
               // short progress note for the user.
               let toolText: string;
               if (out.kind === "search") {
+                searched = true;
                 emit(`\n🔎 searching Kiwix for “${String(args.query ?? "")}”\n`);
                 if (!out.results.length) {
                   toolText = "No results.";
