@@ -9,7 +9,8 @@ import Markdown from "./Markdown";
 
 type Role = "user" | "assistant";
 type MsgStats = { tps: number; tokens: number; total: number; ttft: number };
-type ChatMessage = { role: Role; content: string; stats?: MsgStats };
+type Source = { n: number; title: string; url: string; cited?: boolean };
+type ChatMessage = { role: Role; content: string; stats?: MsgStats; sources?: Source[] };
 type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number; renamed?: boolean };
 
 function newId() {
@@ -82,11 +83,40 @@ function ThinkBlock({ content, active, labelClass }: { content: string; active: 
   );
 }
 
-function renderAssistant(content: string, inProgress: boolean, labelClass: string) {
+function renderAssistant(content: string, inProgress: boolean, labelClass: string, sources?: Source[]) {
+  // Map [n] → article so the Markdown renderer makes citation chips clickable.
+  const cites = Object.fromEntries((sources ?? []).map(s => [s.n, { url: s.url, title: s.title }]));
   return splitThinking(content).map((seg, i) =>
     seg.type === "think"
       ? <ThinkBlock key={i} content={seg.content} active={!!seg.open && inProgress} labelClass={labelClass} />
-      : (seg.content.trim() ? <Markdown key={i} text={seg.content} /> : null)
+      : (seg.content.trim() ? <Markdown key={i} text={seg.content} cites={cites} /> : null)
+  );
+}
+
+// "Sources" disclosure under a reply — the articles the model actually cited.
+function SourcesList({ sources, labelClass, textClass }: { sources: Source[]; labelClass: string; textClass: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-1">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1 text-[11px] ${labelClass} opacity-60 hover:opacity-90`}
+      >
+        <ChevronRight size={11} className={`transition-transform ${open ? "rotate-90" : ""}`} />
+        {sources.length} source{sources.length === 1 ? "" : "s"}
+      </button>
+      {open && (
+        <ol className="mt-1 ml-1 pl-3 border-l-2 border-black/15 dark:border-white/20 flex flex-col gap-0.5">
+          {sources.map(s => (
+            <li key={s.n} className={`text-[11px] ${textClass} opacity-75`}>
+              <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:opacity-70">
+                <span className="opacity-50">[{s.n}]</span> <span className="underline underline-offset-2">{s.title}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 
@@ -548,10 +578,15 @@ export default function ChatWidget({
     if (config.useKiwix && config.kiwixUrl && config.kiwixSource) {
       parts.push(
         `You have access to the user's offline Kiwix reference library${config.kiwixSourceTitle ? ` (${config.kiwixSourceTitle})` : ""} through the search_kiwix and get_article tools. ` +
-        `When a question calls for factual, encyclopedic, or how-to knowledge — including when the user asks you to look something up or verify it — use the tools rather than guessing. ` +
-        `Kiwix is a KEYWORD index: search the entity or article name (e.g. "Lionel Messi"), not a full question or filler words like "born"/"when"/"birth date" — those worsen the results. ` +
-        `Then open the most relevant result with get_article, read it, answer from it, and cite the article title. If the first query misses, retry with a simpler/shorter keyword, not a longer one. ` +
-        `For casual conversation or things you already know well, just answer directly without searching.`
+        `For factual, encyclopedic, or how-to questions — or when asked to look something up or verify something — use the tools rather than guessing. For casual chat or things you know well, just answer directly.\n\n` +
+        `Work as a research loop, one step at a time, thinking between every step:\n` +
+        `1. PLAN: restate the goal and what facts you still need. Pick the single best next action. For a question with several parts, the best source is usually ONE overview/list/hub page that contains them all, not separate searches per item.\n` +
+        `2. SEARCH: search_kiwix is a library search box backed by article titles and text, NOT a question box. Type ONLY the proper name of the thing you want the page for — a person, place, work, team, or topic — and nothing else. No descriptors, no category words, no dates, no "birthdate/when/history", no year. Example: to find a person's page you type just their name, then read the date off their article — you do NOT type "<nationality> <occupation> <name> birthdate". Extra words almost always return NO results, because it matches them all. If a search misses, the fix is ALWAYS to remove words and try the barest name, never to add more.\n` +
+        `3. READ: search snippets are only a hint — actually open the most relevant result with get_article and read it. Its full text includes the page's data tables and lists, so the specifics you need are usually right there.\n` +
+        `4. ASSESS: after each result, check what you now have against the goal. If the goal is met, answer. If not, decide the next smart step (a different page, a more specific entry, a follow-up search) and loop again.\n` +
+        `5. STOP only when you have the complete answer, or when you've genuinely exhausted reasonable searches and reads — then say what you found and what you couldn't.\n\n` +
+        `Never defer the work back to the user (e.g. "tell me the names and I'll look them up") — find them yourself. Don't settle for a partial answer when more steps could complete it. When several pages combine into a fuller answer, read them all and synthesize.\n\n` +
+        `CITE YOUR SOURCES: every search result and article is labeled with a number like [1], [2]. In your final answer, put the matching bracketed number right after each claim drawn from that source, e.g. "Messi was born in 1987 [1]." Only cite sources you actually used; never invent a number you weren't shown.`
       );
     }
     return parts.join("\n\n");
@@ -640,7 +675,14 @@ export default function ChatWidget({
       const body = bodyOf(acc);
       const sep = acc.indexOf("\x1e");
       let tokens = 0;
-      if (sep !== -1) { try { tokens = JSON.parse(acc.slice(sep + 1)).tokens ?? 0; } catch {} }
+      let sources: Source[] | undefined;
+      if (sep !== -1) {
+        try {
+          const trailer = JSON.parse(acc.slice(sep + 1));
+          tokens = trailer.tokens ?? 0;
+          if (Array.isArray(trailer.sources) && trailer.sources.length) sources = trailer.sources;
+        } catch {}
+      }
       const end = performance.now();
       const { start, first } = timingRef.current;
       const ttft = first ? (first - start) / 1000 : 0;
@@ -649,7 +691,7 @@ export default function ChatWidget({
         ? { tokens, ttft, total: (end - start) / 1000, tps: genS > 0 ? tokens / genS : 0 }
         : undefined;
 
-      const finalMessages: ChatMessage[] = [...history, { role: "assistant", content: body, stats }];
+      const finalMessages: ChatMessage[] = [...history, { role: "assistant", content: body, stats, sources }];
       setMessages(finalMessages);
       persist(config, finalMessages);
     } catch (err) {
@@ -1092,10 +1134,13 @@ export default function ChatWidget({
                     >
                       {m.role === "assistant"
                         ? (m.content
-                            ? renderAssistant(m.content, inProgress, c.label)
+                            ? renderAssistant(m.content, inProgress, c.label, m.sources)
                             : (inProgress ? <span className="inline-block w-2 h-2 rounded-full bg-current opacity-50 animate-pulse" /> : null))
                         : m.content}
                     </div>
+                    {!inProgress && m.role === "assistant" && m.sources && m.sources.length > 0 && (
+                      <SourcesList sources={m.sources} labelClass={c.label} textClass={c.text} />
+                    )}
                     {inProgress && (
                       <span className={`px-1 text-[10px] ${c.text} opacity-45`}>
                         {m.content

@@ -92,52 +92,42 @@ function kiwixTools(sourceTitle?: string) {
   ];
 }
 
-// Kiwix is a keyword index, so a question-shaped query ("Lionel Messi birth
-// date") ranks worse than the bare entity ("Lionel Messi"). Models often add
-// filler anyway, so strip the obvious temporal/question words before searching —
-// like a human typing just the name. Conservative: leaves proper nouns and
-// disambiguators (incl. parentheticals) intact, and bails to the original if
-// nothing meaningful is left.
-const FILLER = new Set([
-  "when", "what", "who", "whom", "whose", "where", "why", "how", "was", "were",
-  "is", "are", "did", "does", "do", "of", "in", "on", "for", "to", "the", "a", "an",
-  "born", "birth", "birthday", "birthdate", "date", "dates", "dob",
-  "release", "released", "launch", "launched", "founded", "founding", "established",
-  "history", "biography", "bio", "info", "information", "about", "details", "detail",
-  "year", "day", "month", "age", "old",
-]);
-function simplifyQuery(raw: string): string {
-  const words = raw.replace(/[?.!,]/g, " ").split(/\s+/).filter(Boolean);
-  const kept = words.filter((w) => !FILLER.has(w.toLowerCase()));
-  const result = kept.join(" ").trim();
-  return result.length >= 2 ? result : raw.trim();
+// Derive a readable title from a content url, e.g. /A/Lionel_Messi → "Lionel Messi".
+function titleFromUrl(url: string): string {
+  try {
+    const seg = decodeURIComponent(url.split("/").filter(Boolean).pop() ?? "");
+    return seg.replace(/_/g, " ").trim() || url;
+  } catch { return url; }
 }
+
+type ToolResult =
+  | { kind: "search"; results: { title: string; url: string; snippet: string }[] }
+  | { kind: "article"; url: string; text: string }
+  | { kind: "message"; text: string };
 
 // Execute a tool call by calling the Kiwix lib directly (NOT via /api/kiwix —
 // that server-side fetch carries no session cookie and the auth middleware would
-// redirect it to the HTML login page). Returns text the model can read.
+// redirect it to the HTML login page). Returns structured data; the loop turns it
+// into numbered, citeable text for the model.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function runKiwixTool(name: string, args: any, kiwix: Kiwix, signal: AbortSignal): Promise<string> {
+async function runKiwixTool(name: string, args: any, kiwix: Kiwix, signal: AbortSignal): Promise<ToolResult> {
   try {
     if (name === "search_kiwix") {
-      const raw = String(args?.query ?? "").trim();
-      if (!raw) return "No query provided.";
-      const q = simplifyQuery(raw);
-      let results = await kiwixSearch(kiwix.baseUrl, kiwix.source, q, 6, signal);
-      // Fall back to the model's original wording only if the trimmed one whiffs.
-      if (!results.length && q !== raw) results = await kiwixSearch(kiwix.baseUrl, kiwix.source, raw, 6, signal);
-      if (!results.length) return `No results for "${q}".`;
-      return results.map((r, i) => `${i + 1}. ${r.title}\n   url: ${r.url}\n   ${r.snippet}`).join("\n");
+      const q = String(args?.query ?? "").trim();
+      if (!q) return { kind: "message", text: "No query provided." };
+      const results = await kiwixSearch(kiwix.baseUrl, kiwix.source, q, 6, signal);
+      return { kind: "search", results };
     }
     if (name === "get_article") {
       const url = String(args?.url ?? "");
-      if (!url) return "No url provided.";
-      return (await articleExtract(kiwix.baseUrl, url, signal)) || "No text found in that article.";
+      if (!url) return { kind: "message", text: "No url provided." };
+      const text = await articleExtract(kiwix.baseUrl, url, signal);
+      return { kind: "article", url, text: text || "No text found in that article." };
     }
   } catch (err) {
-    return `Tool error: ${String(err instanceof Error ? err.message : err)}`;
+    return { kind: "message", text: `Tool error: ${String(err instanceof Error ? err.message : err)}` };
   }
-  return `Unknown tool: ${name}`;
+  return { kind: "message", text: `Unknown tool: ${name}` };
 }
 
 export async function POST(request: NextRequest) {
@@ -170,7 +160,7 @@ export async function POST(request: NextRequest) {
   if (kiwix && kiwix.baseUrl && kiwix.source) {
     const tools = kiwixTools(kiwix.sourceTitle);
     const encoder = new TextEncoder();
-    const MAX_ITERS = 5;
+    const MAX_ITERS = 10;
 
     const readable = new ReadableStream({
       async start(controller) {
@@ -180,6 +170,23 @@ export async function POST(request: NextRequest) {
         const closeThink = () => { if (thinkOpen) { emit("</think>\n\n"); thinkOpen = false; } };
         let totalTokens = 0;
         const convo: ChatMessage[] = [...messages];
+
+        // Citation registry: every article the model retrieves gets a stable
+        // number. Attribution is data-first — the trace owns it, inline [n] is just
+        // decoration. `opened` tracks articles actually READ via get_article, so a
+        // correctly-read source still shows even if the model forgets to print [n].
+        const sources: { n: number; title: string; url: string }[] = [];
+        const byUrl = new Map<string, number>();
+        const opened = new Set<number>();
+        const cite = (title: string, url: string): number => {
+          const existing = byUrl.get(url);
+          if (existing) return existing;
+          const n = sources.length + 1;
+          sources.push({ n, title, url });
+          byUrl.set(url, n);
+          return n;
+        };
+        let finalAnswer = "";
 
         try {
           for (let iter = 0; iter < MAX_ITERS; iter++) {
@@ -235,7 +242,7 @@ export async function POST(request: NextRequest) {
             }
 
             const made = calls.filter(Boolean).filter((c) => c.name);
-            if (!made.length) break; // no tool calls → the streamed content is the answer
+            if (!made.length) { finalAnswer = assistantContent; break; } // no tools → answer
 
             // Record the assistant's tool-call turn, then run each tool.
             convo.push({
@@ -252,19 +259,90 @@ export async function POST(request: NextRequest) {
               let args: Record<string, unknown> = {};
               try { args = JSON.parse(c.arguments || "{}"); } catch {}
               openThink();
-              const label =
-                c.name === "search_kiwix" ? `searching Kiwix for “${simplifyQuery(String(args.query ?? ""))}”`
-                : c.name === "get_article" ? `reading article…`
-                : `calling ${c.name}`;
-              emit(`\n🔎 ${label}\n`);
-              const result = await runKiwixTool(c.name, args, kiwix, request.signal);
-              emit(result.length > 600 ? result.slice(0, 600) + "…\n" : result + "\n");
-              convo.push({ role: "tool", tool_call_id: c.id || `call_${iter}_${i}`, content: result });
+              const out = await runKiwixTool(c.name, args, kiwix, request.signal);
+
+              // Turn the result into numbered, citeable text for the model and a
+              // short progress note for the user.
+              let toolText: string;
+              if (out.kind === "search") {
+                emit(`\n🔎 searching Kiwix for “${String(args.query ?? "")}”\n`);
+                if (!out.results.length) {
+                  toolText = "No results.";
+                  emit("no results\n");
+                } else {
+                  toolText = out.results
+                    .map((r) => `[${cite(r.title, r.url)}] ${r.title}\n   url: ${r.url}\n   ${r.snippet}`)
+                    .join("\n");
+                  emit(out.results.map((r) => `[${byUrl.get(r.url)}] ${r.title}`).join("\n") + "\n");
+                }
+              } else if (out.kind === "article") {
+                const n = cite(titleFromUrl(out.url), out.url);
+                opened.add(n); // actually read → a real source regardless of inline [n]
+                emit(`\n📖 reading [${n}] ${titleFromUrl(out.url)}\n`);
+                toolText = `[${n}] ${titleFromUrl(out.url)}\n${out.text}`;
+              } else {
+                toolText = out.text;
+                emit(out.text + "\n");
+              }
+              convo.push({ role: "tool", tool_call_id: c.id || `call_${iter}_${i}`, content: toolText });
+            }
+          }
+
+          // The loop ended while the model was still calling tools (it hit the
+          // research-round cap without concluding). Force one final, tool-free
+          // turn so the user always gets an answer instead of a dangling trail.
+          if (!finalAnswer) {
+            convo.push({
+              role: "user",
+              content:
+                "Research budget reached — do not call any more tools. Using everything you gathered above, " +
+                "give your best final answer now. Cite sources with [n]. State what you found; for anything still " +
+                "missing, say so briefly rather than continuing to search.",
+            });
+            const upstream = await fetch(url, {
+              method: "POST",
+              headers: upstreamHeaders,
+              body: JSON.stringify({ model, messages: convo, stream: true, ...extra }),
+              signal: request.signal,
+            });
+            if (upstream.ok && upstream.body) {
+              const reader = upstream.body.getReader();
+              const decoder = new TextDecoder();
+              let buffer = "";
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() ?? "";
+                for (const line of lines) {
+                  const t = line.trim();
+                  if (!t.startsWith("data:")) continue;
+                  const payload = t.slice(5).trim();
+                  if (payload === "[DONE]") continue;
+                  let json;
+                  try { json = JSON.parse(payload); } catch { continue; }
+                  const delta = json.choices?.[0]?.delta;
+                  if (!delta) continue;
+                  const reasoning = delta.reasoning ?? delta.reasoning_content;
+                  if (reasoning) { openThink(); emit(reasoning); totalTokens++; }
+                  if (delta.content) { closeThink(); emit(delta.content); finalAnswer += delta.content; totalTokens++; }
+                }
+              }
             }
           }
 
           closeThink();
-          emit("\x1e" + JSON.stringify({ tokens: totalTokens }));
+          // Sources = articles actually read (opened via get_article) OR cited inline
+          // with [n] (covers answering straight from a search snippet). This is the
+          // durable floor: a source the model used still shows even when it forgot
+          // the bracket. `cited` marks which were referenced inline.
+          const usedNums = new Set<number>();
+          for (const m of finalAnswer.matchAll(/\[(\d+)\]/g)) usedNums.add(Number(m[1]));
+          const shownSources = sources
+            .filter((s) => opened.has(s.n) || usedNums.has(s.n))
+            .map((s) => ({ ...s, cited: usedNums.has(s.n) }));
+          emit("\x1e" + JSON.stringify({ tokens: totalTokens, sources: shownSources }));
         } catch (err) {
           if ((err as Error).name !== "AbortError") { closeThink(); emit(`\n[error] ${String(err)}`); }
         } finally {

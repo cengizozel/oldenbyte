@@ -103,7 +103,21 @@ export async function search(
   });
 }
 
-// Fetch an article and extract a readable plain-text lead (~1400 chars).
+// Strip tags (cells separated by spaces), decode, drop citation markers, tidy.
+function cleanBlock(s: string): string {
+  return decodeEntities(s.replace(/<[^>]+>/g, " "))
+    .replace(/\[(?:note\s*)?\d+\]/gi, "") // [1] / [note 1] citation markers
+    .replace(/\s*ⓘ\s*/g, " ") // audio-pronunciation glyph
+    .replace(/\s+([,.;:])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Fetch an article and extract readable plain text: the lead paragraphs PLUS
+// data-table rows. A lot of the factual specifics on a page (anything tabular —
+// lists, stats, entries with dates) live in wikitables, often well below the
+// intro, so paragraph-only extraction misses them. Capped so one article stays a
+// reasonable chunk of context.
 export async function articleExtract(
   baseUrl: string,
   articleUrl: string,
@@ -122,20 +136,32 @@ export async function articleExtract(
   // Narrow to the main wiki content when present, so we skip nav/sidebars.
   const main = html.match(/id="mw-content-text"[\s\S]*/);
   if (main) html = main[0];
-  const paras = (html.match(/<p[\s>][\s\S]*?<\/p>/g) ?? [])
-    .map((para) =>
-      decodeEntities(para.replace(/<[^>]+>/g, ""))
-        .replace(/\[(?:note\s*)?\d+\]/gi, "") // drop [1] / [note 1] citation markers
-        .replace(/\s*ⓘ\s*/g, " ") // audio-pronunciation glyph
-        .replace(/\s+([,.;:])/g, "$1") // tidy spacing left by removals
-        .replace(/\s+/g, " ")
-        .trim()
-    )
-    .filter((t) => t.length > 40);
-  let extract = "";
-  for (const para of paras) {
-    extract += para + "\n\n";
-    if (extract.length > 1400) break;
+
+  const LEAD_CAP = 1500;
+  const TOTAL_CAP = 6000;
+
+  // Lead paragraphs.
+  let lead = "";
+  for (const p of html.match(/<p[\s>][\s\S]*?<\/p>/g) ?? []) {
+    const t = cleanBlock(p);
+    if (t.length <= 40) continue;
+    lead += t + "\n\n";
+    if (lead.length > LEAD_CAP) break;
   }
-  return extract.trim();
+
+  // Data-table rows (wikitables: squads, rosters, lists, stats).
+  let tables = "";
+  const seen = new Set<string>();
+  for (const tbl of html.match(/<table[^>]*class="[^"]*wikitable[^"]*"[\s\S]*?<\/table>/gi) ?? []) {
+    for (const row of tbl.match(/<tr[\s>][\s\S]*?<\/tr>/gi) ?? []) {
+      const t = cleanBlock(row);
+      if (t.length < 8 || seen.has(t)) continue;
+      seen.add(t);
+      tables += t + "\n";
+      if (lead.length + tables.length > TOTAL_CAP) break;
+    }
+    if (lead.length + tables.length > TOTAL_CAP) break;
+  }
+
+  return [lead.trim(), tables.trim()].filter(Boolean).join("\n\n");
 }

@@ -103,11 +103,25 @@ model search the offline Kiwix library mid-conversation:
 ```
 
 When present, the model is given `search_kiwix(query)` and `get_article(url)`
-tools. The route runs an agentic loop (up to 5 rounds): it streams the model's
-turn, and whenever the model calls a tool, executes it against `/api/kiwix`,
-feeds the result back, and continues until the model answers. Tool progress is
-streamed inside `<think>…</think>` so the client renders it as a collapsible
+tools. The route runs an agentic loop (up to 8 rounds) by calling `lib/kiwix.ts`
+directly (not over HTTP — a server-side fetch to `/api/kiwix` would be redirected
+to the login page by the auth middleware): it streams the model's turn, and
+whenever the model calls a tool, executes it, feeds the result back, and
+continues until the model answers. Query terms are simplified (filler/question
+words stripped) before searching, since Kiwix is a keyword index. Tool progress
+is streamed inside `<think>…</think>` so the client renders it as a collapsible
 trail. Requires a tool-calling-capable model (e.g. qwen, llama3.1+).
+
+**Citations.** Each retrieved article is numbered, and the model is told to cite
+claims inline with `[n]`. The stream's final trailer carries the sources the
+model actually cited:
+
+```
+…answer text…\x1e{"tokens": 412, "sources": [{"n": 1, "title": "Lionel Messi", "url": "http://host:3702/content/…/A/Lionel_Messi"}]}
+```
+
+The client turns each inline `[n]` into a clickable chip and renders a collapsible
+"Sources" list under the reply.
 
 ---
 
