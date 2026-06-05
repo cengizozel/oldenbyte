@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library, Power, Layers } from "lucide-react";
+import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library, Power, Layers, Users, Trash2 } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherDashboardContext } from "@/lib/dashboardContext";
@@ -11,7 +11,14 @@ type Role = "user" | "assistant";
 type MsgStats = { tps: number; tokens: number; total: number; ttft: number };
 type Source = { n: number; title: string; url: string; cited?: boolean };
 type ChatMessage = { role: Role; content: string; stats?: MsgStats; sources?: Source[] };
-type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number; renamed?: boolean };
+type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number; renamed?: boolean; characterId?: string };
+
+// A persona with its own system prompt and a private, scoped memory about the
+// user. `focus` both shapes the memory and gates auto-capture: a character only
+// auto-remembers when it has a focus (so the plain Assistant stays memory-less).
+type Character = { id: string; name: string; emoji: string; persona: string; focus: string; memories: string[] };
+
+const DEFAULT_CHARACTER_ID = "default";
 
 function newId() {
   return `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -188,8 +195,16 @@ type ChatState = {
   config: ChatConfig;
   conversations?: Conversation[];
   activeId?: string;
+  characters?: Character[];
+  activeCharacterId?: string;
   messages?: ChatMessage[]; // legacy single-conversation format
 };
+
+// Seed the built-in Assistant (no focus → no auto-memory; its persona is the
+// config's system prompt, preserving existing behavior).
+function defaultCharacter(persona: string): Character {
+  return { id: DEFAULT_CHARACTER_ID, name: "Assistant", emoji: "🤖", persona, focus: "", memories: [] };
+}
 
 const DEFAULT_CONFIG: ChatConfig = {
   baseUrl: "",
@@ -236,6 +251,27 @@ export default function ChatWidget({
   const [activeId, setActiveId] = useState("");
   const activeIdRef = useRef("");
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+
+  // Characters (personas + scoped memory). The active one drives the system
+  // prompt for new chats; each conversation remembers which character it used.
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [activeCharacterId, setActiveCharacterId] = useState(DEFAULT_CHARACTER_ID);
+  const charactersRef = useRef<Character[]>([]);
+  const activeCharacterIdRef = useRef(DEFAULT_CHARACTER_ID);
+  // Refs so character-only saves can read the latest config/conversations.
+  const configRef = useRef<ChatConfig>(DEFAULT_CONFIG);
+  const conversationsRef = useRef<Conversation[]>([]);
+  useEffect(() => { charactersRef.current = characters; }, [characters]);
+  useEffect(() => { activeCharacterIdRef.current = activeCharacterId; }, [activeCharacterId]);
+  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
+  useEffect(() => { configRef.current = config; }, [config]);
+  // The character driving the current chat (its conversation's, falling back to active).
+  const activeConvCharId = conversations.find(cv => cv.id === activeId)?.characterId ?? activeCharacterId;
+  const activeCharacter = characters.find(ch => ch.id === activeConvCharId) ?? characters.find(ch => ch.id === DEFAULT_CHARACTER_ID);
+  const [charactersOpen, setCharactersOpen] = useState(false);   // characters list overlay
+  const [editingCharId, setEditingCharId] = useState<string | null>(null); // editor overlay (null = closed)
+  const [charDraft, setCharDraft] = useState<Character | null>(null);
+
   const [historyOpen, setHistoryOpen] = useState(false);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -332,10 +368,14 @@ export default function ChatWidget({
     storage.getItem(storageKey).then(saved => {
       let convs: Conversation[] = [];
       let active = "";
+      let chars: Character[] = [];
+      let activeChar = DEFAULT_CHARACTER_ID;
+      let cfg: ChatConfig = DEFAULT_CONFIG;
       if (saved) {
         try {
           const parsed: ChatState = JSON.parse(saved);
-          setConfig({ ...DEFAULT_CONFIG, ...parsed.config });
+          cfg = { ...DEFAULT_CONFIG, ...parsed.config };
+          setConfig(cfg);
           if (parsed.conversations?.length) {
             convs = parsed.conversations;
             active = parsed.activeId && convs.some(c => c.id === parsed.activeId) ? parsed.activeId : convs[0].id;
@@ -346,6 +386,8 @@ export default function ChatWidget({
             convs = [{ id, title: titleFrom(legacy), messages: legacy, updatedAt: Date.now() }];
             active = id;
           }
+          chars = parsed.characters ?? [];
+          activeChar = parsed.activeCharacterId ?? DEFAULT_CHARACTER_ID;
           if (parsed.config?.useDashboard) refreshContext();
         } catch {}
       }
@@ -354,9 +396,18 @@ export default function ChatWidget({
         convs = [{ id, title: "New chat", messages: [], updatedAt: Date.now() }];
         active = id;
       }
+      // Ensure a default character exists (its persona = the config system prompt).
+      if (!chars.some(ch => ch.id === DEFAULT_CHARACTER_ID)) chars = [defaultCharacter(cfg.system), ...chars];
+      if (!chars.some(ch => ch.id === activeChar)) activeChar = DEFAULT_CHARACTER_ID;
+      setCharacters(chars);
+      charactersRef.current = chars;
+      setActiveCharacterId(activeChar);
+      activeCharacterIdRef.current = activeChar;
       setConversations(convs);
+      conversationsRef.current = convs;
       setActiveId(active);
       activeIdRef.current = active;
+      configRef.current = cfg;
       setMessages(convs.find(c => c.id === active)?.messages ?? []);
       setLoaded(true);
     });
@@ -374,15 +425,25 @@ export default function ChatWidget({
         found = true;
         return { ...cv, messages: msgs, title: cv.renamed ? cv.title : titleFrom(msgs), updatedAt: Date.now() };
       });
-      if (!found) merged.push({ id: active || newId(), title: titleFrom(msgs), messages: msgs, updatedAt: Date.now() });
-      storage.setItem(storageKey, JSON.stringify({ config: cfg, conversations: merged, activeId: active || merged[merged.length - 1].id }));
+      if (!found) merged.push({ id: active || newId(), title: titleFrom(msgs), messages: msgs, updatedAt: Date.now(), characterId: activeCharacterIdRef.current });
+      conversationsRef.current = merged;
+      storage.setItem(storageKey, JSON.stringify({ config: cfg, conversations: merged, activeId: active || merged[merged.length - 1].id, characters: charactersRef.current, activeCharacterId: activeCharacterIdRef.current }));
       return merged;
     });
   }, [storageKey]);
 
   // Write the current conversation list to storage as-is.
   const persistConversations = useCallback((cfg: ChatConfig, convs: Conversation[], active: string) => {
-    storage.setItem(storageKey, JSON.stringify({ config: cfg, conversations: convs, activeId: active }));
+    conversationsRef.current = convs;
+    storage.setItem(storageKey, JSON.stringify({ config: cfg, conversations: convs, activeId: active, characters: charactersRef.current, activeCharacterId: activeCharacterIdRef.current }));
+  }, [storageKey]);
+
+  // Save when only the characters / active character changed (uses latest refs
+  // for everything else so it never clobbers in-flight conversation state).
+  const persistCharacters = useCallback((chars: Character[], activeChar: string) => {
+    charactersRef.current = chars;
+    activeCharacterIdRef.current = activeChar;
+    storage.setItem(storageKey, JSON.stringify({ config: configRef.current, conversations: conversationsRef.current, activeId: activeIdRef.current, characters: chars, activeCharacterId: activeChar }));
   }, [storageKey]);
 
   // Keep the view pinned to the latest message — but only if the user hasn't
@@ -747,9 +808,74 @@ export default function ChatWidget({
   }
 
   function newChat() {
+    newChatWith(activeCharacterIdRef.current);
+  }
+
+  // ── Characters ─────────────────────────────────────────────────────────────
+  function newChatWith(characterId: string) {
     const id = newId();
-    const conv: Conversation = { id, title: "New chat", messages: [], updatedAt: Date.now() };
+    const conv: Conversation = { id, title: "New chat", messages: [], updatedAt: Date.now(), characterId };
     switchTo(id, [conv, ...syncActive(conversations)]);
+  }
+
+  // Pick a character to talk to: retag the current chat if it's empty, else start
+  // a fresh one with this character.
+  function activateCharacter(id: string) {
+    setActiveCharacterId(id);
+    activeCharacterIdRef.current = id;
+    setCharactersOpen(false);
+    if (messages.length === 0) {
+      setConversations(prev => {
+        const next = prev.map(cv => cv.id === activeIdRef.current ? { ...cv, characterId: id } : cv);
+        persistConversations(config, next, activeIdRef.current);
+        return next;
+      });
+    } else {
+      newChatWith(id);
+    }
+  }
+
+  function createCharacter() {
+    const ch: Character = { id: newId(), name: "New character", emoji: "🦊", persona: "", focus: "", memories: [] };
+    const next = [...charactersRef.current, ch];
+    setCharacters(next);
+    persistCharacters(next, activeCharacterIdRef.current);
+    setEditingCharId(ch.id);
+    setCharDraft({ ...ch });
+  }
+
+  function saveCharacter() {
+    if (!charDraft) return;
+    const draft: Character = {
+      ...charDraft,
+      name: charDraft.name.trim() || "Character",
+      emoji: charDraft.emoji.trim() || "💬",
+      memories: charDraft.memories.map(m => m.trim()).filter(Boolean),
+    };
+    const next = charactersRef.current.map(ch => ch.id === draft.id ? draft : ch);
+    setCharacters(next);
+    persistCharacters(next, activeCharacterIdRef.current);
+    setEditingCharId(null);
+    setCharDraft(null);
+  }
+
+  function deleteCharacter(id: string) {
+    if (id === DEFAULT_CHARACTER_ID) return; // the Assistant is permanent
+    const nextChars = charactersRef.current.filter(ch => ch.id !== id);
+    const nextActive = activeCharacterIdRef.current === id ? DEFAULT_CHARACTER_ID : activeCharacterIdRef.current;
+    setCharacters(nextChars);
+    setActiveCharacterId(nextActive);
+    activeCharacterIdRef.current = nextActive;
+    charactersRef.current = nextChars;
+    // Reassign any chats that used it back to the default Assistant.
+    setConversations(prev => {
+      const conv = prev.map(cv => cv.characterId === id ? { ...cv, characterId: DEFAULT_CHARACTER_ID } : cv);
+      conversationsRef.current = conv;
+      storage.setItem(storageKey, JSON.stringify({ config: configRef.current, conversations: conv, activeId: activeIdRef.current, characters: nextChars, activeCharacterId: nextActive }));
+      return conv;
+    });
+    setEditingCharId(null);
+    setCharDraft(null);
   }
 
   function selectChat(id: string) {
@@ -780,7 +906,18 @@ export default function ChatWidget({
   // and feeds.
   function buildSystemContent(dash: typeof ctx): string {
     const parts: string[] = [BASE_IDENTITY];
-    if (config.system.trim()) parts.push(config.system.trim());
+    // The active character's persona (the default Assistant's persona is the
+    // config system prompt, so editing it in settings still works) + its memory.
+    const ch = activeCharacter;
+    const persona = ch && ch.id !== DEFAULT_CHARACTER_ID ? ch.persona : config.system;
+    if (persona.trim()) parts.push(persona.trim());
+    if (ch && ch.memories.length) {
+      parts.push(
+        `What you (as ${ch.name}) remember about the user from past chats:\n` +
+        ch.memories.map(m => `- ${m}`).join("\n") +
+        `\nDraw on these naturally when relevant; don't list them back unprompted.`
+      );
+    }
     const styleHint = LENGTH_PRESETS[config.length].instruction;
     if (styleHint) parts.push(styleHint);
     if (config.useDashboard && dash?.text) {
@@ -819,7 +956,8 @@ export default function ChatWidget({
         `When the user asks about their own notes, what they recorded, or anything personal that would live in their notes, use the tools instead of guessing. For general knowledge, answer directly (or use Kiwix if available).\n\n` +
         `Work as a research loop, one step at a time:\n` +
         `1. SEARCH: call search_anytype with concise keywords — the note's name or topic (e.g. "Istanbul", "reading list"), not a full sentence. It returns numbered objects with ids and snippets.\n` +
-        `2. READ: a snippet is only a hint. Open the most relevant object with read_anytype_object (using its id) and read its full markdown body before answering.\n` +
+        `2. READ: a snippet is only a hint. Open the most relevant object with read_anytype_object (using its id) before answering. Long notes come back in parts (the result says how many) — for a specific fact in a long note, pass find="keywords" to jump straight to the relevant sections (e.g. find="Istanbul" in a journal). Don't try to read a huge note all at once.\n` +
+        `For an open-ended question about a WHOLE long note — "summarize my journal", "what does my 2026 journal say about me" — call summarize_anytype_object(id) instead: it digests the entire note part by part and returns per-part summaries for you to synthesize. (It takes a while on a big note; that's expected.)\n` +
         `Each result and object also carries metadata — its Created and Last modified dates (when the note was written/edited) and any custom properties (dates, amounts, tags, links). Use these directly for "when did I write this", "what did I note on…", or questions about those fields.\n` +
         `3. ASSESS: if the answer is complete, give it; otherwise search or read again. When several notes combine into the answer, read them all and synthesize.\n` +
         `4. Don't defer back to the user — find it yourself. If nothing relevant exists in their Anytype, say so plainly rather than inventing it.\n\n` +
@@ -827,6 +965,50 @@ export default function ChatWidget({
       );
     }
     return parts.join("\n\n");
+  }
+
+  // After a reply, quietly review the exchange and save NEW durable facts about
+  // the user that are relevant to this character's focus (ignoring off-topic
+  // stuff). Runs only for characters that have a focus. Fire-and-forget; a second,
+  // non-streaming model call that never blocks the reply.
+  async function extractMemories(character: Character, userMsg: string, reply: string) {
+    if (!character.focus.trim() || !configured || !userMsg.trim() || !reply.trim()) return;
+    try {
+      const sys =
+        `You maintain the long-term memory of "${character.name}", an assistant focused on: ${character.focus.trim()}. ` +
+        `From the exchange below, extract NEW, durable facts ABOUT THE USER that are relevant to that focus. ` +
+        `Ignore anything off-topic or outside the focus, transient/one-off details, the assistant's own statements, and anything already known. ` +
+        `Output ONLY a JSON array of short factual strings (e.g. ["Has a CS degree"]); output [] if nothing qualifies.` +
+        (character.memories.length ? ` Already known: ${JSON.stringify(character.memories)}.` : "");
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.model, stream: false, maxTokens: 220,
+          messages: [{ role: "system", content: sys }, { role: "user", content: `User: ${userMsg}\nAssistant: ${reply}` }],
+        }),
+      });
+      if (!res.ok) return;
+      const raw = String((await res.json()).content ?? "").replace(/<think>[\s\S]*?<\/think>/gi, "");
+      const a = raw.indexOf("["), b = raw.lastIndexOf("]");
+      if (a === -1 || b <= a) return;
+      let facts: unknown;
+      try { facts = JSON.parse(raw.slice(a, b + 1)); } catch { return; }
+      if (!Array.isArray(facts)) return;
+      const clean = facts.map(f => String(f).trim()).filter(f => f.length > 1 && f.length < 200);
+      if (!clean.length) return;
+      setCharacters(prev => {
+        const next = prev.map(ch => {
+          if (ch.id !== character.id) return ch;
+          const have = new Set(ch.memories.map(m => m.toLowerCase()));
+          const added = clean.filter(f => !have.has(f.toLowerCase()));
+          if (!added.length) return ch;
+          return { ...ch, memories: [...ch.memories, ...added].slice(-40) }; // cap memory size
+        });
+        persistCharacters(next, activeCharacterIdRef.current);
+        return next;
+      });
+    } catch { /* memory is best-effort */ }
   }
 
   async function send() {
@@ -940,6 +1122,12 @@ export default function ChatWidget({
       // Ollama resets to its default keep_alive after a reply — restore the chosen
       // linger so it sticks. (LM Studio's ttl already rode the request above.)
       if (config.keepAlive && backend === "ollama") { postPower({ keepAlive: config.keepAlive }); pollPower(); }
+      // Let the active character quietly remember anything relevant (uses refs so
+      // it tracks the conversation's character even if state shifted mid-stream).
+      const convChar = conversationsRef.current.find(cv => cv.id === activeIdRef.current)?.characterId ?? activeCharacterIdRef.current;
+      const memCh = charactersRef.current.find(ch => ch.id === convChar);
+      const lastUser = [...history].reverse().find(m => m.role === "user")?.content ?? "";
+      if (memCh) extractMemories(memCh, lastUser, body.replace(/<think>[\s\S]*?<\/think>/gi, "").trim());
     } catch (err) {
       if ((err as Error).name === "AbortError") {
         // Keep whatever streamed so far; drop a trailing empty assistant turn.
@@ -971,6 +1159,8 @@ export default function ChatWidget({
   const actionCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`;
   // Dashboard controls stay visible (at a steady opacity) while the mode is on.
   const dashCtrlCls = `${c.icon} opacity-55 hover:opacity-100 transition-opacity`;
+  // Filled pill for an active (on) data toggle, so it's clearly distinct from off.
+  const toolOnCls = `${c.label} bg-black/10 dark:bg-white/15 opacity-100 transition-colors`;
 
   return (
     <div className={`rounded-2xl border flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
@@ -978,7 +1168,14 @@ export default function ChatWidget({
       {/* Header — single row, no divider (a border here reads like a tab bar) */}
       <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2 shrink-0">
         <span className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-          <Bot size={14} className="shrink-0 opacity-60" />
+          {/* Active character — click to switch/manage personas */}
+          <button
+            onClick={() => setCharactersOpen(true)}
+            title={activeCharacter ? `Talking to ${activeCharacter.name} — click to switch character` : "Characters"}
+            className="shrink-0 text-sm leading-none hover:opacity-70 transition-opacity"
+          >
+            {activeCharacter && activeCharacter.id !== DEFAULT_CHARACTER_ID ? activeCharacter.emoji : <Bot size={14} className="opacity-60" />}
+          </button>
           <span className="flex flex-col min-w-0 leading-tight">
             {editingTitle ? (
               <input
@@ -1002,7 +1199,9 @@ export default function ChatWidget({
                 {chatTitle}
               </button>
             )}
-            {config.model && <span className="text-[10px] opacity-45 truncate">{config.model}</span>}
+            <span className="text-[10px] opacity-45 truncate">
+              {activeCharacter && activeCharacter.id !== DEFAULT_CHARACTER_ID ? `${activeCharacter.name}${config.model ? " · " : ""}` : ""}{config.model}
+            </span>
           </span>
         </span>
         {!settingsOpen && (
@@ -1079,6 +1278,9 @@ export default function ChatWidget({
                 <RotateCcw size={14} />
               </button>
             )}
+            <button onClick={() => setCharactersOpen(true)} title="Characters" className={actionCls}>
+              <Users size={14} />
+            </button>
             <button onClick={() => setHistoryOpen(true)} title="Chats" className={actionCls}>
               <MessageSquare size={14} />
             </button>
@@ -1171,6 +1373,94 @@ export default function ChatWidget({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Characters list — pick/manage personas */}
+      {charactersOpen && (
+        <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
+          <div className={`flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b ${c.border}`}>
+            <span className={`flex items-center gap-1.5 text-xs font-medium opacity-70 ${c.label}`}>
+              <Users size={13} /> Characters
+            </span>
+            <div className="flex items-center gap-3">
+              <button onClick={createCharacter} title="New character" className={`opacity-60 hover:opacity-100 ${c.label}`}><Plus size={15} /></button>
+              <button onClick={() => setCharactersOpen(false)} title="Close" className={`opacity-50 hover:opacity-90 ${c.label}`}><X size={14} /></button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto p-2 flex flex-col gap-1">
+            {characters.map(ch => {
+              const isActive = ch.id === activeConvCharId;
+              return (
+                <div
+                  key={ch.id}
+                  onClick={() => activateCharacter(ch.id)}
+                  className={`group/row flex items-start gap-2 px-3 py-2 rounded-xl cursor-pointer transition-colors ${isActive ? `${c.bg} ring-1 ring-[var(--surface-border-focus)]` : "hover:bg-black/5 dark:hover:bg-white/5"}`}
+                >
+                  <span className="text-base leading-none mt-0.5 shrink-0">{ch.id === DEFAULT_CHARACTER_ID ? "🤖" : ch.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm truncate ${c.text} ${isActive ? "font-medium" : "opacity-80"}`}>{ch.name}</p>
+                    <p className={`text-[10px] ${c.label} opacity-45 truncate`}>
+                      {ch.id === DEFAULT_CHARACTER_ID ? "default · no memory" : (ch.focus ? `remembers: ${ch.focus}` : "no focus — won't auto-remember")}
+                      {ch.memories.length ? ` · ${ch.memories.length} ${ch.memories.length === 1 ? "memory" : "memories"}` : ""}
+                    </p>
+                  </div>
+                  <button onClick={e => { e.stopPropagation(); setEditingCharId(ch.id); setCharDraft({ ...ch }); }} title="Edit" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-50 hover:!opacity-90 ${c.label}`}><Pencil size={12} /></button>
+                  {ch.id !== DEFAULT_CHARACTER_ID && (
+                    <button onClick={e => { e.stopPropagation(); deleteCharacter(ch.id); }} title="Delete character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-50 hover:!opacity-90 ${c.label}`}><X size={13} /></button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Character editor */}
+      {editingCharId && charDraft && (
+        <div className={`absolute inset-0 z-50 rounded-2xl flex flex-col ${c.bg}`}>
+          <div className={`flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b ${c.border}`}>
+            <span className={`flex items-center gap-1.5 text-xs font-medium opacity-70 ${c.label}`}>
+              <Users size={13} /> Edit character
+            </span>
+            <div className="flex items-center gap-3">
+              <button onClick={() => { setEditingCharId(null); setCharDraft(null); }} title="Cancel" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={14} /></button>
+              <button onClick={saveCharacter} title="Save" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Check size={14} /></button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto p-4 flex flex-col gap-3">
+            <div className="flex gap-2">
+              <input value={charDraft.emoji} onChange={e => setCharDraft(d => (d ? { ...d, emoji: e.target.value } : d))} placeholder="🎓" maxLength={8} className="w-14 text-center text-lg border border-neutral-200 rounded-xl px-2 py-2 outline-none bg-white" />
+              <input value={charDraft.name} onChange={e => setCharDraft(d => (d ? { ...d, name: e.target.value } : d))} placeholder="Education Coach" className="flex-1 text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white" />
+            </div>
+            {charDraft.id === DEFAULT_CHARACTER_ID ? (
+              <p className="text-[11px] text-neutral-400 leading-relaxed">This is the default Assistant. Edit its system prompt in Settings; it doesn&apos;t keep memory. Create a new character for a persona with its own scoped memory.</p>
+            ) : (
+              <>
+                <div>
+                  <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Persona <span className="opacity-60">(its system prompt)</span></p>
+                  <textarea value={charDraft.persona} onChange={e => setCharDraft(d => (d ? { ...d, persona: e.target.value } : d))} rows={4} placeholder="You are my education coach. Help me plan, stay accountable, and learn effectively." className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white resize-none" />
+                </div>
+                <div>
+                  <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Remembers <span className="opacity-60">(what it cares about — empty = no memory)</span></p>
+                  <input value={charDraft.focus} onChange={e => setCharDraft(d => (d ? { ...d, focus: e.target.value } : d))} placeholder="my education, goals, academic background" className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white" />
+                </div>
+                <div>
+                  <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Memories <span className="opacity-60">({charDraft.memories.length})</span></p>
+                  <div className="flex flex-col gap-1">
+                    {charDraft.memories.map((m, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input value={m} onChange={e => setCharDraft(d => { if (!d) return d; const mem = [...d.memories]; mem[i] = e.target.value; return { ...d, memories: mem }; })} className="flex-1 text-xs border border-neutral-200 rounded-lg px-2 py-1.5 outline-none focus:border-neutral-300 text-neutral-700 bg-white" />
+                        <button onClick={() => setCharDraft(d => (d ? { ...d, memories: d.memories.filter((_, j) => j !== i) } : d))} className="shrink-0 text-neutral-400 hover:text-red-400"><Trash2 size={13} /></button>
+                      </div>
+                    ))}
+                    <button onClick={() => setCharDraft(d => (d ? { ...d, memories: [...d.memories, ""] } : d))} className="self-start text-[11px] text-neutral-400 hover:text-neutral-600 flex items-center gap-1 mt-0.5"><Plus size={11} /> add memory</button>
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-1">It also adds to these automatically after chats, based on what you share that fits its focus.</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1575,7 +1865,7 @@ export default function ChatWidget({
                   <button
                     onClick={toggleDashboard}
                     title={config.useDashboard ? "Using dashboard data — click to turn off" : "Answer using my dashboard data"}
-                    className={`p-1.5 rounded-full ${config.useDashboard ? `opacity-90 ${c.label}` : dashCtrlCls}`}
+                    className={`p-1.5 rounded-full ${config.useDashboard ? toolOnCls : dashCtrlCls}`}
                   >
                     <Database size={14} />
                   </button>
@@ -1608,7 +1898,7 @@ export default function ChatWidget({
                           ? `Kiwix lookup on (${config.kiwixSourceTitle || "library"}) — click to turn off`
                           : "Let me look things up in your Kiwix library"
                     }
-                    className={`p-1.5 rounded-full ${config.useKiwix ? `opacity-90 ${c.label}` : dashCtrlCls} ${(!config.kiwixUrl || !config.kiwixSource) ? "opacity-30" : ""}`}
+                    className={`p-1.5 rounded-full ${config.useKiwix ? toolOnCls : dashCtrlCls} ${(!config.kiwixUrl || !config.kiwixSource) ? "opacity-30" : ""}`}
                   >
                     <Library size={14} />
                   </button>
@@ -1621,7 +1911,7 @@ export default function ChatWidget({
                           ? `Anytype lookup on (${config.anytypeSpaceName || "space"}) — click to turn off`
                           : "Let me look things up in your Anytype"
                     }
-                    className={`p-1.5 rounded-full ${config.useAnytype ? `opacity-90 ${c.label}` : dashCtrlCls} ${(!config.anytypeApiKey || !config.anytypeSpaceId) ? "opacity-30" : ""}`}
+                    className={`p-1.5 rounded-full ${config.useAnytype ? toolOnCls : dashCtrlCls} ${(!config.anytypeApiKey || !config.anytypeSpaceId) ? "opacity-30" : ""}`}
                   >
                     <Layers size={14} />
                   </button>
