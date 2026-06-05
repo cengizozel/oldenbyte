@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library, Power } from "lucide-react";
+import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library, Power, Layers } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherDashboardContext } from "@/lib/dashboardContext";
@@ -156,6 +156,11 @@ type ChatConfig = {
   kiwixUrl: string;        // kiwix-serve base URL
   kiwixSource: string;     // selected ZIM content-route id
   kiwixSourceTitle: string;
+  useAnytype: boolean;     // let the model search the user's Anytype via tools
+  anytypeUrl: string;      // Anytype local API base (default 127.0.0.1:31009)
+  anytypeApiKey: string;   // paired Bearer token
+  anytypeSpaceId: string;  // selected space
+  anytypeSpaceName: string;
   // Ollama only: how long the model lingers in VRAM after a reply. "" = leave
   // it to Ollama's default; "5m"/"30m"/"1h" = that duration; "-1" = stay loaded.
   keepAlive: string;
@@ -199,6 +204,11 @@ const DEFAULT_CONFIG: ChatConfig = {
   kiwixUrl: "",
   kiwixSource: "",
   kiwixSourceTitle: "",
+  useAnytype: false,
+  anytypeUrl: "http://127.0.0.1:31009",
+  anytypeApiKey: "",
+  anytypeSpaceId: "",
+  anytypeSpaceName: "",
   keepAlive: "",
 };
 
@@ -242,6 +252,14 @@ export default function ChatWidget({
   const [loadingKiwix, setLoadingKiwix] = useState(false);
   const [kiwixError, setKiwixError] = useState("");
 
+  // Anytype pairing (in chat settings) — its own connection, like the Kiwix one.
+  const [anytypeSpaces, setAnytypeSpaces] = useState<{ id: string; name: string }[]>([]);
+  const [anytypePairing, setAnytypePairing] = useState<"idle" | "awaiting-code">("idle");
+  const [anytypeChallengeId, setAnytypeChallengeId] = useState("");
+  const [anytypeCode, setAnytypeCode] = useState("");
+  const [anytypeBusy, setAnytypeBusy] = useState(false);
+  const [anytypeError, setAnytypeError] = useState("");
+
   // Dashboard context — gathered snapshot of the user's notes/feeds, injected
   // when `config.useDashboard` is on. Cached so we don't re-fetch every message.
   const [ctx, setCtx] = useState<{ text: string; chars: number; sections: number } | null>(null);
@@ -272,6 +290,8 @@ export default function ChatWidget({
   const [editDraft, setEditDraft] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Composer auto-grows with its content up to a cap (then scrolls).
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   // Follow the stream only while the user is near the bottom; if they scroll up
   // (e.g. to read while it's still thinking), stop auto-scrolling.
   const atBottomRef = useRef(true);
@@ -383,6 +403,14 @@ export default function ChatWidget({
 
   // Abort any in-flight stream on unmount
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // Grow the composer to fit its text, up to a max height (then it scrolls).
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
 
   const configured = Boolean(config.baseUrl && config.model);
 
@@ -522,16 +550,82 @@ export default function ChatWidget({
     }
   }
 
+  // ── Anytype pairing (mirrors the AnytypeWidget flow) ───────────────────────
+  async function startAnytypePairing() {
+    setAnytypeError("");
+    if (!draft.anytypeUrl.startsWith("http")) { setAnytypeError("Enter the Anytype API URL (http://…)."); return; }
+    setAnytypeBusy(true);
+    try {
+      const res = await fetch("/api/anytype", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "challenge", baseUrl: draft.anytypeUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setAnytypeChallengeId(data.challengeId);
+      setAnytypePairing("awaiting-code");
+      setAnytypeCode("");
+    } catch (e) {
+      setAnytypeError(`Could not reach Anytype: ${String((e as Error).message ?? e)}. Is the desktop app running?`);
+    } finally {
+      setAnytypeBusy(false);
+    }
+  }
+
+  async function confirmAnytypeCode() {
+    setAnytypeError("");
+    if (!anytypeCode.trim()) { setAnytypeError("Enter the 4-digit code from Anytype."); return; }
+    setAnytypeBusy(true);
+    try {
+      const res = await fetch("/api/anytype", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "key", baseUrl: draft.anytypeUrl, challengeId: anytypeChallengeId, code: anytypeCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setDraft((d) => ({ ...d, anytypeApiKey: data.apiKey }));
+      setAnytypePairing("idle");
+      await loadAnytypeSpaces(draft.anytypeUrl, data.apiKey, draft.anytypeSpaceId);
+    } catch (e) {
+      setAnytypeError(`Pairing failed: ${String((e as Error).message ?? e)}`);
+    } finally {
+      setAnytypeBusy(false);
+    }
+  }
+
+  async function loadAnytypeSpaces(baseUrl: string, apiKey: string, preferred: string) {
+    if (!baseUrl.startsWith("http") || !apiKey) return;
+    setAnytypeBusy(true);
+    setAnytypeSpaces([]);
+    try {
+      const res = await fetch(`/api/anytype?op=spaces&baseUrl=${encodeURIComponent(baseUrl)}&apiKey=${encodeURIComponent(apiKey)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      const list: { id: string; name: string }[] = data.spaces ?? [];
+      setAnytypeSpaces(list);
+      const pick = list.find((s) => s.id === preferred) ?? list[0];
+      if (pick) setDraft((d) => ({ ...d, anytypeSpaceId: pick.id, anytypeSpaceName: pick.name }));
+    } catch (e) {
+      setAnytypeError(`Could not load spaces: ${String((e as Error).message ?? e)}`);
+    } finally {
+      setAnytypeBusy(false);
+    }
+  }
+
   function openSettings() {
     setDraft(config);
     setModels([]);
     setModelsError("");
     setKiwixSources([]);
     setKiwixError("");
+    setAnytypeSpaces([]);
+    setAnytypePairing("idle");
+    setAnytypeError("");
     setSettingsOpen(true);
     // Auto-load the model list so the dropdown is ready (keeps the chosen model).
     if (config.baseUrl) fetchModels(config);
     if (config.kiwixUrl) loadKiwixSources(config.kiwixUrl, config.kiwixSource);
+    if (config.anytypeUrl && config.anytypeApiKey) loadAnytypeSpaces(config.anytypeUrl, config.anytypeApiKey, config.anytypeSpaceId);
   }
 
   function saveSettings() {
@@ -565,6 +659,12 @@ export default function ChatWidget({
 
   function toggleKiwix() {
     const next = { ...config, useKiwix: !config.useKiwix };
+    setConfig(next);
+    persist(next, messages);
+  }
+
+  function toggleAnytype() {
+    const next = { ...config, useAnytype: !config.useAnytype };
     setConfig(next);
     persist(next, messages);
   }
@@ -713,6 +813,19 @@ export default function ChatWidget({
         `CITE YOUR SOURCES: every search result and article is labeled with a number like [1], [2]. In your final answer, put the matching bracketed number right after each claim drawn from that source, e.g. "Messi was born in 1987 [1]." Only cite sources you actually used; never invent a number you weren't shown.`
       );
     }
+    if (config.useAnytype && config.anytypeUrl && config.anytypeApiKey && config.anytypeSpaceId) {
+      parts.push(
+        `You can search the user's own Anytype knowledge base${config.anytypeSpaceName ? ` (space "${config.anytypeSpaceName}")` : ""} — their personal notes, journals, trips, people, projects, and bookmarks — through the search_anytype and read_anytype_object tools. ` +
+        `When the user asks about their own notes, what they recorded, or anything personal that would live in their notes, use the tools instead of guessing. For general knowledge, answer directly (or use Kiwix if available).\n\n` +
+        `Work as a research loop, one step at a time:\n` +
+        `1. SEARCH: call search_anytype with concise keywords — the note's name or topic (e.g. "Istanbul", "reading list"), not a full sentence. It returns numbered objects with ids and snippets.\n` +
+        `2. READ: a snippet is only a hint. Open the most relevant object with read_anytype_object (using its id) and read its full markdown body before answering.\n` +
+        `Each result and object also carries metadata — its Created and Last modified dates (when the note was written/edited) and any custom properties (dates, amounts, tags, links). Use these directly for "when did I write this", "what did I note on…", or questions about those fields.\n` +
+        `3. ASSESS: if the answer is complete, give it; otherwise search or read again. When several notes combine into the answer, read them all and synthesize.\n` +
+        `4. Don't defer back to the user — find it yourself. If nothing relevant exists in their Anytype, say so plainly rather than inventing it.\n\n` +
+        `CITE YOUR SOURCES: each search result and object is labeled [1], [2], …. Put the matching number right after each claim drawn from that note, e.g. "You arrived Feb 22 [1]." Only cite objects you actually read; never invent a number.`
+      );
+    }
     return parts.join("\n\n");
   }
 
@@ -767,6 +880,9 @@ export default function ChatWidget({
           stream: true,
           kiwix: config.useKiwix && config.kiwixUrl && config.kiwixSource
             ? { baseUrl: config.kiwixUrl, source: config.kiwixSource, sourceTitle: config.kiwixSourceTitle }
+            : null,
+          anytype: config.useAnytype && config.anytypeUrl && config.anytypeApiKey && config.anytypeSpaceId
+            ? { baseUrl: config.anytypeUrl, apiKey: config.anytypeApiKey, spaceId: config.anytypeSpaceId, spaceName: config.anytypeSpaceName }
             : null,
           // LM Studio sets its idle-unload from the request itself; pass the
           // chosen linger as ttl seconds (Ollama uses its own keep_alive path).
@@ -1193,6 +1309,63 @@ export default function ChatWidget({
             </div>
 
             <div>
+              <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Anytype lookup <span className="opacity-60">(optional)</span></p>
+              <input
+                type="url"
+                value={draft.anytypeUrl}
+                onChange={e => setDraft(d => ({ ...d, anytypeUrl: e.target.value, anytypeApiKey: "" }))}
+                placeholder="http://127.0.0.1:31009"
+                className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
+              />
+              {draft.anytypeApiKey ? (
+                anytypeSpaces.length > 0 ? (
+                  <select
+                    value={draft.anytypeSpaceId}
+                    onChange={e => {
+                      const s = anytypeSpaces.find(x => x.id === e.target.value);
+                      setDraft(d => ({ ...d, anytypeSpaceId: e.target.value, anytypeSpaceName: s?.name ?? "" }));
+                    }}
+                    className="w-full mt-1.5 text-sm border border-neutral-200 rounded-xl px-2.5 py-2 outline-none focus:border-neutral-300 text-neutral-700 bg-white"
+                  >
+                    {anytypeSpaces.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                ) : (
+                  <p className="text-[10px] text-neutral-400 mt-1.5 flex items-center gap-1">
+                    {anytypeBusy && <Loader size={10} className="animate-spin" />} paired ✓ {draft.anytypeSpaceName && `· ${draft.anytypeSpaceName}`}
+                  </p>
+                )
+              ) : anytypePairing === "awaiting-code" ? (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <input
+                    inputMode="numeric"
+                    value={anytypeCode}
+                    onChange={e => setAnytypeCode(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && confirmAnytypeCode()}
+                    placeholder="4-digit code from Anytype"
+                    className="flex-1 text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white tracking-widest"
+                  />
+                  <button
+                    onClick={confirmAnytypeCode}
+                    disabled={anytypeBusy || !anytypeCode.trim()}
+                    className="text-xs px-3 py-2 rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:text-neutral-900 disabled:opacity-40 shrink-0"
+                  >
+                    {anytypeBusy ? <Loader size={12} className="animate-spin" /> : "Confirm"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={startAnytypePairing}
+                  disabled={anytypeBusy || !draft.anytypeUrl.startsWith("http")}
+                  className="mt-1.5 text-xs px-3 py-1.5 rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:text-neutral-900 disabled:opacity-40"
+                >
+                  {anytypeBusy ? <span className="flex items-center gap-1.5"><Loader size={12} className="animate-spin" /> contacting…</span> : "Pair with Anytype"}
+                </button>
+              )}
+              {anytypeError && <p className="text-red-400 text-[11px] mt-1">{anytypeError}</p>}
+              <p className="text-[10px] text-neutral-400 mt-1">Pair, pick a space, then turn lookup on with the box icon by the send button.</p>
+            </div>
+
+            <div>
               <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Response style</p>
               <div className="flex flex-wrap gap-1">
                 {(Object.keys(LENGTH_PRESETS) as Length[]).map(key => (
@@ -1382,6 +1555,7 @@ export default function ChatWidget({
           <div className={`shrink-0 p-2.5 border-t ${c.border}`}>
             <div className="flex items-end gap-2 bg-[var(--surface)] rounded-2xl border border-[var(--surface-border)] px-3 py-1.5">
               <textarea
+                ref={composerRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => {
@@ -1393,7 +1567,7 @@ export default function ChatWidget({
                 disabled={!configured || !loaded}
                 rows={1}
                 placeholder={configured ? "Message…" : "Configure a model first"}
-                className="flex-1 resize-none max-h-24 text-sm outline-none text-neutral-700 placeholder:text-neutral-300 bg-transparent py-1 disabled:opacity-50"
+                className="flex-1 resize-none overflow-y-auto text-sm outline-none text-neutral-700 placeholder:text-neutral-300 bg-transparent py-1 disabled:opacity-50"
               />
               {/* Dashboard tools, revealed by the "+" toggle */}
               {toolsOpen && (
@@ -1438,12 +1612,25 @@ export default function ChatWidget({
                   >
                     <Library size={14} />
                   </button>
+                  <button
+                    onClick={() => (config.anytypeApiKey && config.anytypeSpaceId ? toggleAnytype() : openSettings())}
+                    title={
+                      !config.anytypeApiKey || !config.anytypeSpaceId
+                        ? "Set up Anytype lookup in settings"
+                        : config.useAnytype
+                          ? `Anytype lookup on (${config.anytypeSpaceName || "space"}) — click to turn off`
+                          : "Let me look things up in your Anytype"
+                    }
+                    className={`p-1.5 rounded-full ${config.useAnytype ? `opacity-90 ${c.label}` : dashCtrlCls} ${(!config.anytypeApiKey || !config.anytypeSpaceId) ? "opacity-30" : ""}`}
+                  >
+                    <Layers size={14} />
+                  </button>
                 </div>
               )}
               <button
                 onClick={() => setToolsOpen(o => !o)}
                 title={toolsOpen ? "Hide data tools" : "Data tools"}
-                className={`shrink-0 p-1.5 rounded-full transition-transform ${toolsOpen ? `rotate-45 ${dashCtrlCls}` : (config.useDashboard || config.useKiwix) ? `opacity-90 ${c.label}` : dashCtrlCls}`}
+                className={`shrink-0 p-1.5 rounded-full transition-transform ${toolsOpen ? `rotate-45 ${dashCtrlCls}` : (config.useDashboard || config.useKiwix || config.useAnytype) ? `opacity-90 ${c.label}` : dashCtrlCls}`}
               >
                 <Plus size={14} />
               </button>
