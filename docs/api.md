@@ -90,27 +90,42 @@ Sends a chat completion request to `{baseUrl}/chat/completions`.
 { "baseUrl": "http://localhost:11434/v1", "apiKey": "", "model": "llama3.2", "messages": [{ "role": "user", "content": "..." }], "stream": true }
 ```
 
+Optional fields: `maxTokens` (`max_tokens`), `reasoningEffort` (`reasoning_effort`),
+`ttl` (LM Studio idle-unload seconds, ignored by other servers), and the `kiwix` /
+`anytype` lookup objects below.
+
 With `stream: true` (default), returns a `text/plain` stream of token deltas,
 read with a `ReadableStreamDefaultReader`. With `stream: false`, returns
 `{ "content": "..." }`. Upstream errors are surfaced as
 `{ "error": "..." }` with the upstream status code (or `502` if unreachable).
 
-**Kiwix tool calls (agentic lookup).** Pass an optional `kiwix` object to let the
-model search the offline Kiwix library mid-conversation:
+**Agentic lookup (Kiwix and/or Anytype).** Pass a `kiwix` and/or `anytype` object
+to hand the model search tools so it can ground answers in a source it reads:
 
 ```json
-{ "...": "...", "kiwix": { "baseUrl": "http://host:3702", "source": "wikipedia_en_all_maxi_2024-01", "sourceTitle": "Wikipedia" } }
+{ "...": "...",
+  "kiwix":   { "baseUrl": "http://host:3702", "source": "wikipedia_en_all_maxi_2024-01", "sourceTitle": "Wikipedia" },
+  "anytype": { "baseUrl": "http://127.0.0.1:31009", "apiKey": "…", "spaceId": "…", "spaceName": "Main Space" } }
 ```
 
-When present, the model is given `search_kiwix(query)` and `get_article(url)`
-tools. The route runs an agentic loop (up to 8 rounds) by calling `lib/kiwix.ts`
-directly (not over HTTP — a server-side fetch to `/api/kiwix` would be redirected
-to the login page by the auth middleware): it streams the model's turn, and
-whenever the model calls a tool, executes it, feeds the result back, and
-continues until the model answers. Query terms are simplified (filler/question
-words stripped) before searching, since Kiwix is a keyword index. Tool progress
-is streamed inside `<think>…</think>` so the client renders it as a collapsible
-trail. Requires a tool-calling-capable model (e.g. qwen, llama3.1+).
+When either is present, the route runs an agentic loop (up to 10 rounds), calling
+`lib/kiwix.ts` / `lib/anytype.ts` **directly** (not over HTTP — a server-side fetch
+to `/api/*` carries no session cookie and the auth middleware would redirect it to
+the login page). It streams the model's turn, executes any tool calls, feeds
+results back, and repeats until the model answers. Tools offered:
+
+- **Kiwix:** `search_kiwix(query)`, `get_article(url)`.
+- **Anytype:** `search_anytype(query)`, `read_anytype_object(id, find?, page?)`
+  (long notes return in ~6k-char parts; `find` jumps to matching sections, `page`
+  reads sequentially), and `summarize_anytype_object(id, focus?)` — a **map-reduce**
+  digest of a whole long note (chunk → summarize each chunk via a non-streaming
+  sub-call → return per-part summaries to synthesize).
+
+The model's answer streams live except while the "snippet gate" is armed (it
+searched but hasn't read a source yet) — then content is buffered so a
+snippet-only answer can be bounced back to read first. Tool progress streams
+inside `<think>…</think>` as a collapsible trail. Requires a tool-calling model
+(e.g. qwen, llama3.1+).
 
 **Citations.** Each retrieved article is numbered, and the model is told to cite
 claims inline with `[n]`. The stream's final trailer carries the sources the
@@ -153,6 +168,50 @@ Fetches one article and returns a plain-text extract of its lead paragraphs (tag
 ```
 
 Upstream errors (e.g. a ZIM that can't be read) are surfaced as `{ "error": "..." }` with a `502` status.
+
+---
+
+## Model
+
+Backend-aware model-residency control for the Chat widget's status pill. The OpenAI-compatible `/v1` endpoint ignores residency options, so this talks to each server's **native** API (deriving the root by stripping `/v1` from `baseUrl`). Detects the backend by probing; reports `backend: null` for servers with no controllable residency (llama.cpp, vLLM, hosted) so the UI hides the control.
+
+### `GET /api/model?baseUrl=<url>`
+Reports the backend and what's loaded. Probes Ollama's `/api/ps` then LM Studio's `/api/v1/models`.
+
+```json
+{ "backend": "ollama", "models": [{ "name": "qwen3:8b", "expiresAt": "2026-…Z", "loaded": true }] }
+```
+
+`expiresAt` (unload time) is Ollama-only; LM Studio reports `loaded` with no countdown.
+
+### `POST /api/model`
+Changes residency. Ollama: `keep_alive` via `/api/generate` (`"5m"` | `-1` pin | `0` unload). LM Studio: `action: "pin"` (manual load) or `"unload"` (`/api/v1/models/unload`); durations are applied as `ttl` on the chat request instead.
+
+```json
+{ "baseUrl": "…", "backend": "ollama", "model": "qwen3:8b", "keepAlive": "30m" }
+```
+
+---
+
+## Anytype
+
+Server-side proxy to the [Anytype](https://anytype.io/) local API (in the desktop app, default `http://127.0.0.1:31009`, localhost-only). Search and object-read logic lives in [`lib/anytype.ts`](../lib/anytype.ts) so the Chat widget's agentic lookup can reuse it directly. Sends the required `Anytype-Version` header; auth is a Bearer token from pairing.
+
+### `POST /api/anytype` — auth
+- `{ op: "challenge", baseUrl }` → `{ challengeId }` (and a 4-digit code appears in the desktop app).
+- `{ op: "key", baseUrl, challengeId, code }` → `{ apiKey }`.
+
+### `GET /api/anytype?op=spaces&baseUrl=<url>&apiKey=<key>`
+```json
+{ "spaces": [{ "id": "…", "name": "Main Space" }] }
+```
+
+### `GET /api/anytype?op=search&baseUrl=<url>&apiKey=<key>&spaceId=<id>&q=<query>&limit=<n>`
+Searches a space (empty `q` = recent, newest first). A multi-word query that returns nothing is retried as an AND of its terms.
+
+```json
+{ "objects": [{ "id": "…", "name": "Journal (2026)", "snippet": "…", "type": "Page", "spaceId": "…", "created": "2026-…Z", "modified": "2026-…Z" }] }
+```
 
 ---
 

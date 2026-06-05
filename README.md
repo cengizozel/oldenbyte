@@ -18,7 +18,14 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 - **Tracker** - time how long you spend on each activity with a one-tap stopwatch (only one runs at a time) and a donut chart of the breakdown; resets daily
 - **Chess** - play an ongoing game against the Stockfish engine with an adjustable Elo difficulty; the game persists between visits
 - **Kiwix** - search an offline [Kiwix](https://kiwix.org/) library (Wikipedia, WikiHow, …) running on your network; enter the server URL, pick a book, and full-text search results link straight to the article
-- **Chat** - chat with any OpenAI-compatible model (Ollama, LM Studio, llama.cpp, vLLM, OpenAI, …) by entering the API URL and model name; responses stream in real-time and the conversation persists. A toggle feeds your dashboard data (full note history, latest feeds, tracked time) to the model so you can ask things like "what's new on arXiv?" or "what did I note last Tuesday?" A second toggle hands the model search tools for a [Kiwix](https://kiwix.org/) library (agentic RAG) so it can look facts up in offline Wikipedia mid-conversation and cite what it read. You can also edit your own past messages to rewind and rerun the conversation from that point.
+- **Anytype** - browse and search your own [Anytype](https://anytype.io/) spaces; pair once with the local desktop app (a 4-digit code), pick a space, then search your objects with results that open straight in Anytype
+- **Chat** - chat with any OpenAI-compatible model (Ollama, LM Studio, llama.cpp, vLLM, OpenAI, …) by entering the API URL and model name; responses stream in real-time and the conversation persists. Highlights:
+  - **Dashboard data** toggle feeds your notes, feeds, and tracked time to the model ("what's new on arXiv?", "what did I note last Tuesday?")
+  - **Kiwix lookup** toggle hands the model search tools for an offline [Kiwix](https://kiwix.org/) library (agentic RAG) so it can look facts up mid-conversation and cite what it read
+  - **Anytype lookup** toggle does the same for your own [Anytype](https://anytype.io/) notes — it searches, reads (with `find`/page navigation for long notes), and can map-reduce **summarize** a whole journal too big to fit in context, while honouring each note's dates and metadata
+  - **Characters** — create personas, each with its own system prompt and a private, *scoped* long-term memory: give one a focus (e.g. an education coach) and it auto-remembers what you tell it that fits (your studies) while ignoring the rest (your trip)
+  - **Model control** — for Ollama/LM Studio, a status pill shows whether the model is loaded and lets you set how long it lingers in VRAM, pin it, or unload it on demand
+  - Regenerate a reply from any of your messages, edit your past messages to rewind, and an auto-growing composer for multi-line input
 
 ## Morning digest
 

@@ -23,11 +23,15 @@ oldenbyte is a single-user personal dashboard built with the Next.js App Router.
 ```
 app/
   api/                  # API route handlers
+    anytype/            # Anytype local-API proxy (auth pairing, spaces, search)
     auth/               # Session login/logout
+    chat/               # OpenAI-compatible chat proxy + agentic Kiwix/Anytype loop
     digest/             # OpenAI proxy for /digest — supports streaming and non-streaming
     f1/                 # F1 race data proxy
     files/[filename]/   # Serve uploaded files
     hf/                 # Hugging Face daily papers proxy
+    kiwix/              # kiwix-serve proxy (catalog, search, article extract)
+    model/              # Model-residency control (Ollama/LM Studio load/unload/keep-alive)
     proxy/              # Server-side URL fetch proxy (curl UA)
     rss/                # RSS/Atom feed parser
     settings/           # Key-value store CRUD + export/import
@@ -41,6 +45,9 @@ app/
   page.tsx              # Main dashboard page
 
 components/
+  AnytypeWidget.tsx     # Browse/search Anytype spaces (pairing + flip-card settings)
+  ChatWidget.tsx        # Chat: lookups, model residency, characters/memory
+  KiwixWidget.tsx       # Offline Kiwix full-text search
   F1Widget.tsx
   NotepadWidget.tsx
   ReaderWidget.tsx
@@ -51,9 +58,13 @@ components/
   WidgetGrid.tsx        # Grid layout, shelf, drag-drop, persistence
   YoutubeWidget.tsx
   TopBar.tsx            # Header with editable fields, date/clock, dark mode
+  (and ArxivWidget, ChessWidget, HuggingFaceWidget, TrackerWidget, Markdown, …)
 
 lib/
+  anytype.ts            # Shared Anytype API: search (AND fallback), read (markdown + metadata)
   auth.ts               # HMAC-SHA256 session token creation/verification
+  dashboardContext.ts   # Gathers the dashboard snapshot fed to Chat/digest
+  kiwix.ts              # Shared Kiwix search + article extraction
   prisma.ts             # Prisma client singleton
   storage.ts            # Client-side storage API wrapper
   widgets.ts            # Widget type definitions and color map
