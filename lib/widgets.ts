@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix" | "anytype";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -129,6 +129,14 @@ export const widgets: Widget[] = [
     color: "teal",
     title: "Kiwix",
     description: "Search an offline Kiwix library (Wikipedia, etc.).",
+    digestable: false,
+  },
+  {
+    id: "anytype",
+    type: "anytype",
+    color: "sky",
+    title: "Anytype",
+    description: "Browse and search your Anytype spaces.",
     digestable: false,
   },
 ];

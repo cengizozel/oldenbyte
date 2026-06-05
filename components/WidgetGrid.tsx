@@ -22,6 +22,7 @@ import TrackerWidget from "./TrackerWidget";
 import dynamic from "next/dynamic";
 import ChatWidget from "./ChatWidget";
 import KiwixWidget from "./KiwixWidget";
+import AnytypeWidget from "./AnytypeWidget";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 const ChessWidget = dynamic(() => import("./ChessWidget"), { ssr: false });
 
@@ -33,22 +34,23 @@ type TabLayoutItem = LayoutItem & { tabs?: string[] };
 const initialLayout: TabLayoutItem[] = [
   { i: "notebook",            x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 1, maxW: 4, maxH: 6 },
   { i: "arxiv-default",       x: 1, y: 0, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6, tabs: ["hf-default"] },
-  { i: "ebook",               x: 2, y: 0, w: 2, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "kiwix-default",       x: 2, y: 0, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "chat-default",        x: 3, y: 0, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
   { i: "rss",                 x: 0, y: 3, w: 1, h: 5, minW: 1, minH: 1, maxW: 4, maxH: 6 },
   { i: "f1-default",          x: 1, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
-  { i: "reddit",              x: 2, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
-  { i: "youtube",             x: 3, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6 },
+  { i: "youtube",             x: 2, y: 4, w: 1, h: 4, minW: 1, minH: 1, maxW: 4, maxH: 6, tabs: ["reddit"] },
 ];
 
 const initialInstances: Record<string, Widget> = {
   "notebook":      { id: "notebook",      type: "notebook", color: "amber",  title: "Notepad",  description: "A simple place for temporary notes." },
-  "ebook":         { id: "ebook",         type: "ebook",    color: "sky",    title: "Reader",   description: "Read a PDF or EPUB file." },
   "rss":           { id: "rss",           type: "rss",      color: "teal",   title: "Feed",     description: "Headlines from any RSS feed." },
   "reddit":        { id: "reddit",        type: "reddit",   color: "orange", title: "Reddit",   description: "Top posts from your chosen subreddits." },
   "youtube":       { id: "youtube",       type: "youtube",  color: "rose",   title: "YouTube",  description: "Latest videos from your chosen channels." },
   "f1-default":    { id: "f1-default",    type: "f1",       color: "rose",   title: "F1",       description: "Next race and driver standings." },
   "arxiv-default": { id: "arxiv-default", type: "arxiv",    color: "sky",    title: "arXiv",    description: "Latest papers from a chosen research field." },
   "hf-default":    { id: "hf-default",    type: "hf",       color: "orange", title: "HF Daily", description: "Trending AI papers curated by Hugging Face." },
+  "kiwix-default": { id: "kiwix-default", type: "kiwix",    color: "teal",   title: "Kiwix",    description: "Search an offline Kiwix library (Wikipedia, etc.)." },
+  "chat-default":  { id: "chat-default",  type: "chat",     color: "sky",    title: "Chat",     description: "Chat with a local or OpenAI-compatible model." },
 };
 
 function renderWidget(widget: Widget, extraClass = "") {
@@ -66,6 +68,7 @@ function renderWidget(widget: Widget, extraClass = "") {
   if (widget.type === "chess")    return <ChessWidget     widget={widget} className={cls} />;
   if (widget.type === "chat")     return <ChatWidget      widget={widget} className={cls} />;
   if (widget.type === "kiwix")    return <KiwixWidget     widget={widget} className={cls} />;
+  if (widget.type === "anytype")  return <AnytypeWidget   widget={widget} className={cls} />;
   return <WidgetCard widget={widget} className={cls} />;
 }
 
