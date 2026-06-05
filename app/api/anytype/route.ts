@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { anytypeSearch, ANYTYPE_VERSION } from "@/lib/anytype";
 
 // Proxy to the Anytype local API (embedded in the Anytype desktop app, default
 // http://127.0.0.1:31009). Server-side, like /api/kiwix and /api/model, to dodge
@@ -7,9 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
 //
 // Auth is a one-time pairing: POST /v1/auth/challenges → Anytype shows a 4-digit
 // code → POST /v1/auth/api_keys {challenge_id, code} → api_key (a Bearer token).
-// Reads (spaces, search) carry that token.
-
-const ANYTYPE_VERSION = "2025-11-08";
+// Reads (spaces, search) carry that token. Search/object reads live in lib/anytype
+// so the chat route can reuse them directly.
 
 function root(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, "");
@@ -54,30 +54,8 @@ export async function GET(request: NextRequest) {
       const q = sp.get("q") ?? "";
       const spaceId = sp.get("spaceId") ?? "";
       const limit = Math.min(100, Math.max(1, Number(sp.get("limit") ?? 25)));
-      // Per-space search when a space is chosen; otherwise across all spaces.
-      const url = spaceId
-        ? `${root(baseUrl)}/v1/spaces/${encodeURIComponent(spaceId)}/search?limit=${limit}`
-        : `${root(baseUrl)}/v1/search?limit=${limit}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: headers(apiKey),
-        // Empty query + sort by recency gives a "recent objects" list.
-        body: JSON.stringify({ query: q, sort: { property_key: "last_modified_date", direction: "desc" } }),
-        signal: request.signal,
-      });
-      if (!res.ok) throw new Error(await errMsg(res));
-      const data = await res.json();
-      const objects = (data.data ?? [])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((o: any) => !o.archived)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((o: any) => ({
-          id: o.id,
-          name: o.name || "(untitled)",
-          snippet: o.snippet || "",
-          spaceId: o.space_id,
-          type: o.type?.name || o.type?.key || "",
-        }));
+      // Empty query + recency sort gives a "recent objects" list.
+      const objects = await anytypeSearch(baseUrl, apiKey, spaceId, q, limit, request.signal);
       return NextResponse.json({ objects });
     }
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });

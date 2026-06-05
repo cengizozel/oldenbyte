@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { search as kiwixSearch, articleExtract } from "@/lib/kiwix";
+import { anytypeSearch, anytypeReadObject, anytypeDeepLink } from "@/lib/anytype";
 
 // Server-side proxy to any OpenAI-compatible chat endpoint (Ollama, LM Studio,
 // llama.cpp, vLLM, OpenAI itself, …). Running it server-side avoids CORS and
@@ -15,6 +16,7 @@ import { search as kiwixSearch, articleExtract } from "@/lib/kiwix";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ChatMessage = { role: string; content: string } & Record<string, any>;
 type Kiwix = { baseUrl: string; source: string; sourceTitle?: string };
+type Anytype = { baseUrl: string; apiKey: string; spaceId: string; spaceName?: string };
 
 // Strip trailing slashes so we can safely append "/chat/completions" etc.
 function normalizeBase(baseUrl: string): string {
@@ -92,6 +94,46 @@ function kiwixTools(sourceTitle?: string) {
   ];
 }
 
+// ── Anytype tools ─────────────────────────────────────────────────────────────
+function anytypeTools(spaceName?: string) {
+  const where = spaceName ? ` (space: ${spaceName})` : "";
+  return [
+    {
+      type: "function",
+      function: {
+        name: "search_anytype",
+        description:
+          `Full-text search the user's own Anytype notes and objects${where}. ` +
+          `Use this for anything about the user's personal knowledge: their notes, journals, ` +
+          `trips, people, projects, bookmarks. Search by name or keyword, e.g. "Istanbul" or ` +
+          `"reading list". Returns a numbered list of objects with names, ids, and snippets; ` +
+          `open the most relevant one with read_anytype_object to read its full text.`,
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Concise keywords — usually the note/object name or topic" },
+          },
+          required: ["query"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "read_anytype_object",
+        description:
+          "Read the full markdown body of an Anytype object using an id returned by " +
+          "search_anytype, when the snippet isn't enough to answer.",
+        parameters: {
+          type: "object",
+          properties: { id: { type: "string", description: "Object id from a search result" } },
+          required: ["id"],
+        },
+      },
+    },
+  ];
+}
+
 // Derive a readable title from a content url, e.g. /A/Lionel_Messi → "Lionel Messi".
 function titleFromUrl(url: string): string {
   try {
@@ -100,29 +142,62 @@ function titleFromUrl(url: string): string {
   } catch { return url; }
 }
 
+// A search hit, normalized across sources: `ref` is what the model passes to the
+// matching read tool (a url for Kiwix, an object id for Anytype); `link` is the
+// clickable source shown in citations.
+type SearchHit = { title: string; ref: string; link: string; snippet: string; meta?: string };
 type ToolResult =
-  | { kind: "search"; results: { title: string; url: string; snippet: string }[] }
-  | { kind: "article"; url: string; text: string }
+  | { kind: "search"; source: "kiwix" | "anytype"; query: string; results: SearchHit[] }
+  | { kind: "article"; title: string; link: string; text: string; meta?: string }
   | { kind: "message"; text: string };
 
-// Execute a tool call by calling the Kiwix lib directly (NOT via /api/kiwix —
-// that server-side fetch carries no session cookie and the auth middleware would
-// redirect it to the HTML login page). Returns structured data; the loop turns it
-// into numbered, citeable text for the model.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function runKiwixTool(name: string, args: any, kiwix: Kiwix, signal: AbortSignal): Promise<ToolResult> {
+// Execute a tool call by calling the source libs directly (NOT via /api/* — a
+// server-side fetch carries no session cookie and the auth middleware would
+// redirect it to the login page). Returns structured data; the loop turns it into
+// numbered, citeable text for the model.
+async function runTool(
+  name: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  args: any,
+  ctx: { kiwix?: Kiwix; anytype?: Anytype },
+  signal: AbortSignal,
+): Promise<ToolResult> {
   try {
-    if (name === "search_kiwix") {
+    if (name === "search_kiwix" && ctx.kiwix) {
       const q = String(args?.query ?? "").trim();
       if (!q) return { kind: "message", text: "No query provided." };
-      const results = await kiwixSearch(kiwix.baseUrl, kiwix.source, q, 6, signal);
-      return { kind: "search", results };
+      const results = await kiwixSearch(ctx.kiwix.baseUrl, ctx.kiwix.source, q, 6, signal);
+      return { kind: "search", source: "kiwix", query: q, results: results.map(r => ({ title: r.title, ref: r.url, link: r.url, snippet: r.snippet })) };
     }
-    if (name === "get_article") {
+    if (name === "get_article" && ctx.kiwix) {
       const url = String(args?.url ?? "");
       if (!url) return { kind: "message", text: "No url provided." };
-      const text = await articleExtract(kiwix.baseUrl, url, signal);
-      return { kind: "article", url, text: text || "No text found in that article." };
+      const text = await articleExtract(ctx.kiwix.baseUrl, url, signal);
+      return { kind: "article", title: titleFromUrl(url), link: url, text: text || "No text found in that article." };
+    }
+    if (name === "search_anytype" && ctx.anytype) {
+      const q = String(args?.query ?? "").trim();
+      if (!q) return { kind: "message", text: "No query provided." };
+      const hits = await anytypeSearch(ctx.anytype.baseUrl, ctx.anytype.apiKey, ctx.anytype.spaceId, q, 6, signal);
+      return {
+        kind: "search", source: "anytype", query: q,
+        results: hits.map(o => ({
+          title: o.name, ref: o.id, link: anytypeDeepLink(o.spaceId, o.id), snippet: o.snippet || o.type,
+          meta: [o.created && `created ${o.created}`, o.modified && `modified ${o.modified}`].filter(Boolean).join(", "),
+        })),
+      };
+    }
+    if (name === "read_anytype_object" && ctx.anytype) {
+      const id = String(args?.id ?? "");
+      if (!id) return { kind: "message", text: "No id provided." };
+      const obj = await anytypeReadObject(ctx.anytype.baseUrl, ctx.anytype.apiKey, ctx.anytype.spaceId, id, signal);
+      const meta = [
+        obj.type && `Type: ${obj.type}`,
+        obj.created && `Created: ${obj.created}`,
+        obj.modified && `Last modified: ${obj.modified}`,
+        ...obj.fields.map(f => `${f.name}: ${f.value}`),
+      ].filter(Boolean).join("\n");
+      return { kind: "article", title: obj.name, link: anytypeDeepLink(ctx.anytype.spaceId, id), text: obj.markdown || "(no body text)", meta };
     }
   } catch (err) {
     return { kind: "message", text: `Tool error: ${String(err instanceof Error ? err.message : err)}` };
@@ -140,10 +215,12 @@ export async function POST(request: NextRequest) {
     maxTokens = 0,
     reasoningEffort = "",
     kiwix = null,
+    anytype = null,
     ttl = 0,
   }: {
     baseUrl: string; apiKey?: string; model: string; messages: ChatMessage[];
     stream?: boolean; maxTokens?: number; reasoningEffort?: string; kiwix?: Kiwix | null;
+    anytype?: Anytype | null;
     ttl?: number; // LM Studio idle-unload, in seconds; set the model's linger per request
   } = await request.json();
 
@@ -161,9 +238,15 @@ export async function POST(request: NextRequest) {
     ...(Number(ttl) > 0 ? { ttl: Math.floor(Number(ttl)) } : {}),
   };
 
-  // ── Agentic path: model can call Kiwix search tools ─────────────────────────
-  if (kiwix && kiwix.baseUrl && kiwix.source) {
-    const tools = kiwixTools(kiwix.sourceTitle);
+  // ── Agentic path: model can call Kiwix and/or Anytype search tools ──────────
+  const useKiwix = !!(kiwix && kiwix.baseUrl && kiwix.source);
+  const useAnytype = !!(anytype && anytype.baseUrl && anytype.apiKey && anytype.spaceId);
+  if (useKiwix || useAnytype) {
+    const toolCtx = { kiwix: useKiwix ? kiwix! : undefined, anytype: useAnytype ? anytype! : undefined };
+    const tools = [
+      ...(useKiwix ? kiwixTools(kiwix!.sourceTitle) : []),
+      ...(useAnytype ? anytypeTools(anytype!.spaceName) : []),
+    ];
     const encoder = new TextEncoder();
     const MAX_ITERS = 10;
 
@@ -261,9 +344,9 @@ export async function POST(request: NextRequest) {
                 convo.push({
                   role: "user",
                   content:
-                    "You searched but did not open any article, so you'd be answering from search " +
-                    "snippets — that is not allowed. Call get_article on the most relevant result, read " +
-                    "it, then answer from its text.",
+                    "You searched but did not open any result, so you'd be answering from search " +
+                    "snippets — that is not allowed. Open the most relevant result (get_article for a " +
+                    "Kiwix url, read_anytype_object for an Anytype id), read it, then answer from its text.",
                 });
                 continue;
               }
@@ -288,28 +371,30 @@ export async function POST(request: NextRequest) {
               let args: Record<string, unknown> = {};
               try { args = JSON.parse(c.arguments || "{}"); } catch {}
               openThink();
-              const out = await runKiwixTool(c.name, args, kiwix, request.signal);
+              const out = await runTool(c.name, args, toolCtx, request.signal);
 
               // Turn the result into numbered, citeable text for the model and a
               // short progress note for the user.
               let toolText: string;
               if (out.kind === "search") {
                 searched = true;
-                emit(`\n🔎 searching Kiwix for “${String(args.query ?? "")}”\n`);
+                const label = out.source === "anytype" ? "Anytype" : "Kiwix";
+                const refLabel = out.source === "anytype" ? "id" : "url";
+                emit(`\n🔎 searching ${label} for “${out.query}”\n`);
                 if (!out.results.length) {
                   toolText = "No results.";
                   emit("no results\n");
                 } else {
                   toolText = out.results
-                    .map((r) => `[${cite(r.title, r.url)}] ${r.title}\n   url: ${r.url}\n   ${r.snippet}`)
+                    .map((r) => `[${cite(r.title, r.link)}] ${r.title}\n   ${refLabel}: ${r.ref}${r.meta ? `\n   ${r.meta}` : ""}\n   ${r.snippet}`)
                     .join("\n");
-                  emit(out.results.map((r) => `[${byUrl.get(r.url)}] ${r.title}`).join("\n") + "\n");
+                  emit(out.results.map((r) => `[${byUrl.get(r.link)}] ${r.title}`).join("\n") + "\n");
                 }
               } else if (out.kind === "article") {
-                const n = cite(titleFromUrl(out.url), out.url);
+                const n = cite(out.title, out.link);
                 opened.add(n); // actually read → a real source regardless of inline [n]
-                emit(`\n📖 reading [${n}] ${titleFromUrl(out.url)}\n`);
-                toolText = `[${n}] ${titleFromUrl(out.url)}\n${out.text}`;
+                emit(`\n📖 reading [${n}] ${out.title}\n`);
+                toolText = `[${n}] ${out.title}\n${out.meta ? out.meta + "\n\n" : ""}${out.text}`;
               } else {
                 toolText = out.text;
                 emit(out.text + "\n");
