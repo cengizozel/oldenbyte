@@ -54,10 +54,10 @@ function extractMeta(properties: any[]): { created: string; modified: string; fi
   return { created, modified, fields };
 }
 
-// Full-text search a space (or all spaces when spaceId is empty), newest first.
-export async function anytypeSearch(
-  baseUrl: string, apiKey: string, spaceId: string, query: string, limit: number, signal?: AbortSignal,
-): Promise<AnytypeHit[]> {
+// One raw search request. Anytype matches the query as a contiguous phrase, so
+// multi-word queries only hit when those words appear adjacent.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function rawSearch(baseUrl: string, apiKey: string, spaceId: string, query: string, limit: number, signal?: AbortSignal): Promise<any[]> {
   const url = spaceId
     ? `${root(baseUrl)}/v1/spaces/${encodeURIComponent(spaceId)}/search?limit=${limit}`
     : `${root(baseUrl)}/v1/search?limit=${limit}`;
@@ -70,22 +70,41 @@ export async function anytypeSearch(
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data.data ?? [])
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .filter((o: any) => !o.archived)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((o: any) => {
-      const meta = extractMeta(o.properties);
-      return {
-        id: o.id,
-        name: o.name || "(untitled)",
-        snippet: o.snippet || "",
-        type: o.type?.name || o.type?.key || "",
-        spaceId: o.space_id,
-        created: meta.created,
-        modified: meta.modified,
-      };
-    });
+  return (data.data ?? []).filter((o: any) => !o.archived);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toHit(o: any): AnytypeHit {
+  const meta = extractMeta(o.properties);
+  return {
+    id: o.id,
+    name: o.name || "(untitled)",
+    snippet: o.snippet || "",
+    type: o.type?.name || o.type?.key || "",
+    spaceId: o.space_id,
+    created: meta.created,
+    modified: meta.modified,
+  };
+}
+
+// Full-text search a space (or all spaces when spaceId is empty), newest first.
+// Because Anytype matches the whole query as a phrase, a multi-word query that
+// finds nothing is retried as an AND of its terms — search each word and keep the
+// objects that match every one — so "2026 journal" still finds "Journal (2026)".
+export async function anytypeSearch(
+  baseUrl: string, apiKey: string, spaceId: string, query: string, limit: number, signal?: AbortSignal,
+): Promise<AnytypeHit[]> {
+  const direct = await rawSearch(baseUrl, apiKey, spaceId, query, limit, signal);
+  const terms = query.trim().split(/\s+/).filter(Boolean);
+  if (direct.length > 0 || terms.length < 2) return direct.map(toHit);
+
+  const perTerm = await Promise.all(
+    terms.map((t) => rawSearch(baseUrl, apiKey, spaceId, t, Math.max(limit, 50), signal)),
+  );
+  const idSets = perTerm.map((arr) => new Set(arr.map((o) => o.id)));
+  // Keep objects present in every term's results, ordered by the first term's ranking.
+  const merged = perTerm[0].filter((o) => idSets.every((s) => s.has(o.id)));
+  return merged.slice(0, limit).map(toHit);
 }
 
 // Read an object's full body as markdown (the ?format=md ObjectWithBody view).

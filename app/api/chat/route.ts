@@ -120,18 +120,93 @@ function anytypeTools(spaceName?: string) {
     {
       type: "function",
       function: {
-        name: "read_anytype_object",
+        name: "summarize_anytype_object",
         description:
-          "Read the full markdown body of an Anytype object using an id returned by " +
-          "search_anytype, when the snippet isn't enough to answer.",
+          "Digest an ENTIRE long note that's too big to read at once — use this for open-ended " +
+          "questions about a whole note, e.g. \"summarize my journal\" or \"what does my 2026 journal " +
+          "say about me\". It splits the note into parts, summarizes each, and returns the per-part " +
+          "summaries for you to synthesize into the answer. (For a single specific fact, use " +
+          "read_anytype_object with find= instead — it's much faster.)",
         parameters: {
           type: "object",
-          properties: { id: { type: "string", description: "Object id from a search result" } },
+          properties: {
+            id: { type: "string", description: "Object id from a search result" },
+            focus: { type: "string", description: "Optional: what to focus on, e.g. 'what it reveals about the author'" },
+          },
+          required: ["id"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "read_anytype_object",
+        description:
+          "Read the markdown body of an Anytype object using an id returned by search_anytype. " +
+          "Long notes are returned in parts — the result tells you the total size and how many " +
+          "parts there are. For a long note, prefer find=\"keywords\" to jump straight to the " +
+          "relevant sections (e.g. find=\"Istanbul\" in a journal), or page=N to read it part by " +
+          "part and summarize across parts. Omit both to read from the start.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Object id from a search result" },
+            find: { type: "string", description: "Optional: jump to sections matching these keywords" },
+            page: { type: "integer", description: "Optional: which part to read (1-based) when reading a long note sequentially" },
+          },
           required: ["id"],
         },
       },
     },
   ];
+}
+
+// Window a long object body so it never floods the model's context. With `find`,
+// return the sections matching the keywords (±context, merged); otherwise return
+// the requested ~READ_CAP-char page with a header saying how to read further.
+const READ_CAP = 6000;
+function windowMarkdown(md: string, find?: string, page?: number): { header: string; text: string } {
+  const total = md.length;
+  if (total <= READ_CAP && !find) return { header: "", text: md };
+
+  if (find && find.trim()) {
+    const needle = find.trim().toLowerCase();
+    const hay = md.toLowerCase();
+    const W = 600; // context chars on each side of a match
+    const ranges: [number, number][] = [];
+    let idx = hay.indexOf(needle);
+    while (idx !== -1 && ranges.length < 25) {
+      ranges.push([Math.max(0, idx - W), Math.min(total, idx + needle.length + W)]);
+      idx = hay.indexOf(needle, idx + needle.length);
+    }
+    if (!ranges.length) {
+      return { header: `No matches for "${find}" in this note (${total} chars). Try another keyword, or read it by page (page=1).`, text: "" };
+    }
+    ranges.sort((a, b) => a[0] - b[0]);
+    const merged: [number, number][] = [];
+    for (const r of ranges) {
+      const last = merged[merged.length - 1];
+      if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+      else merged.push(r);
+    }
+    let out = "";
+    let shown = 0;
+    for (const [a, b] of merged) {
+      const seg = `${a > 0 ? "…" : ""}${md.slice(a, b)}${b < total ? "…" : ""}`;
+      if (out.length + seg.length > READ_CAP) break;
+      out += seg + "\n";
+      shown++;
+    }
+    return { header: `${ranges.length} match(es) for "${find}" in this note (${total} chars); showing ${shown} section(s):`, text: out.trim() };
+  }
+
+  const pages = Math.max(1, Math.ceil(total / READ_CAP));
+  const p = Math.min(Math.max(1, Math.floor(page || 1)), pages);
+  const slice = md.slice((p - 1) * READ_CAP, p * READ_CAP);
+  const more = p < pages
+    ? ` — for the next part call read_anytype_object again with page=${p + 1}, or find="keyword" to jump to a section`
+    : " (final part)";
+  return { header: `Part ${p} of ${pages} (${total} chars total)${more}:`, text: slice };
 }
 
 // Derive a readable title from a content url, e.g. /A/Lionel_Messi → "Lionel Messi".
@@ -197,7 +272,10 @@ async function runTool(
         obj.modified && `Last modified: ${obj.modified}`,
         ...obj.fields.map(f => `${f.name}: ${f.value}`),
       ].filter(Boolean).join("\n");
-      return { kind: "article", title: obj.name, link: anytypeDeepLink(ctx.anytype.spaceId, id), text: obj.markdown || "(no body text)", meta };
+      // Window long notes so they don't overflow the model's context.
+      const win = windowMarkdown(obj.markdown || "", args?.find ? String(args.find) : undefined, args?.page ? Number(args.page) : undefined);
+      const text = (win.header ? win.header + "\n" : "") + (win.text || "(no body text)");
+      return { kind: "article", title: obj.name, link: anytypeDeepLink(ctx.anytype.spaceId, id), text, meta };
     }
   } catch (err) {
     return { kind: "message", text: `Tool error: ${String(err instanceof Error ? err.message : err)}` };
@@ -278,6 +356,50 @@ export async function POST(request: NextRequest) {
         let searched = false; // model has run at least one search_kiwix
         let nudges = 0;       // times we've bounced a snippet-only answer
 
+        // One non-streaming completion, used by the map-reduce summarizer to digest
+        // each chunk of a long note. Bounded + tool-free; strips any <think> trace.
+        const complete = async (msgs: ChatMessage[]): Promise<string> => {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: upstreamHeaders,
+            body: JSON.stringify({ model, messages: msgs, stream: false, max_tokens: 256 }),
+            signal: request.signal,
+          });
+          if (!res.ok) throw new Error(`summarize HTTP ${res.status}`);
+          const data = await res.json();
+          const content = data.choices?.[0]?.message?.content ?? "";
+          return content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+        };
+
+        // Map-reduce digest of a long Anytype note: summarize each ~6k chunk on its
+        // own (so nothing overflows context), return the per-part summaries for the
+        // main model to synthesize. Emits progress into the thinking trail.
+        const summarizeObject = async (id: string, focus: string): Promise<string> => {
+          const obj = await anytypeReadObject(anytype!.baseUrl, anytype!.apiKey, anytype!.spaceId, id, request.signal);
+          const n = cite(obj.name, anytypeDeepLink(anytype!.spaceId, id));
+          opened.add(n);
+          const md = obj.markdown || "";
+          const CHUNK = 6000, MAX_CHUNKS = 40;
+          const chunks: string[] = [];
+          for (let p = 0; p < md.length && chunks.length < MAX_CHUNKS; p += CHUNK) chunks.push(md.slice(p, p + CHUNK));
+          const truncated = md.length > MAX_CHUNKS * CHUNK;
+          openThink();
+          emit(`\n🧩 digesting [${n}] ${obj.name} — ${chunks.length} part(s)${truncated ? " (capped)" : ""}; this can take a minute on a long note…\n`);
+          const focusLine = focus ? `Focus on: ${focus}. ` : "";
+          const parts: string[] = [];
+          for (let k = 0; k < chunks.length; k++) {
+            emit(`  · part ${k + 1}/${chunks.length}\n`);
+            const s = await complete([
+              { role: "system", content: "You summarize one part of a longer personal note for someone digesting the whole thing. Be faithful and specific in 2-4 sentences: concrete events, dates, names, feelings, and what it reveals about the author. No preamble." },
+              { role: "user", content: `${focusLine}Summarize part ${k + 1} of ${chunks.length} of the note "${obj.name}":\n\n${chunks[k]}` },
+            ]);
+            parts.push(`Part ${k + 1}: ${s || "(no content)"}`);
+          }
+          return `Map-reduce digest of [${n}] ${obj.name} (${md.length} chars in ${chunks.length} part(s)${truncated ? ", capped" : ""}). ` +
+            `Below are faithful per-part summaries — synthesize them into the final answer for the user and cite [${n}].\n\n` +
+            parts.join("\n\n");
+        };
+
         try {
           for (let iter = 0; iter < MAX_ITERS; iter++) {
             const upstream = await fetch(url, {
@@ -294,8 +416,12 @@ export async function POST(request: NextRequest) {
               break;
             }
 
-            // Parse this round's SSE: stream reasoning live, but BUFFER content so a
-            // snippet-only answer can be intercepted by the gate before the user sees it.
+            // Parse this round's SSE. Stream reasoning and answer content live (like
+            // the plain path) — EXCEPT when the gate is "armed": the model has searched
+            // but not yet read a source, so it might answer from snippets and need to be
+            // bounced. Only then do we buffer content (so the user never sees the bounced
+            // text). searched/opened/nudges only change between rounds, so this is stable.
+            const gateArmed = searched && opened.size === 0 && nudges < 2;
             const reader = upstream.body!.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
@@ -319,7 +445,11 @@ export async function POST(request: NextRequest) {
                 if (!delta) continue;
                 const reasoning = delta.reasoning ?? delta.reasoning_content;
                 if (reasoning) { openThink(); emit(reasoning); totalTokens++; }
-                if (delta.content) { assistantContent += delta.content; totalTokens++; }
+                if (delta.content) {
+                  assistantContent += delta.content;
+                  if (!gateArmed) { closeThink(); emit(delta.content); } // stream live
+                  totalTokens++;
+                }
                 if (delta.tool_calls) {
                   for (const tc of delta.tool_calls) {
                     const idx = tc.index ?? 0;
@@ -334,10 +464,10 @@ export async function POST(request: NextRequest) {
 
             const made = calls.filter(Boolean).filter((c) => c.name);
             if (!made.length) {
-              // GATE: if the model searched but never opened an article, it's about to
+              // GATE: if the model searched but never opened a result, it's about to
               // answer from search snippets. Don't allow it — bounce it back to read the
-              // most relevant result first. (Direct answers with no search are fine.)
-              if (searched && opened.size === 0 && nudges < 2) {
+              // most relevant result first. (We buffered the content, so nothing leaked.)
+              if (gateArmed) {
                 nudges++;
                 if (assistantContent.trim()) { openThink(); emit(assistantContent.trim() + "\n"); }
                 convo.push({ role: "assistant", content: assistantContent });
@@ -351,7 +481,7 @@ export async function POST(request: NextRequest) {
                 continue;
               }
               closeThink();
-              emit(assistantContent);
+              // Content was already streamed live above (gate wasn't armed).
               finalAnswer = assistantContent;
               break;
             }
@@ -371,6 +501,21 @@ export async function POST(request: NextRequest) {
               let args: Record<string, unknown> = {};
               try { args = JSON.parse(c.arguments || "{}"); } catch {}
               openThink();
+
+              // Map-reduce summarize is handled here (not in runTool) because it
+              // needs the model caller and emits its own progress.
+              if (c.name === "summarize_anytype_object" && useAnytype) {
+                let summary: string;
+                try {
+                  summary = await summarizeObject(String(args.id ?? ""), String(args.focus ?? "").trim());
+                } catch (err) {
+                  summary = `Could not summarize: ${String(err instanceof Error ? err.message : err)}`;
+                  emit("  (summary failed)\n");
+                }
+                convo.push({ role: "tool", tool_call_id: c.id || `call_${iter}_${i}`, content: summary });
+                continue;
+              }
+
               const out = await runTool(c.name, args, toolCtx, request.signal);
 
               // Turn the result into numbered, citeable text for the model and a
