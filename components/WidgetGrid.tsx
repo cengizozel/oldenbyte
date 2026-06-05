@@ -275,6 +275,8 @@ export default function WidgetGrid({
     tracker:  { w: 1, h: 3 },
     chess:    { w: 2, h: 4 },
     chat:     { w: 1, h: 4 },
+    kiwix:    { w: 1, h: 4 },
+    anytype:  { w: 1, h: 4 },
   };
 
   function findNextPosition(
