@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library } from "lucide-react";
+import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library, Power } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherDashboardContext } from "@/lib/dashboardContext";
@@ -22,6 +22,17 @@ function titleFrom(messages: ChatMessage[]): string {
   const first = messages.find(m => m.role === "user")?.content.trim().replace(/\s+/g, " ");
   if (!first) return "New chat";
   return first.length > 40 ? first.slice(0, 40) + "…" : first;
+}
+
+// Compact countdown for the model-residency pill: 45s, 4m, 1h12m.
+function fmtRemaining(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return mm ? `${h}h${mm}m` : `${h}h`;
 }
 
 function timeAgo(ms: number): string {
@@ -145,6 +156,9 @@ type ChatConfig = {
   kiwixUrl: string;        // kiwix-serve base URL
   kiwixSource: string;     // selected ZIM content-route id
   kiwixSourceTitle: string;
+  // Ollama only: how long the model lingers in VRAM after a reply. "" = leave
+  // it to Ollama's default; "5m"/"30m"/"1h" = that duration; "-1" = stay loaded.
+  keepAlive: string;
 };
 
 // Always-on identity so the assistant knows who and where it is, even when the
@@ -185,6 +199,7 @@ const DEFAULT_CONFIG: ChatConfig = {
   kiwixUrl: "",
   kiwixSource: "",
   kiwixSourceTitle: "",
+  keepAlive: "",
 };
 
 // Common local OpenAI-compatible servers, shown as quick-fill hints.
@@ -234,6 +249,16 @@ export default function ChatWidget({
   const [showContext, setShowContext] = useState(false);
   // Dashboard tools (data toggle / view / refresh) tuck behind a "+" by the send button.
   const [toolsOpen, setToolsOpen] = useState(false);
+
+  // Model residency. `backend` is null until we know what this server is: null =
+  // not a controllable backend (control hidden), "ollama"/"lmstudio" = supported.
+  // `models` carries residency (expiresAt is Ollama-only; loaded is the flag).
+  // `nowMs` ticks each second so Ollama's countdown stays live between polls.
+  type Backend = "ollama" | "lmstudio" | null;
+  const [power, setPower] = useState<{ backend: Backend; models: { name: string; expiresAt: string | null; loaded: boolean }[] }>({ backend: null, models: [] });
+  const [nowMs, setNowMs] = useState(0);
+  const [powerOpen, setPowerOpen] = useState(false);
+  const [powerBusy, setPowerBusy] = useState(false);
   // Inline rename of the active conversation's title in the header.
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
@@ -361,6 +386,95 @@ export default function ChatWidget({
 
   const configured = Boolean(config.baseUrl && config.model);
 
+  // ── Model residency (Ollama / LM Studio) ────────────────────────────────────
+  // Match the configured model to a residency entry. Servers tag names (Ollama
+  // "llama3.2:latest"; LM Studio "publisher/model") so accept base/prefix matches.
+  const base = (s: string) => s.split(":")[0];
+  const loadedEntry = power.models.find(
+    m => m.name === config.model || base(m.name) === base(config.model) || m.name.startsWith(config.model)
+  );
+  const backend = power.backend;
+  const powerCapable = backend !== null;
+  const isLoaded = !!loadedEntry?.loaded;
+  // Only Ollama reports an unload time, so the countdown is Ollama-only.
+  const remainingMs = loadedEntry?.expiresAt ? new Date(loadedEntry.expiresAt).getTime() - (nowMs || Date.now()) : 0;
+  const hasCountdown = backend === "ollama" && isLoaded && remainingMs > 0;
+  // keep_alive -1 pushes expires_at far into the future — treat >30 days as pinned.
+  const pinned = (backend === "ollama" && remainingMs > 1000 * 60 * 60 * 24 * 30)
+    || (backend === "lmstudio" && config.keepAlive === "-1" && isLoaded);
+
+  // Map a keep-alive preset to LM Studio's ttl (seconds). "-1"/"" → no ttl.
+  const ttlSeconds = (v: string) => ({ "5m": 300, "30m": 1800, "1h": 3600 } as Record<string, number>)[v] ?? 0;
+
+  const pollPower = useCallback(async () => {
+    if (!config.baseUrl || !config.model) { setPower({ backend: null, models: [] }); return; }
+    try {
+      const res = await fetch(`/api/model?baseUrl=${encodeURIComponent(config.baseUrl)}`);
+      const data = await res.json();
+      setPower({ backend: data.backend ?? null, models: data.models ?? [] });
+    } catch {
+      setPower({ backend: null, models: [] });
+    }
+  }, [config.baseUrl, config.model]);
+
+  // Poll residency every 5s while configured.
+  useEffect(() => {
+    if (!configured) { setPower({ backend: null, models: [] }); return; }
+    pollPower();
+    const id = setInterval(pollPower, 5000);
+    return () => clearInterval(id);
+  }, [configured, pollPower]);
+
+  // Tick the countdown once a second while a backend is detected (Ollama only
+  // shows it, but the cheap tick is harmless either way).
+  useEffect(() => {
+    if (!powerCapable) return;
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [powerCapable]);
+
+  // Low-level residency change. Ollama: keep_alive ("5m" | -1 | 0). LM Studio:
+  // action "pin" (manual load) | "unload".
+  const postPower = useCallback(async (body: Record<string, unknown>) => {
+    try {
+      await fetch("/api/model", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseUrl: config.baseUrl, model: config.model, backend: power.backend, ...body }),
+      });
+    } catch {}
+  }, [config.baseUrl, config.model, power.backend]);
+
+  // Choose how long the model lingers. Persists the preference (Ollama re-applies
+  // it after each reply; LM Studio sends it as ttl on each request). Picking a
+  // duration never force-loads an idle model — only an explicit pin (∞) does.
+  async function chooseLinger(value: string, opts?: { load?: boolean }) {
+    const next = { ...config, keepAlive: value };
+    setConfig(next);
+    persist(next, messages);
+    setPowerBusy(true);
+    if (backend === "ollama") {
+      if (opts?.load || isLoaded) await postPower({ keepAlive: value === "" ? "5m" : value });
+    } else if (backend === "lmstudio") {
+      // ∞ pins via a manual load; durations just take effect on the next message.
+      if (value === "-1") await postPower({ action: "pin" });
+    }
+    await pollPower();
+    setPowerBusy(false);
+  }
+
+  // Evict the model from VRAM right now. One-shot — doesn't change the linger
+  // preference, so the next message reloads under whatever you've chosen.
+  async function unloadNow() {
+    setPowerBusy(true);
+    if (backend === "ollama") await postPower({ keepAlive: 0 });
+    else if (backend === "lmstudio") await postPower({ action: "unload" });
+    await pollPower();
+    setPowerBusy(false);
+    setPowerOpen(false);
+  }
+
   async function fetchModels(cfg: ChatConfig) {
     if (!cfg.baseUrl) {
       setModelsError("Enter an API URL first.");
@@ -484,6 +598,16 @@ export default function ChatWidget({
     setMessages(next);
     persist(config, next);
     cancelEdit();
+  }
+
+  // Regenerate the reply to a user message — the same effect as editing it and
+  // confirming unchanged: keep everything up to and including it, drop the rest,
+  // and rerun from that point.
+  function retry(i: number) {
+    if (streaming || !configured) return;
+    setError("");
+    cancelEdit();
+    generate(messages.slice(0, i + 1));
   }
 
   // ── Conversations ──────────────────────────────────────────────────────────
@@ -644,6 +768,9 @@ export default function ChatWidget({
           kiwix: config.useKiwix && config.kiwixUrl && config.kiwixSource
             ? { baseUrl: config.kiwixUrl, source: config.kiwixSource, sourceTitle: config.kiwixSourceTitle }
             : null,
+          // LM Studio sets its idle-unload from the request itself; pass the
+          // chosen linger as ttl seconds (Ollama uses its own keep_alive path).
+          ttl: backend === "lmstudio" ? ttlSeconds(config.keepAlive) : 0,
         }),
         signal: controller.signal,
       });
@@ -694,6 +821,9 @@ export default function ChatWidget({
       const finalMessages: ChatMessage[] = [...history, { role: "assistant", content: body, stats, sources }];
       setMessages(finalMessages);
       persist(config, finalMessages);
+      // Ollama resets to its default keep_alive after a reply — restore the chosen
+      // linger so it sticks. (LM Studio's ttl already rode the request above.)
+      if (config.keepAlive && backend === "ollama") { postPower({ keepAlive: config.keepAlive }); pollPower(); }
     } catch (err) {
       if ((err as Error).name === "AbortError") {
         // Keep whatever streamed so far; drop a trailing empty assistant turn.
@@ -761,6 +891,73 @@ export default function ChatWidget({
         </span>
         {!settingsOpen && (
           <div className="flex items-center gap-2.5 shrink-0">
+            {/* Ollama model-residency pill — only shown for Ollama servers */}
+            {powerCapable && (
+              <div className="relative">
+                <button
+                  onClick={() => setPowerOpen(o => !o)}
+                  title={isLoaded ? `Model loaded on ${backend} — click to control how long it stays` : "Model not loaded"}
+                  className={`flex items-center gap-1 text-[10px] leading-none rounded-full px-1.5 py-1 border transition-colors ${
+                    isLoaded
+                      ? "border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                      : `border-[var(--surface-border)] ${c.label} opacity-55 hover:opacity-90`
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isLoaded ? "bg-emerald-500" : "bg-current opacity-40"}`} />
+                  {isLoaded ? (pinned ? "loaded · ∞" : hasCountdown ? `loaded · ${fmtRemaining(remainingMs)}` : "loaded") : "unloaded"}
+                </button>
+                {powerOpen && (
+                  <>
+                    {/* click-away backdrop */}
+                    <div className="fixed inset-0 z-40" onClick={() => setPowerOpen(false)} />
+                    <div className={`absolute right-0 top-7 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2.5 flex flex-col gap-2`}>
+                      <p className={`text-[10px] opacity-50 ${c.label} flex items-center gap-1`}>
+                        <Power size={11} /> Keep model loaded
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {[
+                          { v: "5m", label: "5m" },
+                          { v: "30m", label: "30m" },
+                          { v: "1h", label: "1h" },
+                          { v: "-1", label: "∞" },
+                        ].map(opt => (
+                          <button
+                            key={opt.v}
+                            disabled={powerBusy}
+                            onClick={() => chooseLinger(opt.v, { load: opt.v === "-1" })}
+                            title={opt.v === "-1" ? "Load now and keep it loaded until you unload" : `Linger ${opt.label} after each reply`}
+                            className={`px-2 py-1 rounded-lg text-[11px] border transition-colors disabled:opacity-40 ${
+                              config.keepAlive === opt.v
+                                ? "border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)]"
+                                : "border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--surface-border-focus)]"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={unloadNow}
+                        disabled={powerBusy || !isLoaded}
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--surface-border-focus)] disabled:opacity-30"
+                      >
+                        {powerBusy ? <Loader size={11} className="animate-spin" /> : <Power size={11} />}
+                        Unload now
+                      </button>
+                      <p className={`text-[9px] opacity-40 ${c.label} leading-snug`}>
+                        {config.keepAlive === "-1"
+                          ? "Stays loaded until you unload."
+                          : config.keepAlive
+                            ? `Unloads after ${config.keepAlive} idle.`
+                            : backend === "lmstudio"
+                              ? "Using LM Studio's default (60m) idle unload."
+                              : "Using Ollama's default linger."}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             {messages.length > 0 && (
               <button onClick={clearChat} title="Clear this conversation" className={actionCls}>
                 <RotateCcw size={14} />
@@ -1162,6 +1359,15 @@ export default function ChatWidget({
                           className={`opacity-0 group-hover/msg:opacity-50 [@media(hover:none)]:!opacity-50 hover:!opacity-90 ${c.icon}`}
                         >
                           <Pencil size={12} />
+                        </button>
+                      )}
+                      {canEdit && m.role === "user" && (
+                        <button
+                          onClick={() => retry(i)}
+                          title="Regenerate the reply from here"
+                          className={`opacity-0 group-hover/msg:opacity-50 [@media(hover:none)]:!opacity-50 hover:!opacity-90 ${c.icon}`}
+                        >
+                          <RefreshCw size={12} />
                         </button>
                       )}
                     </div>

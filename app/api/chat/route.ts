@@ -140,9 +140,11 @@ export async function POST(request: NextRequest) {
     maxTokens = 0,
     reasoningEffort = "",
     kiwix = null,
+    ttl = 0,
   }: {
     baseUrl: string; apiKey?: string; model: string; messages: ChatMessage[];
     stream?: boolean; maxTokens?: number; reasoningEffort?: string; kiwix?: Kiwix | null;
+    ttl?: number; // LM Studio idle-unload, in seconds; set the model's linger per request
   } = await request.json();
 
   if (!baseUrl || !/^https?:\/\//.test(baseUrl) || !model || !Array.isArray(messages)) {
@@ -154,6 +156,9 @@ export async function POST(request: NextRequest) {
   const extra = {
     ...(Number(maxTokens) > 0 ? { max_tokens: Math.floor(Number(maxTokens)) } : {}),
     ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+    // LM Studio reads `ttl` (idle seconds) off the request to set auto-unload.
+    // Other servers ignore the unknown field. Only sent for LM Studio durations.
+    ...(Number(ttl) > 0 ? { ttl: Math.floor(Number(ttl)) } : {}),
   };
 
   // ── Agentic path: model can call Kiwix search tools ─────────────────────────
