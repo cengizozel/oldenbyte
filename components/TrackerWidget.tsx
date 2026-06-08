@@ -226,6 +226,9 @@ export default function TrackerWidget({
     secs: (elapsed[it.id] ?? 0) + (it.id === activeId ? runningSecs() : 0),
   }));
   const total = rows.reduce((a, b) => a + b.secs, 0);
+  // Show the most-tracked activity first (color stays pinned to the item since it
+  // was assigned above before sorting). Reorders live as the running timer climbs.
+  const sortedRows = [...rows].sort((a, b) => b.secs - a.secs);
 
   const hoveredRow = hovered != null ? rows.find(r => r.id === hovered) : undefined;
   const hoveredPct = hoveredRow && total > 0 ? Math.round((hoveredRow.secs / total) * 100) : 0;
@@ -281,7 +284,7 @@ export default function TrackerWidget({
                 <div className="relative w-28 h-28">
                   <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                     <circle cx={50} cy={50} r={R} fill="none" strokeWidth={STROKE} className="stroke-black/[0.07] dark:stroke-white/10" />
-                    {total > 0 && rows.filter(r => r.secs > 0).map(r => {
+                    {total > 0 && sortedRows.filter(r => r.secs > 0).map(r => {
                       const len = (r.secs / total) * CIRC;
                       const seg = (
                         <circle
@@ -319,7 +322,7 @@ export default function TrackerWidget({
 
               {/* Item list */}
               <ul className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-1">
-                {rows.map(r => {
+                {sortedRows.map(r => {
                   const isActive = r.id === activeId;
                   return (
                     <li key={r.id}>
