@@ -1,25 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-function decodeEntities(str: string): string {
-  return str
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
-}
-
-function extractCdata(str: string): string {
-  const m = str.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
-  return decodeEntities(m ? m[1].trim() : str.trim());
-}
-
-function extractTag(xml: string, tag: string): string {
-  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
-  return m ? extractCdata(m[1]) : "";
-}
+import { fetchFeed } from "@/lib/rss";
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get("url");
@@ -30,36 +10,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; RSS reader)" },
-      next: { revalidate: 3600 },
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const xml = await res.text();
-    const items: { title: string; link: string; pubDate: string; content: string }[] = [];
-
-    // Detect format: Atom uses <entry>, RSS uses <item>
-    const isAtom = /<entry[\s>]/i.test(xml);
-    const blockRegex = isAtom ? /<entry>([\s\S]*?)<\/entry>/g : /<item>([\s\S]*?)<\/item>/g;
-    let match;
-
-    while ((match = blockRegex.exec(xml)) !== null && items.length < limit) {
-      const block = match[1];
-      const title = extractTag(block, "title");
-      // Atom: <link href="..."/> — extract href attribute
-      // RSS:  <link>...</link> or <guid>...</guid>
-      const atomLinkMatch = block.match(/<link[^>]+href="([^"]+)"/i);
-      const link = atomLinkMatch
-        ? atomLinkMatch[1]
-        : extractTag(block, "link") || extractTag(block, "guid");
-      const pubDate = extractTag(block, "pubDate") || extractTag(block, "updated");
-      const content = extractTag(block, "content") || extractTag(block, "description") || extractTag(block, "summary");
-      if (title) items.push({ title, link, pubDate, content });
-    }
-
-    return NextResponse.json(items);
+    return NextResponse.json(await fetchFeed(url, limit, request.signal));
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

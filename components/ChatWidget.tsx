@@ -2,19 +2,25 @@
 
 import { Fragment, useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, MessageSquare, Plus, ChevronRight, ChevronDown, Library, Power, Layers, Users, Trash2, CalendarDays, EllipsisVertical, Brain, Copy, Paperclip } from "lucide-react";
+import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, MessageSquare, Plus, ChevronRight, ChevronDown, Library, Power, Layers, Users, Trash2, CalendarDays, EllipsisVertical, Brain, Copy, Paperclip, ChevronsRight } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { gatherWidgetEntries, listDashboardWidgets, getCalendarAccount, type WidgetEntry, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
+import { listDashboardWidgets, getCalendarAccount, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
 import { SettingsInput, SettingsSelect, SettingsTextarea } from "./ui/Field";
 import { EmptyState } from "./ui/WidgetChrome";
 import { stripThinking } from "@/lib/citations";
+import { tagColor } from "@/lib/colors";
 import Markdown from "./Markdown";
 
 type Role = "user" | "assistant";
 type MsgStats = { tps: number; tokens: number; total: number; ttft: number };
 type Source = { n: number; title: string; url: string; cited?: boolean };
-type ChatMessage = { role: Role; content: string; at?: number; images?: string[]; stats?: MsgStats; sources?: Source[] };
+type Proposal = {
+  title: string; start: string; end?: string; location?: string; description?: string;
+  calendarName: string; calendarUrl: string;
+  status: "pending" | "added" | "dismissed" | "failed";
+};
+type ChatMessage = { role: Role; content: string; at?: number; images?: string[]; memory?: string[]; proposals?: Proposal[]; stats?: MsgStats; sources?: Source[] };
 type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number; renamed?: boolean; characterId?: string };
 
 // A persona with its own system prompt and a private, scoped memory about the
@@ -431,22 +437,47 @@ export default function ChatWidget({
   const [anytypeBusy, setAnytypeBusy] = useState(false);
   const [anytypeError, setAnytypeError] = useState("");
 
-  // Dashboard data — gathered for widgets enabled in dashboardWidgets and
-  // shipped with each request for the model's read_widget/search_dashboard
-  // tools (only a small roster enters the model's context). Cached so we don't
-  // re-fetch every message.
-  const [ctx, setCtx] = useState<WidgetEntry[] | null>(null);
-  const [gathering, setGathering] = useState(false);
-  const [showContext, setShowContext] = useState(false);
-  // Roster for the settings checkbox list (no content fetching).
+  // Roster of readable widgets (names only; content is fetched server-side
+  // when the model explicitly calls a tool).
   const [roster, setRoster] = useState<WidgetRosterItem[]>([]);
+  // @-mention picker state: the partial token being typed and its position.
+  const [mention, setMention] = useState<{ query: string; start: number } | null>(null);
+  const [mentionIdx, setMentionIdx] = useState(0);
+  const mentionMatches = mention
+    ? roster.filter(w =>
+        w.title.toLowerCase().startsWith(mention.query.toLowerCase()) ||
+        w.type.toLowerCase().startsWith(mention.query.toLowerCase())
+      ).slice(0, 6)
+    : [];
+
+  function detectMention(value: string, caret: number) {
+    const before = value.slice(0, caret);
+    const m = before.match(/(^|\s)@([^\s@]*)$/);
+    if (!m) { setMention(null); return; }
+    if (!roster.length) listDashboardWidgets().then(setRoster).catch(() => {});
+    setMention({ query: m[2], start: caret - m[2].length - 1 });
+    setMentionIdx(0);
+  }
+
+  function insertMention(w: WidgetRosterItem) {
+    if (!mention) return;
+    const el = composerRef.current;
+    const caret = el?.selectionStart ?? input.length;
+    const next = input.slice(0, mention.start) + "@" + w.title + " " + input.slice(caret);
+    setInput(next);
+    setMention(null);
+    requestAnimationFrame(() => {
+      const pos = mention.start + w.title.length + 2;
+      el?.focus();
+      el?.setSelectionRange(pos, pos);
+    });
+  }
   // CalDAV account from the dashboard's Calendar widget (null = none
   // configured); enabling that widget's row grants agenda + calendar tools.
   const [calSource, setCalSource] = useState<CalendarSource | null>(null);
   useEffect(() => { getCalendarAccount().then(setCalSource).catch(() => {}); }, []);
   const anySourceOn = Object.values(config.dashboardWidgets).some(Boolean);
   const calendarOn = !!(calSource && config.dashboardWidgets[calSource.widgetId]);
-  const ctxChars = ctx ? ctx.reduce((n, e) => n + e.text.length, 0) : 0;
   // Image attachments: pending (pre-send) data URLs, the lightbox viewer, and
   // whether the selected model can see images (null = backend can't tell us).
   const [pendingImages, setPendingImages] = useState<string[]>([]);
@@ -477,10 +508,7 @@ export default function ChatWidget({
     if (urls.length) { setError(""); setPendingImages(prev => [...prev, ...urls].slice(0, 3)); }
   }
 
-  // Transient "added to memory" notice (auto-dismisses; click opens the character).
-  const [memoryNotice, setMemoryNotice] = useState<{ charId: string; name: string; facts: string[] } | null>(null);
-  const memNoticeTimer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(memNoticeTimer.current), []);
+
 
   // Model residency. `backend` is null until we know what this server is: null =
   // not a controllable backend (control hidden), "ollama"/"lmstudio" = supported.
@@ -528,22 +556,6 @@ export default function ChatWidget({
     return () => clearInterval(id);
   }, [streaming]);
 
-  const refreshContext = useCallback(async () => {
-    setGathering(true);
-    try {
-      const allowed = configRef.current.dashboardWidgets;
-      const result = await gatherWidgetEntries(id => allowed[id] === true);
-      setCtx(result);
-      return result;
-    } catch {
-      const empty: WidgetEntry[] = [];
-      setCtx(empty);
-      return empty;
-    } finally {
-      setGathering(false);
-    }
-  }, []);
-
   // Load persisted config + conversations (migrating the old single-chat format)
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -582,7 +594,6 @@ export default function ChatWidget({
           }
           chars = parsed.characters ?? [];
           activeChar = parsed.activeCharacterId ?? DEFAULT_CHARACTER_ID;
-          if (Object.values(cfg.dashboardWidgets).some(Boolean)) refreshContext();
         } catch {}
       }
       if (!convs.length) {
@@ -605,7 +616,7 @@ export default function ChatWidget({
       setMessages(convs.find(c => c.id === active)?.messages ?? []);
       setLoaded(true);
     });
-  }, [storageKey, refreshContext]);
+  }, [storageKey]);
 
   // Persist config + all conversations, syncing the active conversation's
   // messages from the working copy. (Signature unchanged so existing callers —
@@ -897,9 +908,6 @@ export default function ChatWidget({
     configRef.current = next;
     persist(next, messages);
     setSettingsOpen(false);
-    // Checkbox changes invalidate the cached gather; rebuild if lookup is on.
-    setCtx(null);
-    if (Object.values(next.dashboardWidgets).some(Boolean)) refreshContext();
   }
 
   function clearChat() {
@@ -908,6 +916,41 @@ export default function ChatWidget({
     setMessages([]);
     setError("");
     persist(config, []);
+  }
+
+  // Resolve a calendar proposal: only a user click here ever creates the event.
+  async function resolveProposal(msgIndex: number, propIndex: number, accept: boolean) {
+    const msg = messages[msgIndex];
+    const prop = msg?.proposals?.[propIndex];
+    if (!prop || prop.status !== "pending") return;
+    let status: Proposal["status"] = "dismissed";
+    if (accept) {
+      if (!calSource) { status = "failed"; }
+      else {
+        try {
+          const res = await fetch("/api/caldav", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              op: "create",
+              baseUrl: calSource.account.baseUrl,
+              username: calSource.account.username,
+              password: calSource.account.password,
+              calendar: { name: prop.calendarName, url: prop.calendarUrl },
+              event: { title: prop.title, start: prop.start, end: prop.end, location: prop.location, description: prop.description },
+            }),
+          });
+          status = res.ok ? "added" : "failed";
+        } catch { status = "failed"; }
+      }
+    }
+    const next = messages.map((m, i) =>
+      i === msgIndex
+        ? { ...m, proposals: m.proposals!.map((pr, j) => (j === propIndex ? { ...pr, status } : pr)) }
+        : m
+    );
+    setMessages(next);
+    persist(config, next);
   }
 
   // Flip one widget's data access; invalidate the cached gather so the next
@@ -921,7 +964,6 @@ export default function ChatWidget({
     setConfig(next);
     configRef.current = next;
     persist(next, messages);
-    setCtx(null);
   }
 
   function toggleKiwix() {
@@ -1132,7 +1174,7 @@ export default function ChatWidget({
   // Combine the user's system prompt with tool guidance. Dashboard data itself
   // never enters the prompt: the model reads it on demand through the
   // read_widget/search_dashboard tools (the request carries the data).
-  function buildSystemContent(dash: WidgetEntry[] | null): string {
+  function buildSystemContent(dash: WidgetRosterItem[] | null): string {
     const parts: string[] = [BASE_IDENTITY];
     // The active character's persona (the default Assistant's persona is the
     // config system prompt, so editing it in settings still works) + its memory.
@@ -1155,6 +1197,7 @@ export default function ChatWidget({
         `- read_widget(id): read one widget's current content. The tool description lists every widget available right now (their notes, feeds, tracker, headlines...). Long content comes back in parts; use find="keywords" to jump to matching sections or page=N to read sequentially.\n` +
         `- search_dashboard(query): keyword-search across ALL widgets at once, when you don't know which widget holds the answer.\n\n` +
         `When the user asks about their notes, what they wrote, their tracked time, or what's new in the things they follow, use these tools rather than guessing. ` +
+        `When the user mentions a widget with @ (like "@Tracker"), they are pointing you at that widget: read it. ` +
         `Typical flow: for "what's new on X" read that widget directly; for "where did I mention Y" search the dashboard first, then read the matching widget for context. ` +
         `Notes are the user's own writing: quote them faithfully, with their dates. ` +
         `What the tools return is everything you can see. If the answer isn't there, say so plainly rather than inventing entries.`
@@ -1164,7 +1207,7 @@ export default function ChatWidget({
       parts.push(
         `You can read and write the user's calendar through list_calendar_events and create_calendar_event. ` +
         `Use list_calendar_events for any question about their schedule, free time, or upcoming events; today's date is ${new Date().toISOString().split("T")[0]}. ` +
-        `Only call create_calendar_event when the user explicitly asks to add or schedule something; afterwards, confirm exactly what you created (title, date, time, calendar). ` +
+        `create_calendar_event NEVER writes directly: it shows the user a confirmation card and they decide. Only propose an event when the user explicitly asks to add or schedule something, and afterwards tell them it awaits their confirmation. ` +
         `If a create fails on a read-only calendar, say so and suggest a writable one.`
       );
     }
@@ -1302,10 +1345,18 @@ export default function ChatWidget({
       );
       setCharacters(next);
       persistCharacters(next, activeCharacterIdRef.current);
-      // Show what changed instead of revising silently.
-      setMemoryNotice({ charId: character.id, name: character.name, facts: changes });
-      window.clearTimeout(memNoticeTimer.current);
-      memNoticeTimer.current = window.setTimeout(() => setMemoryNotice(null), 8000);
+      // Surface what changed as permanent text on the reply that caused it.
+      const convId = activeIdRef.current;
+      const attach = (msgs: ChatMessage[]): ChatMessage[] => {
+        const idx = msgs.map(m => m.role).lastIndexOf("assistant");
+        if (idx === -1) return msgs;
+        return msgs.map((m, i) => (i === idx ? { ...m, memory: [...(m.memory ?? []), ...changes] } : m));
+      };
+      const convs = conversationsRef.current.map(cv => (cv.id === convId ? { ...cv, messages: attach(cv.messages) } : cv));
+      conversationsRef.current = convs;
+      setConversations(convs);
+      persistConversations(configRef.current, convs, activeIdRef.current);
+      if (convId === activeIdRef.current) setMessages(prev => attach(prev));
     } catch { /* memory is best-effort */ }
   }
 
@@ -1320,23 +1371,34 @@ export default function ChatWidget({
   }
 
   // Stream an assistant reply for a history ending in a user message. Shared by
-  // send() and by editing a user message (which truncates, then regenerates).
-  async function generate(history: ChatMessage[]) {
+  // send(), editing a user message, and continuing a cut-off reply (which
+  // streams into the existing last assistant message, tools disabled).
+  async function generate(history: ChatMessage[], opts?: { continueFrom?: { base: string } }) {
+    const cont = opts?.continueFrom;
     timingRef.current = { start: performance.now(), first: null };
     atBottomRef.current = true; // follow the new turn
     setStreaming(true);
 
-    // Make sure dashboard data is gathered before we build the prompt (cached
-    // after the first time, so this is instant on subsequent messages).
-    const dash = anySourceOn ? (ctx ?? await refreshContext()) : null;
+    // Only the roster travels with the request; widget content is fetched
+    // server-side when the model explicitly reads a widget. An @-mention in
+    // the message force-includes that widget even when its toggle is off.
+    const lastUserText = [...history].reverse().find(m => m.role === "user")?.content ?? "";
+    const wantsRoster = anySourceOn || lastUserText.includes("@");
+    const rosterNow = wantsRoster && !cont ? await listDashboardWidgets().catch(() => [] as WidgetRosterItem[]) : [];
+    const dash = rosterNow.filter(w =>
+      config.dashboardWidgets[w.id] === true || lastUserText.includes(`@${w.title}`)
+    );
 
-    // Assistant placeholder we stream tokens into
-    setMessages([...history, { role: "assistant", content: "" }]);
+    // Continuation streams into the existing message; otherwise append a placeholder.
+    setMessages(cont ? [...history] : [...history, { role: "assistant", content: "" }]);
 
     // Only role/content go upstream. Strip prior assistant <think>…</think>
     // reasoning — replaying it wastes the context window (and reasoning models
     // expect history without it), which otherwise crowds out the conversation.
     const systemContent = buildSystemContent(dash);
+    const continueNudge: { role: Role; content: string }[] = cont
+      ? [{ role: "user", content: "Continue your previous answer exactly where it left off. Do not repeat or summarize earlier text; just continue." }]
+      : [];
     const cleanHistory = history.map(m => {
       const text = m.role === "assistant" ? m.content.replace(/<think>[\s\S]*?<\/think>\s*/gi, "").trim() : m.content;
       // Images ride as OpenAI-style content parts; plain messages stay strings.
@@ -1351,9 +1413,11 @@ export default function ChatWidget({
       }
       return { role: m.role, content: text };
     });
-    const payload = systemContent
-      ? [{ role: "system", content: systemContent }, ...cleanHistory]
-      : cleanHistory;
+    const payload = [
+      ...(systemContent ? [{ role: "system", content: systemContent }] : []),
+      ...cleanHistory,
+      ...continueNudge,
+    ];
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -1370,16 +1434,16 @@ export default function ChatWidget({
           maxTokens: config.maxTokens,
           reasoningEffort: config.effort === "default" ? "" : config.effort,
           stream: true,
-          kiwix: config.useKiwix && config.kiwixUrl
+          kiwix: !cont && config.useKiwix && config.kiwixUrl
             ? { baseUrl: config.kiwixUrl } // no source: search every book on the server
             : null,
-          anytype: config.useAnytype && config.anytypeUrl && config.anytypeApiKey && config.anytypeSpaceId
+          anytype: !cont && config.useAnytype && config.anytypeUrl && config.anytypeApiKey && config.anytypeSpaceId
             ? { baseUrl: config.anytypeUrl, apiKey: config.anytypeApiKey, spaceId: config.anytypeSpaceId, spaceName: config.anytypeSpaceName }
             : null,
-          dashboard: dash?.length
-            ? { widgets: dash.map(e => ({ id: e.id, title: e.title, type: e.type, text: e.text })) }
+          dashboard: dash.length
+            ? { widgets: dash.map(w => ({ id: w.id, title: w.title, type: w.type })) }
             : null,
-          caldav: calendarOn ? calSource!.account : null,
+          caldav: !cont && calendarOn ? calSource!.account : null,
           // LM Studio sets its idle-unload from the request itself; pass the
           // chosen linger as ttl seconds (Ollama uses its own keep_alive path).
           ttl: backend === "lmstudio" ? ttlSeconds(config.keepAlive) : 0,
@@ -1406,7 +1470,7 @@ export default function ChatWidget({
         if (body && timingRef.current.first == null) timingRef.current.first = performance.now();
         setMessages(prev => {
           const next = [...prev];
-          next[next.length - 1] = { ...next[next.length - 1], content: body };
+          next[next.length - 1] = { ...next[next.length - 1], content: (cont?.base ?? "") + body };
           return next;
         });
       }
@@ -1415,11 +1479,15 @@ export default function ChatWidget({
       const sep = acc.indexOf("\x1e");
       let tokens = 0;
       let sources: Source[] | undefined;
+      let proposals: Proposal[] | undefined;
       if (sep !== -1) {
         try {
           const trailer = JSON.parse(acc.slice(sep + 1));
           tokens = trailer.tokens ?? 0;
           if (Array.isArray(trailer.sources) && trailer.sources.length) sources = trailer.sources;
+          if (Array.isArray(trailer.proposals) && trailer.proposals.length) {
+            proposals = trailer.proposals.map((pr: Omit<Proposal, "status">) => ({ ...pr, status: "pending" as const }));
+          }
         } catch {}
       }
       const end = performance.now();
@@ -1430,7 +1498,15 @@ export default function ChatWidget({
         ? { tokens, ttft, total: (end - start) / 1000, tps: genS > 0 ? tokens / genS : 0 }
         : undefined;
 
-      const finalMessages: ChatMessage[] = [...history, { role: "assistant", content: body, at: Date.now(), stats, sources }];
+      const finalMessages: ChatMessage[] = cont
+        ? [...history.slice(0, -1), {
+            ...history[history.length - 1],
+            content: cont.base + body,
+            stats: stats && history[history.length - 1].stats
+              ? { ...stats, tokens: stats.tokens + (history[history.length - 1].stats!.tokens ?? 0) }
+              : stats ?? history[history.length - 1].stats,
+          }]
+        : [...history, { role: "assistant", content: body, at: Date.now(), stats, sources, ...(proposals ? { proposals } : {}) }];
       setMessages(finalMessages);
       persist(config, finalMessages);
       // Ollama resets to its default keep_alive after a reply — restore the chosen
@@ -1619,6 +1695,7 @@ export default function ChatWidget({
                         </button>
                       );
                     })}
+                    <p className={`px-2.5 pt-2 pb-1 text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-40 border-t ${c.border} mt-1 ${c.label}`}>Connections</p>
                     {([
                       { icon: Library, label: "Kiwix library", caption: "all books", on: config.useKiwix, ready: !!config.kiwixUrl, toggle: toggleKiwix, hint: "set up in settings" },
                       { icon: Layers, label: "Anytype", caption: config.anytypeSpaceName || "", on: config.useAnytype, ready: !!(config.anytypeApiKey && config.anytypeSpaceId), toggle: toggleAnytype, hint: "pair in settings" },
@@ -1641,37 +1718,7 @@ export default function ChatWidget({
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.on && row.ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
                       </button>
                     ))}
-                    {anySourceOn && (
-                      <button
-                        onClick={() => refreshContext()}
-                        disabled={gathering}
-                        className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/5 ${c.text} disabled:opacity-50`}
-                      >
-                        <RefreshCw size={13} className={`shrink-0 opacity-60 ${c.label} ${gathering ? "animate-spin" : ""}`} />
-                        <span className="flex-1 min-w-0">
-                          {gathering ? "Refreshing dashboard data…" : "Refresh dashboard data"}
-                          {!gathering && ctx?.length ? (
-                            <span className={`block text-[10px] opacity-50 ${c.label}`}>
-                              {ctx.length} widget{ctx.length === 1 ? "" : "s"} · ~{Math.round(ctxChars / 1000)}k chars tool-readable
-                            </span>
-                          ) : null}
-                        </span>
-                      </button>
-                    )}
                     <div className={`my-1 border-t ${c.border} opacity-60`} />
-                    <button
-                      onClick={() => { setMenuOpen(false); if (anySourceOn && !ctx) refreshContext(); setShowContext(true); }}
-                      className={`text-left px-2.5 py-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/5 ${c.text}`}
-                    >
-                      View model context
-                      <span className={`block text-[10px] opacity-50 ${c.label}`}>
-                        {gathering
-                          ? "gathering…"
-                          : anySourceOn
-                            ? (ctx?.length ? `${ctx.length} widget${ctx.length === 1 ? "" : "s"} · ~${Math.round(ctxChars / 1000)}k chars tool-readable` : "widget access on")
-                            : "no widget access enabled"}
-                      </span>
-                    </button>
                     <button
                       onClick={() => { setMenuOpen(false); clearChat(); }}
                       disabled={messages.length === 0}
@@ -1853,50 +1900,6 @@ export default function ChatWidget({
           </div>
         </div>
       )}
-
-      {/* Context viewer overlay. Two clearly separated halves: what is sent to
-          the model with every message (small), and what its tools may fetch on
-          demand (large, never in the prompt). */}
-      {showContext && (() => {
-        const prompt = buildSystemContent(ctx);
-        const roster = ctx?.length
-          ? ctx.map(e => `- ${e.id}: "${e.title}" (${e.type}, ${e.text.length} chars)`).join("\n")
-          : "";
-        const sentChars = prompt.length + roster.length;
-        return (
-          <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
-            <div className={`flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b ${c.border}`}>
-              <span className={`flex items-center gap-1.5 text-xs font-medium opacity-70 ${c.label}`}>
-                <Database size={13} />
-                Context: ~{Math.max(1, Math.round(sentChars / 1000))}k chars sent
-                {ctx ? ` · ~${Math.round(ctxChars / 1000)}k tool-readable (${ctx.length} widget${ctx.length === 1 ? "" : "s"})` : ""}
-              </span>
-              <button onClick={() => setShowContext(false)} title="Close" className={`opacity-50 hover:opacity-90 ${c.label}`}>
-                <X size={14} />
-              </button>
-            </div>
-            <div className="flex-1 min-h-0 overflow-auto p-4 flex flex-col gap-3">
-              <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 ${c.label}`}>
-                Sent with every message ({sentChars.toLocaleString()} chars)
-              </p>
-              <pre className={`text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono ${c.text} opacity-90`}>
-                {prompt || "No system prompt."}
-                {roster ? `\n\nWidget roster (inside the read_widget tool):\n${roster}` : ""}
-              </pre>
-              {ctx && ctx.length > 0 && (
-                <>
-                  <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 mt-2 ${c.label}`}>
-                    Fetched only when a tool reads it ({ctxChars.toLocaleString()} chars, never sent up front)
-                  </p>
-                  <pre className={`text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono ${c.text} opacity-60`}>
-                    {ctx.map(e => e.text).join("\n\n")}
-                  </pre>
-                </>
-              )}
-            </div>
-          </div>
-        );
-      })()}
 
       {settingsOpen ? (
         /* Settings panel: Model, Behavior, Data sources */
@@ -2270,6 +2273,59 @@ export default function ChatWidget({
                     {!inProgress && m.role === "assistant" && m.sources && m.sources.length > 0 && (
                       <SourcesList sources={m.sources} labelClass={c.label} textClass={c.text} />
                     )}
+                    {!inProgress && m.role === "assistant" && (m.proposals?.length ?? 0) > 0 && (
+                      <div className="flex flex-col gap-1.5 max-w-[85%]">
+                        {m.proposals!.map((pr, j) => (
+                          <div key={j} className={`rounded-xl border ${c.border} bg-[var(--surface)] px-3 py-2 flex flex-col gap-1`}>
+                            <span className="flex items-center gap-1.5 text-xs text-[var(--text-primary)]">
+                              <CalendarDays size={12} className={`shrink-0 ${c.label}`} />
+                              <span className="font-medium truncate">{pr.title}</span>
+                            </span>
+                            <span className="text-[11px] text-[var(--text-secondary)]">
+                              {pr.start.replace("T", " ")}{pr.end ? ` to ${pr.end.replace("T", " ")}` : ""} · {pr.calendarName}
+                              {pr.location ? ` · ${pr.location}` : ""}
+                            </span>
+                            {pr.status === "pending" ? (
+                              <span className="flex items-center gap-2 mt-0.5">
+                                <button
+                                  onClick={() => resolveProposal(i, j, true)}
+                                  className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-600/90 text-white hover:bg-emerald-600"
+                                >
+                                  Add to calendar
+                                </button>
+                                <button
+                                  onClick={() => resolveProposal(i, j, false)}
+                                  className="text-[11px] px-2.5 py-1 rounded-lg border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                >
+                                  Dismiss
+                                </button>
+                              </span>
+                            ) : (
+                              <span className={`text-[10px] ${pr.status === "added" ? "text-emerald-600 dark:text-emerald-400" : pr.status === "failed" ? "text-red-500" : "opacity-50 text-[var(--text-secondary)]"}`}>
+                                {pr.status === "added" ? "added to calendar" : pr.status === "failed" ? "could not add (check the calendar widget)" : "dismissed"}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {!inProgress && m.role === "assistant" && (m.memory?.length ?? 0) > 0 && (
+                      <button
+                        onClick={() => {
+                          const ch = characters.find(x => x.id === (activeConv?.characterId ?? activeCharacterId));
+                          if (ch) { setEditingCharId(ch.id); setCharDraft({ ...ch }); }
+                        }}
+                        title="Open this character's memories"
+                        className={`flex flex-col items-start gap-0.5 px-1 text-left opacity-55 hover:opacity-90 transition-opacity ${c.label}`}
+                      >
+                        {m.memory!.map((line, k) => (
+                          <span key={k} className="flex items-center gap-1 text-[10px]">
+                            <Brain size={10} className="shrink-0" />
+                            <span className="truncate max-w-[260px]">{line}</span>
+                          </span>
+                        ))}
+                      </button>
+                    )}
                     {inProgress && (() => {
                       // Honest status: residency-aware before the first byte,
                       // trail-aware while a think block is open (tool activity
@@ -2329,6 +2385,15 @@ export default function ChatWidget({
                           <RefreshCw size={12} />
                         </button>
                       )}
+                      {canEdit && m.role === "assistant" && i === messages.length - 1 && (
+                        <button
+                          onClick={() => generate([...messages], { continueFrom: { base: m.content } })}
+                          title="Continue this reply where it left off"
+                          className={`opacity-0 group-hover/msg:opacity-50 [@media(hover:none)]:!opacity-50 hover:!opacity-90 ${c.icon}`}
+                        >
+                          <ChevronsRight size={12} />
+                        </button>
+                      )}
                     </div>
                   </div>
                   </Fragment>
@@ -2338,34 +2403,6 @@ export default function ChatWidget({
             )}
             {error && <p className="text-red-400 text-xs">{error}</p>}
           </div>
-
-          {/* Transient memory notice: what the character just learned */}
-          {memoryNotice && (
-            <div className="relative shrink-0">
-              <button
-                onClick={() => {
-                  const ch = characters.find(x => x.id === memoryNotice.charId);
-                  if (ch) { setEditingCharId(ch.id); setCharDraft({ ...ch }); }
-                  setMemoryNotice(null);
-                }}
-                title="Open this character's memories"
-                className={`absolute bottom-1.5 left-3 right-3 z-30 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border ${c.border} bg-[var(--surface)] shadow-sm text-[11px] text-left text-[var(--text-secondary)]`}
-              >
-                <Brain size={12} className={`shrink-0 ${c.label}`} />
-                <span className="flex-1 min-w-0 truncate">
-                  {memoryNotice.facts.length > 1
-                    ? `${memoryNotice.name}: ${memoryNotice.facts.length} memory changes`
-                    : `${memoryNotice.name} ${memoryNotice.facts[0]}`}
-                </span>
-                <span
-                  onClick={e => { e.stopPropagation(); setMemoryNotice(null); }}
-                  className="shrink-0 opacity-50 hover:opacity-100"
-                >
-                  <X size={12} />
-                </span>
-              </button>
-            </div>
-          )}
 
           {/* Pending image attachments */}
           {pendingImages.length > 0 && (
@@ -2391,19 +2428,51 @@ export default function ChatWidget({
             </div>
           )}
 
+          {/* @-mention picker */}
+          {mention && mentionMatches.length > 0 && (
+            <div className="relative shrink-0">
+              <div className={`absolute bottom-1.5 left-3 right-3 z-30 rounded-xl border ${c.border} bg-[var(--surface)] shadow-lg p-1 flex flex-col`}>
+                {mentionMatches.map((w, k) => (
+                  <button
+                    key={w.id}
+                    onMouseDown={e => { e.preventDefault(); insertMention(w); }}
+                    onMouseEnter={() => setMentionIdx(k)}
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-left ${
+                      k === mentionIdx ? "bg-black/5 dark:bg-white/10" : ""
+                    } text-[var(--text-primary)]`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(w.type).dot }} />
+                    <span className="flex-1 min-w-0 truncate">{w.title}</span>
+                    <span className="text-[10px] opacity-50">{w.type}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Composer */}
           <div className={`shrink-0 p-2.5 border-t ${c.border}`}>
             <div className="flex items-end gap-2 bg-[var(--surface)] rounded-2xl border border-[var(--surface-border)] px-3 py-1.5">
               <textarea
                 ref={composerRef}
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={e => {
+                  setInput(e.target.value);
+                  detectMention(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                }}
                 onKeyDown={e => {
+                  if (mention && mentionMatches.length) {
+                    if (e.key === "ArrowDown") { e.preventDefault(); setMentionIdx(i => (i + 1) % mentionMatches.length); return; }
+                    if (e.key === "ArrowUp") { e.preventDefault(); setMentionIdx(i => (i - 1 + mentionMatches.length) % mentionMatches.length); return; }
+                    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(mentionMatches[mentionIdx]); return; }
+                    if (e.key === "Escape") { setMention(null); return; }
+                  }
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     send();
                   }
                 }}
+                onBlur={() => setTimeout(() => setMention(null), 150)}
                 onPaste={e => {
                   const files = [...e.clipboardData.items]
                     .filter(it => it.kind === "file" && it.type.startsWith("image/"))

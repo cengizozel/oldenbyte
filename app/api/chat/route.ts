@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { search as kiwixSearch, searchAllBooks, articleExtract } from "@/lib/kiwix";
 import { anytypeSearch, anytypeReadObject, anytypeDeepLink } from "@/lib/anytype";
-import { listEvents, createEvent, type CalDAVCalendar } from "@/lib/caldav";
+import { listEvents, type CalDAVCalendar } from "@/lib/caldav";
+import { readWidgetData } from "@/lib/widgetData";
 
 // Server-side proxy to any OpenAI-compatible chat endpoint (Ollama, LM Studio,
 // llama.cpp, vLLM, OpenAI itself, …). Running it server-side avoids CORS and
@@ -20,10 +21,10 @@ type ChatMessage = { role: string; content: string } & Record<string, any>;
 // language under the hood); set it to pin the search to one ZIM.
 type Kiwix = { baseUrl: string; source?: string; sourceTitle?: string };
 type Anytype = { baseUrl: string; apiKey: string; spaceId: string; spaceName?: string };
-// Widget data gathered client-side (the browser has live access to every
-// widget's content) and shipped with the request. Only the roster line goes
-// into the model's context; the texts stay server-side until a tool reads them.
-type DashWidget = { id: string; title: string; type: string; text: string };
+// The request carries only a roster of readable widgets; their content is
+// fetched fresh, server-side, when the model explicitly calls read_widget or
+// search_dashboard (each call is visible in the chat's research trail).
+type DashWidget = { id: string; title: string; type: string };
 type Dashboard = { widgets: DashWidget[] };
 // Credentials come from the dashboard's Calendar widget config, relayed by the
 // chat client per request (same pattern as anytype).
@@ -177,7 +178,7 @@ function anytypeTools(spaceName?: string) {
 // ── Dashboard tools ──────────────────────────────────────────────────────────
 function dashboardTools(widgets: DashWidget[]) {
   const roster = widgets
-    .map(w => `- ${w.id}: "${w.title}" (${w.type}, ${(w.text || "").length} chars)`)
+    .map(w => `- ${w.id}: "${w.title}" (${w.type})`)
     .join("\n");
   return [
     {
@@ -221,7 +222,7 @@ function dashboardTools(widgets: DashWidget[]) {
 
 // Cross-widget keyword search: phrase first, then individual terms, up to 3
 // merged ±200-char windows per widget, ~3000 chars total.
-function searchWidgets(widgets: DashWidget[], query: string): { text: string; hitIds: string[] } {
+function searchWidgets(widgets: (DashWidget & { text: string })[], query: string): { text: string; hitIds: string[] } {
   const phrase = query.toLowerCase().trim();
   const terms = [phrase, ...phrase.split(/\s+/).filter(t => t.length >= 3 && t !== phrase)];
   const out: string[] = [];
@@ -380,7 +381,16 @@ type ToolResult =
   | { kind: "article"; title: string; link: string; text: string; meta?: string }
   // Dashboard reads: full text goes to the model, only `note` shows in the trail.
   | { kind: "widget"; note: string; text: string }
+  // Calendar writes are NEVER executed by the model: they become proposals the
+  // user must confirm in the UI (delivered to the client via the trailer).
+  | { kind: "proposal"; note: string; text: string; proposal: CalendarProposal }
   | { kind: "message"; text: string };
+
+export type CalendarProposal = {
+  title: string; start: string; end?: string;
+  location?: string; description?: string;
+  calendarName: string; calendarUrl: string;
+};
 
 // Execute a tool call by calling the source libs directly (NOT via /api/* — a
 // server-side fetch carries no session cookie and the auth middleware would
@@ -407,8 +417,8 @@ async function runTool(
       const events = settled.flatMap(r => (r.status === "fulfilled" ? r.value : []));
       events.sort((a, b) => a.start.localeCompare(b.start));
       const text = events.length
-        ? `Events from ${start} to ${end}:\n${events.map(fmtEventLine).join("\n")}`
-        : `No events between ${start} and ${end}.`;
+        ? `Today is ${today}. Events from ${start} to ${end}, in chronological order:\n${events.map(fmtEventLine).join("\n")}`
+        : `Today is ${today}. No events between ${start} and ${end}.`;
       return { kind: "widget", note: `checking calendar ${start} to ${end} (${events.length} events)`, text };
     }
     if (name === "create_calendar_event" && ctx.caldav) {
@@ -419,15 +429,20 @@ async function runTool(
       const wanted = String(args?.calendar ?? "").trim().toLowerCase();
       const calendar = (wanted && writable.find(c => c.name.toLowerCase().includes(wanted))) || writable[0];
       if (!calendar) return { kind: "message", text: "No writable calendar available." };
-      const account = { baseUrl: ctx.caldav.baseUrl, username: ctx.caldav.username, password: ctx.caldav.password };
-      await createEvent(account, calendar, {
+      // No write happens here: the user gets a confirmation card and the event
+      // is only created when they approve it client-side.
+      const proposal: CalendarProposal = {
         title, start,
         end: args?.end ? String(args.end) : undefined,
         location: args?.location ? String(args.location) : undefined,
         description: args?.description ? String(args.description) : undefined,
-      }, signal);
-      const text = `Created "${title}" on ${start.replace("T", " ")} in calendar "${calendar.name}".`;
-      return { kind: "widget", note: `adding "${title}" to ${calendar.name}`, text };
+        calendarName: calendar.name, calendarUrl: calendar.url,
+      };
+      const text =
+        `Proposed event "${title}" (${start.replace("T", " ")}) for calendar "${calendar.name}". ` +
+        `It is NOT on the calendar yet: the user sees a confirmation card and must approve it. ` +
+        `Tell them it is awaiting their confirmation; never claim it was added.`;
+      return { kind: "proposal", note: `proposing "${title}" for ${start.replace("T", " ")}`, text, proposal };
     }
     if (name === "read_widget" && ctx.dashboard) {
       const id = String(args?.id ?? "").trim();
@@ -439,14 +454,25 @@ async function runTool(
       if (!w) {
         return { kind: "message", text: `No widget "${id}". Valid ids: ${ctx.dashboard.widgets.map(x => x.id).join(", ")}` };
       }
-      const win = windowMarkdown(w.text || "", args?.find ? String(args.find) : undefined, args?.page ? Number(args.page) : undefined);
+      const data = await readWidgetData(w.id, w.type, w.title);
+      const win = windowMarkdown(data, args?.find ? String(args.find) : undefined, args?.page ? Number(args.page) : undefined);
       const text = (win.header ? win.header + "\n" : "") + (win.text || "(this widget has no content right now)");
-      return { kind: "widget", note: `reading widget "${w.title}"`, text: `Widget "${w.title}" (${w.type}):\n${text}` };
+      return { kind: "widget", note: `reading widget "${w.title}"`, text };
     }
     if (name === "search_dashboard" && ctx.dashboard) {
       const q = String(args?.query ?? "").trim();
       if (!q) return { kind: "message", text: "No query provided." };
-      const { text, hitIds } = searchWidgets(ctx.dashboard.widgets, q);
+      // Fetch every readable widget live, then window-match across them.
+      const settled = await Promise.allSettled(
+        ctx.dashboard.widgets.slice(0, 20).map(async w => ({
+          id: w.id, title: w.title, type: w.type,
+          text: await readWidgetData(w.id, w.type, w.title),
+        }))
+      );
+      const filled = settled
+        .filter((r): r is PromiseFulfilledResult<{ id: string; title: string; type: string; text: string }> => r.status === "fulfilled")
+        .map(r => r.value);
+      const { text, hitIds } = searchWidgets(filled, q);
       const note = hitIds.length
         ? `searching dashboard for "${q}" — matches in ${hitIds.join(", ")}`
         : `searching dashboard for "${q}" — no matches`;
@@ -571,6 +597,7 @@ export async function POST(request: NextRequest) {
         // decoration. `opened` tracks articles actually READ via get_article, so a
         // correctly-read source still shows even if the model forgets to print [n].
         const sources: { n: number; title: string; url: string }[] = [];
+        const proposals: CalendarProposal[] = [];
         const byUrl = new Map<string, number>();
         const opened = new Set<number>();
         const cite = (title: string, url: string): number => {
@@ -773,6 +800,10 @@ export async function POST(request: NextRequest) {
                 // Dashboard data is the user's own; it is not a citeable source.
                 emit(`\n📊 ${out.note}\n`);
                 toolText = out.text;
+              } else if (out.kind === "proposal") {
+                emit(`\n📅 ${out.note}\n`);
+                proposals.push(out.proposal);
+                toolText = out.text;
               } else {
                 toolText = out.text;
                 emit(out.text + "\n");
@@ -835,7 +866,7 @@ export async function POST(request: NextRequest) {
           const shownSources = sources
             .filter((s) => opened.has(s.n) || usedNums.has(s.n))
             .map((s) => ({ ...s, cited: usedNums.has(s.n) }));
-          emit("\x1e" + JSON.stringify({ tokens: totalTokens, sources: shownSources }));
+          emit("\x1e" + JSON.stringify({ tokens: totalTokens, sources: shownSources, proposals }));
         } catch (err) {
           if ((err as Error).name !== "AbortError") { closeThink(); emit(`\n[error] ${String(err)}`); }
         } finally {

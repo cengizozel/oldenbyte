@@ -411,6 +411,20 @@ function SettingsPanel({
             </div>
           </section>
         </div>
+
+        <div className="shrink-0 px-5 py-3 border-t border-[var(--surface-border)]">
+          <p className="text-[10px] text-[var(--text-muted)]">
+            oldenbyte © 2026{" "}
+            <a
+              href="https://github.com/cengizozel/oldenbyte"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-[var(--text-secondary)]"
+            >
+              Cengiz Ozel
+            </a>
+          </p>
+        </div>
       </div>
     </>
   );
@@ -592,13 +606,6 @@ export default function TopBar({
           {dashboards && onDashboardsChange && (
             <DashboardSwitcher dashboards={dashboards} onChange={onDashboardsChange} />
           )}
-          <a
-            href="/digest"
-            className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-            title="Morning digest"
-          >
-            <Newspaper size={14} />
-          </a>
           <button
             onClick={onToggleEdit}
             className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
@@ -606,6 +613,13 @@ export default function TopBar({
           >
             {editing ? <Check size={14} /> : <LayoutGrid size={14} />}
           </button>
+          <a
+            href="/digest"
+            className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            title="Morning digest"
+          >
+            <Newspaper size={14} />
+          </a>
           <button
             onClick={() => setSettingsOpen(o => !o)}
             className="transition-colors text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
