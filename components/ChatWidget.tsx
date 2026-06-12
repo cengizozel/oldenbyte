@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library, Power, Layers, Users, Trash2 } from "lucide-react";
+import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library, Power, Layers, Users, Trash2, CalendarDays } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { gatherWidgetEntries, listDashboardWidgets, type WidgetEntry, type WidgetRosterItem } from "@/lib/dashboardContext";
+import { gatherWidgetEntries, listDashboardWidgets, getCalendarAccount, type WidgetEntry, type WidgetRosterItem, type CalendarAccount } from "@/lib/dashboardContext";
 import { SettingsInput, SettingsSelect, SettingsTextarea } from "./ui/Field";
 import Markdown from "./Markdown";
 
@@ -167,6 +167,7 @@ type ChatConfig = {
   kiwixUrl: string;        // kiwix-serve base URL; lookups search ALL books on it
   kiwixSource: string;     // legacy single-book pin (no longer set by the UI)
   kiwixSourceTitle: string;
+  useCalendar: boolean;    // let the model read/write the dashboard Calendar widget's CalDAV account
   useAnytype: boolean;     // let the model search the user's Anytype via tools
   anytypeUrl: string;      // Anytype local API base (default 127.0.0.1:31009)
   anytypeApiKey: string;   // paired Bearer token
@@ -224,6 +225,7 @@ const DEFAULT_CONFIG: ChatConfig = {
   kiwixUrl: "",
   kiwixSource: "",
   kiwixSourceTitle: "",
+  useCalendar: false,
   useAnytype: false,
   anytypeUrl: "http://127.0.0.1:31009",
   anytypeApiKey: "",
@@ -310,6 +312,9 @@ export default function ChatWidget({
   const [showContext, setShowContext] = useState(false);
   // Roster for the settings checkbox list (no content fetching).
   const [roster, setRoster] = useState<WidgetRosterItem[]>([]);
+  // CalDAV account from the dashboard's Calendar widget (null = none configured).
+  const [calAccount, setCalAccount] = useState<CalendarAccount | null>(null);
+  useEffect(() => { getCalendarAccount().then(setCalAccount).catch(() => {}); }, []);
   const ctxChars = ctx ? ctx.reduce((n, e) => n + e.text.length, 0) : 0;
   // Dashboard tools (data toggle / view / refresh) tuck behind a "+" by the send button.
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -740,6 +745,12 @@ export default function ChatWidget({
     persist(next, messages);
   }
 
+  function toggleCalendar() {
+    const next = { ...config, useCalendar: !config.useCalendar };
+    setConfig(next);
+    persist(next, messages);
+  }
+
   function toggleAnytype() {
     const next = { ...config, useAnytype: !config.useAnytype };
     setConfig(next);
@@ -948,6 +959,14 @@ export default function ChatWidget({
         `What the tools return is everything you can see. If the answer isn't there, say so plainly rather than inventing entries.`
       );
     }
+    if (config.useCalendar) {
+      parts.push(
+        `You can read and write the user's calendar through list_calendar_events and create_calendar_event. ` +
+        `Use list_calendar_events for any question about their schedule, free time, or upcoming events; today's date is ${new Date().toISOString().split("T")[0]}. ` +
+        `Only call create_calendar_event when the user explicitly asks to add or schedule something; afterwards, confirm exactly what you created (title, date, time, calendar). ` +
+        `If a create fails on a read-only calendar, say so and suggest a writable one.`
+      );
+    }
     if (config.useKiwix && config.kiwixUrl) {
       parts.push(
         `You have access to the user's offline Kiwix reference library through the search_kiwix and get_article tools. It spans every book installed on their server (Wikipedia, WikiHow, and more), searched all at once. ` +
@@ -1081,6 +1100,7 @@ export default function ChatWidget({
           dashboard: dash?.length
             ? { widgets: dash.map(e => ({ id: e.id, title: e.title, type: e.type, text: e.text })) }
             : null,
+          caldav: config.useCalendar && calAccount ? calAccount : null,
           // LM Studio sets its idle-unload from the request itself; pass the
           // chosen linger as ttl seconds (Ollama uses its own keep_alive path).
           ttl: backend === "lmstudio" ? ttlSeconds(config.keepAlive) : 0,
@@ -1951,12 +1971,25 @@ export default function ChatWidget({
                   >
                     <Layers size={14} />
                   </button>
+                  <button
+                    onClick={() => calAccount && toggleCalendar()}
+                    title={
+                      !calAccount
+                        ? "Add and configure a Calendar widget first"
+                        : config.useCalendar
+                          ? "Calendar access on: click to turn off"
+                          : "Let me read and add to your calendar"
+                    }
+                    className={`p-1.5 rounded-full ${config.useCalendar ? toolOnCls : dashCtrlCls} ${!calAccount ? "opacity-30" : ""}`}
+                  >
+                    <CalendarDays size={14} />
+                  </button>
                 </div>
               )}
               <button
                 onClick={() => setToolsOpen(o => !o)}
                 title={toolsOpen ? "Hide data tools" : "Data tools"}
-                className={`shrink-0 p-1.5 rounded-full transition-transform ${toolsOpen ? `rotate-45 ${dashCtrlCls}` : (config.useDashboard || config.useKiwix || config.useAnytype) ? `opacity-90 ${c.label}` : dashCtrlCls}`}
+                className={`shrink-0 p-1.5 rounded-full transition-transform ${toolsOpen ? `rotate-45 ${dashCtrlCls}` : (config.useDashboard || config.useKiwix || config.useAnytype || config.useCalendar) ? `opacity-90 ${c.label}` : dashCtrlCls}`}
               >
                 <Plus size={14} />
               </button>

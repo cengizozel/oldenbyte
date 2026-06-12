@@ -391,6 +391,7 @@ export default function DigestPage() {
       case "notebook": return loadNotepad(id, widget);
       case "text":     return loadText(id, widget);
       case "weather":  return loadWeather(id, widget);
+      case "calendar": return loadCalendar(id, widget);
       case "f1":       return loadF1(widget);
       case "rss":      return loadRss(id, widget);
       case "reddit":   return loadReddit(id, widget);
@@ -440,6 +441,34 @@ export default function DigestPage() {
       const lines = summarizeForecast(cfg.name, cfg.unit ?? "c", await res.json());
       if (!lines.length) return null;
       return { id, label: widget.title || "Weather", type: "weather", entries: [{ text: lines.join("\n") }] };
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadCalendar(id: string, widget: WidgetInstance): Promise<Section | null> {
+    const raw = await storage.getItem(`calendar-widget-${id}`);
+    if (!raw) return null;
+    try {
+      const cfg = JSON.parse(raw);
+      if (!cfg?.baseUrl || !cfg.username || !cfg.calendars?.length) return null;
+      const start = new Date();
+      const end = new Date(start.getTime() + 2 * 86400000);
+      const fmt = (d: Date) => d.toISOString().slice(0, 10);
+      const res = await fetch("/api/caldav", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "events", baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password, calendars: cfg.calendars, start: fmt(start), end: fmt(end) }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      type Ev = { start: string; allDay: boolean; title: string; location?: string };
+      const events: Ev[] = data.events ?? [];
+      if (!events.length) return null;
+      const text = events
+        .map((e: Ev) => `${e.allDay ? `${e.start} all day` : e.start.replace("T", " ")}: ${e.title}${e.location ? ` at ${e.location}` : ""}`)
+        .join("\n");
+      return { id, label: widget.title || "Calendar", type: "calendar", entries: [{ text }] };
     } catch {
       return null;
     }

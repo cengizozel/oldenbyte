@@ -26,6 +26,7 @@ import ChatWidget from "./ChatWidget";
 import KiwixWidget from "./KiwixWidget";
 import AnytypeWidget from "./AnytypeWidget";
 import WeatherWidget from "./WeatherWidget";
+import CalendarWidget from "./CalendarWidget";
 import BankWidget from "./BankWidget";
 import type { BankWidgetDef } from "@/lib/widgetBank";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
@@ -69,6 +70,7 @@ function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, 
   if (widget.type === "ebook")    return <ReaderWidget   widget={widget} className={cls} />;
   if (widget.type === "f1")       return <F1Widget       widget={widget} className={cls} />;
   if (widget.type === "weather")  return <WeatherWidget  widget={widget} className={cls} />;
+  if (widget.type === "calendar") return <CalendarWidget widget={widget} className={cls} />;
   if (widget.type === "arxiv")    return <ArxivWidget    widget={widget} className={cls} />;
   if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className={cls} />;
   if (widget.type === "tracker")  return <TrackerWidget   widget={widget} className={cls} />;
@@ -274,6 +276,7 @@ export default function WidgetGrid({
     youtube:  { w: 1, h: 3 },
     f1:       { w: 1, h: 2 },
     weather:  { w: 1, h: 3 },
+    calendar: { w: 1, h: 3 },
     arxiv:    { w: 2, h: 3 },
     hf:       { w: 2, h: 3 },
     tracker:  { w: 1, h: 3 },

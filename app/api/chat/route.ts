@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { search as kiwixSearch, searchAllBooks, articleExtract } from "@/lib/kiwix";
 import { anytypeSearch, anytypeReadObject, anytypeDeepLink } from "@/lib/anytype";
+import { listEvents, createEvent, type CalDAVCalendar } from "@/lib/caldav";
 
 // Server-side proxy to any OpenAI-compatible chat endpoint (Ollama, LM Studio,
 // llama.cpp, vLLM, OpenAI itself, …). Running it server-side avoids CORS and
@@ -24,6 +25,9 @@ type Anytype = { baseUrl: string; apiKey: string; spaceId: string; spaceName?: s
 // into the model's context; the texts stay server-side until a tool reads them.
 type DashWidget = { id: string; title: string; type: string; text: string };
 type Dashboard = { widgets: DashWidget[] };
+// Credentials come from the dashboard's Calendar widget config, relayed by the
+// chat client per request (same pattern as anytype).
+type Caldav = { baseUrl: string; username: string; password: string; calendars: CalDAVCalendar[] };
 
 // Strip trailing slashes so we can safely append "/chat/completions" etc.
 function normalizeBase(baseUrl: string): string {
@@ -261,6 +265,56 @@ function searchWidgets(widgets: DashWidget[], query: string): { text: string; hi
   return { text: out.join("\n\n"), hitIds };
 }
 
+// ── Calendar tools ───────────────────────────────────────────────────────────
+function calendarTools(calendars: CalDAVCalendar[]) {
+  const names = calendars.map(c => `"${c.name}"${c.readOnly ? " (read-only)" : ""}`).join(", ");
+  return [
+    {
+      type: "function",
+      function: {
+        name: "list_calendar_events",
+        description:
+          `Read the user's calendar (calendars: ${names}). Use for anything about their schedule: ` +
+          `"what's on my calendar", "am I free Friday", "when is X". Defaults to the next 14 days.`,
+        parameters: {
+          type: "object",
+          properties: {
+            start_date: { type: "string", description: "YYYY-MM-DD (default today)" },
+            end_date: { type: "string", description: "YYYY-MM-DD exclusive (default start + 14 days)" },
+          },
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "create_calendar_event",
+        description:
+          `Add an event to the user's calendar. ONLY call this when the user explicitly asks to add, ` +
+          `schedule, or book something. Echo back what you created. Writable calendars: ` +
+          calendars.filter(c => !c.readOnly).map(c => `"${c.name}"`).join(", ") + ".",
+        parameters: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Event title" },
+            start: { type: "string", description: "YYYY-MM-DD for all-day, or YYYY-MM-DDTHH:mm" },
+            end: { type: "string", description: "Optional end, same format (default: 1 hour after start)" },
+            calendar: { type: "string", description: "Calendar name (default: first writable)" },
+            location: { type: "string" },
+            description: { type: "string" },
+          },
+          required: ["title", "start"],
+        },
+      },
+    },
+  ];
+}
+
+function fmtEventLine(e: { start: string; end: string; allDay: boolean; title: string; calendar: string; location?: string }): string {
+  const when = e.allDay ? `${e.start} (all day)` : `${e.start.replace("T", " ")} to ${e.end.slice(11, 16) || e.end}`;
+  return `- ${when}: ${e.title} [${e.calendar}]${e.location ? ` @ ${e.location}` : ""}`;
+}
+
 // Window a long object body so it never floods the model's context. With `find`,
 // return the sections matching the keywords (±context, merged); otherwise return
 // the requested ~READ_CAP-char page with a header saying how to read further.
@@ -336,10 +390,45 @@ async function runTool(
   name: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any,
-  ctx: { kiwix?: Kiwix; anytype?: Anytype; dashboard?: Dashboard },
+  ctx: { kiwix?: Kiwix; anytype?: Anytype; dashboard?: Dashboard; caldav?: Caldav },
   signal: AbortSignal,
 ): Promise<ToolResult> {
   try {
+    if (name === "list_calendar_events" && ctx.caldav) {
+      const today = new Date().toISOString().slice(0, 10);
+      const start = /^\d{4}-\d{2}-\d{2}$/.test(String(args?.start_date ?? "")) ? String(args.start_date) : today;
+      const end = /^\d{4}-\d{2}-\d{2}$/.test(String(args?.end_date ?? ""))
+        ? String(args.end_date)
+        : new Date(Date.parse(start) + 14 * 86400000).toISOString().slice(0, 10);
+      const account = { baseUrl: ctx.caldav.baseUrl, username: ctx.caldav.username, password: ctx.caldav.password };
+      const settled = await Promise.allSettled(
+        ctx.caldav.calendars.slice(0, 20).map(c => listEvents(account, c, start, end, signal))
+      );
+      const events = settled.flatMap(r => (r.status === "fulfilled" ? r.value : []));
+      events.sort((a, b) => a.start.localeCompare(b.start));
+      const text = events.length
+        ? `Events from ${start} to ${end}:\n${events.map(fmtEventLine).join("\n")}`
+        : `No events between ${start} and ${end}.`;
+      return { kind: "widget", note: `checking calendar ${start} to ${end} (${events.length} events)`, text };
+    }
+    if (name === "create_calendar_event" && ctx.caldav) {
+      const title = String(args?.title ?? "").trim();
+      const start = String(args?.start ?? "").trim();
+      if (!title || !start) return { kind: "message", text: "Missing title or start." };
+      const writable = ctx.caldav.calendars.filter(c => !c.readOnly);
+      const wanted = String(args?.calendar ?? "").trim().toLowerCase();
+      const calendar = (wanted && writable.find(c => c.name.toLowerCase().includes(wanted))) || writable[0];
+      if (!calendar) return { kind: "message", text: "No writable calendar available." };
+      const account = { baseUrl: ctx.caldav.baseUrl, username: ctx.caldav.username, password: ctx.caldav.password };
+      await createEvent(account, calendar, {
+        title, start,
+        end: args?.end ? String(args.end) : undefined,
+        location: args?.location ? String(args.location) : undefined,
+        description: args?.description ? String(args.description) : undefined,
+      }, signal);
+      const text = `Created "${title}" on ${start.replace("T", " ")} in calendar "${calendar.name}".`;
+      return { kind: "widget", note: `adding "${title}" to ${calendar.name}`, text };
+    }
     if (name === "read_widget" && ctx.dashboard) {
       const id = String(args?.id ?? "").trim();
       const w =
@@ -422,12 +511,14 @@ export async function POST(request: NextRequest) {
     kiwix = null,
     anytype = null,
     dashboard = null,
+    caldav = null,
     ttl = 0,
   }: {
     baseUrl: string; apiKey?: string; model: string; messages: ChatMessage[];
     stream?: boolean; maxTokens?: number; reasoningEffort?: string; kiwix?: Kiwix | null;
     anytype?: Anytype | null;
     dashboard?: Dashboard | null;
+    caldav?: Caldav | null;
     ttl?: number; // LM Studio idle-unload, in seconds; set the model's linger per request
   } = await request.json();
 
@@ -449,14 +540,17 @@ export async function POST(request: NextRequest) {
   const useKiwix = !!(kiwix && kiwix.baseUrl);
   const useAnytype = !!(anytype && anytype.baseUrl && anytype.apiKey && anytype.spaceId);
   const useDashboard = !!(dashboard && dashboard.widgets?.length);
-  if (useKiwix || useAnytype || useDashboard) {
+  const useCaldav = !!(caldav && caldav.baseUrl && caldav.username && caldav.calendars?.length);
+  if (useKiwix || useAnytype || useDashboard || useCaldav) {
     const toolCtx = {
       kiwix: useKiwix ? kiwix! : undefined,
       anytype: useAnytype ? anytype! : undefined,
       dashboard: useDashboard ? dashboard! : undefined,
+      caldav: useCaldav ? caldav! : undefined,
     };
     const tools = [
       ...(useDashboard ? dashboardTools(dashboard!.widgets) : []),
+      ...(useCaldav ? calendarTools(caldav!.calendars) : []),
       ...(useKiwix ? kiwixTools(kiwix!.sourceTitle) : []),
       ...(useAnytype ? anytypeTools(anytype!.spaceName) : []),
     ];

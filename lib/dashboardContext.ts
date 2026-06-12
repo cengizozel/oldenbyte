@@ -16,7 +16,7 @@ type WidgetInstance = { id: string; type: string; title: string };
 
 // Widget types worth feeding to the model as text. Notebook is handled
 // separately (full history); reader/chess/chat/empty have no useful text.
-const FEED_TYPES = new Set(["text", "f1", "weather", "rss", "reddit", "youtube", "arxiv", "hf", "tracker"]);
+const FEED_TYPES = new Set(["text", "f1", "weather", "calendar", "rss", "reddit", "youtube", "arxiv", "hf", "tracker"]);
 
 const today = () => new Date().toISOString().split("T")[0];
 
@@ -103,6 +103,30 @@ async function gatherWeather(id: string, title: string): Promise<string | null> 
     if (!res.ok) return null;
     const lines = summarizeForecast(config.name, config.unit ?? "c", await res.json());
     return lines.length ? `## ${title} (Weather)\n${lines.join("\n")}` : null;
+  } catch { return null; }
+}
+
+async function gatherCalendar(id: string, title: string): Promise<string | null> {
+  const cfg = await readJSON<CalendarAccount & { days?: number }>(`calendar-widget-${id}`);
+  if (!cfg?.baseUrl || !cfg.username || !cfg.calendars?.length) return null;
+  try {
+    const start = new Date();
+    const end = new Date(start.getTime() + (cfg.days ?? 7) * 86400000);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const res = await fetch("/api/caldav", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "events", baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password, calendars: cfg.calendars, start: fmt(start), end: fmt(end) }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    type Ev = { start: string; end: string; allDay: boolean; title: string; calendar: string; location?: string };
+    const events: Ev[] = data.events ?? [];
+    if (!events.length) return `## ${title} (Calendar)\nNo events in the next ${cfg.days ?? 7} days.`;
+    const lines = events.map(e =>
+      `- ${e.allDay ? `${e.start} (all day)` : e.start.replace("T", " ")}: ${e.title} [${e.calendar}]${e.location ? ` @ ${e.location}` : ""}`
+    );
+    return `## ${title} (Calendar, next ${cfg.days ?? 7} days)\n${lines.join("\n")}`;
   } catch { return null; }
 }
 
@@ -281,6 +305,7 @@ async function gatherWidget(id: string, w: WidgetInstance): Promise<string | nul
     case "notebook": return gatherNotebook(id, w.title);
     case "text":    return gatherText(id, w.title);
     case "weather": return gatherWeather(id, w.title);
+    case "calendar": return gatherCalendar(id, w.title);
     case "f1":      return gatherF1(w.title);
     case "rss":     return gatherRss(id, w.title);
     case "reddit":  return gatherReddit(id, w.title);
@@ -301,6 +326,38 @@ export type WidgetEntry = { id: string; title: string; type: string; text: strin
 const ENTRY_TYPES = new Set([...FEED_TYPES, "notebook"]);
 
 export type WidgetRosterItem = { id: string; title: string; type: string };
+
+export type CalendarAccount = {
+  baseUrl: string;
+  username: string;
+  password: string;
+  calendars: { name: string; url: string; readOnly?: boolean }[];
+};
+
+/**
+ * The first configured Calendar widget's CalDAV account on the active
+ * dashboard, so the chat can read/write the calendar without storing a second
+ * copy of the credentials.
+ */
+export async function getCalendarAccount(): Promise<CalendarAccount | null> {
+  const keys = await getActiveDataKeys();
+  const [layout, instances] = await Promise.all([
+    readJSON<TabLayoutItem[]>(keys.layout),
+    readJSON<Record<string, WidgetInstance>>(keys.instances),
+  ]);
+  if (!layout || !instances) return null;
+  const ids: string[] = [];
+  for (const item of layout) {
+    ids.push(item.i);
+    for (const tab of item.tabs ?? []) ids.push(tab);
+  }
+  for (const id of ids) {
+    if (instances[id]?.type !== "calendar") continue;
+    const cfg = await readJSON<CalendarAccount>(`calendar-widget-${id}`);
+    if (cfg?.baseUrl && cfg.username && cfg.calendars?.length) return cfg;
+  }
+  return null;
+}
 
 /**
  * Just the roster of data-bearing widgets on the active dashboard (no content

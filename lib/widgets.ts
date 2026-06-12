@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -130,6 +130,14 @@ export const widgets: Widget[] = [
     color: "orange",
     title: "HF Daily",
     description: "Trending AI papers curated by Hugging Face.",
+  },
+  {
+    id: "calendar",
+    type: "calendar",
+    category: "tools",
+    color: "amber",
+    title: "Calendar",
+    description: "Upcoming events from a CalDAV server (Nextcloud, Radicale).",
   },
   {
     id: "tracker",
