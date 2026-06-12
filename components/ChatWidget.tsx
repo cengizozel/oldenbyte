@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, MessageSquare, Plus, ChevronRight, ChevronDown, Library, Power, Layers, Users, Trash2, CalendarDays, EllipsisVertical, Brain, Copy } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, MessageSquare, Plus, ChevronRight, ChevronDown, Library, Power, Layers, Users, Trash2, CalendarDays, EllipsisVertical, Brain, Copy, Paperclip } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherWidgetEntries, listDashboardWidgets, getCalendarAccount, type WidgetEntry, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
@@ -13,7 +14,7 @@ import Markdown from "./Markdown";
 type Role = "user" | "assistant";
 type MsgStats = { tps: number; tokens: number; total: number; ttft: number };
 type Source = { n: number; title: string; url: string; cited?: boolean };
-type ChatMessage = { role: Role; content: string; at?: number; stats?: MsgStats; sources?: Source[] };
+type ChatMessage = { role: Role; content: string; at?: number; images?: string[]; stats?: MsgStats; sources?: Source[] };
 type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number; renamed?: boolean; characterId?: string };
 
 // A persona with its own system prompt and a private, scoped memory about the
@@ -67,6 +68,112 @@ function msgDayLabel(ms: number): string {
   if (sameDay(d, now)) return "Today";
   if (sameDay(d, new Date(Date.now() - 86400000))) return "Yesterday";
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" as const } : {}) });
+}
+
+// Downscale an attached image so stored conversations and model payloads stay
+// small (max 1568px on the long edge, JPEG on a white background).
+async function fileToDataUrl(file: File): Promise<string | null> {
+  if (!file.type.startsWith("image/")) return null;
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return null;
+  const MAX = 1568;
+  const k = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * k));
+  const h = Math.max(1, Math.round(bitmap.height * k));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const g = canvas.getContext("2d");
+  if (!g) return null;
+  g.fillStyle = "#ffffff";
+  g.fillRect(0, 0, w, h);
+  g.drawImage(bitmap, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
+// Full-viewport image viewer: scroll wheel or pinch to zoom, drag to pan when
+// zoomed, double-click to toggle, Escape / X / backdrop click to leave.
+function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  const [scale, setScale] = useState(1);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinchStart = useRef<{ dist: number; scale: number } | null>(null);
+  const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setScale(s => Math.min(6, Math.max(1, s * (e.deltaY < 0 ? 1.12 : 1 / 1.12))));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  useEffect(() => { if (scale === 1) setPos({ x: 0, y: 0 }); }, [scale]);
+
+  const dist = () => {
+    const pts = [...pointers.current.values()];
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  };
+
+  return createPortal(
+    <div
+      ref={wrapRef}
+      className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center touch-none overscroll-contain"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onPointerDown={e => {
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.current.size === 2) pinchStart.current = { dist: dist(), scale };
+        else if (scale > 1) drag.current = { x: pos.x, y: pos.y, px: e.clientX, py: e.clientY };
+      }}
+      onPointerMove={e => {
+        if (!pointers.current.has(e.pointerId)) return;
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.current.size === 2 && pinchStart.current) {
+          setScale(Math.min(6, Math.max(1, pinchStart.current.scale * (dist() / pinchStart.current.dist))));
+        } else if (drag.current) {
+          setPos({ x: drag.current.x + e.clientX - drag.current.px, y: drag.current.y + e.clientY - drag.current.py });
+        }
+      }}
+      onPointerUp={e => {
+        pointers.current.delete(e.pointerId);
+        if (pointers.current.size < 2) pinchStart.current = null;
+        if (pointers.current.size === 0) drag.current = null;
+      }}
+      onPointerCancel={e => {
+        pointers.current.delete(e.pointerId);
+        pinchStart.current = null;
+        drag.current = null;
+      }}
+      onDoubleClick={() => setScale(s => (s > 1 ? 1 : 2.5))}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt="attachment"
+        draggable={false}
+        className="max-w-[92vw] max-h-[92vh] select-none rounded-lg shadow-2xl"
+        style={{
+          transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})`,
+          cursor: scale > 1 ? "grab" : "zoom-in",
+          transition: pinchStart.current || drag.current ? "none" : "transform 120ms",
+        }}
+      />
+      <button onClick={onClose} title="Close" className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20">
+        <X size={18} />
+      </button>
+    </div>,
+    document.body
+  );
 }
 
 // Reasoning models (qwen3, deepseek-r1, …) stream their chain-of-thought inline
@@ -340,6 +447,36 @@ export default function ChatWidget({
   const anySourceOn = Object.values(config.dashboardWidgets).some(Boolean);
   const calendarOn = !!(calSource && config.dashboardWidgets[calSource.widgetId]);
   const ctxChars = ctx ? ctx.reduce((n, e) => n + e.text.length, 0) : 0;
+  // Image attachments: pending (pre-send) data URLs, the lightbox viewer, and
+  // whether the selected model can see images (null = backend can't tell us).
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [visionOk, setVisionOk] = useState<boolean | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!config.baseUrl || !config.model) { setVisionOk(null); return; }
+    let stale = false;
+    fetch(`/api/model?baseUrl=${encodeURIComponent(config.baseUrl)}&op=caps&model=${encodeURIComponent(config.model)}`)
+      .then(r => r.json())
+      .then(d => { if (!stale) setVisionOk(typeof d.vision === "boolean" ? d.vision : null); })
+      .catch(() => { if (!stale) setVisionOk(null); });
+    return () => { stale = true; };
+  }, [config.baseUrl, config.model]);
+
+  async function attachImages(files: Iterable<File>) {
+    if (visionOk === false) {
+      setError(`${config.model} can't see images; pick a vision-capable model in settings.`);
+      return;
+    }
+    const room = 3 - pendingImages.length;
+    const urls: string[] = [];
+    for (const f of [...files].slice(0, Math.max(0, room))) {
+      const url = await fileToDataUrl(f);
+      if (url) urls.push(url);
+    }
+    if (urls.length) { setError(""); setPendingImages(prev => [...prev, ...urls].slice(0, 3)); }
+  }
+
   // Transient "added to memory" notice (auto-dismisses; click opens the character).
   const [memoryNotice, setMemoryNotice] = useState<{ charId: string; name: string; facts: string[] } | null>(null);
   const memNoticeTimer = useRef<number | undefined>(undefined);
@@ -356,6 +493,9 @@ export default function ChatWidget({
   const [powerBusy, setPowerBusy] = useState(false);
   // Header overflow menu (clear conversation, context viewer).
   const [menuOpen, setMenuOpen] = useState(false);
+  // Inline rename via the room-title pill above the messages.
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   // Inline rename of a row in the Chats list.
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -1171,10 +1311,12 @@ export default function ChatWidget({
 
   async function send() {
     const text = input.trim();
-    if (!text || streaming || !configured) return;
+    if ((!text && !pendingImages.length) || streaming || !configured) return;
+    const images = pendingImages.length ? [...pendingImages] : undefined;
     setError("");
     setInput("");
-    await generate([...messages, { role: "user", content: text, at: Date.now() }]);
+    setPendingImages([]);
+    await generate([...messages, { role: "user", content: text, at: Date.now(), ...(images ? { images } : {}) }]);
   }
 
   // Stream an assistant reply for a history ending in a user message. Shared by
@@ -1195,10 +1337,20 @@ export default function ChatWidget({
     // reasoning — replaying it wastes the context window (and reasoning models
     // expect history without it), which otherwise crowds out the conversation.
     const systemContent = buildSystemContent(dash);
-    const cleanHistory = history.map(m => ({
-      role: m.role,
-      content: m.role === "assistant" ? m.content.replace(/<think>[\s\S]*?<\/think>\s*/gi, "").trim() : m.content,
-    }));
+    const cleanHistory = history.map(m => {
+      const text = m.role === "assistant" ? m.content.replace(/<think>[\s\S]*?<\/think>\s*/gi, "").trim() : m.content;
+      // Images ride as OpenAI-style content parts; plain messages stay strings.
+      if (m.images?.length) {
+        return {
+          role: m.role,
+          content: [
+            ...(text ? [{ type: "text", text }] : []),
+            ...m.images.map(url => ({ type: "image_url", image_url: { url } })),
+          ],
+        };
+      }
+      return { role: m.role, content: text };
+    });
     const payload = systemContent
       ? [{ role: "system", content: systemContent }, ...cleanHistory]
       : cleanHistory;
@@ -1302,7 +1454,10 @@ export default function ChatWidget({
           return next;
         });
       } else {
-        setError(String(err instanceof Error ? err.message : err));
+        const raw = String(err instanceof Error ? err.message : err);
+        setError(/image|vision|multimodal|pixel/i.test(raw)
+          ? `${config.model} couldn't process the image; it may not support vision. Try another model or remove the image.`
+          : raw);
         setMessages(prev => (prev[prev.length - 1]?.content === "" ? prev.slice(0, -1) : prev));
       }
     } finally {
@@ -1534,6 +1689,8 @@ export default function ChatWidget({
 
 
       {/* Chats list — switches the whole widget to a list of saved conversations */}
+      {lightbox && <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />}
+
       {historyOpen && (
         <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
           <div className={`flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b ${c.border}`}>
@@ -2020,11 +2177,30 @@ export default function ChatWidget({
               <EmptyState c={c}>ask anything</EmptyState>
             ) : (
               <>
-              {/* Room title: quiet pill, renamed in the Chats list */}
+              {/* Room title: quiet pill; click to rename in place */}
               <div className="self-center shrink-0">
-                <span className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-35 ${c.label}`}>
-                  {chatTitle}
-                </span>
+                {editingTitle ? (
+                  <input
+                    autoFocus
+                    value={titleDraft}
+                    onChange={e => setTitleDraft(e.target.value)}
+                    onBlur={() => { renameChat(activeId, titleDraft); setEditingTitle(false); }}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") { renameChat(activeId, titleDraft); setEditingTitle(false); }
+                      if (e.key === "Escape") setEditingTitle(false);
+                    }}
+                    placeholder={titleFrom(messages)}
+                    className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest text-center font-[family-name:var(--font-dm-mono)] bg-transparent border border-[var(--surface-border)] outline-none w-44 ${c.label}`}
+                  />
+                ) : (
+                  <button
+                    onClick={() => { setTitleDraft(activeConv?.renamed ? activeConv.title : ""); setEditingTitle(true); }}
+                    title="Rename this chat"
+                    className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-35 hover:opacity-70 transition-opacity ${c.label}`}
+                  >
+                    {chatTitle}
+                  </button>
+                )}
               </div>
               {messages.map((m, i) => {
                 const inProgress = streaming && i === messages.length - 1 && m.role === "assistant";
@@ -2066,7 +2242,21 @@ export default function ChatWidget({
                     </div>
                   )}
                   <div className={`flex flex-col gap-0.5 group/msg ${m.role === "user" ? "items-end" : "items-start"}`}>
-                    {!(m.role === "assistant" && !m.content) && (
+                    {(m.images?.length ?? 0) > 0 && (
+                      <div className="max-w-[85%] flex flex-wrap gap-1.5 justify-end">
+                        {m.images!.map((src, k) => (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            key={k}
+                            src={src}
+                            alt="attachment"
+                            onClick={() => setLightbox(src)}
+                            className="max-h-36 max-w-full rounded-xl border border-[var(--surface-border)] cursor-zoom-in"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {!(m.role === "assistant" && !m.content) && !(m.role === "user" && !m.content) && (
                       <div
                         className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${
                           m.role === "user"
@@ -2177,6 +2367,30 @@ export default function ChatWidget({
             </div>
           )}
 
+          {/* Pending image attachments */}
+          {pendingImages.length > 0 && (
+            <div className={`shrink-0 px-3 pb-1.5 flex items-center gap-2`}>
+              {pendingImages.map((src, k) => (
+                <div key={k} className="relative group/img">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt="pending attachment"
+                    onClick={() => setLightbox(src)}
+                    className="h-12 w-12 object-cover rounded-lg border border-[var(--surface-border)] cursor-zoom-in"
+                  />
+                  <button
+                    onClick={() => setPendingImages(prev => prev.filter((_, j) => j !== k))}
+                    title="Remove"
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[10px] leading-none shadow-sm"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Composer */}
           <div className={`shrink-0 p-2.5 border-t ${c.border}`}>
             <div className="flex items-end gap-2 bg-[var(--surface)] rounded-2xl border border-[var(--surface-border)] px-3 py-1.5">
@@ -2190,11 +2404,41 @@ export default function ChatWidget({
                     send();
                   }
                 }}
+                onPaste={e => {
+                  const files = [...e.clipboardData.items]
+                    .filter(it => it.kind === "file" && it.type.startsWith("image/"))
+                    .map(it => it.getAsFile())
+                    .filter((f): f is File => !!f);
+                  if (files.length) { e.preventDefault(); attachImages(files); }
+                }}
                 disabled={!configured || !loaded}
                 rows={1}
                 placeholder={configured ? "Message…" : "Configure a model first"}
                 className="flex-1 resize-none overflow-y-auto text-sm outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-transparent py-1 disabled:opacity-50"
               />
+              {visionOk !== false && (
+                <>
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={!configured || pendingImages.length >= 3}
+                    title={pendingImages.length >= 3 ? "Up to 3 images per message" : "Attach an image (or paste one)"}
+                    className={`shrink-0 p-1.5 rounded-full disabled:opacity-30 ${c.icon} opacity-55 hover:opacity-100 transition-opacity`}
+                  >
+                    <Paperclip size={14} />
+                  </button>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={e => {
+                      if (e.target.files?.length) attachImages(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </>
+              )}
               {streaming ? (
                 <button
                   onClick={stop}
@@ -2206,7 +2450,7 @@ export default function ChatWidget({
               ) : (
                 <button
                   onClick={send}
-                  disabled={!input.trim() || !configured}
+                  disabled={(!input.trim() && !pendingImages.length) || !configured}
                   title="Send"
                   className={`shrink-0 p-1.5 rounded-full disabled:opacity-30 ${c.label} hover:opacity-80`}
                 >

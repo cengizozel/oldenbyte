@@ -346,7 +346,10 @@ export default function WidgetGrid({
     const { x, y, w, h } = findNextPosition(layout, dw, dh);
 
     const layoutIds = new Set(layout.map(l => l.i));
-    const sameType = Object.values(instances).filter(w => w.type === template.type && layoutIds.has(w.id));
+    // Bank widgets all share the "custom" type; siblings are same-def only.
+    const sameType = Object.values(instances).filter(w =>
+      (template.type === "custom" ? w.bankId === template.bankId : w.type === template.type) && layoutIds.has(w.id)
+    );
     const title = sameType.length === 0
       ? template.title
       : `${template.title} ${sameType.length + 1}`;

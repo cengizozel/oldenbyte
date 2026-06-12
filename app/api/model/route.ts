@@ -58,6 +58,8 @@ async function lmstudioStatus(root: string, signal: AbortSignal): Promise<Status
 }
 
 // GET /api/model?baseUrl=… — detect the backend and report residency.
+// GET /api/model?baseUrl=…&op=caps&model=… — report a model's capabilities
+// (vision: true/false, or null when the backend doesn't say).
 // Ollama's /api/ps and LM Studio's /api/v1/models are each unique to that
 // server, so probing in turn can't false-positive on the other.
 export async function GET(request: NextRequest) {
@@ -66,6 +68,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ backend: null, error: "Missing or invalid baseUrl" }, { status: 400 });
   }
   const root = trimBase(baseUrl);
+
+  if (request.nextUrl.searchParams.get("op") === "caps") {
+    const model = request.nextUrl.searchParams.get("model");
+    if (!model) return NextResponse.json({ vision: null });
+    // Ollama: /api/show lists capabilities ("completion", "tools", "vision"...).
+    try {
+      const res = await fetch(`${root}/api/show`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model }),
+        signal: request.signal,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.capabilities)) {
+          return NextResponse.json({ vision: data.capabilities.includes("vision") });
+        }
+      }
+    } catch { /* not Ollama */ }
+    // LM Studio: model entries may carry capabilities or a vision flag.
+    try {
+      const res = await fetch(`${root}/api/v1/models`, { signal: request.signal });
+      if (res.ok) {
+        const data = await res.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const arr: any[] = Array.isArray(data) ? data : (data.data ?? data.models ?? []);
+        const m = arr.find(x => (x.id ?? x.key ?? x.model ?? x.name) === model);
+        if (m) {
+          if (Array.isArray(m.capabilities)) return NextResponse.json({ vision: m.capabilities.includes("vision") });
+          if (typeof m.vision === "boolean") return NextResponse.json({ vision: m.vision });
+        }
+      }
+    } catch { /* not LM Studio */ }
+    return NextResponse.json({ vision: null }); // unknown backend: can't tell
+  }
+
   try { return NextResponse.json(await ollamaStatus(root, request.signal)); } catch { /* not Ollama */ }
   try { return NextResponse.json(await lmstudioStatus(root, request.signal)); } catch { /* not LM Studio */ }
   return NextResponse.json({ backend: null });
