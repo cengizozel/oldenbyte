@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, MessageSquare, Plus, ChevronRight, Library, Power, Layers, Users, Trash2, CalendarDays, EllipsisVertical } from "lucide-react";
+import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, MessageSquare, Plus, ChevronRight, ChevronDown, Library, Power, Layers, Users, Trash2, CalendarDays, EllipsisVertical, Brain } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherWidgetEntries, listDashboardWidgets, getCalendarAccount, type WidgetEntry, type WidgetRosterItem, type CalendarAccount } from "@/lib/dashboardContext";
@@ -333,8 +333,10 @@ export default function ChatWidget({
   const [calAccount, setCalAccount] = useState<CalendarAccount | null>(null);
   useEffect(() => { getCalendarAccount().then(setCalAccount).catch(() => {}); }, []);
   const ctxChars = ctx ? ctx.reduce((n, e) => n + e.text.length, 0) : 0;
-  // Dashboard tools (data toggle / view / refresh) tuck behind a "+" by the send button.
-  const [toolsOpen, setToolsOpen] = useState(false);
+  // Transient "added to memory" notice (auto-dismisses; click opens the character).
+  const [memoryNotice, setMemoryNotice] = useState<{ charId: string; name: string; facts: string[] } | null>(null);
+  const memNoticeTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(memNoticeTimer.current), []);
 
   // Model residency. `backend` is null until we know what this server is: null =
   // not a controllable backend (control hidden), "ollama"/"lmstudio" = supported.
@@ -1029,6 +1031,7 @@ export default function ChatWidget({
       const sys =
         `You maintain the long-term memory of "${character.name}", an assistant focused on: ${character.focus.trim()}. ` +
         `From the exchange below, extract NEW, durable facts ABOUT THE USER that are relevant to that focus. ` +
+        `Record only what the user explicitly stated in THIS exchange, with their wording for specifics (dates, scores, names); never infer, embellish, or merge with already-known facts. ` +
         `Ignore anything off-topic or outside the focus, transient/one-off details, the assistant's own statements, and anything already known. ` +
         `Output ONLY a JSON array of short factual strings (e.g. ["Has a CS degree"]); output [] if nothing qualifies.` +
         (character.memories.length ? ` Already known: ${JSON.stringify(character.memories)}.` : "");
@@ -1052,17 +1055,20 @@ export default function ChatWidget({
       if (!Array.isArray(facts)) return;
       const clean = facts.map(f => String(f).trim()).filter(f => f.length > 1 && f.length < 200);
       if (!clean.length) return;
-      setCharacters(prev => {
-        const next = prev.map(ch => {
-          if (ch.id !== character.id) return ch;
-          const have = new Set(ch.memories.map(m => m.toLowerCase()));
-          const added = clean.filter(f => !have.has(f.toLowerCase()));
-          if (!added.length) return ch;
-          return { ...ch, memories: [...ch.memories, ...added].slice(-40) }; // cap memory size
-        });
-        persistCharacters(next, activeCharacterIdRef.current);
-        return next;
-      });
+      const current = charactersRef.current.find(ch => ch.id === character.id);
+      if (!current) return;
+      const have = new Set(current.memories.map(m => m.toLowerCase()));
+      const added = clean.filter(f => !have.has(f.toLowerCase()));
+      if (!added.length) return;
+      const next = charactersRef.current.map(ch =>
+        ch.id === character.id ? { ...ch, memories: [...ch.memories, ...added].slice(-40) } : ch // cap memory size
+      );
+      setCharacters(next);
+      persistCharacters(next, activeCharacterIdRef.current);
+      // Show what was learned instead of saving silently.
+      setMemoryNotice({ charId: character.id, name: character.name, facts: added });
+      window.clearTimeout(memNoticeTimer.current);
+      memNoticeTimer.current = window.setTimeout(() => setMemoryNotice(null), 8000);
     } catch { /* memory is best-effort */ }
   }
 
@@ -1220,10 +1226,6 @@ export default function ChatWidget({
 
   // Hover-revealed header action icon (matches the other widgets).
   const actionCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`;
-  // Dashboard controls stay visible (at a steady opacity) while the mode is on.
-  const dashCtrlCls = `${c.icon} opacity-55 hover:opacity-100 transition-opacity`;
-  // Filled pill for an active (on) data toggle, so it's clearly distinct from off.
-  const toolOnCls = `${c.label} bg-black/10 dark:bg-white/15 opacity-100 transition-colors`;
 
   return (
     <div className={`rounded-2xl border flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
@@ -1233,8 +1235,8 @@ export default function ChatWidget({
         <div className={`flex items-center gap-2 min-w-0 ${c.label}`}>
           {/* Identity: avatar + character name open the characters list */}
           <button
-            onClick={() => setCharactersOpen(true)}
-            title={activeCharacter ? `Talking to ${activeCharacter.name}: click to switch character` : "Characters"}
+            onClick={() => { if (activeCharacter) { setEditingCharId(activeCharacter.id); setCharDraft({ ...activeCharacter }); } }}
+            title={activeCharacter ? `${activeCharacter.name}: settings and memories` : "Character settings"}
             className="shrink-0 w-7 h-7 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-base leading-none hover:bg-black/10 dark:hover:bg-white/15 transition-colors"
           >
             {activeCharacter && activeCharacter.id !== DEFAULT_CHARACTER_ID ? activeCharacter.emoji : <Bot size={15} className="opacity-60" />}
@@ -1242,9 +1244,11 @@ export default function ChatWidget({
           <span className="flex flex-col min-w-0 leading-tight">
             <button
               onClick={() => setCharactersOpen(true)}
-              className="text-xs font-medium truncate text-left hover:opacity-80"
+              title="Switch character"
+              className="flex items-center gap-0.5 text-xs font-medium min-w-0 text-left hover:opacity-80"
             >
-              {activeCharacter?.name ?? "Assistant"}
+              <span className="truncate">{activeCharacter?.name ?? "Assistant"}</span>
+              <ChevronDown size={11} className="shrink-0 opacity-50" />
             </button>
             {/* Live status: residency dot first (the signal), model name truncates.
                 Separate tap target from the identity above. */}
@@ -1336,7 +1340,47 @@ export default function ChatWidget({
                 <>
                   {/* click-away backdrop */}
                   <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                  <div className={`absolute right-0 top-6 z-50 w-56 rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
+                  <div className={`absolute right-0 top-6 z-50 w-60 rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
+                    <p className={`px-2.5 pt-1.5 pb-1 text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-40 ${c.label}`}>Data sources</p>
+                    {([
+                      { icon: Database, label: "Dashboard", on: config.useDashboard, ready: true, toggle: toggleDashboard, hint: "" },
+                      { icon: Library, label: "Kiwix library", on: config.useKiwix, ready: !!config.kiwixUrl, toggle: toggleKiwix, hint: "set up in settings" },
+                      { icon: Layers, label: "Anytype", on: config.useAnytype, ready: !!(config.anytypeApiKey && config.anytypeSpaceId), toggle: toggleAnytype, hint: "pair in settings" },
+                      { icon: CalendarDays, label: "Calendar", on: config.useCalendar, ready: !!calAccount, toggle: toggleCalendar, hint: "configure a Calendar widget" },
+                    ] as const).map(row => (
+                      <button
+                        key={row.label}
+                        onClick={() => {
+                          if (row.ready) { row.toggle(); return; } // stays open for multi-toggling
+                          setMenuOpen(false);
+                          if (row.label !== "Calendar") openSettings();
+                        }}
+                        title={row.ready ? (row.on ? "On: click to turn off" : "Off: click to turn on") : row.hint}
+                        className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/5 ${c.text} ${row.ready ? "" : "opacity-40"}`}
+                      >
+                        <row.icon size={13} className={`shrink-0 opacity-60 ${c.label}`} />
+                        <span className="flex-1 min-w-0 truncate">{row.label}</span>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.on && row.ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
+                      </button>
+                    ))}
+                    {config.useDashboard && (
+                      <button
+                        onClick={() => refreshContext()}
+                        disabled={gathering}
+                        className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/5 ${c.text} disabled:opacity-50`}
+                      >
+                        <RefreshCw size={13} className={`shrink-0 opacity-60 ${c.label} ${gathering ? "animate-spin" : ""}`} />
+                        <span className="flex-1 min-w-0">
+                          {gathering ? "Refreshing dashboard data…" : "Refresh dashboard data"}
+                          {!gathering && ctx?.length ? (
+                            <span className={`block text-[10px] opacity-50 ${c.label}`}>
+                              {ctx.length} widget{ctx.length === 1 ? "" : "s"} · ~{Math.round(ctxChars / 1000)}k chars tool-readable
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                    )}
+                    <div className={`my-1 border-t ${c.border} opacity-60`} />
                     <button
                       onClick={() => { setMenuOpen(false); if (config.useDashboard && !ctx) refreshContext(); setShowContext(true); }}
                       className={`text-left px-2.5 py-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/5 ${c.text}`}
@@ -2007,6 +2051,34 @@ export default function ChatWidget({
             {error && <p className="text-red-400 text-xs">{error}</p>}
           </div>
 
+          {/* Transient memory notice: what the character just learned */}
+          {memoryNotice && (
+            <div className="relative shrink-0">
+              <button
+                onClick={() => {
+                  const ch = characters.find(x => x.id === memoryNotice.charId);
+                  if (ch) { setEditingCharId(ch.id); setCharDraft({ ...ch }); }
+                  setMemoryNotice(null);
+                }}
+                title="Open this character's memories"
+                className={`absolute bottom-1.5 left-3 right-3 z-30 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border ${c.border} bg-[var(--surface)] shadow-sm text-[11px] text-left text-[var(--text-secondary)]`}
+              >
+                <Brain size={12} className={`shrink-0 ${c.label}`} />
+                <span className="flex-1 min-w-0 truncate">
+                  {memoryNotice.name} remembered{memoryNotice.facts.length > 1
+                    ? ` ${memoryNotice.facts.length} things`
+                    : `: ${memoryNotice.facts[0]}`}
+                </span>
+                <span
+                  onClick={e => { e.stopPropagation(); setMemoryNotice(null); }}
+                  className="shrink-0 opacity-50 hover:opacity-100"
+                >
+                  <X size={12} />
+                </span>
+              </button>
+            </div>
+          )}
+
           {/* Composer */}
           <div className={`shrink-0 p-2.5 border-t ${c.border}`}>
             <div className="flex items-end gap-2 bg-[var(--surface)] rounded-2xl border border-[var(--surface-border)] px-3 py-1.5">
@@ -2025,74 +2097,6 @@ export default function ChatWidget({
                 placeholder={configured ? "Message…" : "Configure a model first"}
                 className="flex-1 resize-none overflow-y-auto text-sm outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-transparent py-1 disabled:opacity-50"
               />
-              {/* Dashboard tools, revealed by the "+" toggle */}
-              {toolsOpen && (
-                <div className="flex items-center shrink-0">
-                  <button
-                    onClick={toggleDashboard}
-                    title={config.useDashboard ? "Using dashboard data: click to turn off" : "Answer using my dashboard data"}
-                    className={`p-1.5 rounded-full ${config.useDashboard ? toolOnCls : dashCtrlCls}`}
-                  >
-                    <Database size={14} />
-                  </button>
-                  {config.useDashboard && (
-                    <button
-                      onClick={() => refreshContext()}
-                      disabled={gathering}
-                      title="Refresh dashboard data"
-                      className={`p-1.5 rounded-full ${dashCtrlCls}`}
-                    >
-                      <RefreshCw size={14} className={gathering ? "animate-spin" : ""} />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => (config.kiwixUrl ? toggleKiwix() : openSettings())}
-                    title={
-                      !config.kiwixUrl
-                        ? "Set up the Kiwix library in settings"
-                        : config.useKiwix
-                          ? "Kiwix lookup on (all books): click to turn off"
-                          : "Let me look things up in your Kiwix library"
-                    }
-                    className={`p-1.5 rounded-full ${config.useKiwix ? toolOnCls : dashCtrlCls} ${!config.kiwixUrl ? "opacity-30" : ""}`}
-                  >
-                    <Library size={14} />
-                  </button>
-                  <button
-                    onClick={() => (config.anytypeApiKey && config.anytypeSpaceId ? toggleAnytype() : openSettings())}
-                    title={
-                      !config.anytypeApiKey || !config.anytypeSpaceId
-                        ? "Set up Anytype lookup in settings"
-                        : config.useAnytype
-                          ? `Anytype lookup on (${config.anytypeSpaceName || "space"}) — click to turn off`
-                          : "Let me look things up in your Anytype"
-                    }
-                    className={`p-1.5 rounded-full ${config.useAnytype ? toolOnCls : dashCtrlCls} ${(!config.anytypeApiKey || !config.anytypeSpaceId) ? "opacity-30" : ""}`}
-                  >
-                    <Layers size={14} />
-                  </button>
-                  <button
-                    onClick={() => calAccount && toggleCalendar()}
-                    title={
-                      !calAccount
-                        ? "Add and configure a Calendar widget first"
-                        : config.useCalendar
-                          ? "Calendar access on: click to turn off"
-                          : "Let me read and add to your calendar"
-                    }
-                    className={`p-1.5 rounded-full ${config.useCalendar ? toolOnCls : dashCtrlCls} ${!calAccount ? "opacity-30" : ""}`}
-                  >
-                    <CalendarDays size={14} />
-                  </button>
-                </div>
-              )}
-              <button
-                onClick={() => setToolsOpen(o => !o)}
-                title={toolsOpen ? "Hide data tools" : "Data tools"}
-                className={`shrink-0 p-1.5 rounded-full transition-transform ${toolsOpen ? `rotate-45 ${dashCtrlCls}` : (config.useDashboard || config.useKiwix || config.useAnytype || config.useCalendar) ? `opacity-90 ${c.label}` : dashCtrlCls}`}
-              >
-                <Plus size={14} />
-              </button>
               {streaming ? (
                 <button
                   onClick={stop}
