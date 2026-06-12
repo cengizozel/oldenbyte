@@ -1,30 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, X, RotateCcw, Loader, Plus, ChevronLeft, ExternalLink, Flame } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, ChevronLeft, ExternalLink, Flame } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { timeAgo, formatCount } from "@/lib/format";
+import { tagColor } from "@/lib/colors";
+import { useScrollFade } from "@/lib/useScrollFade";
+import FlipCard from "@/components/ui/FlipCard";
+import { SettingsInput } from "@/components/ui/Field";
+import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type Period = "day" | "week" | "month" | "year" | "all";
 type SubEntry = { name: string; limit: number; period: Period };
 type RedditConfig = { subreddits: SubEntry[] };
 type Post = { title: string; link: string; subreddit: string; pubDate: string; content: string; score: number };
-
-function timeAgo(iso: string): string {
-  if (!iso) return "";
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 60)  return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24)  return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7)   return `${d}d ago`;
-  const w = Math.floor(d / 7);
-  if (w < 5)   return `${w}w ago`;
-  const mo = Math.floor(d / 30);
-  if (mo < 12) return `${mo}mo ago`;
-  return `${Math.floor(d / 365)}y ago`;
-}
 
 function sanitizeRedditHtml(raw: string | undefined): string {
   if (!raw) return "";
@@ -65,16 +55,6 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: "all",   label: "All" },
 ];
 
-
-const SUB_COLORS = [
-  { label: "text-sky-700",     bg: "bg-sky-100"     },
-  { label: "text-teal-700",    bg: "bg-teal-100"    },
-  { label: "text-violet-700",  bg: "bg-violet-100"  },
-  { label: "text-rose-600",    bg: "bg-rose-100"    },
-  { label: "text-amber-700",   bg: "bg-amber-100"   },
-  { label: "text-emerald-700", bg: "bg-emerald-100" },
-];
-
 export default function RedditWidget({
   widget,
   className = "",
@@ -94,18 +74,8 @@ export default function RedditWidget({
   const [draft, setDraft]               = useState<RedditConfig>(DEFAULT);
   const [subInput, setSubInput]         = useState("");
   const [selected, setSelected]         = useState<Post | null>(null);
-  const [listShowFade, setListShowFade]           = useState(false);
-  const [listShowTopFade, setListShowTopFade]     = useState(false);
-  const [detailShowFade, setDetailShowFade]       = useState(false);
-  const [detailShowTopFade, setDetailShowTopFade] = useState(false);
-  const listScrollRef   = useRef<HTMLDivElement>(null);
-  const detailScrollRef = useRef<HTMLDivElement>(null);
-
-  function checkFade(el: HTMLDivElement, setBottom: (v: boolean) => void, setTop: (v: boolean) => void) {
-    const overflows = el.scrollHeight > el.clientHeight + 1;
-    setBottom(overflows && el.scrollHeight - el.scrollTop - el.clientHeight > 20);
-    setTop(overflows && el.scrollTop > 20);
-  }
+  const list   = useScrollFade<HTMLDivElement>([posts]);
+  const detail = useScrollFade<HTMLDivElement>([selected]);
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -130,26 +100,6 @@ export default function RedditWidget({
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
-
-  useEffect(() => {
-    const el = listScrollRef.current;
-    if (!el) return;
-    checkFade(el, setListShowFade, setListShowTopFade);
-    const ro = new ResizeObserver(() => checkFade(el, setListShowFade, setListShowTopFade));
-    ro.observe(el);
-    return () => ro.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts]);
-
-  useEffect(() => {
-    const el = detailScrollRef.current;
-    if (!el) return;
-    checkFade(el, setDetailShowFade, setDetailShowTopFade);
-    const ro = new ResizeObserver(() => checkFade(el, setDetailShowFade, setDetailShowTopFade));
-    ro.observe(el);
-    return () => ro.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
 
   function cacheKeyFor(cfg: RedditConfig) {
     return `${storageKey}-v3-${today}-${cfg.subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
@@ -217,64 +167,48 @@ export default function RedditWidget({
     setSettingsOpen(false);
   }
 
-  const subColorIndex: Record<string, number> = {};
-  config.subreddits.forEach((s, i) => { subColorIndex[s.name] = i % SUB_COLORS.length; });
-
   return (
-    <div
-      className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
-      style={{ perspective: "1200px" }}
-    >
-      {/* Flipper */}
-      <div
-        className="relative w-full h-full transition-transform duration-300 ease-in-out"
-        style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
-      >
-
-      {/* Front face */}
-      <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", pointerEvents: settingsOpen ? "none" : "auto" }}>
+    <FlipCard
+      c={c}
+      flipped={settingsOpen}
+      className={className}
+      front={
+        <>
         <div className="flex items-center justify-between mb-3 shrink-0">
           <div className={`flex items-center gap-1.5 ${c.label}`}>
             <span className="opacity-50"><Flame size={14} /></span>
             <span className="text-xs font-medium opacity-60">Reddit</span>
           </div>
-          <button
-            onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
-            className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-          >
-            <Pencil size={14} />
-          </button>
+          <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
         </div>
 
         <div className="flex-1 min-h-0 relative overflow-hidden">
           {/* Post list */}
           <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
-            <div ref={listScrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget, setListShowFade, setListShowTopFade)}>
+            <div ref={list.ref} className="absolute inset-0 overflow-y-auto pr-3" onScroll={list.onScroll}>
               {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                </div>
+                <LoadingState c={c} />
               ) : posts.length ? (
                 <ul className="flex flex-col">
                   {posts.map((post, i) => {
-                    const sc = SUB_COLORS[subColorIndex[post.subreddit] ?? 0];
+                    const sc = tagColor(post.subreddit.toLowerCase());
                     return (
                       <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                        <span className="flex items-center gap-1.5 mb-1">
-                          <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                        <span className="flex items-center gap-1.5 mb-1 min-w-0">
+                          <span className={`inline-block min-w-0 truncate text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                             r/{post.subreddit}
                           </span>
                           {post.pubDate && (
-                            <span className={`text-[10px] opacity-40 ${c.text}`}>{timeAgo(post.pubDate)}</span>
+                            <span className={`shrink-0 text-[10px] opacity-40 ${c.text}`}>{timeAgo(post.pubDate)}</span>
                           )}
                           {post.score > 0 && (
-                            <span className={`text-[10px] opacity-40 ${c.text}`}>▲ {post.score >= 1000 ? `${(post.score / 1000).toFixed(1)}k` : post.score}</span>
+                            <span className={`shrink-0 text-[10px] opacity-40 ${c.text}`}>▲ {formatCount(post.score)}</span>
                           )}
                         </span>
                         <div className="flex items-start gap-1 group/title">
                           <button
                             onClick={() => setSelected(post)}
-                            className={`flex-1 text-left text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                            className={`flex-1 min-w-0 break-words text-left text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
                           >
                             {post.title}
                           </button>
@@ -293,13 +227,10 @@ export default function RedditWidget({
                   })}
                 </ul>
               ) : (
-                <p className={`text-xs opacity-45 ${c.text}`}>
-                  hover and click the pencil to add subreddits
-                </p>
+                <EmptyState c={c} action="add subreddits" />
               )}
             </div>
-            {listShowTopFade && <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
-            {listShowFade && <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
+            <ScrollFades c={c} top={list.topFade} bottom={list.bottomFade} />
           </div>
 
           {/* Post detail */}
@@ -310,15 +241,15 @@ export default function RedditWidget({
                   <button onClick={() => setSelected(null)} className="shrink-0 opacity-60 hover:opacity-100">
                     <ChevronLeft size={14} />
                   </button>
-                  <span className="flex-1 text-xs font-medium truncate opacity-80">{selected.title}</span>
+                  <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
                   <a href={selected.link} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80">
                     <ExternalLink size={11} />
                   </a>
                 </div>
-                <div ref={detailScrollRef} className="flex-1 min-h-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget, setDetailShowFade, setDetailShowTopFade)}>
+                <div ref={detail.ref} className="flex-1 min-h-0 overflow-y-auto pr-3" onScroll={detail.onScroll}>
                   {sanitizeRedditHtml(selected.content) ? (
                     <div
-                      className={`text-sm leading-relaxed ${c.text} opacity-80
+                      className={`text-sm leading-relaxed break-words ${c.text} opacity-80
                         [&_p]:mb-2 [&_p:last-child]:mb-0
                         [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-2
                         [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-2
@@ -327,38 +258,35 @@ export default function RedditWidget({
                         [&_a]:underline [&_a]:opacity-70 [&_a:hover]:opacity-100
                         [&_blockquote]:pl-3 [&_blockquote]:border-l-2 [&_blockquote]:border-current/30 [&_blockquote]:italic [&_blockquote]:opacity-70
                         [&_code]:font-mono [&_code]:text-xs [&_code]:bg-black/5 [&_code]:px-1 [&_code]:rounded
+                        [&_pre]:overflow-x-auto [&_pre]:max-w-full
                         [&_strong]:font-semibold [&_em]:italic`}
                       dangerouslySetInnerHTML={{ __html: sanitizeRedditHtml(selected.content) }}
                     />
                   ) : (
-                    <p className={`text-xs opacity-40 ${c.text}`}>No text content — this is a link post.</p>
+                    <p className={`text-xs opacity-40 ${c.text}`}>No text content: this is a link post.</p>
                   )}
                 </div>
-                {detailShowTopFade && <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
-                {detailShowFade && <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
+                <ScrollFades c={c} top={detail.topFade} bottom={detail.bottomFade} />
               </>
             )}
           </div>
         </div>
-      </div>
-
-      {/* Back face (settings) */}
-      <div
-        className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${c.bg}`}
-        style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", pointerEvents: settingsOpen ? "auto" : "none" }}
-      >
+        </>
+      }
+      back={
+        <>
         <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
 
           {/* Subreddit input */}
           <div className="flex gap-1">
-            <input
+            <SettingsInput
               autoFocus
               type="text"
               value={subInput}
               onChange={e => setSubInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && addSub()}
               placeholder="subreddit name"
-              className="flex-1 text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
+              className="flex-1"
             />
             <button
               onClick={addSub}
@@ -371,12 +299,12 @@ export default function RedditWidget({
           {/* Selected subreddits with per-sub limit and period */}
           {draft.subreddits.length > 0 && (
             <div className="flex flex-col gap-2">
-              {draft.subreddits.map((sub, i) => {
-                const sc = SUB_COLORS[i % SUB_COLORS.length];
+              {draft.subreddits.map(sub => {
+                const sc = tagColor(sub.name);
                 return (
                   <div key={sub.name} className={`flex flex-col gap-1.5 px-2 py-1.5 rounded-lg ${sc.bg} ${sc.label}`}>
                     <div className="flex items-center gap-2 text-xs font-medium">
-                      <span className="flex-1">r/{sub.name}</span>
+                      <span className="flex-1 min-w-0 truncate">r/{sub.name}</span>
                       <input
                         type="number"
                         min={1}
@@ -417,23 +345,15 @@ export default function RedditWidget({
           {error && <p className="text-red-400 text-xs">{error}</p>}
 
         </div>
-          <div className="flex items-center justify-between shrink-0 pt-1">
-            <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset">
-              <RotateCcw size={13} />
-            </button>
-            <div className="flex gap-3">
-              <button onClick={() => { setSettingsOpen(false); setError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-                <X size={14} />
-              </button>
-              <button onClick={handleSave} disabled={loading} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40">
-                {loading ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
-              </button>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
+        <SaveCancelRow
+          c={c}
+          onSave={handleSave}
+          onCancel={() => { setSettingsOpen(false); setError(""); }}
+          onReset={handleReset}
+          saving={loading}
+        />
+        </>
+      }
+    />
   );
 }

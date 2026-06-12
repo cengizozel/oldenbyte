@@ -1,53 +1,22 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, X, RotateCcw, Loader, Plus, PlaySquare, ExternalLink, ChevronLeft } from "lucide-react";
+import { Loader, Plus, PlaySquare, ExternalLink, ChevronLeft } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { timeAgo, formatCount, formatClock } from "@/lib/format";
+import { tagColor } from "@/lib/colors";
+import { useScrollFade } from "@/lib/useScrollFade";
+import FlipCard from "@/components/ui/FlipCard";
+import { SettingsInput } from "@/components/ui/Field";
+import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean };
 type YoutubeConfig  = { channels: YoutubeChannel[] };
 type Video          = { title: string; link: string; published: string; channelId: string; channelName: string };
 type VideoDetails   = { title: string; author: string; description: string; lengthSeconds: number; viewCount: number };
 
-function fmtDuration(s: number): string {
-  if (!s) return "";
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  return h ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`;
-}
-function fmtViews(n: number): string {
-  if (!n) return "";
-  if (n >= 1e6) return `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M views`;
-  if (n >= 1e3) return `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K views`;
-  return `${n} views`;
-}
-
-function timeAgo(iso: string): string {
-  if (!iso) return "";
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 60)   return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24)   return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7)    return `${d}d ago`;
-  const w = Math.floor(d / 7);
-  if (w < 5)    return `${w}w ago`;
-  const mo = Math.floor(d / 30);
-  if (mo < 12)  return `${mo}mo ago`;
-  return `${Math.floor(d / 365)}y ago`;
-}
-
 const DEFAULT: YoutubeConfig = { channels: [] };
-
-const CH_COLORS = [
-  { label: "text-rose-600",    bg: "bg-rose-100"    },
-  { label: "text-sky-700",     bg: "bg-sky-100"     },
-  { label: "text-violet-700",  bg: "bg-violet-100"  },
-  { label: "text-teal-700",    bg: "bg-teal-100"    },
-  { label: "text-amber-700",   bg: "bg-amber-100"   },
-  { label: "text-emerald-700", bg: "bg-emerald-100" },
-];
 
 export default function YoutubeWidget({
   widget,
@@ -62,15 +31,7 @@ export default function YoutubeWidget({
 
   const [config, setConfig]             = useState<YoutubeConfig>(DEFAULT);
   const [videos, setVideos]             = useState<Video[]>([]);
-  const [showBottomFade, setShowBottomFade] = useState(false);
-  const [showTopFade, setShowTopFade]       = useState(false);
-  const scrollRef                           = useRef<HTMLDivElement>(null);
-
-  function checkFade(el: HTMLDivElement) {
-    const overflows = el.scrollHeight > el.clientHeight + 1;
-    setShowBottomFade(overflows && el.scrollHeight - el.scrollTop - el.clientHeight > 20);
-    setShowTopFade(overflows && el.scrollTop > 20);
-  }
+  const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([videos]);
   const [loading, setLoading]           = useState(false);
   const [resolving, setResolving]       = useState(false);
   const [error, setError]               = useState("");
@@ -127,16 +88,6 @@ export default function YoutubeWidget({
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    checkFade(el);
-    const ro = new ResizeObserver(() => checkFade(el));
-    ro.observe(el);
-    return () => ro.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videos]);
 
   function cacheKeyFor(cfg: YoutubeConfig) {
     return `${storageKey}-${today}-${cfg.channels.map(ch => `${ch.channelId}:${ch.limit}:${ch.filterMembers ? 1 : 0}:${ch.includeShorts ? 1 : 0}`).join(",")}`;
@@ -220,63 +171,49 @@ export default function YoutubeWidget({
     setSettingsOpen(false);
   }
 
-  const chColorIndex: Record<string, number> = {};
-  config.channels.forEach((ch, i) => { chColorIndex[ch.channelId] = i % CH_COLORS.length; });
-
   return (
-    <div
-      className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
-      style={{ perspective: "1200px" }}
-    >
-      <div
-        className="relative w-full h-full transition-transform duration-300 ease-in-out"
-        style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
-      >
-        {/* Front */}
-        <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", pointerEvents: settingsOpen ? "none" : "auto" }}>
+    <FlipCard
+      c={c}
+      flipped={settingsOpen}
+      className={className}
+      front={
+        <>
           <div className="flex items-center justify-between mb-3 shrink-0">
             <div className={`flex items-center gap-1.5 ${c.label}`}>
               <span className="opacity-50"><PlaySquare size={14} /></span>
               <span className="text-xs font-medium opacity-60">YouTube</span>
             </div>
             {!selected && (
-              <button
-                onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
-                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-              >
-                <Pencil size={14} />
-              </button>
+              <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
             )}
           </div>
           <div className="flex-1 min-h-0 relative overflow-hidden">
             {/* Video list */}
             <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
-              <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget)}>
+              <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={onScroll}>
                 {loading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                  </div>
+                  <LoadingState c={c} />
                 ) : videos.length ? (
                   <ul className="flex flex-col">
                     {videos.map((v, i) => {
-                      const sc = CH_COLORS[chColorIndex[v.channelId] ?? 0];
+                      const sc = tagColor(v.channelName);
                       return (
                         <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                          <span className="flex items-center gap-1.5 mb-1">
-                            <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                          <span className="flex items-center gap-1.5 mb-1 min-w-0">
+                            <span className={`inline-block min-w-0 truncate text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                               {v.channelName}
                             </span>
                             {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
-                              <span className={`text-[9px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
+                              <span className={`shrink-0 text-[9px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
                             )}
                             {v.published && (
-                              <span className={`text-[10px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
+                              <span className={`shrink-0 text-[10px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
                             )}
                           </span>
                           <div className="flex items-start gap-1 group/title">
                             <button
                               onClick={() => openVideo(v)}
-                              className={`flex-1 text-left block text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                              className={`flex-1 min-w-0 break-words text-left block text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
                             >
                               {v.title}
                             </button>
@@ -295,17 +232,10 @@ export default function YoutubeWidget({
                     })}
                   </ul>
                 ) : (
-                  <p className={`text-xs opacity-45 ${c.text}`}>
-                    hover and click the pencil to add YouTube channels
-                  </p>
+                  <EmptyState c={c} action="add YouTube channels" />
                 )}
               </div>
-              {showTopFade && (
-                <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
-              )}
-              {showBottomFade && (
-                <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
-              )}
+              <ScrollFades c={c} top={topFade} bottom={bottomFade} />
             </div>
 
             {/* Video detail */}
@@ -323,21 +253,23 @@ export default function YoutubeWidget({
                   </div>
                   <div className="flex-1 min-h-0 overflow-y-auto pr-3">
                     {loadingDetails ? (
-                      <div className="flex items-center justify-center h-full">
-                        <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                      </div>
+                      <LoadingState c={c} />
                     ) : detailsError ? (
                       <p className="text-red-400 text-xs">{detailsError}</p>
                     ) : details ? (
                       <div className="flex flex-col gap-2">
-                        <p className={`text-sm font-medium leading-snug ${c.text}`}>{details.title || selected.title}</p>
+                        <p className={`text-sm font-medium leading-snug break-words ${c.text}`}>{details.title || selected.title}</p>
                         <p className={`text-[11px] opacity-50 ${c.text}`}>
-                          {[details.author, fmtViews(details.viewCount), fmtDuration(details.lengthSeconds)].filter(Boolean).join(" · ")}
+                          {[
+                            details.author,
+                            details.viewCount ? `${formatCount(details.viewCount)} views` : "",
+                            details.lengthSeconds ? formatClock(details.lengthSeconds) : "",
+                          ].filter(Boolean).join(" · ")}
                         </p>
                         {details.description ? (
                           <>
                             <div className="border-t border-black/5" />
-                            <p className={`text-xs leading-relaxed opacity-75 whitespace-pre-line ${c.text}`}>{details.description}</p>
+                            <p className={`text-xs leading-relaxed opacity-75 whitespace-pre-line break-words ${c.text}`}>{details.description}</p>
                           </>
                         ) : (
                           <p className={`text-xs opacity-45 ${c.text}`}>No description.</p>
@@ -349,19 +281,19 @@ export default function YoutubeWidget({
               )}
             </div>
           </div>
-        </div>
-
-        {/* Back (settings) */}
-        <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", pointerEvents: settingsOpen ? "auto" : "none" }}>
+        </>
+      }
+      back={
+        <>
           <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
             <div className="flex gap-1">
-              <input
+              <SettingsInput
                 type="text"
                 value={chInput}
                 onChange={e => setChInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && addChannel()}
                 placeholder="@handle or channel URL"
-                className="flex-1 text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
+                className="flex-1 min-w-0"
               />
               <button
                 onClick={addChannel}
@@ -373,8 +305,8 @@ export default function YoutubeWidget({
             </div>
             {draft.channels.length > 0 && (
               <div className="flex flex-col gap-1.5">
-                {draft.channels.map((ch, i) => {
-                  const sc = CH_COLORS[i % CH_COLORS.length];
+                {draft.channels.map(ch => {
+                  const sc = tagColor(ch.name);
                   return (
                     <div key={ch.channelId} className={`flex flex-col gap-1 px-2 py-1.5 rounded-lg text-xs font-medium ${sc.bg} ${sc.label}`}>
                       <div className="flex items-center gap-2">
@@ -404,7 +336,7 @@ export default function YoutubeWidget({
                         />
                         <span className="opacity-60 font-normal">include Shorts</span>
                       </label>
-                      {/* filter members-only toggle — revisit later
+                      {/* filter members-only toggle, revisit later
                       <label className="flex items-center gap-1.5 cursor-pointer select-none">
                         <input
                           type="checkbox"
@@ -422,21 +354,15 @@ export default function YoutubeWidget({
             )}
             {error && <p className="text-red-400 text-xs">{error}</p>}
           </div>
-          <div className="flex items-center justify-between shrink-0">
-            <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset">
-              <RotateCcw size={13} />
-            </button>
-            <div className="flex gap-3">
-              <button onClick={() => { setSettingsOpen(false); setError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-                <X size={14} />
-              </button>
-              <button onClick={handleSave} disabled={loading} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40">
-                {loading ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          <SaveCancelRow
+            c={c}
+            onSave={handleSave}
+            onCancel={() => { setSettingsOpen(false); setError(""); }}
+            onReset={handleReset}
+            saving={loading}
+          />
+        </>
+      }
+    />
   );
 }

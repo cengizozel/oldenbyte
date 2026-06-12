@@ -1,9 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Layers, Search, Pencil, Check, X, RotateCcw, Loader, ExternalLink, Home } from "lucide-react";
+import { Layers, Search, Loader, ExternalLink, Home } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { useScrollFade } from "@/lib/useScrollFade";
+import FlipCard from "@/components/ui/FlipCard";
+import { SettingsInput, SettingsSelect } from "@/components/ui/Field";
+import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type AnytypeObject = { id: string; name: string; snippet: string; spaceId: string; type: string };
 type Space = { id: string; name: string };
@@ -46,6 +50,8 @@ export default function AnytypeWidget({
   const [pairBusy, setPairBusy] = useState(false);
 
   const configured = Boolean(config.baseUrl && config.apiKey && config.spaceId);
+
+  const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([objects, searching, error]);
 
   useEffect(() => {
     storage.getItem(storageKey).then((saved) => {
@@ -200,19 +206,13 @@ export default function AnytypeWidget({
     setSettingsOpen(false);
   }
 
-  const inputCls = "w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white";
-
   return (
-    <div
-      className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
-      style={{ perspective: "1200px" }}
-    >
-      <div
-        className="relative w-full h-full transition-transform duration-300 ease-in-out"
-        style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
-      >
-        {/* Front */}
-        <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", pointerEvents: settingsOpen ? "none" : "auto" }}>
+    <FlipCard
+      c={c}
+      flipped={settingsOpen}
+      className={className}
+      front={
+        <>
           <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
             <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
               <span className="opacity-50 shrink-0"><Layers size={14} /></span>
@@ -224,12 +224,7 @@ export default function AnytypeWidget({
                   <Home size={14} />
                 </button>
               )}
-              <button
-                onClick={openSettings}
-                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-              >
-                <Pencil size={14} />
-              </button>
+              <PencilButton c={c} onClick={openSettings} />
             </div>
           </div>
 
@@ -246,58 +241,58 @@ export default function AnytypeWidget({
                   className={`w-full text-sm rounded-xl pl-8 pr-3 py-1.5 outline-none bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/10 dark:focus:border-white/10 ${c.text} placeholder:opacity-40`}
                 />
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-                {searching ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                  </div>
-                ) : error ? (
-                  <p className="text-red-400 text-xs">{error}</p>
-                ) : objects.length ? (
-                  <ul className="flex flex-col">
-                    {objects.map((o) => (
-                      <li key={o.id} className="py-2.5 border-t border-black/10 dark:border-white/10 first:border-t-0">
-                        <div className="flex items-start gap-1 group/title">
-                          <a
-                            href={deepLink(o)}
-                            className={`flex-1 text-left text-sm leading-snug font-medium ${c.text} hover:opacity-70 transition-opacity`}
-                            title="Open in Anytype"
-                          >
-                            {o.name}
-                          </a>
-                          <a
-                            href={deepLink(o)}
-                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
-                            title="Open in Anytype"
-                          >
-                            <ExternalLink size={11} />
-                          </a>
-                        </div>
-                        {o.snippet && <p className={`text-xs mt-0.5 opacity-50 ${c.text} line-clamp-2`}>{o.snippet}</p>}
-                        {o.type && <span className={`text-[10px] opacity-40 ${c.label}`}>{o.type}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className={`text-xs opacity-45 ${c.text}`}>{searched ? "No objects found." : "No recent objects."}</p>
-                )}
+              <div className="flex-1 min-h-0 relative">
+                <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={onScroll}>
+                  {searching ? (
+                    <LoadingState c={c} />
+                  ) : error ? (
+                    <p className="text-red-400 text-xs break-words">{error}</p>
+                  ) : objects.length ? (
+                    <ul className="flex flex-col">
+                      {objects.map((o, i) => (
+                        <li key={o.id} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                          <div className="flex items-start gap-1 group/title">
+                            <a
+                              href={deepLink(o)}
+                              className={`flex-1 min-w-0 text-left text-sm leading-snug font-medium break-words ${c.text} hover:opacity-70 transition-opacity`}
+                              title="Open in Anytype"
+                            >
+                              {o.name}
+                            </a>
+                            <a
+                              href={deepLink(o)}
+                              className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                              title="Open in Anytype"
+                            >
+                              <ExternalLink size={11} />
+                            </a>
+                          </div>
+                          {o.snippet && <p className={`text-xs mt-0.5 opacity-50 ${c.text} line-clamp-2 break-words`}>{o.snippet}</p>}
+                          {o.type && <span className={`text-[10px] opacity-40 ${c.label}`}>{o.type}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <EmptyState c={c}>{searched ? "No objects found." : "No recent objects."}</EmptyState>
+                  )}
+                </div>
+                <ScrollFades c={c} top={topFade} bottom={bottomFade} />
               </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center">
-              <p className={`text-xs opacity-45 ${c.text}`}>hover and click the pencil to connect your Anytype app</p>
+              <EmptyState c={c} action="connect your Anytype app" />
             </div>
           )}
-        </div>
-
-        {/* Back (settings) */}
-        <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", pointerEvents: settingsOpen ? "auto" : "none" }}>
-          <input
+        </>
+      }
+      back={
+        <>
+          <SettingsInput
             type="url"
             value={draft.baseUrl}
             onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value, apiKey: "" }))}
             placeholder="http://127.0.0.1:31009"
-            className={inputCls}
           />
 
           {/* Pairing / paired state */}
@@ -306,18 +301,18 @@ export default function AnytypeWidget({
               {loadingSpaces ? (
                 <span className="flex items-center gap-1.5 text-xs text-neutral-400"><Loader size={12} className="animate-spin" /> loading spaces…</span>
               ) : spaces.length > 0 ? (
-                <select
+                <SettingsSelect
                   value={draft.spaceId}
                   onChange={(e) => {
                     const s = spaces.find((x) => x.id === e.target.value);
                     setDraft((d) => ({ ...d, spaceId: e.target.value, spaceName: s?.name ?? "" }));
                   }}
-                  className="flex-1 min-w-0 text-sm border border-neutral-200 rounded-xl px-2 py-2 outline-none text-neutral-700 bg-white"
+                  className="flex-1 min-w-0"
                 >
                   {spaces.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                </SettingsSelect>
               ) : (
-                <span className="text-xs text-neutral-400 truncate">{draft.spaceName || "paired ✓ — no spaces loaded"}</span>
+                <span className="text-xs text-neutral-400 truncate min-w-0">{draft.spaceName || "paired ✓, no spaces loaded"}</span>
               )}
               <button
                 onClick={() => loadSpaces(draft.baseUrl, draft.apiKey, draft.spaceId)}
@@ -330,14 +325,14 @@ export default function AnytypeWidget({
             <div className="flex flex-col gap-1.5">
               <p className={`text-xs opacity-60 ${c.label}`}>Enter the 4-digit code shown in Anytype:</p>
               <div className="flex items-center gap-2">
-                <input
+                <SettingsInput
                   autoFocus
                   inputMode="numeric"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmCode()}
                   placeholder="1234"
-                  className={inputCls + " flex-1 tracking-widest"}
+                  className="flex-1 min-w-0 tracking-widest"
                 />
                 <button
                   onClick={confirmCode}
@@ -368,16 +363,15 @@ export default function AnytypeWidget({
             ))}
           </div>
 
-          {error && <p className="text-red-400 text-xs">{error}</p>}
-          <div className="flex items-center justify-between mt-auto">
-            <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset"><RotateCcw size={13} /></button>
-            <div className="flex gap-3">
-              <button onClick={() => { setSettingsOpen(false); setError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={14} /></button>
-              <button onClick={handleSave} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Check size={14} /></button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          {error && <p className="text-red-400 text-xs break-words">{error}</p>}
+          <SaveCancelRow
+            c={c}
+            onSave={handleSave}
+            onCancel={() => { setSettingsOpen(false); setError(""); }}
+            onReset={handleReset}
+          />
+        </>
+      }
+    />
   );
 }

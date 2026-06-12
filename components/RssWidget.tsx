@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, X, RotateCcw, Loader, Rss } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Rss } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import FlipCard from "@/components/ui/FlipCard";
+import { SettingsInput } from "@/components/ui/Field";
+import { useScrollFade } from "@/lib/useScrollFade";
+import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type RssItem = { title: string; link: string; pubDate: string };
 type RssConfig = { url: string; limit: number; name?: string };
@@ -31,28 +35,10 @@ export default function RssWidget({
   const [config, setConfig] = useState<RssConfig>(DEFAULT);
   const [items, setItems] = useState<RssItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showBottomFade, setShowBottomFade] = useState(false);
-  const [showTopFade, setShowTopFade] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  function checkFade(el: HTMLDivElement) {
-    const overflows = el.scrollHeight > el.clientHeight + 1;
-    setShowBottomFade(overflows && el.scrollHeight - el.scrollTop - el.clientHeight > 20);
-    setShowTopFade(overflows && el.scrollTop > 20);
-  }
+  const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([items]);
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<RssConfig>(DEFAULT);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    checkFade(el);
-    const ro = new ResizeObserver(() => checkFade(el));
-    ro.observe(el);
-    return () => ro.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -114,69 +100,55 @@ export default function RssWidget({
   }
 
   return (
-    <div
-      className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
-      style={{ perspective: "1200px" }}
-    >
-      <div
-        className="relative w-full h-full transition-transform duration-300 ease-in-out"
-        style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
-      >
-        {/* Front */}
-        <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", pointerEvents: settingsOpen ? "none" : "auto" }}>
+    <FlipCard
+      c={c}
+      flipped={settingsOpen}
+      className={className}
+      front={
+        <>
           <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 ${c.label}`}>
-              <span className="opacity-50"><Rss size={14} /></span>
-              {config.name && <span className="text-xs font-medium opacity-60">{config.name}</span>}
+            <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
+              <span className="opacity-50 shrink-0"><Rss size={14} /></span>
+              {config.name && <span className="text-xs font-medium opacity-60 truncate">{config.name}</span>}
             </div>
-            <button
-              onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
-              className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-            >
-              <Pencil size={14} />
-            </button>
+            <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
           </div>
           <div className="flex-1 min-h-0 relative">
-            <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={e => checkFade(e.currentTarget)}>
+            <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={onScroll}>
               {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                </div>
+                <LoadingState c={c} />
               ) : items.length ? (
                 <ul className="flex flex-col">
                   {items.map((item, i) => (
                     <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                      <a href={item.link} target="_blank" rel="noopener noreferrer" className={`text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}>
+                      <a href={item.link} target="_blank" rel="noopener noreferrer" className={`text-sm leading-snug break-words ${c.text} hover:opacity-70 transition-opacity`}>
                         {item.title}
                       </a>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className={`text-xs opacity-45 ${c.text}`}>hover and click the pencil to add an RSS feed URL</p>
+                <EmptyState c={c} action="add an RSS feed URL" />
               )}
             </div>
-            {showTopFade && <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
-            {showBottomFade && <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
+            <ScrollFades c={c} top={topFade} bottom={bottomFade} />
           </div>
-        </div>
-
-        {/* Back (settings) */}
-        <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", pointerEvents: settingsOpen ? "auto" : "none" }}>
-          <input
+        </>
+      }
+      back={
+        <>
+          <SettingsInput
             type="text"
             value={draft.name ?? ""}
             onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
             placeholder="Name (e.g. BBC, Reddit…)"
-            className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
           />
-          <input
+          <SettingsInput
             type="url"
             value={draft.url}
             onChange={e => setDraft(d => ({ ...d, url: e.target.value }))}
             onKeyDown={e => e.key === "Enter" && handleSave()}
             placeholder="https://feeds.bbci.co.uk/news/rss.xml"
-            className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
           />
           <div className="flex flex-col gap-0.5">
             {RSS_EXAMPLES.map(ex => (
@@ -196,17 +168,15 @@ export default function RssWidget({
             ))}
           </div>
           {error && <p className="text-red-400 text-xs">{error}</p>}
-          <div className="flex items-center justify-between mt-auto">
-            <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset"><RotateCcw size={13} /></button>
-            <div className="flex gap-3">
-              <button onClick={() => { setSettingsOpen(false); setError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={14} /></button>
-              <button onClick={handleSave} disabled={loading} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40">
-                {loading ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          <SaveCancelRow
+            c={c}
+            onSave={handleSave}
+            onCancel={() => { setSettingsOpen(false); setError(""); }}
+            onReset={handleReset}
+            saving={loading}
+          />
+        </>
+      }
+    />
   );
 }

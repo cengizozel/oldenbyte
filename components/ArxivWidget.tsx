@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { BookOpen, Pencil, Check, X, ExternalLink, ChevronLeft, Loader } from "lucide-react";
+import { useState, useEffect } from "react";
+import { BookOpen, ExternalLink, ChevronLeft } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { formatDate } from "@/lib/format";
+import { useScrollFade } from "@/lib/useScrollFade";
+import FlipCard from "@/components/ui/FlipCard";
+import { SettingsSelect } from "@/components/ui/Field";
+import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 const CATEGORY_GROUPS = [
   {
@@ -57,9 +62,9 @@ const CATEGORY_GROUPS = [
     subs: [
       { value: "quant-ph",         label: "Quantum Physics" },
       { value: "gr-qc",            label: "General Relativity & Quantum Cosmology" },
-      { value: "hep-th",           label: "High Energy Physics – Theory" },
-      { value: "hep-ph",           label: "High Energy Physics – Phenomenology" },
-      { value: "hep-ex",           label: "High Energy Physics – Experiment" },
+      { value: "hep-th",           label: "High Energy Physics - Theory" },
+      { value: "hep-ph",           label: "High Energy Physics - Phenomenology" },
+      { value: "hep-ex",           label: "High Energy Physics - Experiment" },
       { value: "cond-mat.stat-mech", label: "Statistical Mechanics" },
       { value: "cond-mat.mtrl-sci", label: "Materials Science" },
       { value: "cond-mat.supr-con", label: "Superconductivity" },
@@ -172,38 +177,8 @@ export default function ArxivWidget({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft]               = useState<ArxivConfig>(DEFAULT);
   const [selected, setSelected]         = useState<Paper | null>(null);
-  const [listTopFade, setListTopFade]     = useState(false);
-  const [listBottomFade, setListBottomFade] = useState(false);
-  const [detailTopFade, setDetailTopFade]     = useState(false);
-  const [detailBottomFade, setDetailBottomFade] = useState(false);
-  const listScrollRef   = useRef<HTMLDivElement>(null);
-  const detailScrollRef = useRef<HTMLDivElement>(null);
-
-  function checkFade(el: HTMLDivElement, setTop: (v: boolean) => void, setBottom: (v: boolean) => void) {
-    const overflows = el.scrollHeight > el.clientHeight + 1;
-    setTop(overflows && el.scrollTop > 20);
-    setBottom(overflows && el.scrollHeight - el.scrollTop - el.clientHeight > 20);
-  }
-
-  useEffect(() => {
-    const el = listScrollRef.current;
-    if (!el) return;
-    checkFade(el, setListTopFade, setListBottomFade);
-    const ro = new ResizeObserver(() => checkFade(el, setListTopFade, setListBottomFade));
-    ro.observe(el);
-    return () => ro.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cache]);
-
-  useEffect(() => {
-    const el = detailScrollRef.current;
-    if (!el) return;
-    checkFade(el, setDetailTopFade, setDetailBottomFade);
-    const ro = new ResizeObserver(() => checkFade(el, setDetailTopFade, setDetailBottomFade));
-    ro.observe(el);
-    return () => ro.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
+  const listFade   = useScrollFade([cache]);
+  const detailFade = useScrollFade([selected]);
 
   useEffect(() => {
     storage.getItem(configKey).then(async saved => {
@@ -251,31 +226,22 @@ export default function ArxivWidget({
   const draftGroup = CATEGORY_GROUPS.find(g => g.label === findGroup(draft.category)) ?? CATEGORY_GROUPS[0];
 
   return (
-    <div
-      className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
-      style={{ perspective: "1200px" }}
-    >
-      <div
-        className="relative w-full h-full transition-transform duration-300 ease-in-out"
-        style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
-      >
-        {/* Front */}
-        <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", pointerEvents: settingsOpen ? "none" : "auto" }}>
+    <FlipCard
+      c={c}
+      flipped={settingsOpen}
+      className={className}
+      front={
+        <>
           <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 ${c.label}`}>
+            <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
               <span className="opacity-50"><BookOpen size={14} /></span>
               <span className="text-xs font-medium opacity-60">arXiv</span>
-              <span className={`text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md opacity-60 ${c.bg} border ${c.border}`}>
+              <span className={`text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md opacity-60 truncate ${c.bg} border ${c.border}`}>
                 {config.category}
               </span>
             </div>
             {!selected && (
-              <button
-                onClick={() => { setDraft(config); setSettingsOpen(true); }}
-                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-              >
-                <Pencil size={14} />
-              </button>
+              <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
             )}
           </div>
 
@@ -283,14 +249,12 @@ export default function ArxivWidget({
             {/* Paper list */}
             <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
               <div
-                ref={listScrollRef}
+                ref={listFade.ref}
                 className="absolute inset-0 overflow-y-auto pr-3"
-                onScroll={e => checkFade(e.currentTarget, setListTopFade, setListBottomFade)}
+                onScroll={listFade.onScroll}
               >
                 {loading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                  </div>
+                  <LoadingState c={c} />
                 ) : cache?.papers.length ? (
                   <ul className="flex flex-col">
                     {cache.papers.map((p, i) => (
@@ -298,7 +262,7 @@ export default function ArxivWidget({
                         <div className="flex items-start gap-1 group/title">
                           <button
                             onClick={() => setSelected(p)}
-                            className={`flex-1 text-left text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                            className={`flex-1 min-w-0 text-left text-sm leading-snug break-words ${c.text} hover:opacity-70 transition-opacity`}
                           >
                             {p.title}
                           </button>
@@ -316,13 +280,10 @@ export default function ArxivWidget({
                     ))}
                   </ul>
                 ) : (
-                  <p className={`text-xs opacity-45 ${c.text}`}>
-                    hover and click the pencil to choose a category
-                  </p>
+                  <EmptyState c={c} action="choose a category" />
                 )}
               </div>
-              {listTopFade && <div className={`absolute top-0 left-0 right-0 h-8 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
-              {listBottomFade && <div className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
+              <ScrollFades c={c} top={listFade.topFade} bottom={listFade.bottomFade} />
             </div>
 
             {/* Paper detail */}
@@ -335,86 +296,76 @@ export default function ArxivWidget({
                       <button onClick={() => setSelected(null)} className="shrink-0 opacity-60 hover:opacity-100">
                         <ChevronLeft size={14} />
                       </button>
-                      <span className="flex-1 text-xs font-medium truncate opacity-80">{selected.title}</span>
+                      <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
                       <a href={selected.link} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80">
                         <ExternalLink size={11} />
                       </a>
                     </div>
                     <div
-                      ref={detailScrollRef}
+                      ref={detailFade.ref}
                       className="flex-1 min-h-0 overflow-y-auto pr-3"
-                      onScroll={e => checkFade(e.currentTarget, setDetailTopFade, setDetailBottomFade)}
+                      onScroll={detailFade.onScroll}
                     >
                       <div className="flex flex-col gap-2">
                         {p.authors && (
-                          <p className={`text-xs opacity-55 leading-snug ${c.text}`}>{p.authors}</p>
+                          <p className={`text-xs opacity-55 leading-snug break-words ${c.text}`}>{p.authors}</p>
                         )}
                         {selected.pubDate && (
                           <p className={`text-xs opacity-35 ${c.text}`}>
-                            {new Date(selected.pubDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            {formatDate(selected.pubDate)}
                             {" · "}{config.category}
                           </p>
                         )}
                         {p.abstract && (
                           <>
                             <div className="border-t border-black/5" />
-                            <p className={`text-xs leading-relaxed opacity-75 ${c.text}`}>{p.abstract}</p>
+                            <p className={`text-xs leading-relaxed opacity-75 break-words ${c.text}`}>{p.abstract}</p>
                           </>
                         )}
                       </div>
                     </div>
-                    {detailTopFade && <div className={`absolute top-0 left-0 right-0 h-8 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
-                    {detailBottomFade && <div className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
+                    <ScrollFades c={c} top={detailFade.topFade} bottom={detailFade.bottomFade} />
                   </>
                 );
               })()}
             </div>
           </div>
-        </div>
-
-        {/* Back (settings) */}
-        <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", pointerEvents: settingsOpen ? "auto" : "none" }}>
+        </>
+      }
+      back={
+        <>
           <div className="flex flex-col gap-1.5">
             <label className={`text-[10px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
               Field
             </label>
-            <select
+            <SettingsSelect
               value={draftGroup.label}
               onChange={e => {
                 const group = CATEGORY_GROUPS.find(g => g.label === e.target.value) ?? CATEGORY_GROUPS[0];
                 setDraft({ category: group.subs[0].value });
               }}
-              className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none text-neutral-700 bg-white"
             >
               {CATEGORY_GROUPS.map(g => (
                 <option key={g.label} value={g.label}>{g.label}</option>
               ))}
-            </select>
+            </SettingsSelect>
           </div>
           <div className="flex flex-col gap-1.5">
             <label className={`text-[10px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
               Topic
             </label>
-            <select
+            <SettingsSelect
               value={draft.category}
               onChange={e => setDraft({ category: e.target.value })}
-              className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none text-neutral-700 bg-white"
             >
               {draftGroup.subs.map(sub => (
                 <option key={sub.value} value={sub.value}>{sub.label}</option>
               ))}
-            </select>
+            </SettingsSelect>
           </div>
-          <div className="flex items-center justify-end gap-3 mt-auto">
-            <button onClick={() => setSettingsOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-              <X size={14} />
-            </button>
-            <button onClick={handleSave} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-              <Check size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+          <SaveCancelRow c={c} onSave={handleSave} onCancel={() => setSettingsOpen(false)} />
+        </>
+      }
+    />
   );
 }

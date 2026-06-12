@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Flag, Loader, RotateCcw } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Flag, RotateCcw } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { formatDate } from "@/lib/format";
+import { useScrollFade } from "@/lib/useScrollFade";
+import { LoadingState, ScrollFades } from "@/components/ui/WidgetChrome";
 
 type Race = {
   raceName: string;
@@ -32,10 +35,6 @@ function countdown(dateStr: string, timeStr?: string): string {
   return `in ${days} days`;
 }
 
-function formatRaceDate(dateStr: string): string {
-  return new Date(dateStr + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
 export default function F1Widget({
   widget,
   className = "",
@@ -49,24 +48,7 @@ export default function F1Widget({
   const [data, setData] = useState<F1Data | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [showTopFade, setShowTopFade] = useState(false);
-  const [showBottomFade, setShowBottomFade] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  function checkFade(el: HTMLDivElement) {
-    const overflows = el.scrollHeight > el.clientHeight + 1;
-    setShowTopFade(overflows && el.scrollTop > 20);
-    setShowBottomFade(overflows && el.scrollHeight - el.scrollTop - el.clientHeight > 20);
-  }
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    checkFade(el);
-    const ro = new ResizeObserver(() => checkFade(el));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [data]);
+  const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([data]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,12 +86,10 @@ export default function F1Widget({
         <div
           ref={scrollRef}
           className="absolute inset-0 overflow-y-auto pr-3"
-          onScroll={e => checkFade(e.currentTarget)}
+          onScroll={onScroll}
         >
           {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-            </div>
+            <LoadingState c={c} />
           ) : data ? (
             <div className="flex flex-col gap-3">
 
@@ -123,7 +103,7 @@ export default function F1Widget({
                     <p className={`text-sm font-medium leading-snug ${c.text}`}>{data.race.raceName}</p>
                     <p className={`text-xs opacity-60 ${c.text}`}>{data.race.Circuit.circuitName}</p>
                     <p className={`text-xs opacity-50 ${c.text}`}>
-                      {formatRaceDate(data.race.date)} · {countdown(data.race.date, data.race.time)}
+                      {formatDate(`${data.race.date}T12:00:00Z`, { year: false })} · {countdown(data.race.date, data.race.time)}
                     </p>
                   </div>
                   <img
@@ -147,7 +127,7 @@ export default function F1Widget({
                     {data.standings.map((s, i) => (
                       <div
                         key={s.position}
-                        className={`flex items-center gap-2 py-1.5 ${i > 0 ? "border-t border-black/5" : ""}`}
+                        className={`flex items-center gap-2 py-1.5 ${i > 0 ? "border-t border-black/10" : ""}`}
                       >
                         <span className={`text-xs font-semibold opacity-40 w-4 shrink-0 tabular-nums ${c.label}`}>{s.position}</span>
                         <span className={`text-xs font-bold w-8 shrink-0 ${c.label}`}>{s.Driver.code}</span>
@@ -171,18 +151,11 @@ export default function F1Widget({
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full">
-              <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-            </div>
+            <LoadingState c={c} />
           )}
         </div>
 
-        {showTopFade && (
-          <div className={`absolute top-0 left-0 right-0 h-8 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />
-        )}
-        {showBottomFade && (
-          <div className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />
-        )}
+        <ScrollFades c={c} top={topFade} bottom={bottomFade} />
       </div>
     </div>
   );

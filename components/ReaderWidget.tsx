@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Pencil, ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { colorMap, type Widget } from "@/lib/widgets";
+import FlipCard from "@/components/ui/FlipCard";
+import { PencilButton, LoadingState } from "@/components/ui/WidgetChrome";
 import * as storage from "@/lib/storage";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
@@ -318,7 +320,7 @@ function FullscreenOverlay({
       >
         {/* Overlay header */}
         <div className="flex items-center justify-between px-5 py-3 shrink-0 border-b border-neutral-100">
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-medium text-neutral-700 truncate">{config.displayName}</p>
             <span className="text-xs text-neutral-400 uppercase tracking-widest">{config.fileType}</span>
           </div>
@@ -439,7 +441,7 @@ export default function ReaderWidget({
       }}
     >
       {uploading ? (
-        <Loader size={18} className={`animate-spin opacity-40 ${c.label}`} />
+        <LoadingState c={c} />
       ) : (
         <>
           <button
@@ -471,16 +473,12 @@ export default function ReaderWidget({
 
   return (
     <>
-      <div
-        className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
-        style={{ perspective: "1200px" }}
-      >
-        <div
-          className="relative w-full h-full transition-transform duration-300 ease-in-out"
-          style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
-        >
-          {/* Front */}
-          <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", pointerEvents: settingsOpen ? "none" : "auto" }}>
+      <FlipCard
+        c={c}
+        flipped={settingsOpen}
+        className={className}
+        front={
+          <>
             <div className="flex items-center justify-between mb-3 shrink-0">
               <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
                 <span className="opacity-50 shrink-0"><BookOpen size={14} /></span>
@@ -498,13 +496,7 @@ export default function ReaderWidget({
                     <Maximize2 size={14} />
                   </button>
                 )}
-                <button
-                  onClick={() => { setSettingsOpen(true); setError(""); }}
-                  className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-                  title="Settings"
-                >
-                  <Pencil size={14} />
-                </button>
+                <PencilButton c={c} onClick={() => { setSettingsOpen(true); setError(""); }} title="Settings" />
               </div>
             </div>
 
@@ -533,10 +525,10 @@ export default function ReaderWidget({
             ) : (
               uploadZone()
             )}
-          </div>
-
-          {/* Back (settings) */}
-          <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", pointerEvents: settingsOpen ? "auto" : "none" }}>
+          </>
+        }
+        back={
+          <>
             {uploadZone(true)}
             <div className="flex items-center justify-between mt-auto">
               <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Remove file">
@@ -550,9 +542,9 @@ export default function ReaderWidget({
                 <X size={14} />
               </button>
             </div>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {fullscreen && config && (
         <FullscreenOverlay

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { NotebookPen, Pencil, Check, X, Bold, Italic, Underline, List, History, Trash2 } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { formatDate } from "@/lib/format";
 
 const REGISTRY_KEY = "notepad-registry";
 
@@ -11,7 +12,7 @@ function toDateStr(date: Date) {
   return date.toISOString().split("T")[0];
 }
 
-// Rich text helpers — notes are stored as HTML. Older notes were saved as plain
+// Rich text helpers: notes are stored as HTML. Older notes were saved as plain
 // text; those are detected and converted on display, then re-saved as HTML on edit.
 function isHtml(s: string) {
   return /<\/?[a-z][\s\S]*>/i.test(s);
@@ -44,8 +45,9 @@ function stripHtml(html: string) {
     .trim();
 }
 
+// Noon time avoids timezone day-shift for bare YYYY-MM-DD strings.
 function fmtDate(date: string) {
-  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return formatDate(`${date}T12:00:00`);
 }
 
 const FORMATS = [
@@ -177,7 +179,7 @@ function RichTextEditor({
           e.preventDefault();
           document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
         }}
-        className={`flex-1 min-h-0 overflow-y-auto outline-none text-sm leading-relaxed ${textClass} ${editable ? "" : "opacity-60"} empty:before:content-[attr(data-ph)] empty:before:opacity-50 empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4`}
+        className={`flex-1 min-h-0 overflow-y-auto outline-none text-sm leading-relaxed break-words ${textClass} ${editable ? "" : "opacity-60"} empty:before:content-[attr(data-ph)] empty:before:opacity-50 empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4`}
       />
     </div>
   );
@@ -351,7 +353,7 @@ export default function NotebookWidget({
       <div className="flex gap-3 flex-1 min-h-0">
 
         {/* Left: icon + note */}
-        <div className="flex flex-col flex-1 min-h-0">
+        <div className="flex flex-col flex-1 min-h-0 min-w-0">
           {renaming ? (
             <div className="flex items-center gap-1.5 mb-3 shrink-0">
               <span className={`opacity-50 shrink-0 ${c.label}`}><NotebookPen size={14} /></span>
@@ -361,18 +363,18 @@ export default function NotebookWidget({
                 onChange={e => setDraftName(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setRenaming(false); }}
                 placeholder="Name this notepad…"
-                className="flex-1 text-xs border border-neutral-200 rounded-lg px-2 py-1 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white min-w-0"
+                className="flex-1 min-w-0 text-xs border border-[var(--surface-border)] rounded-lg px-2 py-1 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
               />
               <button onClick={() => setRenaming(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0"><X size={13} /></button>
               <button onClick={saveName} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0"><Check size={13} /></button>
             </div>
           ) : (
             <div className="flex items-center justify-between mb-3 shrink-0">
-              <div className={`flex items-center gap-1.5 ${c.label}`}>
-                <span className="opacity-50"><NotebookPen size={14} /></span>
-                {customName && <span className="text-xs font-medium opacity-60">{customName}</span>}
+              <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
+                <span className="opacity-50 shrink-0"><NotebookPen size={14} /></span>
+                {customName && <span className="text-xs font-medium opacity-60 truncate">{customName}</span>}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={openHistory}
                   title="All notes"
@@ -394,12 +396,12 @@ export default function NotebookWidget({
           {!isToday && (
             <div className="mb-1.5 shrink-0">
               <p className={`text-xs opacity-50 ${c.label}`}>
-                {new Date(viewDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                {fmtDate(viewDate)}
                 {" · "}
                 <button onClick={() => setViewDate(today)} className="underline underline-offset-2">back to today</button>
               </p>
               {showTabs && (
-                <div className="flex gap-1 mt-1.5">
+                <div className="flex flex-wrap gap-1 mt-1.5">
                   {tabs.map(tab => (
                     <button
                       key={tab.id}
@@ -430,7 +432,7 @@ export default function NotebookWidget({
         </div>
 
         {/* Calendar */}
-        <div className="w-28 shrink-0 flex flex-col gap-1.5">
+        <div className="w-28 min-w-0 flex flex-col gap-1.5">
 
           <div className="flex items-center justify-between">
             <button onClick={prevMonth} className={`text-xs opacity-60 hover:opacity-90 ${c.label}`}>‹</button>
@@ -489,7 +491,7 @@ export default function NotebookWidget({
               <X size={14} />
             </button>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-1">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-1">
             {history.length === 0 ? (
               <p className={`text-xs opacity-45 ${c.text}`}>no notes yet</p>
             ) : history.map(e => (

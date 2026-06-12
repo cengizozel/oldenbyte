@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Pencil, Type, Check, X, Loader } from "lucide-react";
+import { Type } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import FlipCard from "@/components/ui/FlipCard";
+import { SettingsInput } from "@/components/ui/Field";
+import { PencilButton, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type FontFamily = "sans" | "serif" | "mono";
 type SourceConfig = { type: "text" | "url"; value: string };
@@ -47,6 +50,14 @@ export default function TextWidget({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
+  const settingsBodyRef = useRef<HTMLDivElement>(null);
+
+  // Restore the old open-settings autofocus. The input is always mounted on
+  // FlipCard's back face, so `autoFocus` would steal focus at page load;
+  // instead focus it when the card flips to settings.
+  useEffect(() => {
+    if (settingsOpen) settingsBodyRef.current?.querySelector("input")?.focus();
+  }, [settingsOpen]);
 
   useEffect(() => {
     storage.getItem(storageKey).then(saved => {
@@ -147,25 +158,45 @@ export default function TextWidget({
   }
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
+    <FlipCard
+      c={c}
+      flipped={settingsOpen}
+      className={className}
+      front={
+        <>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-3 shrink-0">
+            <span className={`opacity-50 ${c.label}`}><Type size={14} /></span>
+            <PencilButton
+              c={c}
+              onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
+            />
+          </div>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <span className={`opacity-50 ${c.label}`}><Type size={14} /></span>
-        {!settingsOpen && (
-          <button
-            onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
-            className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-          >
-            <Pencil size={14} />
-          </button>
-        )}
-      </div>
+          {/* Auto-fit text display */}
+          <div ref={containerRef} className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+            {display ? (
+              <div
+                ref={textRef}
+                style={{ fontSize: `${fontSize}px` }}
+                className={`${FONT_CLASS[config.font]} ${c.text} text-center leading-tight break-words w-full`}
+              >
+                {display}
+              </div>
+            ) : (
+              <EmptyState c={c} action="add text" />
+            )}
+          </div>
+        </>
+      }
+      back={
+        <>
+          {/* Header */}
+          <div className="flex items-center justify-between shrink-0">
+            <span className={`opacity-50 ${c.label}`}><Type size={14} /></span>
+          </div>
 
-      {settingsOpen ? (
-        /* Settings panel */
-        <div className="flex flex-col gap-3 flex-1 min-h-0">
-          <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-1">
+          <div ref={settingsBodyRef} className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
 
             {/* Source type toggle */}
             <div className="flex gap-1">
@@ -185,14 +216,12 @@ export default function TextWidget({
             </div>
 
             {/* Input */}
-            <input
-              autoFocus
+            <SettingsInput
               type={draft.source.type === "url" ? "url" : "text"}
               value={draft.source.value}
               onChange={e => setDraft(d => ({ ...d, source: { ...d.source, value: e.target.value } }))}
               onKeyDown={e => e.key === "Enter" && handleSave()}
               placeholder={draft.source.type === "url" ? "https://..." : "Enter any text…"}
-              className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
             />
 
             {/* Font picker */}
@@ -223,41 +252,14 @@ export default function TextWidget({
 
           </div>
 
-          {/* Actions — pinned outside scroll */}
-          <div className="flex items-center justify-end gap-3 shrink-0">
-            <button
-              onClick={() => { setSettingsOpen(false); setError(""); }}
-              className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              title="Cancel"
-            >
-              <X size={14} />
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={testing}
-              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
-              title={draft.source.type === "url" ? "Test & Save" : "Save"}
-            >
-              {testing ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* Auto-fit text display */
-        <div ref={containerRef} className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden">
-          {display ? (
-            <div
-              ref={textRef}
-              style={{ fontSize: `${fontSize}px` }}
-              className={`${FONT_CLASS[config.font]} ${c.text} text-center leading-tight break-words w-full`}
-            >
-              {display}
-            </div>
-          ) : (
-            <p className={`text-xs opacity-45 ${c.text}`}>hover and click the pencil to add text</p>
-          )}
-        </div>
-      )}
-    </div>
+          <SaveCancelRow
+            c={c}
+            onSave={handleSave}
+            onCancel={() => { setSettingsOpen(false); setError(""); }}
+            saving={testing}
+          />
+        </>
+      }
+    />
   );
 }

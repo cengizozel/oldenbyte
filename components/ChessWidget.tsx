@@ -221,21 +221,21 @@ export default function ChessWidget({
   let status: string;
   if (!ready) status = "loading engine…";
   else if (thinking) status = "thinking…";
-  else if (game.isCheckmate()) status = game.turn() === playerColor ? "checkmate — you lose" : "checkmate — you win";
+  else if (game.isCheckmate()) status = game.turn() === playerColor ? "checkmate, you lose" : "checkmate, you win";
   else if (game.isDraw()) status = "draw";
   else if (game.isStalemate()) status = "stalemate";
   else status = (game.turn() === playerColor ? "your move" : "engine's move") + (game.inCheck() ? " · check" : "");
 
   return (
     <div className={`rounded-2xl border p-5 flex flex-col h-full ${c.bg} ${c.border} ${c.glow} ${className}`}>
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 ${c.label}`}>
+      <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+        <div className={`flex items-center gap-1.5 shrink-0 ${c.label}`}>
           <span className="opacity-50"><Swords size={14} /></span>
           <span className="text-xs font-medium opacity-60">Chess</span>
         </div>
-        <span className={`flex items-center gap-1 text-xs opacity-50 ${c.label}`}>
-          {thinking && <Loader size={11} className="animate-spin" />}
-          {status}
+        <span className={`flex items-center gap-1 text-xs opacity-50 min-w-0 ${c.label}`}>
+          {thinking && <Loader size={11} className="animate-spin shrink-0" />}
+          <span className="truncate">{status}</span>
         </span>
       </div>
 

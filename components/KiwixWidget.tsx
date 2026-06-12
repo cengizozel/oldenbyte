@@ -1,9 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Library, Search, Pencil, Check, X, RotateCcw, Loader, ExternalLink, ChevronLeft, Home } from "lucide-react";
+import { Library, Search, Loader, ExternalLink, ChevronLeft, Home } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { useScrollFade } from "@/lib/useScrollFade";
+import FlipCard from "@/components/ui/FlipCard";
+import { SettingsInput, SettingsSelect } from "@/components/ui/Field";
+import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type Result = { title: string; url: string; snippet: string };
 // A "source" is a kiwix ZIM (Wikipedia, WikiHow, …). `id` is its content-route name.
@@ -52,6 +56,9 @@ export default function KiwixWidget({
   const [loadingArticle, setLoadingArticle] = useState(false);
   const [articleError, setArticleError] = useState("");
   const articleAbort = useRef<AbortController | null>(null);
+
+  const resultsFade = useScrollFade<HTMLDivElement>([results, searching, error, searched]);
+  const articleFade = useScrollFade<HTMLDivElement>([extract, loadingArticle, articleError, selected]);
 
   async function openArticle(r: Result) {
     setSelected(r);
@@ -157,7 +164,7 @@ export default function KiwixWidget({
       setError("Load sources and pick one.");
       return;
     }
-    // Results belong to the old source — clear them when switching.
+    // Results belong to the old source, so clear them when switching.
     if (draft.source !== config.source) {
       setResults([]);
       setQuery("");
@@ -188,16 +195,12 @@ export default function KiwixWidget({
   }
 
   return (
-    <div
-      className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
-      style={{ perspective: "1200px" }}
-    >
-      <div
-        className="relative w-full h-full transition-transform duration-300 ease-in-out"
-        style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
-      >
-        {/* Front */}
-        <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", pointerEvents: settingsOpen ? "none" : "auto" }}>
+    <FlipCard
+      c={c}
+      flipped={settingsOpen}
+      className={className}
+      front={
+        <>
           <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
             <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
               <span className="opacity-50 shrink-0"><Library size={14} /></span>
@@ -213,14 +216,7 @@ export default function KiwixWidget({
                   <Home size={14} />
                 </button>
               )}
-              {!selected && (
-                <button
-                  onClick={openSettings}
-                  className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-                >
-                  <Pencil size={14} />
-                </button>
-              )}
+              {!selected && <PencilButton c={c} onClick={openSettings} />}
             </div>
           </div>
 
@@ -239,41 +235,42 @@ export default function KiwixWidget({
                     className={`w-full text-sm rounded-xl pl-8 pr-3 py-1.5 outline-none bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/10 dark:focus:border-white/10 ${c.text} placeholder:opacity-40`}
                   />
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-                  {searching ? (
-                    <div className="flex items-center justify-center h-full">
-                      <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                    </div>
-                  ) : error ? (
-                    <p className="text-red-400 text-xs">{error}</p>
-                  ) : results.length ? (
-                    <ul className="flex flex-col">
-                      {results.map((r, i) => (
-                        <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
-                          <div className="flex items-start gap-1 group/title">
-                            <button
-                              onClick={() => openArticle(r)}
-                              className={`flex-1 text-left text-sm leading-snug font-medium ${c.text} hover:opacity-70 transition-opacity`}
-                            >
-                              {r.title}
-                            </button>
-                            <a
-                              href={r.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
-                            >
-                              <ExternalLink size={11} />
-                            </a>
-                          </div>
-                          {r.snippet && <p className={`text-xs mt-0.5 opacity-50 ${c.text} line-clamp-2`}>{r.snippet}</p>}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className={`text-xs opacity-45 ${c.text}`}>{searched ? "No results." : "Type a query and press Enter."}</p>
-                  )}
+                <div className="flex-1 min-h-0 relative">
+                  <div ref={resultsFade.ref} onScroll={resultsFade.onScroll} className="h-full overflow-y-auto pr-3">
+                    {searching ? (
+                      <LoadingState c={c} />
+                    ) : error ? (
+                      <p className="text-red-400 text-xs">{error}</p>
+                    ) : results.length ? (
+                      <ul className="flex flex-col">
+                        {results.map((r, i) => (
+                          <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                            <div className="flex items-start gap-1 group/title">
+                              <button
+                                onClick={() => openArticle(r)}
+                                className={`flex-1 min-w-0 text-left text-sm leading-snug font-medium break-words ${c.text} hover:opacity-70 transition-opacity`}
+                              >
+                                {r.title}
+                              </button>
+                              <a
+                                href={r.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                              >
+                                <ExternalLink size={11} />
+                              </a>
+                            </div>
+                            {r.snippet && <p className={`text-xs mt-0.5 opacity-50 ${c.text} line-clamp-2`}>{r.snippet}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className={`text-xs opacity-45 ${c.text}`}>{searched ? "No results." : "Type a query and press Enter."}</p>
+                    )}
+                  </div>
+                  <ScrollFades c={c} top={resultsFade.topFade} bottom={resultsFade.bottomFade} />
                 </div>
               </div>
 
@@ -285,23 +282,24 @@ export default function KiwixWidget({
                       <button onClick={() => setSelected(null)} className="shrink-0 opacity-60 hover:opacity-100">
                         <ChevronLeft size={14} />
                       </button>
-                      <span className="flex-1 text-xs font-medium truncate opacity-80">{selected.title}</span>
+                      <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
                       <a href={selected.url} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80" title="Open in Kiwix">
                         <ExternalLink size={11} />
                       </a>
                     </div>
-                    <div className="flex-1 min-h-0 overflow-y-auto pr-3">
-                      {loadingArticle ? (
-                        <div className="flex items-center justify-center h-full">
-                          <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                        </div>
-                      ) : articleError ? (
-                        <p className="text-red-400 text-xs">{articleError}</p>
-                      ) : extract ? (
-                        <p className={`text-xs leading-relaxed opacity-75 whitespace-pre-line ${c.text}`}>{extract}</p>
-                      ) : (
-                        <p className={`text-xs opacity-45 ${c.text}`}>No preview available — open in Kiwix.</p>
-                      )}
+                    <div className="flex-1 min-h-0 relative">
+                      <div ref={articleFade.ref} onScroll={articleFade.onScroll} className="h-full overflow-y-auto pr-3">
+                        {loadingArticle ? (
+                          <LoadingState c={c} />
+                        ) : articleError ? (
+                          <p className="text-red-400 text-xs">{articleError}</p>
+                        ) : extract ? (
+                          <p className={`text-xs leading-relaxed opacity-75 whitespace-pre-line break-words ${c.text}`}>{extract}</p>
+                        ) : (
+                          <p className={`text-xs opacity-45 ${c.text}`}>No preview available, open in Kiwix.</p>
+                        )}
+                      </div>
+                      <ScrollFades c={c} top={articleFade.topFade} bottom={articleFade.bottomFade} />
                     </div>
                   </>
                 )}
@@ -309,19 +307,18 @@ export default function KiwixWidget({
             </div>
           ) : (
             <div className="flex-1 flex items-center">
-              <p className={`text-xs opacity-45 ${c.text}`}>hover and click the pencil to connect your Kiwix server</p>
+              <EmptyState c={c} action="connect your Kiwix server" />
             </div>
           )}
-        </div>
-
-        {/* Back (settings) */}
-        <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", pointerEvents: settingsOpen ? "auto" : "none" }}>
-          <input
+        </>
+      }
+      back={
+        <>
+          <SettingsInput
             type="url"
             value={draft.baseUrl}
             onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value }))}
             placeholder="http://192.168.1.24:3702"
-            className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
           />
           <div className="flex items-center gap-2">
             <button
@@ -332,20 +329,20 @@ export default function KiwixWidget({
               {loadingSources ? <Loader size={12} className="animate-spin" /> : "Load sources"}
             </button>
             {sources.length > 0 ? (
-              <select
+              <SettingsSelect
                 value={draft.source}
                 onChange={(e) => {
                   const s = sources.find((x) => x.id === e.target.value);
                   setDraft((d) => ({ ...d, source: e.target.value, sourceTitle: s?.title ?? "" }));
                 }}
-                className="flex-1 min-w-0 text-sm border border-neutral-200 rounded-xl px-2 py-2 outline-none text-neutral-700 bg-white"
+                className="flex-1 min-w-0"
               >
                 {sources.map((s) => (
                   <option key={s.id} value={s.id}>{s.title}</option>
                 ))}
-              </select>
+              </SettingsSelect>
             ) : (
-              <span className="text-xs text-neutral-400 truncate">{draft.sourceTitle || "no source selected"}</span>
+              <span className="text-xs text-neutral-400 truncate min-w-0">{draft.sourceTitle || "no source selected"}</span>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -358,15 +355,14 @@ export default function KiwixWidget({
             ))}
           </div>
           {error && <p className="text-red-400 text-xs">{error}</p>}
-          <div className="flex items-center justify-between mt-auto">
-            <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset"><RotateCcw size={13} /></button>
-            <div className="flex gap-3">
-              <button onClick={() => { setSettingsOpen(false); setError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={14} /></button>
-              <button onClick={handleSave} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Check size={14} /></button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          <SaveCancelRow
+            c={c}
+            onSave={handleSave}
+            onCancel={() => { setSettingsOpen(false); setError(""); }}
+            onReset={handleReset}
+          />
+        </>
+      }
+    />
   );
 }

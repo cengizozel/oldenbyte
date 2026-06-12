@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Sparkles, ChevronLeft, ExternalLink, Loader, Pencil, Check, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Sparkles, ChevronLeft, ExternalLink } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { formatCount, formatDate } from "@/lib/format";
+import { useScrollFade } from "@/lib/useScrollFade";
+import FlipCard from "@/components/ui/FlipCard";
+import { PencilButton, ScrollFades, LoadingState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type HFPaper = {
   id: string;
@@ -36,38 +40,8 @@ export default function HuggingFaceWidget({
   const [selected, setSelected]         = useState<HFPaper | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft]               = useState<HFConfig>(DEFAULT);
-  const [listTopFade, setListTopFade]         = useState(false);
-  const [listBottomFade, setListBottomFade]   = useState(false);
-  const [detailTopFade, setDetailTopFade]     = useState(false);
-  const [detailBottomFade, setDetailBottomFade] = useState(false);
-  const listScrollRef   = useRef<HTMLDivElement>(null);
-  const detailScrollRef = useRef<HTMLDivElement>(null);
-
-  function checkFade(el: HTMLDivElement, setTop: (v: boolean) => void, setBottom: (v: boolean) => void) {
-    const overflows = el.scrollHeight > el.clientHeight + 1;
-    setTop(overflows && el.scrollTop > 20);
-    setBottom(overflows && el.scrollHeight - el.scrollTop - el.clientHeight > 20);
-  }
-
-  useEffect(() => {
-    const el = listScrollRef.current;
-    if (!el) return;
-    checkFade(el, setListTopFade, setListBottomFade);
-    const ro = new ResizeObserver(() => checkFade(el, setListTopFade, setListBottomFade));
-    ro.observe(el);
-    return () => ro.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [papers]);
-
-  useEffect(() => {
-    const el = detailScrollRef.current;
-    if (!el) return;
-    checkFade(el, setDetailTopFade, setDetailBottomFade);
-    const ro = new ResizeObserver(() => checkFade(el, setDetailTopFade, setDetailBottomFade));
-    ro.observe(el);
-    return () => ro.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
+  const listFade   = useScrollFade<HTMLDivElement>([papers]);
+  const detailFade = useScrollFade<HTMLDivElement>([selected]);
 
   useEffect(() => {
     storage.getItem(configKey).then(async saved => {
@@ -104,28 +78,19 @@ export default function HuggingFaceWidget({
   }
 
   return (
-    <div
-      className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
-      style={{ perspective: "1200px" }}
-    >
-      <div
-        className="relative w-full h-full transition-transform duration-300 ease-in-out"
-        style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d", transform: settingsOpen ? "rotateY(180deg)" : "rotateY(0deg)" }}
-      >
-        {/* Front */}
-        <div className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", pointerEvents: settingsOpen ? "none" : "auto" }}>
+    <FlipCard
+      c={c}
+      flipped={settingsOpen}
+      className={className}
+      front={
+        <>
           <div className="flex items-center justify-between mb-3 shrink-0">
             <div className={`flex items-center gap-1.5 ${c.label}`}>
               <span className="opacity-50"><Sparkles size={14} /></span>
               <span className="text-xs font-medium opacity-60">HF Daily</span>
             </div>
             {!selected && (
-              <button
-                onClick={() => { setDraft(config); setSettingsOpen(true); }}
-                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-              >
-                <Pencil size={14} />
-              </button>
+              <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
             )}
           </div>
 
@@ -133,22 +98,20 @@ export default function HuggingFaceWidget({
             {/* Paper list */}
             <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
               <div
-                ref={listScrollRef}
+                ref={listFade.ref}
                 className="absolute inset-0 overflow-y-auto pr-3"
-                onScroll={e => checkFade(e.currentTarget, setListTopFade, setListBottomFade)}
+                onScroll={listFade.onScroll}
               >
-                {loading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                  </div>
-                ) : papers.length ? (
+                {loading || !papers.length ? (
+                  <LoadingState c={c} />
+                ) : (
                   <ul className="flex flex-col">
                     {papers.map((p, i) => (
                       <li key={p.id} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
                         <div className="flex items-start gap-1 group/title">
                           <button
                             onClick={() => setSelected(p)}
-                            className={`flex-1 text-left text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                            className={`flex-1 min-w-0 text-left text-sm leading-snug break-words ${c.text} hover:opacity-70 transition-opacity`}
                           >
                             {p.title}
                           </button>
@@ -165,14 +128,9 @@ export default function HuggingFaceWidget({
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader size={16} className={`animate-spin opacity-40 ${c.label}`} />
-                  </div>
                 )}
               </div>
-              {listTopFade && <div className={`absolute top-0 left-0 right-0 h-8 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
-              {listBottomFade && <div className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
+              <ScrollFades c={c} top={listFade.topFade} bottom={listFade.bottomFade} />
             </div>
 
             {/* Paper detail */}
@@ -183,51 +141,50 @@ export default function HuggingFaceWidget({
                     <button onClick={() => setSelected(null)} className="shrink-0 opacity-60 hover:opacity-100">
                       <ChevronLeft size={14} />
                     </button>
-                    <span className="flex-1 text-xs font-medium truncate opacity-80">{selected.title}</span>
+                    <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
                     <a href={selected.link} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80">
                       <ExternalLink size={11} />
                     </a>
                   </div>
                   <div
-                    ref={detailScrollRef}
+                    ref={detailFade.ref}
                     className="flex-1 min-h-0 overflow-y-auto pr-3"
-                    onScroll={e => checkFade(e.currentTarget, setDetailTopFade, setDetailBottomFade)}
+                    onScroll={detailFade.onScroll}
                   >
                     <div className="flex flex-col gap-2">
                       {selected.authors.length > 0 && (
-                        <p className={`text-xs opacity-55 leading-snug ${c.text}`}>
+                        <p className={`text-xs opacity-55 leading-snug break-words ${c.text}`}>
                           {selected.authors.join(", ")}
                         </p>
                       )}
                       <div className={`flex items-center gap-2 text-xs opacity-35 ${c.text}`}>
                         {selected.publishedAt && (
-                          <span>{new Date(selected.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                          <span>{formatDate(selected.publishedAt)}</span>
                         )}
                         {selected.upvotes > 0 && (
                           <>
                             <span>·</span>
-                            <span>▲ {selected.upvotes}</span>
+                            <span>▲ {formatCount(selected.upvotes)}</span>
                           </>
                         )}
                       </div>
                       {selected.abstract && (
                         <>
                           <div className="border-t border-black/5" />
-                          <p className={`text-xs leading-relaxed opacity-75 ${c.text}`}>{selected.abstract}</p>
+                          <p className={`text-xs leading-relaxed opacity-75 break-words ${c.text}`}>{selected.abstract}</p>
                         </>
                       )}
                     </div>
                   </div>
-                  {detailTopFade && <div className={`absolute top-0 left-0 right-0 h-8 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
-                  {detailBottomFade && <div className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
+                  <ScrollFades c={c} top={detailFade.topFade} bottom={detailFade.bottomFade} />
                 </>
               )}
             </div>
           </div>
-        </div>
-
-        {/* Back (settings) */}
-        <div className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${c.bg}`} style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", pointerEvents: settingsOpen ? "auto" : "none" }}>
+        </>
+      }
+      back={
+        <>
           <div className="flex flex-col gap-1.5">
             <label className={`text-[10px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
               Papers to show
@@ -248,16 +205,9 @@ export default function HuggingFaceWidget({
               ))}
             </div>
           </div>
-          <div className="flex items-center justify-end gap-3 mt-auto">
-            <button onClick={() => setSettingsOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-              <X size={14} />
-            </button>
-            <button onClick={handleSave} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-              <Check size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+          <SaveCancelRow c={c} onSave={handleSave} onCancel={() => setSettingsOpen(false)} />
+        </>
+      }
+    />
   );
 }
