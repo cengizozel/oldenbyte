@@ -9,7 +9,7 @@
 // that don't expand return the recurrence master once.
 
 export type CalDAVAccount = { baseUrl: string; username: string; password: string };
-export type CalDAVCalendar = { name: string; url: string; readOnly?: boolean };
+export type CalDAVCalendar = { name: string; url: string; readOnly?: boolean; source?: string };
 export type CalDAVEvent = {
   uid: string;
   href: string;
@@ -87,30 +87,37 @@ export async function listCalendars(account: CalDAVAccount, signal?: AbortSignal
 
   // 2. Where do my calendars live?
   const homeXml = await dav(principalUrl, "PROPFIND", account,
-    `<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml-ns:caldav"><d:prop><c:calendar-home-set/></d:prop></d:propfind>`,
+    `<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><c:calendar-home-set/></d:prop></d:propfind>`,
     { Depth: "0" }, signal);
   const homeHref = xmlText(xmlText(homeXml, "calendar-home-set"), "href");
   const homeUrl = resolveHref(base, decodeXml(homeHref || principalHref || "/"));
 
   // 3. Which children are calendars supporting VEVENT?
   const listXml = await dav(homeUrl, "PROPFIND", account,
-    `<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml-ns:caldav" xmlns:cs="http://calendarserver.org/ns/">` +
-    `<d:prop><d:resourcetype/><d:displayname/><c:supported-calendar-component-set/><d:current-user-privilege-set/></d:prop></d:propfind>`,
+    `<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/">` +
+    `<d:prop><d:resourcetype/><d:displayname/><c:supported-calendar-component-set/><d:current-user-privilege-set/><cs:source/></d:prop></d:propfind>`,
     { Depth: "1" }, signal);
 
   const calendars: CalDAVCalendar[] = [];
   for (const resp of xmlTags(listXml, "response")) {
     const type = xmlText(resp, "resourcetype");
-    if (!/calendar[\s/>]/.test(type)) continue;
-    // Skip calendars that can't hold events (e.g. Nextcloud contact birthdays still report VEVENT; task-only lists report VTODO only).
+    // Real calendars, plus webcal subscriptions (e.g. a Google calendar added
+    // to Nextcloud): subscriptions are served read-only but are queryable.
+    const isCalendar = /calendar[\s/>]/.test(type);
+    const isSubscribed = /subscribed[\s/>]/.test(type);
+    if (!isCalendar && !isSubscribed) continue;
+    // Skip calendars that can't hold events (task-only lists report VTODO only).
     const comps = xmlText(resp, "supported-calendar-component-set");
-    if (comps && !/VEVENT/i.test(comps)) continue;
+    if (isCalendar && comps && !/VEVENT/i.test(comps)) continue;
     const href = decodeXml(xmlText(resp, "href"));
     if (!href) continue;
     const name = decodeXml(xmlText(resp, "displayname")) || decodeURIComponent(href.split("/").filter(Boolean).pop() ?? "calendar");
     const privileges = xmlText(resp, "current-user-privilege-set");
-    const readOnly = privileges ? !/write(?:-content)?[\s/>]/.test(privileges) : false;
-    calendars.push({ name, url: resolveHref(base, href), readOnly });
+    const readOnly = isSubscribed || (privileges ? !/write(?:-content)?[\s/>]/.test(privileges) : false);
+    // Subscriptions carry the upstream webcal/ICS URL; Nextcloud serves the
+    // node itself empty over DAV, so events are read from the source feed.
+    const source = isSubscribed ? decodeXml(xmlText(xmlText(resp, "source"), "href")) || undefined : undefined;
+    calendars.push({ name, url: resolveHref(base, href), readOnly, source });
   }
   return calendars;
 }
@@ -170,15 +177,200 @@ function parseVevents(ics: string, href: string, calendarName: string): CalDAVEv
   return events;
 }
 
+// ── Webcal subscriptions ──────────────────────────────────────────────────────
+// Nextcloud (and most servers) expose a subscription as an empty node plus a
+// source URL; the events live in the upstream ICS feed. We fetch the feed and
+// expand recurrences ourselves: DAILY/WEEKLY/MONTHLY/YEARLY with INTERVAL,
+// COUNT, UNTIL, BYDAY (incl. monthly ordinals like 2TU/-1FR), EXDATE, and
+// RECURRENCE-ID overrides. TZID-local times are treated as server-local time;
+// UTC times are converted (good enough when the feed and user share a region).
+
+const WEEKDAYS: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
+function icalToMs(value: string, isDate: boolean): number {
+  const iso = icalToIso(value, isDate);
+  return Date.parse(iso.includes("T") ? iso : `${iso}T00:00:00`);
+}
+
+function msToIso(ms: number, allDay: boolean): string {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return allDay ? date : `${date}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// Occurrence starts (epoch ms) of an RRULE within [rangeStart, rangeEnd).
+function expandRrule(rule: string, startMs: number, rangeStart: number, rangeEnd: number): number[] {
+  const parts: Record<string, string> = {};
+  for (const kv of rule.split(";")) {
+    const [k, v] = kv.split("=");
+    if (k && v) parts[k.toUpperCase()] = v;
+  }
+  const freq = parts.FREQ;
+  if (!freq) return [];
+  const interval = Math.max(1, parseInt(parts.INTERVAL ?? "1") || 1);
+  let count = parts.COUNT ? parseInt(parts.COUNT) : Infinity;
+  const until = parts.UNTIL ? icalToMs(parts.UNTIL, /^\d{8}$/.test(parts.UNTIL)) + (/^\d{8}$/.test(parts.UNTIL) ? 86399000 : 0) : Infinity;
+  const limit = Math.min(rangeEnd, until + 1);
+  const out: number[] = [];
+  const MAX = 1000;
+
+  const consider = (t: number) => {
+    if (count <= 0) return false;
+    count--;
+    if (t >= rangeStart && t < limit) out.push(t);
+    return true;
+  };
+
+  const start = new Date(startMs);
+  if (freq === "DAILY") {
+    for (let i = 0, t = startMs; i < MAX && t < limit && count > 0; i++, t = startMs + i * interval * 86400000) consider(t);
+  } else if (freq === "WEEKLY") {
+    const bydays = (parts.BYDAY ? parts.BYDAY.split(",") : []).map(d => WEEKDAYS[d.trim()]).filter(d => d !== undefined);
+    const days = bydays.length ? bydays : [start.getDay()];
+    // Walk week by week from the start's week (weeks begin Monday per RFC default
+    // unless WKST; close enough for typical feeds).
+    const weekAnchor = new Date(startMs);
+    weekAnchor.setHours(0, 0, 0, 0);
+    weekAnchor.setDate(weekAnchor.getDate() - weekAnchor.getDay());
+    for (let w = 0; w < MAX && count > 0; w += interval) {
+      const weekStart = new Date(weekAnchor);
+      weekStart.setDate(weekStart.getDate() + w * 7);
+      if (weekStart.getTime() > limit) break;
+      for (const dow of [...days].sort()) {
+        const occ = new Date(weekStart);
+        occ.setDate(occ.getDate() + dow);
+        occ.setHours(start.getHours(), start.getMinutes(), start.getSeconds(), 0);
+        const t = occ.getTime();
+        if (t < startMs) continue;
+        if (t > limit && count !== Infinity) { consider(t); continue; }
+        if (t >= limit) { count = 0; break; }
+        if (!consider(t)) break;
+      }
+    }
+  } else if (freq === "MONTHLY") {
+    const byday = parts.BYDAY?.match(/^(-?\d)([A-Z]{2})$/);
+    for (let i = 0; i < MAX && count > 0; i += interval) {
+      const month = new Date(start.getFullYear(), start.getMonth() + i, 1, start.getHours(), start.getMinutes());
+      let occ: Date | null = null;
+      if (byday) {
+        const ord = parseInt(byday[1]);
+        const dow = WEEKDAYS[byday[2]];
+        if (ord > 0) {
+          const first = new Date(month);
+          first.setDate(1 + ((dow - first.getDay() + 7) % 7) + (ord - 1) * 7);
+          occ = first.getMonth() === month.getMonth() ? first : null;
+        } else {
+          const last = new Date(month.getFullYear(), month.getMonth() + 1, 0, start.getHours(), start.getMinutes());
+          last.setDate(last.getDate() - ((last.getDay() - dow + 7) % 7) + (ord + 1) * 7);
+          occ = last.getMonth() === month.getMonth() ? last : null;
+        }
+      } else {
+        const dom = start.getDate();
+        const candidate = new Date(month.getFullYear(), month.getMonth(), dom, start.getHours(), start.getMinutes());
+        occ = candidate.getMonth() === month.getMonth() ? candidate : null; // skip short months
+      }
+      if (!occ) continue;
+      const t = occ.getTime();
+      if (t < startMs) continue;
+      if (t >= limit) break;
+      if (!consider(t)) break;
+    }
+  } else if (freq === "YEARLY") {
+    for (let i = 0; i < MAX && count > 0; i += interval) {
+      const t = new Date(start.getFullYear() + i, start.getMonth(), start.getDate(), start.getHours(), start.getMinutes()).getTime();
+      if (t >= limit) break;
+      if (!consider(t)) break;
+    }
+  }
+  return out;
+}
+
+// Events from a subscription's ICS feed within [startIso, endIso).
+async function listSubscriptionEvents(
+  calendar: CalDAVCalendar, startIso: string, endIso: string, signal?: AbortSignal,
+): Promise<CalDAVEvent[]> {
+  const url = calendar.source!.replace(/^webcal:/i, "https:");
+  const res = await fetch(url, { headers: { "User-Agent": "oldenbyte-dashboard" }, signal });
+  if (!res.ok) throw new Error(`Subscription feed failed (HTTP ${res.status})`);
+  const unfolded = (await res.text()).replace(/\r?\n[ \t]/g, "");
+  const rangeStart = Date.parse(`${startIso}T00:00:00`);
+  const rangeEnd = Date.parse(`${endIso}T00:00:00`);
+
+  type Raw = {
+    uid: string; title: string; location?: string; description?: string;
+    allDay: boolean; startMs: number; durMs: number;
+    rrule?: string; exdates: number[]; recId?: number;
+  };
+  const raws: Raw[] = [];
+  for (const block of unfolded.split(/BEGIN:VEVENT/).slice(1)) {
+    const body = block.split(/END:VEVENT/)[0];
+    const prop = (name: string) => {
+      const m = body.match(new RegExp(`^${name}((?:;[^:\\n]*)?):(.*)$`, "mi"));
+      return m ? { params: m[1] ?? "", value: m[2].trim() } : null;
+    };
+    const dtstart = prop("DTSTART");
+    if (!dtstart) continue;
+    const allDay = /VALUE=DATE(?:;|$)/i.test(dtstart.params) || /^\d{8}$/.test(dtstart.value);
+    const startMs = icalToMs(dtstart.value, allDay);
+    const dtend = prop("DTEND");
+    const endMs = dtend ? icalToMs(dtend.value, allDay) : startMs + (allDay ? 86400000 : 3600000);
+    const exdates: number[] = [];
+    for (const m of body.matchAll(/^EXDATE((?:;[^:\n]*)?):(.*)$/gim)) {
+      for (const v of m[2].split(",")) {
+        const val = v.trim();
+        if (val) exdates.push(icalToMs(val, /^\d{8}$/.test(val)));
+      }
+    }
+    const recIdProp = prop("RECURRENCE-ID");
+    raws.push({
+      uid: prop("UID")?.value ?? "",
+      title: unescapeIcal(prop("SUMMARY")?.value ?? "(untitled)"),
+      location: unescapeIcal(prop("LOCATION")?.value ?? "") || undefined,
+      description: unescapeIcal(prop("DESCRIPTION")?.value ?? "") || undefined,
+      allDay, startMs, durMs: Math.max(0, endMs - startMs),
+      rrule: prop("RRULE")?.value,
+      exdates,
+      recId: recIdProp ? icalToMs(recIdProp.value, /^\d{8}$/.test(recIdProp.value)) : undefined,
+    });
+  }
+
+  // Occurrences replaced by a RECURRENCE-ID override are dropped from expansion.
+  const overridden = new Set(raws.filter(r => r.recId != null).map(r => `${r.uid}:${r.recId}`));
+  const events: CalDAVEvent[] = [];
+  const emit = (r: Raw, occStartMs: number) => {
+    events.push({
+      uid: r.uid, href: url, calendar: calendar.name, title: r.title,
+      start: msToIso(occStartMs, r.allDay), end: msToIso(occStartMs + r.durMs, r.allDay),
+      allDay: r.allDay, location: r.location, description: r.description,
+      recurring: !!r.rrule || undefined,
+    });
+  };
+  for (const r of raws) {
+    if (r.rrule) {
+      const excluded = new Set(r.exdates);
+      for (const t of expandRrule(r.rrule, r.startMs, rangeStart, rangeEnd)) {
+        if (excluded.has(t) || overridden.has(`${r.uid}:${t}`)) continue;
+        emit(r, t);
+      }
+    } else if (r.startMs + r.durMs > rangeStart && r.startMs < rangeEnd) {
+      emit(r, r.startMs);
+    }
+  }
+  events.sort((a, b) => a.start.localeCompare(b.start));
+  return events;
+}
+
 // All events in [startIso, endIso) for one calendar. Dates as "YYYY-MM-DD".
 export async function listEvents(
   account: CalDAVAccount, calendar: CalDAVCalendar,
   startIso: string, endIso: string, signal?: AbortSignal,
 ): Promise<CalDAVEvent[]> {
+  if (calendar.source) return listSubscriptionEvents(calendar, startIso, endIso, signal);
   const fmt = (iso: string) => iso.replace(/-/g, "") + "T000000Z";
   const body =
     `<?xml version="1.0"?>` +
-    `<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml-ns:caldav">` +
+    `<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">` +
     `<d:prop><d:getetag/><c:calendar-data/></d:prop>` +
     `<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT">` +
     `<c:time-range start="${fmt(startIso)}" end="${fmt(endIso)}"/>` +
