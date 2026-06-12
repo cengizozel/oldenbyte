@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, MessageSquare, Plus, ChevronRight, ChevronDown, Library, Power, Layers, Users, Trash2, CalendarDays, EllipsisVertical, Brain, Copy, Paperclip, ChevronsRight } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { isDemoMode } from "@/lib/demo";
 import { listDashboardWidgets, getCalendarAccount, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
 import { SettingsInput, SettingsSelect, SettingsTextarea } from "./ui/Field";
 import { EmptyState } from "./ui/WidgetChrome";
@@ -925,7 +926,9 @@ export default function ChatWidget({
     if (!prop || prop.status !== "pending") return;
     let status: Proposal["status"] = "dismissed";
     if (accept) {
-      if (!calSource) { status = "failed"; }
+      // Calendar writes go to a real CalDAV server, outside the demo sandbox.
+      if (isDemoMode()) { status = "failed"; }
+      else if (!calSource) { status = "failed"; }
       else {
         try {
           const res = await fetch("/api/caldav", {
@@ -2302,7 +2305,7 @@ export default function ChatWidget({
                               </span>
                             ) : (
                               <span className={`text-[10px] ${pr.status === "added" ? "text-emerald-600 dark:text-emerald-400" : pr.status === "failed" ? "text-red-500" : "opacity-50 text-[var(--text-secondary)]"}`}>
-                                {pr.status === "added" ? "added to calendar" : pr.status === "failed" ? "could not add (check the calendar widget)" : "dismissed"}
+                                {pr.status === "added" ? "added to calendar" : pr.status === "failed" ? (isDemoMode() ? "not available in demo mode" : "could not add (check the calendar widget)") : "dismissed"}
                               </span>
                             )}
                           </div>

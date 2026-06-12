@@ -10,6 +10,7 @@ import "react-resizable/css/styles.css";
 import type { Widget } from "@/lib/widgets";
 import { colorMap, widgets as widgetDefs } from "@/lib/widgets";
 import { layoutKey, instancesKey } from "@/lib/dashboards";
+import { isDemoMode } from "@/lib/demo";
 import WidgetCard from "./WidgetCard";
 import WidgetShelf from "./WidgetShelf";
 import NotebookWidget from "./NotepadWidget";
@@ -295,16 +296,6 @@ export default function WidgetGrid({
     ? Math.floor((size.height - (numRows - 1) * GAP) / numRows)
     : 200;
 
-  function reset() {
-    pushHistory();
-    setLayout(initialLayout);
-    setInstances(initialInstances);
-    setActiveTabs({});
-    setGroupingSource(null);
-    storage.removeItem(LAYOUT_KEY);
-    storage.removeItem(INSTANCES_KEY);
-  }
-
   async function handleExport() {
     const res = await fetch("/api/settings/export");
     const data = await res.json();
@@ -571,7 +562,7 @@ export default function WidgetGrid({
         onTemplateDragEnd={() => setDroppingId(null)}
         onExport={handleExport}
         onImportFile={handleImport}
-        onReset={reset}
+        backupDisabled={isDemoMode()}
       />
     )}
 

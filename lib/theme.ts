@@ -1,4 +1,5 @@
 import * as storage from "@/lib/storage";
+import { isDemoMode } from "@/lib/demo";
 
 // Shared light/dark theme control, usable from anywhere (TopBar button, the
 // global Shift+D hotkey). Reads/writes the `.dark` class on <html>, mirrors it
@@ -27,7 +28,11 @@ export function applyTheme(next: boolean) {
   });
 
   const value = next ? "dark" : "light";
-  try { localStorage.setItem("theme", value); } catch { /* private mode */ }
+  // The localStorage mirror feeds the pre-paint FOUC script, so a demo-session
+  // toggle must not touch it: it would survive exiting demo.
+  if (!isDemoMode()) {
+    try { localStorage.setItem("theme", value); } catch { /* private mode */ }
+  }
   storage.setItem("theme", value);
   window.dispatchEvent(new CustomEvent(THEME_EVENT, { detail: next }));
 }

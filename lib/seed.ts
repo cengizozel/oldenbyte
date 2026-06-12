@@ -27,7 +27,7 @@ export const SEEDED_DASHBOARDS: DashboardsState = {
   activeId: "default",
 };
 
-function buildSeed(): Record<string, unknown> {
+export function buildSeed(): Record<string, unknown> {
   const today = dayOffset(0);
   const d1 = dayOffset(-1);
   const d2 = dayOffset(-2);

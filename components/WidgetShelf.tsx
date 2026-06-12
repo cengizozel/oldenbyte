@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { GripVertical, Download, Upload, RotateCcw, Search, Undo2, Redo2, Trash2 } from "lucide-react";
+import { GripVertical, Download, Upload, Search, Undo2, Redo2, Trash2 } from "lucide-react";
 import type { Widget } from "@/lib/widgets";
 import { colorMap, WIDGET_CATEGORIES } from "@/lib/widgets";
 
@@ -16,12 +16,12 @@ export default function WidgetShelf({
   onTemplateDragEnd,
   onExport,
   onImportFile,
-  onReset,
   onUndo,
   onRedo,
   canUndo = false,
   canRedo = false,
   onWipe,
+  backupDisabled = false,
 }: {
   templates: Widget[];
   bankTemplates?: Widget[];
@@ -30,12 +30,12 @@ export default function WidgetShelf({
   onTemplateDragEnd: () => void;
   onExport: () => void;
   onImportFile: (file: File) => void;
-  onReset: () => void;
   onUndo?: () => void;
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onWipe?: () => void;
+  backupDisabled?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -170,15 +170,17 @@ export default function WidgetShelf({
         <div className="w-px h-4 bg-[var(--surface-border)] mx-0.5" />
         <button
           onClick={onExport}
-          className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-          title="Export backup"
+          disabled={backupDisabled}
+          className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-25"
+          title={backupDisabled ? "Not available in demo mode" : "Export backup"}
         >
           <Download size={13} />
         </button>
         <button
           onClick={() => importRef.current?.click()}
-          className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-          title="Import backup"
+          disabled={backupDisabled}
+          className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-25"
+          title={backupDisabled ? "Not available in demo mode" : "Import backup"}
         >
           <Upload size={13} />
         </button>
@@ -199,13 +201,6 @@ export default function WidgetShelf({
           title="Clear the dashboard (undoable)"
         >
           <Trash2 size={13} />
-        </button>
-        <button
-          onClick={onReset}
-          className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-          title="Reset to the default layout (undoable)"
-        >
-          <RotateCcw size={13} />
         </button>
       </div>
     </div>

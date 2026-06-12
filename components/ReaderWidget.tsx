@@ -10,6 +10,7 @@ import { colorMap, type Widget } from "@/lib/widgets";
 import FlipCard from "@/components/ui/FlipCard";
 import { PencilButton, LoadingState } from "@/components/ui/WidgetChrome";
 import * as storage from "@/lib/storage";
+import { isDemoMode } from "@/lib/demo";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
@@ -387,6 +388,12 @@ export default function ReaderWidget({
   }, [configKey, positionKey]);
 
   async function handleFile(file: File) {
+    // Uploads write real files to the server, which the demo sandbox can't
+    // intercept or roll back.
+    if (isDemoMode()) {
+      setError("Uploads are not available in demo mode.");
+      return;
+    }
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext !== "pdf" && ext !== "epub") {
       setError("Only PDF and EPUB files are supported.");

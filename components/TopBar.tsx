@@ -5,6 +5,7 @@ import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDo
 import * as storage from "@/lib/storage";
 import { isDark, toggleTheme, THEME_EVENT } from "@/lib/theme";
 import { layoutKey, instancesKey, type DashboardsState } from "@/lib/dashboards";
+import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
 
 // ── EditableField ─────────────────────────────────────────────────────────
 
@@ -364,11 +365,15 @@ function SettingsPanel({
   onClose,
   dark,
   onToggleDark,
+  demo,
+  onToggleDemo,
 }: {
   open: boolean;
   onClose: () => void;
   dark: boolean;
   onToggleDark: () => void;
+  demo: boolean;
+  onToggleDemo: () => void;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -409,6 +414,23 @@ function SettingsPanel({
                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${dark ? "translate-x-4" : "translate-x-0"}`} />
               </button>
             </div>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Preview</span>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[var(--text-secondary)]">Demo mode</span>
+              <button
+                onClick={onToggleDemo}
+                title={demo ? "Exit demo mode" : "Enter demo mode"}
+                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${demo ? "bg-[var(--text-muted)]" : "bg-[var(--surface-border-focus)]"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${demo ? "translate-x-4" : "translate-x-0"}`} />
+              </button>
+            </div>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed -mt-1">
+              Preview the first-run dashboards with sample data. Your own data is untouched and nothing you change in demo mode is saved.
+            </p>
           </section>
         </div>
 
@@ -570,6 +592,12 @@ export default function TopBar({
 }) {
   const [dark, setDark] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [demo, setDemo] = useState(false);
+
+  // Demo state comes from sessionStorage, so it can only be read client-side.
+  useEffect(() => {
+    setDemo(isDemoMode());
+  }, []);
 
   // Resolve the initial theme (DB wins, else whatever the FOUC script set) and
   // keep DB ↔ localStorage ↔ DOM consistent.
@@ -578,7 +606,9 @@ export default function TopBar({
       const startDark = saved ? saved === "dark" : isDark();
       setDark(startDark);
       document.documentElement.classList.toggle("dark", startDark);
-      try { localStorage.setItem("theme", startDark ? "dark" : "light"); } catch {}
+      if (!isDemoMode()) {
+        try { localStorage.setItem("theme", startDark ? "dark" : "light"); } catch {}
+      }
     });
   }, []);
 
@@ -608,6 +638,16 @@ export default function TopBar({
           {dashboards && onDashboardsChange && (
             <DashboardSwitcher dashboards={dashboards} onChange={onDashboardsChange} />
           )}
+          {demo && (
+            <button
+              onClick={exitDemoMode}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] uppercase tracking-wider font-[family-name:var(--font-dm-mono)] text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+              title="Exit demo mode"
+            >
+              demo
+              <X size={9} />
+            </button>
+          )}
           {editing && onCancelEdit && (
             <button
               onClick={onCancelEdit}
@@ -624,13 +664,17 @@ export default function TopBar({
           >
             {editing ? <Check size={14} /> : <LayoutGrid size={14} />}
           </button>
-          <a
-            href="/digest"
-            className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-            title="Morning digest"
-          >
-            <Newspaper size={14} />
-          </a>
+          {/* The digest page reads real data and keeps its own settings outside
+              the demo sandbox, so it stays out of reach while demoing. */}
+          {!demo && (
+            <a
+              href="/digest"
+              className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              title="Morning digest"
+            >
+              <Newspaper size={14} />
+            </a>
+          )}
           <button
             onClick={() => setSettingsOpen(o => !o)}
             className="transition-colors text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
@@ -654,6 +698,8 @@ export default function TopBar({
       onClose={() => setSettingsOpen(false)}
       dark={dark}
       onToggleDark={toggleDark}
+      demo={demo}
+      onToggleDemo={() => (demo ? exitDemoMode() : enterDemoMode())}
     />
     </>
   );
