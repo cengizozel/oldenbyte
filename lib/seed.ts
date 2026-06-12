@@ -35,17 +35,16 @@ function buildSeed(): Record<string, unknown> {
   const d4 = dayOffset(-4);
 
   return {
-    // ── Home dashboard ───────────────────────────────────────────────────────
+    // ── Home dashboard: a clean 4x2 grid of equal cells ─────────────────────
     "widget-layout": [
       { i: "notebook-home", x: 0, y: 0, w: 1, h: 3, ...GRID },
       { i: "weather-home",  x: 1, y: 0, w: 1, h: 3, ...GRID },
-      { i: "tracker-home",  x: 2, y: 0, w: 1, h: 4, ...GRID },
-      { i: "chat-home",     x: 3, y: 0, w: 1, h: 4, ...GRID },
-      { i: "rss-home",      x: 0, y: 3, w: 1, h: 4, ...GRID },
-      { i: "reddit-home",   x: 1, y: 3, w: 1, h: 4, ...GRID },
-      { i: "text-home",     x: 2, y: 4, w: 1, h: 1, ...GRID },
-      { i: "kiwix-home",    x: 3, y: 4, w: 1, h: 3, ...GRID },
-      { i: "calendar-home", x: 2, y: 5, w: 1, h: 2, ...GRID },
+      { i: "tracker-home",  x: 2, y: 0, w: 1, h: 3, ...GRID },
+      { i: "chat-home",     x: 3, y: 0, w: 1, h: 3, ...GRID },
+      { i: "rss-home",      x: 0, y: 3, w: 1, h: 3, ...GRID },
+      { i: "reddit-home",   x: 1, y: 3, w: 1, h: 3, ...GRID },
+      { i: "text-home",     x: 2, y: 3, w: 1, h: 3, ...GRID },
+      { i: "calendar-home", x: 3, y: 3, w: 1, h: 3, ...GRID },
     ],
     "widget-instances": {
       "notebook-home": { id: "notebook-home", type: "notebook", color: "amber",  title: "Notepad",  description: "A simple place for temporary notes.", digestable: false },
@@ -55,17 +54,19 @@ function buildSeed(): Record<string, unknown> {
       "rss-home":      { id: "rss-home",      type: "rss",      color: "teal",   title: "Feed",     description: "Headlines from any RSS feed." },
       "reddit-home":   { id: "reddit-home",   type: "reddit",   color: "orange", title: "Reddit",   description: "Top posts from your chosen subreddits." },
       "text-home":     { id: "text-home",     type: "text",     color: "rose",   title: "Text",     description: "A word, quote, or live string." },
-      "kiwix-home":    { id: "kiwix-home",    type: "kiwix",    color: "teal",   title: "Kiwix",    description: "Search an offline Kiwix library (Wikipedia, etc.).", digestable: false },
       "calendar-home": { id: "calendar-home", type: "calendar", color: "amber",  title: "Calendar", description: "Upcoming events from a CalDAV server (Nextcloud, Radicale)." },
     },
 
-    // ── Research dashboard ───────────────────────────────────────────────────
+    // ── Research dashboard: a clean 4x2 grid of equal cells ─────────────────
     [layoutKey("research")]: [
-      { i: "notebook-research", x: 0, y: 0, w: 1, h: 4, ...GRID },
-      { i: "arxiv-research",    x: 1, y: 0, w: 1, h: 4, ...GRID, tabs: ["hf-research"] },
-      { i: "youtube-research",  x: 2, y: 0, w: 1, h: 4, ...GRID },
-      { i: "hn-research",       x: 3, y: 0, w: 1, h: 4, ...GRID },
-      { i: "xkcd-research",     x: 3, y: 4, w: 1, h: 3, ...GRID },
+      { i: "notebook-research", x: 0, y: 0, w: 1, h: 3, ...GRID },
+      { i: "arxiv-research",    x: 1, y: 0, w: 1, h: 3, ...GRID, tabs: ["hf-research"] },
+      { i: "youtube-research",  x: 2, y: 0, w: 1, h: 3, ...GRID },
+      { i: "hn-research",       x: 3, y: 0, w: 1, h: 3, ...GRID },
+      { i: "xkcd-research",     x: 0, y: 3, w: 1, h: 3, ...GRID },
+      { i: "kiwix-research",    x: 1, y: 3, w: 1, h: 3, ...GRID },
+      { i: "anytype-research",  x: 2, y: 3, w: 1, h: 3, ...GRID },
+      { i: "text-research",     x: 3, y: 3, w: 1, h: 3, ...GRID },
     ],
     [instancesKey("research")]: {
       "notebook-research": { id: "notebook-research", type: "notebook", color: "amber",  title: "Notepad",  description: "A simple place for temporary notes.", digestable: false },
@@ -74,6 +75,9 @@ function buildSeed(): Record<string, unknown> {
       "youtube-research":  { id: "youtube-research",  type: "youtube",  color: "rose",   title: "YouTube",  description: "Latest videos from your chosen channels." },
       "hn-research":       { id: "hn-research",       type: "custom",   bankId: "hacker-news", color: "orange",  title: "Hacker News", description: "Front page stories right now.", digestable: false },
       "xkcd-research":     { id: "xkcd-research",     type: "custom",   bankId: "xkcd", color: "neutral", title: "xkcd", description: "Today's xkcd comic.", digestable: false },
+      "kiwix-research":    { id: "kiwix-research",    type: "kiwix",    color: "teal",   title: "Kiwix",   description: "Search an offline Kiwix library (Wikipedia, etc.).", digestable: false },
+      "anytype-research":  { id: "anytype-research",  type: "anytype",  color: "sky",    title: "Anytype", description: "Browse and search your Anytype spaces.", digestable: false },
+      "text-research":     { id: "text-research",     type: "text",     color: "rose",   title: "Text",    description: "A word, quote, or live string." },
     },
 
     // ── Widget content: make it look lived-in ────────────────────────────────
@@ -117,6 +121,7 @@ function buildSeed(): Record<string, unknown> {
       ],
     },
     "text-widget-text-home": { source: { type: "text", value: "make something small every day" }, font: "serif" },
+    "text-widget-text-research": { source: { type: "text", value: "read greedily, take notes, connect things" }, font: "serif" },
 
     "arxiv-widget-arxiv-research": { category: "cs.AI" },
     "hf-widget-hf-research": { limit: 25 },
