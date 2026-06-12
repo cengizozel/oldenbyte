@@ -331,15 +331,16 @@ export type CalendarAccount = {
   baseUrl: string;
   username: string;
   password: string;
-  calendars: { name: string; url: string; readOnly?: boolean }[];
+  calendars: { name: string; url: string; readOnly?: boolean; source?: string }[];
 };
+export type CalendarSource = { widgetId: string; account: CalendarAccount };
 
 /**
  * The first configured Calendar widget's CalDAV account on the active
  * dashboard, so the chat can read/write the calendar without storing a second
  * copy of the credentials.
  */
-export async function getCalendarAccount(): Promise<CalendarAccount | null> {
+export async function getCalendarAccount(): Promise<CalendarSource | null> {
   const keys = await getActiveDataKeys();
   const [layout, instances] = await Promise.all([
     readJSON<TabLayoutItem[]>(keys.layout),
@@ -354,7 +355,7 @@ export async function getCalendarAccount(): Promise<CalendarAccount | null> {
   for (const id of ids) {
     if (instances[id]?.type !== "calendar") continue;
     const cfg = await readJSON<CalendarAccount>(`calendar-widget-${id}`);
-    if (cfg?.baseUrl && cfg.username && cfg.calendars?.length) return cfg;
+    if (cfg?.baseUrl && cfg.username && cfg.calendars?.length) return { widgetId: id, account: cfg };
   }
   return null;
 }

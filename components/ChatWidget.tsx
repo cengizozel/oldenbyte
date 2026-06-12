@@ -1,11 +1,12 @@
 "use client";
 
 import { Fragment, useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, MessageSquare, Plus, ChevronRight, ChevronDown, Library, Power, Layers, Users, Trash2, CalendarDays, EllipsisVertical, Brain } from "lucide-react";
+import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, MessageSquare, Plus, ChevronRight, ChevronDown, Library, Power, Layers, Users, Trash2, CalendarDays, EllipsisVertical, Brain, Copy } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { gatherWidgetEntries, listDashboardWidgets, getCalendarAccount, type WidgetEntry, type WidgetRosterItem, type CalendarAccount } from "@/lib/dashboardContext";
+import { gatherWidgetEntries, listDashboardWidgets, getCalendarAccount, type WidgetEntry, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
 import { SettingsInput, SettingsSelect, SettingsTextarea } from "./ui/Field";
+import { EmptyState } from "./ui/WidgetChrome";
 import { stripThinking } from "@/lib/citations";
 import Markdown from "./Markdown";
 
@@ -172,10 +173,13 @@ type ChatConfig = {
   apiKey: string;
   model: string;
   system: string;
-  useDashboard: boolean;
-  // Which widgets the dashboard lookup may read, by instance id. Missing key =
-  // included, so newly added widgets are searchable by default.
+  useDashboard: boolean;     // legacy (v1 master switch); superseded by per-widget dashboardWidgets
+  // Data access per widget instance id: true = the model may read it. There is
+  // no master switch; missing/false = off, so access is always an explicit
+  // opt-in from the chat's overflow menu. A calendar widget's entry also
+  // grants the calendar read/write tools.
   dashboardWidgets: Record<string, boolean>;
+  sourcesVersion?: number; // 2 = per-widget model (no master toggle)
   maxTokens: number; // cap on response length; 0 = no limit (server default)
   length: Length;    // response-style preset: brevity instruction + suggested cap
   effort: Effort;    // reasoning-model thinking budget
@@ -183,7 +187,7 @@ type ChatConfig = {
   kiwixUrl: string;        // kiwix-serve base URL; lookups search ALL books on it
   kiwixSource: string;     // legacy single-book pin (no longer set by the UI)
   kiwixSourceTitle: string;
-  useCalendar: boolean;    // let the model read/write the dashboard Calendar widget's CalDAV account
+  useCalendar: boolean;    // legacy (v1); a calendar widget's dashboardWidgets entry now grants its tools
   useAnytype: boolean;     // let the model search the user's Anytype via tools
   anytypeUrl: string;      // Anytype local API base (default 127.0.0.1:31009)
   anytypeApiKey: string;   // paired Bearer token
@@ -320,7 +324,7 @@ export default function ChatWidget({
   const [anytypeBusy, setAnytypeBusy] = useState(false);
   const [anytypeError, setAnytypeError] = useState("");
 
-  // Dashboard data — gathered per-widget when `config.useDashboard` is on and
+  // Dashboard data — gathered for widgets enabled in dashboardWidgets and
   // shipped with each request for the model's read_widget/search_dashboard
   // tools (only a small roster enters the model's context). Cached so we don't
   // re-fetch every message.
@@ -329,9 +333,12 @@ export default function ChatWidget({
   const [showContext, setShowContext] = useState(false);
   // Roster for the settings checkbox list (no content fetching).
   const [roster, setRoster] = useState<WidgetRosterItem[]>([]);
-  // CalDAV account from the dashboard's Calendar widget (null = none configured).
-  const [calAccount, setCalAccount] = useState<CalendarAccount | null>(null);
-  useEffect(() => { getCalendarAccount().then(setCalAccount).catch(() => {}); }, []);
+  // CalDAV account from the dashboard's Calendar widget (null = none
+  // configured); enabling that widget's row grants agenda + calendar tools.
+  const [calSource, setCalSource] = useState<CalendarSource | null>(null);
+  useEffect(() => { getCalendarAccount().then(setCalSource).catch(() => {}); }, []);
+  const anySourceOn = Object.values(config.dashboardWidgets).some(Boolean);
+  const calendarOn = !!(calSource && config.dashboardWidgets[calSource.widgetId]);
   const ctxChars = ctx ? ctx.reduce((n, e) => n + e.text.length, 0) : 0;
   // Transient "added to memory" notice (auto-dismisses; click opens the character).
   const [memoryNotice, setMemoryNotice] = useState<{ charId: string; name: string; facts: string[] } | null>(null);
@@ -384,8 +391,8 @@ export default function ChatWidget({
   const refreshContext = useCallback(async () => {
     setGathering(true);
     try {
-      const excluded = configRef.current.dashboardWidgets;
-      const result = await gatherWidgetEntries(id => excluded[id] !== false);
+      const allowed = configRef.current.dashboardWidgets;
+      const result = await gatherWidgetEntries(id => allowed[id] === true);
       setCtx(result);
       return result;
     } catch {
@@ -399,7 +406,7 @@ export default function ChatWidget({
 
   // Load persisted config + conversations (migrating the old single-chat format)
   useEffect(() => {
-    storage.getItem(storageKey).then(saved => {
+    storage.getItem(storageKey).then(async saved => {
       let convs: Conversation[] = [];
       let active = "";
       let chars: Character[] = [];
@@ -409,8 +416,20 @@ export default function ChatWidget({
         try {
           const parsed: ChatState = JSON.parse(saved);
           cfg = { ...DEFAULT_CONFIG, ...parsed.config };
+          if ((cfg.sourcesVersion ?? 1) < 2) {
+            // v1 had a master useDashboard switch with missing-key = included;
+            // v2 is explicit per-widget opt-in. Materialize the old semantics.
+            const roster = await listDashboardWidgets().catch(() => [] as WidgetRosterItem[]);
+            const explicit: Record<string, boolean> = {};
+            for (const w of roster) {
+              explicit[w.id] = w.type === "calendar"
+                ? !!cfg.useCalendar
+                : (cfg.useDashboard ? cfg.dashboardWidgets[w.id] !== false : false);
+            }
+            cfg = { ...cfg, dashboardWidgets: explicit, sourcesVersion: 2 };
+          }
           setConfig(cfg);
-          configRef.current = cfg; // before refreshContext, so the gather respects saved checkboxes
+          configRef.current = cfg; // before refreshContext, so the gather respects saved choices
           if (parsed.conversations?.length) {
             convs = parsed.conversations;
             active = parsed.activeId && convs.some(c => c.id === parsed.activeId) ? parsed.activeId : convs[0].id;
@@ -423,7 +442,7 @@ export default function ChatWidget({
           }
           chars = parsed.characters ?? [];
           activeChar = parsed.activeCharacterId ?? DEFAULT_CHARACTER_ID;
-          if (parsed.config?.useDashboard) refreshContext();
+          if (Object.values(cfg.dashboardWidgets).some(Boolean)) refreshContext();
         } catch {}
       }
       if (!convs.length) {
@@ -740,7 +759,7 @@ export default function ChatWidget({
     setSettingsOpen(false);
     // Checkbox changes invalidate the cached gather; rebuild if lookup is on.
     setCtx(null);
-    if (next.useDashboard) refreshContext();
+    if (Object.values(next.dashboardWidgets).some(Boolean)) refreshContext();
   }
 
   function clearChat() {
@@ -751,21 +770,22 @@ export default function ChatWidget({
     persist(config, []);
   }
 
-  function toggleDashboard() {
-    const next = { ...config, useDashboard: !config.useDashboard };
+  // Flip one widget's data access; invalidate the cached gather so the next
+  // message (or refresh) rebuilds with the new allowlist.
+  function toggleWidgetAccess(id: string) {
+    const next = {
+      ...config,
+      sourcesVersion: 2,
+      dashboardWidgets: { ...config.dashboardWidgets, [id]: !config.dashboardWidgets[id] },
+    };
     setConfig(next);
+    configRef.current = next;
     persist(next, messages);
-    if (next.useDashboard && !ctx) refreshContext();
+    setCtx(null);
   }
 
   function toggleKiwix() {
     const next = { ...config, useKiwix: !config.useKiwix };
-    setConfig(next);
-    persist(next, messages);
-  }
-
-  function toggleCalendar() {
-    const next = { ...config, useCalendar: !config.useCalendar };
     setConfig(next);
     persist(next, messages);
   }
@@ -894,6 +914,24 @@ export default function ChatWidget({
     setCharDraft({ ...ch });
   }
 
+  // Same persona and focus, fresh memory: a clone for a separate context
+  // (e.g. one study coach per class). Opens its editor for renaming.
+  function duplicateCharacter(src: Character) {
+    const ch: Character = {
+      id: newId(),
+      name: `${src.name} (copy)`,
+      emoji: src.id === DEFAULT_CHARACTER_ID ? "\u{1F916}" : src.emoji,
+      persona: src.id === DEFAULT_CHARACTER_ID ? config.system : src.persona,
+      focus: src.focus,
+      memories: [],
+    };
+    const next = [...charactersRef.current, ch];
+    setCharacters(next);
+    persistCharacters(next, activeCharacterIdRef.current);
+    setEditingCharId(ch.id);
+    setCharDraft({ ...ch });
+  }
+
   function saveCharacter() {
     if (!charDraft) return;
     const draft: Character = {
@@ -970,7 +1008,7 @@ export default function ChatWidget({
     }
     const styleHint = LENGTH_PRESETS[config.length].instruction;
     if (styleHint) parts.push(styleHint);
-    if (config.useDashboard && dash?.length) {
+    if (dash?.length) {
       const todayStr = new Date().toISOString().split("T")[0];
       parts.push(
         `The user has turned on dashboard access. Today is ${todayStr}. You can read their dashboard through two tools:\n` +
@@ -982,7 +1020,7 @@ export default function ChatWidget({
         `What the tools return is everything you can see. If the answer isn't there, say so plainly rather than inventing entries.`
       );
     }
-    if (config.useCalendar) {
+    if (calendarOn) {
       parts.push(
         `You can read and write the user's calendar through list_calendar_events and create_calendar_event. ` +
         `Use list_calendar_events for any question about their schedule, free time, or upcoming events; today's date is ${new Date().toISOString().split("T")[0]}. ` +
@@ -1148,7 +1186,7 @@ export default function ChatWidget({
 
     // Make sure dashboard data is gathered before we build the prompt (cached
     // after the first time, so this is instant on subsequent messages).
-    const dash = config.useDashboard ? (ctx ?? await refreshContext()) : null;
+    const dash = anySourceOn ? (ctx ?? await refreshContext()) : null;
 
     // Assistant placeholder we stream tokens into
     setMessages([...history, { role: "assistant", content: "" }]);
@@ -1189,7 +1227,7 @@ export default function ChatWidget({
           dashboard: dash?.length
             ? { widgets: dash.map(e => ({ id: e.id, title: e.title, type: e.type, text: e.text })) }
             : null,
-          caldav: config.useCalendar && calAccount ? calAccount : null,
+          caldav: calendarOn ? calSource!.account : null,
           // LM Studio sets its idle-unload from the request itself; pass the
           // chosen linger as ttl seconds (Ollama uses its own keep_alive path).
           ttl: backend === "lmstudio" ? ttlSeconds(config.keepAlive) : 0,
@@ -1392,7 +1430,7 @@ export default function ChatWidget({
               <Pencil size={14} />
             </button>
             <div className="relative">
-              <button onClick={() => setMenuOpen(o => !o)} title="More" className={menuOpen ? `opacity-90 ${c.icon}` : actionCls}>
+              <button onClick={() => { if (!menuOpen) listDashboardWidgets().then(setRoster).catch(() => {}); setMenuOpen(o => !o); }} title="More" className={menuOpen ? `opacity-90 ${c.icon}` : actionCls}>
                 <EllipsisVertical size={14} />
               </button>
               {menuOpen && (
@@ -1400,29 +1438,55 @@ export default function ChatWidget({
                   {/* click-away backdrop */}
                   <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                   <div className={`absolute right-0 top-6 z-50 w-60 rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
-                    <p className={`px-2.5 pt-1.5 pb-1 text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-40 ${c.label}`}>Data sources</p>
+                    <p className={`px-2.5 pt-1.5 pb-1 text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-40 ${c.label}`}>Data access</p>
+                    {/* One row per data-bearing widget on the dashboard; no master
+                        switch. A calendar widget's row also grants its tools. */}
+                    {roster.length === 0 && (
+                      <p className={`px-2.5 py-1.5 text-[11px] opacity-40 ${c.text}`}>No data widgets on this dashboard.</p>
+                    )}
+                    {roster.map(w => {
+                      const isCal = w.type === "calendar";
+                      const ready = !isCal || calSource?.widgetId === w.id;
+                      const on = !!config.dashboardWidgets[w.id];
+                      return (
+                        <button
+                          key={w.id}
+                          onClick={() => { if (ready) toggleWidgetAccess(w.id); }}
+                          title={!ready ? "Configure the Calendar widget first" : on ? "On: click to turn off" : "Off: click to turn on"}
+                          className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/5 ${c.text} ${ready ? "" : "opacity-40"}`}
+                        >
+                          {isCal ? <CalendarDays size={13} className={`shrink-0 opacity-60 ${c.label}`} /> : <Database size={13} className={`shrink-0 opacity-60 ${c.label}`} />}
+                          <span className="flex-1 min-w-0 truncate">
+                            {w.title}
+                            <span className={`ml-1.5 text-[10px] opacity-50 ${c.label}`}>{isCal ? "agenda + add events" : w.type}</span>
+                          </span>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${on && ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
+                        </button>
+                      );
+                    })}
                     {([
-                      { icon: Database, label: "Dashboard", on: config.useDashboard, ready: true, toggle: toggleDashboard, hint: "" },
-                      { icon: Library, label: "Kiwix library", on: config.useKiwix, ready: !!config.kiwixUrl, toggle: toggleKiwix, hint: "set up in settings" },
-                      { icon: Layers, label: "Anytype", on: config.useAnytype, ready: !!(config.anytypeApiKey && config.anytypeSpaceId), toggle: toggleAnytype, hint: "pair in settings" },
-                      { icon: CalendarDays, label: "Calendar", on: config.useCalendar, ready: !!calAccount, toggle: toggleCalendar, hint: "configure a Calendar widget" },
+                      { icon: Library, label: "Kiwix library", caption: "all books", on: config.useKiwix, ready: !!config.kiwixUrl, toggle: toggleKiwix, hint: "set up in settings" },
+                      { icon: Layers, label: "Anytype", caption: config.anytypeSpaceName || "", on: config.useAnytype, ready: !!(config.anytypeApiKey && config.anytypeSpaceId), toggle: toggleAnytype, hint: "pair in settings" },
                     ] as const).map(row => (
                       <button
                         key={row.label}
                         onClick={() => {
                           if (row.ready) { row.toggle(); return; } // stays open for multi-toggling
                           setMenuOpen(false);
-                          if (row.label !== "Calendar") openSettings();
+                          openSettings();
                         }}
                         title={row.ready ? (row.on ? "On: click to turn off" : "Off: click to turn on") : row.hint}
                         className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/5 ${c.text} ${row.ready ? "" : "opacity-40"}`}
                       >
                         <row.icon size={13} className={`shrink-0 opacity-60 ${c.label}`} />
-                        <span className="flex-1 min-w-0 truncate">{row.label}</span>
+                        <span className="flex-1 min-w-0 truncate">
+                          {row.label}
+                          {row.caption && <span className={`ml-1.5 text-[10px] opacity-50 ${c.label}`}>{row.caption}</span>}
+                        </span>
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.on && row.ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
                       </button>
                     ))}
-                    {config.useDashboard && (
+                    {anySourceOn && (
                       <button
                         onClick={() => refreshContext()}
                         disabled={gathering}
@@ -1441,16 +1505,16 @@ export default function ChatWidget({
                     )}
                     <div className={`my-1 border-t ${c.border} opacity-60`} />
                     <button
-                      onClick={() => { setMenuOpen(false); if (config.useDashboard && !ctx) refreshContext(); setShowContext(true); }}
+                      onClick={() => { setMenuOpen(false); if (anySourceOn && !ctx) refreshContext(); setShowContext(true); }}
                       className={`text-left px-2.5 py-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/5 ${c.text}`}
                     >
                       View model context
                       <span className={`block text-[10px] opacity-50 ${c.label}`}>
                         {gathering
                           ? "gathering…"
-                          : config.useDashboard
-                            ? (ctx?.length ? `${ctx.length} widget${ctx.length === 1 ? "" : "s"} · ~${Math.round(ctxChars / 1000)}k chars tool-readable` : "dashboard lookup on")
-                            : "dashboard lookup off"}
+                          : anySourceOn
+                            ? (ctx?.length ? `${ctx.length} widget${ctx.length === 1 ? "" : "s"} · ~${Math.round(ctxChars / 1000)}k chars tool-readable` : "widget access on")
+                            : "no widget access enabled"}
                       </span>
                     </button>
                     <button
@@ -1574,6 +1638,7 @@ export default function ChatWidget({
                     </p>
                   </div>
                   <button onClick={e => { e.stopPropagation(); setEditingCharId(ch.id); setCharDraft({ ...ch }); }} title="Edit" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-50 hover:!opacity-90 ${c.label}`}><Pencil size={12} /></button>
+                  <button onClick={e => { e.stopPropagation(); duplicateCharacter(ch); }} title="Duplicate: same persona, fresh memory" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-50 hover:!opacity-90 ${c.label}`}><Copy size={12} /></button>
                   {ch.id !== DEFAULT_CHARACTER_ID && (
                     <button onClick={e => { e.stopPropagation(); deleteCharacter(ch.id); }} title="Delete character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-50 hover:!opacity-90 ${c.label}`}><X size={13} /></button>
                   )}
@@ -1833,31 +1898,7 @@ export default function ChatWidget({
 
             <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 mt-1 ${c.label}`}>Data sources</p>
 
-            <div>
-              <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Dashboard widgets the model may read</p>
-              {roster.length === 0 ? (
-                <p className="text-[10px] text-[var(--text-muted)]">No data widgets on the active dashboard.</p>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  {roster.map(w => {
-                    const on = draft.dashboardWidgets[w.id] !== false;
-                    return (
-                      <label key={w.id} className={`flex items-center gap-2 text-xs cursor-pointer ${c.text} ${on ? "opacity-85" : "opacity-45"}`}>
-                        <input
-                          type="checkbox"
-                          checked={on}
-                          onChange={() => setDraft(d => ({ ...d, dashboardWidgets: { ...d.dashboardWidgets, [w.id]: !on } }))}
-                          className="accent-current"
-                        />
-                        <span className="truncate">{w.title}</span>
-                        <span className={`text-[10px] opacity-60 ${c.label}`}>{w.type}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-              <p className="text-[10px] text-[var(--text-muted)] mt-1">Turn lookup on with the database icon by the send button.</p>
-            </div>
+            <p className={`text-[10px] -mt-1 opacity-45 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
 
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -1972,13 +2013,11 @@ export default function ChatWidget({
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 px-4">
                 <Bot size={20} className={`opacity-40 ${c.text}`} />
                 <p className={`text-xs opacity-45 ${c.text}`}>
-                  Connect a local or OpenAI-compatible model. Hover and click the pencil to set the API URL and model.
+                  hover and click the pencil to connect a local or OpenAI-compatible model
                 </p>
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
-                <p className={`text-xs opacity-40 ${c.text}`}>Ask anything…</p>
-              </div>
+              <EmptyState c={c}>ask anything</EmptyState>
             ) : (
               <>
               {/* Room title: quiet pill, renamed in the Chats list */}
