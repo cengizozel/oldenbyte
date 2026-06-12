@@ -10,7 +10,10 @@ const SYSTEM =
   "(1) When you mention a specific item that has a reference number in the REFERENCES block, write that number in square brackets immediately after the mention, like [1] or [2]. " +
   "(2) Always write both the opening bracket, the number, and the closing bracket — never leave brackets empty like [] and never leave them unclosed like [3. " +
   "(3) Only use reference numbers that actually appear in the REFERENCES block. Do not invent numbers. " +
-  "(4) If an item has no reference number, do not add brackets at all.";
+  "(4) If an item has no reference number, do not add brackets at all. " +
+  "(5) Use only this exact square-bracket style, never parentheses or footnotes. " +
+  "Example sentence: Researchers unveiled a sweeping new map of the cosmos [3], even as rivals questioned its methods [1]. " +
+  "Do not repeat or output the REFERENCES block itself.";
 
 const USER = (content: string) =>
   "Below is today's content from one source. Write a brief newspaper-style paragraph about it.\n\n---\n\n" + content;

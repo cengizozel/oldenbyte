@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Zap, ChevronRight } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { widgets as widgetDefs } from "@/lib/widgets";
+import { normalizeCitations } from "@/lib/citations";
+import { getActiveDataKeys } from "@/lib/dashboards";
 
 type TabLayoutItem = { i: string; tabs?: string[] };
 type WidgetInstance = { id: string; type: string; title: string };
@@ -337,7 +339,9 @@ export default function DigestPage() {
   }
 
   function renderProse(text: string, refList: Ref[]) {
-    return text.split(/\n\n+/).map((block, i) => {
+    // Local models produce citation variants and leak reasoning; canonicalize
+    // before parsing so [N] markers stay clickable (idempotent, stream-safe).
+    return normalizeCitations(text, refList).split(/\n\n+/).map((block, i) => {
       const trimmed = block.trim();
       if (!trimmed) return null;
       return (
@@ -349,9 +353,10 @@ export default function DigestPage() {
   }
 
   async function loadAll(): Promise<Section[]> {
+    const keys = await getActiveDataKeys();
     const [rawLayout, rawInstances] = await Promise.all([
-      storage.getItem("widget-layout"),
-      storage.getItem("widget-instances"),
+      storage.getItem(keys.layout),
+      storage.getItem(keys.instances),
     ]);
     if (!rawLayout || !rawInstances) return [];
 
