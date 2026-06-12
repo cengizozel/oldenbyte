@@ -1342,7 +1342,7 @@ export default function ChatWidget({
                         {gathering
                           ? "gathering…"
                           : config.useDashboard
-                            ? (ctx?.length ? `${ctx.length} widget${ctx.length === 1 ? "" : "s"} · ~${Math.round(ctxChars / 1000)}k chars readable` : "dashboard lookup on")
+                            ? (ctx?.length ? `${ctx.length} widget${ctx.length === 1 ? "" : "s"} · ~${Math.round(ctxChars / 1000)}k chars tool-readable` : "dashboard lookup on")
                             : "dashboard lookup off"}
                       </span>
                     </button>
@@ -1525,29 +1525,49 @@ export default function ChatWidget({
         </div>
       )}
 
-      {/* Context viewer overlay: the system message, then the widget data the
-          model can reach through its tools */}
-      {showContext && (
-        <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
-          <div className={`flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b ${c.border}`}>
-            <span className={`flex items-center gap-1.5 text-xs font-medium opacity-70 ${c.label}`}>
-              <Database size={13} />
-              Model context{ctx ? ` · ${ctx.length} widget${ctx.length === 1 ? "" : "s"} · ~${Math.round(ctxChars / 1000)}k chars readable` : ""}
-            </span>
-            <button onClick={() => setShowContext(false)} title="Close" className={`opacity-50 hover:opacity-90 ${c.label}`}>
-              <X size={14} />
-            </button>
+      {/* Context viewer overlay. Two clearly separated halves: what is sent to
+          the model with every message (small), and what its tools may fetch on
+          demand (large, never in the prompt). */}
+      {showContext && (() => {
+        const prompt = buildSystemContent(ctx);
+        const roster = ctx?.length
+          ? ctx.map(e => `- ${e.id}: "${e.title}" (${e.type}, ${e.text.length} chars)`).join("\n")
+          : "";
+        const sentChars = prompt.length + roster.length;
+        return (
+          <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
+            <div className={`flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b ${c.border}`}>
+              <span className={`flex items-center gap-1.5 text-xs font-medium opacity-70 ${c.label}`}>
+                <Database size={13} />
+                Context: ~{Math.max(1, Math.round(sentChars / 1000))}k chars sent
+                {ctx ? ` · ~${Math.round(ctxChars / 1000)}k tool-readable (${ctx.length} widget${ctx.length === 1 ? "" : "s"})` : ""}
+              </span>
+              <button onClick={() => setShowContext(false)} title="Close" className={`opacity-50 hover:opacity-90 ${c.label}`}>
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto p-4 flex flex-col gap-3">
+              <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 ${c.label}`}>
+                Sent with every message ({sentChars.toLocaleString()} chars)
+              </p>
+              <pre className={`text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono ${c.text} opacity-90`}>
+                {prompt || "No system prompt."}
+                {roster ? `\n\nWidget roster (inside the read_widget tool):\n${roster}` : ""}
+              </pre>
+              {ctx && ctx.length > 0 && (
+                <>
+                  <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 mt-2 ${c.label}`}>
+                    Fetched only when a tool reads it ({ctxChars.toLocaleString()} chars, never sent up front)
+                  </p>
+                  <pre className={`text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono ${c.text} opacity-60`}>
+                    {ctx.map(e => e.text).join("\n\n")}
+                  </pre>
+                </>
+              )}
+            </div>
           </div>
-          <div className="flex-1 min-h-0 overflow-auto p-4">
-            <pre className={`text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono ${c.text} opacity-90`}>
-              {buildSystemContent(ctx) || "No context gathered."}
-              {ctx?.length
-                ? "\n\n──── data readable through tools (not in the prompt) ────\n\n" + ctx.map(e => e.text).join("\n\n")
-                : ""}
-            </pre>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {settingsOpen ? (
         /* Settings panel: Model, Behavior, Data sources */
