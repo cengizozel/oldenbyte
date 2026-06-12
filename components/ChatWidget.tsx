@@ -851,8 +851,12 @@ export default function ChatWidget({
     setHistoryOpen(false);
   }
 
+  // The + always opens a fresh room with the default Assistant; talking to a
+  // character is an explicit choice made through the avatar.
   function newChat() {
-    newChatWith(activeCharacterIdRef.current);
+    setActiveCharacterId(DEFAULT_CHARACTER_ID);
+    activeCharacterIdRef.current = DEFAULT_CHARACTER_ID;
+    newChatWith(DEFAULT_CHARACTER_ID);
   }
 
   // ── Characters ─────────────────────────────────────────────────────────────
@@ -1315,7 +1319,7 @@ export default function ChatWidget({
         </div>
         {!settingsOpen && (
           <div className="flex items-center gap-2.5 shrink-0">
-            <button onClick={newChat} title="New chat" className={actionCls}>
+            <button onClick={newChat} title="New chat with the Assistant" className={actionCls}>
               <Plus size={15} />
             </button>
             <button onClick={() => setHistoryOpen(true)} title="Chats" className={actionCls}>
@@ -1371,7 +1375,7 @@ export default function ChatWidget({
               Chats
             </span>
             <div className="flex items-center gap-3">
-              <button onClick={newChat} title="New chat" className={`opacity-60 hover:opacity-100 ${c.label}`}>
+              <button onClick={newChat} title="New chat with the Assistant" className={`opacity-60 hover:opacity-100 ${c.label}`}>
                 <Plus size={15} />
               </button>
               <button onClick={() => setHistoryOpen(false)} title="Close" className={`opacity-50 hover:opacity-90 ${c.label}`}>
