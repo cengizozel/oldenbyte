@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library, Power, Layers, Users, Trash2, CalendarDays } from "lucide-react";
+import { Fragment, useState, useEffect, useRef, useCallback } from "react";
+import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, MessageSquare, Plus, ChevronRight, Library, Power, Layers, Users, Trash2, CalendarDays, EllipsisVertical } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherWidgetEntries, listDashboardWidgets, getCalendarAccount, type WidgetEntry, type WidgetRosterItem, type CalendarAccount } from "@/lib/dashboardContext";
@@ -12,7 +12,7 @@ import Markdown from "./Markdown";
 type Role = "user" | "assistant";
 type MsgStats = { tps: number; tokens: number; total: number; ttft: number };
 type Source = { n: number; title: string; url: string; cited?: boolean };
-type ChatMessage = { role: Role; content: string; stats?: MsgStats; sources?: Source[] };
+type ChatMessage = { role: Role; content: string; at?: number; stats?: MsgStats; sources?: Source[] };
 type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number; renamed?: boolean; characterId?: string };
 
 // A persona with its own system prompt and a private, scoped memory about the
@@ -55,6 +55,19 @@ function timeAgo(ms: number): string {
   return d < 7 ? `${d}d ago` : `${Math.floor(d / 7)}w ago`;
 }
 
+// Messenger-style stamps: "14:32" on each message, day pills between groups.
+function msgTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+function msgDayLabel(ms: number): string {
+  const d = new Date(ms);
+  const now = new Date();
+  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+  if (sameDay(d, now)) return "Today";
+  if (sameDay(d, new Date(Date.now() - 86400000))) return "Yesterday";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" as const } : {}) });
+}
+
 // Reasoning models (qwen3, deepseek-r1, …) stream their chain-of-thought inline
 // as <think>…</think>. Split it out so it can be shown in a collapsible block
 // rather than mixed into the answer. Handles <thinking> too, and an unclosed
@@ -92,7 +105,9 @@ function ThinkBlock({ content, active, labelClass }: { content: string; active: 
         className={`flex items-center gap-1 text-[11px] ${labelClass} opacity-50 hover:opacity-80`}
       >
         <ChevronRight size={11} className={`transition-transform ${open ? "rotate-90" : ""}`} />
-        {active ? "Thinking…" : "Thinking"}
+        {/[\u{1F50E}\u{1F4D6}\u{1F4CA}\u{1F9E9}]/u.test(content)
+          ? (active ? "Researching…" : "Research trail")
+          : (active ? "Thinking…" : "Thinking")}
       </button>
       {open && (
         <div className="mt-1 ml-1 pl-3 border-l-2 border-black/15 dark:border-white/20 text-[12px] opacity-60">
@@ -145,7 +160,7 @@ type Length = "default" | "concise" | "balanced" | "detailed";
 // "default" omits the field; "none" turns thinking off (fast).
 type Effort = "default" | "none" | "low" | "medium" | "high";
 const EFFORT_OPTIONS: { value: Effort; label: string }[] = [
-  { value: "default", label: "Default" },
+  { value: "default", label: "Auto" },
   { value: "none", label: "Off" },
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
@@ -288,6 +303,7 @@ export default function ChatWidget({
 
   // Settings panel
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [draft, setDraft] = useState<ChatConfig>(DEFAULT_CONFIG);
   const [models, setModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -329,9 +345,8 @@ export default function ChatWidget({
   const [nowMs, setNowMs] = useState(0);
   const [powerOpen, setPowerOpen] = useState(false);
   const [powerBusy, setPowerBusy] = useState(false);
-  // Inline rename of the active conversation's title in the header.
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState("");
+  // Header overflow menu (clear conversation, context viewer).
+  const [menuOpen, setMenuOpen] = useState(false);
   // Inline rename of a row in the Chats list.
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -699,6 +714,7 @@ export default function ChatWidget({
     setAnytypePairing("idle");
     setAnytypeError("");
     setSettingsOpen(true);
+    setAdvancedOpen(false);
     // Auto-load the model list so the dropdown is ready (keeps the chosen model).
     if (config.baseUrl) fetchModels(config);
     if (config.kiwixUrl) loadKiwixSources(config.kiwixUrl);
@@ -776,7 +792,7 @@ export default function ChatWidget({
       if (streaming || !configured || !text.trim()) return;
       cancelEdit();
       setError("");
-      generate([...messages.slice(0, i), { role: "user", content: text }]);
+      generate([...messages.slice(0, i), { role: "user", content: text, at: Date.now() }]);
       return;
     }
     // Editing an assistant reply just rewrites its text in place.
@@ -1051,7 +1067,7 @@ export default function ChatWidget({
     if (!text || streaming || !configured) return;
     setError("");
     setInput("");
-    await generate([...messages, { role: "user", content: text }]);
+    await generate([...messages, { role: "user", content: text, at: Date.now() }]);
   }
 
   // Stream an assistant reply for a history ending in a user message. Shared by
@@ -1131,7 +1147,7 @@ export default function ChatWidget({
         if (body && timingRef.current.first == null) timingRef.current.first = performance.now();
         setMessages(prev => {
           const next = [...prev];
-          next[next.length - 1] = { role: "assistant", content: body };
+          next[next.length - 1] = { ...next[next.length - 1], content: body };
           return next;
         });
       }
@@ -1155,7 +1171,7 @@ export default function ChatWidget({
         ? { tokens, ttft, total: (end - start) / 1000, tps: genS > 0 ? tokens / genS : 0 }
         : undefined;
 
-      const finalMessages: ChatMessage[] = [...history, { role: "assistant", content: body, stats, sources }];
+      const finalMessages: ChatMessage[] = [...history, { role: "assistant", content: body, at: Date.now(), stats, sources }];
       setMessages(finalMessages);
       persist(config, finalMessages);
       // Ollama resets to its default keep_alive after a reply — restore the chosen
@@ -1171,7 +1187,10 @@ export default function ChatWidget({
       if ((err as Error).name === "AbortError") {
         // Keep whatever streamed so far; drop a trailing empty assistant turn.
         setMessages(prev => {
-          const next = prev[prev.length - 1]?.content === "" ? prev.slice(0, -1) : prev;
+          const last = prev[prev.length - 1];
+          const next = last?.content === ""
+            ? prev.slice(0, -1)
+            : [...prev.slice(0, -1), { ...last, at: last.at ?? Date.now() }];
           queueMicrotask(() => persist(config, next));
           return next;
         });
@@ -1182,6 +1201,7 @@ export default function ChatWidget({
     } finally {
       setStreaming(false);
       abortRef.current = null;
+      pollPower(); // refresh the residency dot right away
     }
   }
 
@@ -1206,119 +1226,97 @@ export default function ChatWidget({
 
       {/* Header — single row, no divider (a border here reads like a tab bar) */}
       <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2 shrink-0">
-        <span className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-          {/* Active character — click to switch/manage personas */}
+        <div className={`flex items-center gap-2 min-w-0 ${c.label}`}>
+          {/* Identity: avatar + character name open the characters list */}
           <button
             onClick={() => setCharactersOpen(true)}
-            title={activeCharacter ? `Talking to ${activeCharacter.name}, click to switch character` : "Characters"}
-            className="shrink-0 text-sm leading-none hover:opacity-70 transition-opacity"
+            title={activeCharacter ? `Talking to ${activeCharacter.name}: click to switch character` : "Characters"}
+            className="shrink-0 w-7 h-7 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-base leading-none hover:bg-black/10 dark:hover:bg-white/15 transition-colors"
           >
-            {activeCharacter && activeCharacter.id !== DEFAULT_CHARACTER_ID ? activeCharacter.emoji : <Bot size={14} className="opacity-60" />}
+            {activeCharacter && activeCharacter.id !== DEFAULT_CHARACTER_ID ? activeCharacter.emoji : <Bot size={15} className="opacity-60" />}
           </button>
           <span className="flex flex-col min-w-0 leading-tight">
-            {editingTitle ? (
-              <input
-                autoFocus
-                value={titleDraft}
-                onChange={e => setTitleDraft(e.target.value)}
-                onBlur={() => { renameChat(activeId, titleDraft); setEditingTitle(false); }}
-                onKeyDown={e => {
-                  if (e.key === "Enter") { renameChat(activeId, titleDraft); setEditingTitle(false); }
-                  if (e.key === "Escape") setEditingTitle(false);
-                }}
-                placeholder={titleFrom(messages)}
-                className="text-xs font-medium bg-transparent outline-none border-b border-current/30 min-w-0 w-32"
-              />
-            ) : (
-              <button
-                onClick={() => { setTitleDraft(activeConv?.renamed ? activeConv.title : ""); setEditingTitle(true); }}
-                title="Rename chat"
-                className="text-xs font-medium truncate text-left hover:opacity-80"
-              >
-                {chatTitle}
-              </button>
-            )}
-            <span className="text-[10px] opacity-45 truncate">
-              {activeCharacter && activeCharacter.id !== DEFAULT_CHARACTER_ID ? `${activeCharacter.name}${config.model ? " · " : ""}` : ""}{config.model}
+            <button
+              onClick={() => setCharactersOpen(true)}
+              className="text-xs font-medium truncate text-left hover:opacity-80"
+            >
+              {activeCharacter?.name ?? "Assistant"}
+            </button>
+            {/* Live status: residency dot first (the signal), model name truncates.
+                Separate tap target from the identity above. */}
+            <span className="relative flex items-center min-w-0">
+              {powerCapable ? (
+                <button
+                  onClick={e => { e.stopPropagation(); setPowerOpen(o => !o); }}
+                  title={isLoaded ? `Model loaded on ${backend}: click to control how long it stays` : "Model not loaded: click for options"}
+                  className="flex items-center gap-1 min-w-0 -my-0.5 py-0.5 text-[10px] opacity-60 hover:opacity-100 transition-opacity"
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isLoaded ? "bg-emerald-500" : "bg-current opacity-40"}`} />
+                  <span className="shrink-0">
+                    {isLoaded ? (pinned ? "ready · ∞" : hasCountdown ? `ready · ${fmtRemaining(remainingMs)}` : "ready") : "asleep"}
+                  </span>
+                  {config.model && <span className="truncate opacity-70">&nbsp;· {config.model}</span>}
+                </button>
+              ) : (
+                <span className="text-[10px] opacity-45 truncate">{config.model}</span>
+              )}
+              {powerOpen && powerCapable && (
+                <>
+                  {/* click-away backdrop */}
+                  <div className="fixed inset-0 z-40" onClick={() => setPowerOpen(false)} />
+                  <div className={`absolute left-0 top-5 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2.5 flex flex-col gap-2`}>
+                    <p className={`text-[10px] opacity-50 ${c.label} flex items-center gap-1`}>
+                      <Power size={11} /> Keep model loaded
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { v: "5m", label: "5m" },
+                        { v: "30m", label: "30m" },
+                        { v: "1h", label: "1h" },
+                        { v: "-1", label: "∞" },
+                      ].map(opt => (
+                        <button
+                          key={opt.v}
+                          disabled={powerBusy}
+                          onClick={() => chooseLinger(opt.v, { load: opt.v === "-1" })}
+                          title={opt.v === "-1" ? "Load now and keep it loaded until you unload" : `Linger ${opt.label} after each reply`}
+                          className={`px-2 py-1 rounded-lg text-[11px] border transition-colors disabled:opacity-40 ${
+                            config.keepAlive === opt.v
+                              ? "border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)]"
+                              : "border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--surface-border-focus)]"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={unloadNow}
+                      disabled={powerBusy || !isLoaded}
+                      className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--surface-border-focus)] disabled:opacity-30"
+                    >
+                      {powerBusy ? <Loader size={11} className="animate-spin" /> : <Power size={11} />}
+                      Unload now
+                    </button>
+                    <p className={`text-[9px] opacity-40 ${c.label} leading-snug`}>
+                      {config.keepAlive === "-1"
+                        ? "Stays loaded until you unload."
+                        : config.keepAlive
+                          ? `Unloads after ${config.keepAlive} idle.`
+                          : backend === "lmstudio"
+                            ? "Using LM Studio's default (60m) idle unload."
+                            : "Using Ollama's default linger."}
+                    </p>
+                  </div>
+                </>
+              )}
             </span>
           </span>
-        </span>
+        </div>
         {!settingsOpen && (
           <div className="flex items-center gap-2.5 shrink-0">
-            {/* Ollama model-residency pill — only shown for Ollama servers */}
-            {powerCapable && (
-              <div className="relative">
-                <button
-                  onClick={() => setPowerOpen(o => !o)}
-                  title={isLoaded ? `Model loaded on ${backend}: click to control how long it stays` : "Model not loaded"}
-                  className={`flex items-center gap-1 text-[10px] leading-none rounded-full px-1.5 py-1 border transition-colors ${
-                    isLoaded
-                      ? "border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
-                      : `border-[var(--surface-border)] ${c.label} opacity-55 hover:opacity-90`
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${isLoaded ? "bg-emerald-500" : "bg-current opacity-40"}`} />
-                  {isLoaded ? (pinned ? "loaded · ∞" : hasCountdown ? `loaded · ${fmtRemaining(remainingMs)}` : "loaded") : "unloaded"}
-                </button>
-                {powerOpen && (
-                  <>
-                    {/* click-away backdrop */}
-                    <div className="fixed inset-0 z-40" onClick={() => setPowerOpen(false)} />
-                    <div className={`absolute right-0 top-7 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2.5 flex flex-col gap-2`}>
-                      <p className={`text-[10px] opacity-50 ${c.label} flex items-center gap-1`}>
-                        <Power size={11} /> Keep model loaded
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {[
-                          { v: "5m", label: "5m" },
-                          { v: "30m", label: "30m" },
-                          { v: "1h", label: "1h" },
-                          { v: "-1", label: "∞" },
-                        ].map(opt => (
-                          <button
-                            key={opt.v}
-                            disabled={powerBusy}
-                            onClick={() => chooseLinger(opt.v, { load: opt.v === "-1" })}
-                            title={opt.v === "-1" ? "Load now and keep it loaded until you unload" : `Linger ${opt.label} after each reply`}
-                            className={`px-2 py-1 rounded-lg text-[11px] border transition-colors disabled:opacity-40 ${
-                              config.keepAlive === opt.v
-                                ? "border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)]"
-                                : "border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--surface-border-focus)]"
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                      <button
-                        onClick={unloadNow}
-                        disabled={powerBusy || !isLoaded}
-                        className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--surface-border-focus)] disabled:opacity-30"
-                      >
-                        {powerBusy ? <Loader size={11} className="animate-spin" /> : <Power size={11} />}
-                        Unload now
-                      </button>
-                      <p className={`text-[9px] opacity-40 ${c.label} leading-snug`}>
-                        {config.keepAlive === "-1"
-                          ? "Stays loaded until you unload."
-                          : config.keepAlive
-                            ? `Unloads after ${config.keepAlive} idle.`
-                            : backend === "lmstudio"
-                              ? "Using LM Studio's default (60m) idle unload."
-                              : "Using Ollama's default linger."}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-            {messages.length > 0 && (
-              <button onClick={clearChat} title="Clear this conversation" className={actionCls}>
-                <RotateCcw size={14} />
-              </button>
-            )}
-            <button onClick={() => setCharactersOpen(true)} title="Characters" className={actionCls}>
-              <Users size={14} />
+            <button onClick={newChat} title="New chat" className={actionCls}>
+              <Plus size={15} />
             </button>
             <button onClick={() => setHistoryOpen(true)} title="Chats" className={actionCls}>
               <MessageSquare size={14} />
@@ -1326,20 +1324,43 @@ export default function ChatWidget({
             <button onClick={openSettings} title="Settings" className={actionCls}>
               <Pencil size={14} />
             </button>
+            <div className="relative">
+              <button onClick={() => setMenuOpen(o => !o)} title="More" className={menuOpen ? `opacity-90 ${c.icon}` : actionCls}>
+                <EllipsisVertical size={14} />
+              </button>
+              {menuOpen && (
+                <>
+                  {/* click-away backdrop */}
+                  <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                  <div className={`absolute right-0 top-6 z-50 w-56 rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
+                    <button
+                      onClick={() => { setMenuOpen(false); if (config.useDashboard && !ctx) refreshContext(); setShowContext(true); }}
+                      className={`text-left px-2.5 py-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/5 ${c.text}`}
+                    >
+                      View model context
+                      <span className={`block text-[10px] opacity-50 ${c.label}`}>
+                        {gathering
+                          ? "gathering…"
+                          : config.useDashboard
+                            ? (ctx?.length ? `${ctx.length} widget${ctx.length === 1 ? "" : "s"} · ~${Math.round(ctxChars / 1000)}k chars readable` : "dashboard lookup on")
+                            : "dashboard lookup off"}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => { setMenuOpen(false); clearChat(); }}
+                      disabled={messages.length === 0}
+                      className="text-left px-2.5 py-2 rounded-lg text-xs text-red-500 dark:text-red-400 hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30"
+                    >
+                      Clear conversation
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Dashboard-data status — quiet borderless subtitle */}
-      {!settingsOpen && config.useDashboard && (
-        <div className={`shrink-0 px-4 pb-1.5 text-[10px] truncate ${c.label} opacity-45`}>
-          {gathering
-            ? "gathering your dashboard data…"
-            : ctx?.length
-              ? `dashboard lookup on · ${ctx.length} widget${ctx.length === 1 ? "" : "s"} · ~${Math.round(ctxChars / 1000)}k chars readable`
-              : "dashboard lookup on · no data found"}
-        </div>
-      )}
 
       {/* Chats list — switches the whole widget to a list of saved conversations */}
       {historyOpen && (
@@ -1645,7 +1666,18 @@ export default function ChatWidget({
             </div>
 
             <div>
-              <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Max response length <span className="opacity-60">(tokens, 0 = no limit)</span></p>
+              <button
+                onClick={() => setAdvancedOpen(o => !o)}
+                className={`flex items-center gap-1 text-xs opacity-50 hover:opacity-80 ${c.label}`}
+              >
+                <ChevronRight size={11} className={`transition-transform ${advancedOpen ? "rotate-90" : ""}`} />
+                Advanced
+                <span className="opacity-60">
+                  (cap: {draft.maxTokens ? `${draft.maxTokens} tokens` : "none"}{draft.maxTokens !== LENGTH_PRESETS[draft.length].cap ? ", custom" : ""})
+                </span>
+              </button>
+              {advancedOpen && (<div className="mt-1.5">
+              <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Max response length <span className="opacity-60">(tokens, 0 = no limit; style presets set this)</span></p>
               <SettingsInput
                 type="number"
                 min={0}
@@ -1669,6 +1701,7 @@ export default function ChatWidget({
                   </button>
                 ))}
               </div>
+              </div>)}
             </div>
 
             <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 mt-1 ${c.label}`}>Data sources</p>
@@ -1820,7 +1853,14 @@ export default function ChatWidget({
                 <p className={`text-xs opacity-40 ${c.text}`}>Ask anything…</p>
               </div>
             ) : (
-              messages.map((m, i) => {
+              <>
+              {/* Room title: quiet pill, renamed in the Chats list */}
+              <div className="self-center shrink-0">
+                <span className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-35 ${c.label}`}>
+                  {chatTitle}
+                </span>
+              </div>
+              {messages.map((m, i) => {
                 const inProgress = streaming && i === messages.length - 1 && m.role === "assistant";
                 const secs = elapsedMs / 1000;
                 const editing = editingIndex === i;
@@ -1843,34 +1883,74 @@ export default function ChatWidget({
                     </div>
                   );
                 }
+                let lastDatedAt: number | null = null;
+                for (let j = i - 1; j >= 0; j--) {
+                  const a = messages[j].at;
+                  if (a != null) { lastDatedAt = a; break; }
+                }
+                const daySep = m.at != null && (lastDatedAt == null || msgDayLabel(lastDatedAt) !== msgDayLabel(m.at))
+                  ? msgDayLabel(m.at) : null;
                 return (
-                  <div key={i} className={`flex flex-col gap-0.5 group/msg ${m.role === "user" ? "items-end" : "items-start"}`}>
-                    <div
-                      className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${
-                        m.role === "user"
-                          ? "whitespace-pre-wrap bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-primary)] shadow-sm"
-                          : `${c.text} opacity-90`
-                      }`}
-                    >
-                      {m.role === "assistant"
-                        ? (m.content
-                            ? renderAssistant(m.content, inProgress, c.label, m.sources)
-                            : (inProgress ? <span className="inline-block w-2 h-2 rounded-full bg-current opacity-50 animate-pulse" /> : null))
-                        : m.content}
+                  <Fragment key={i}>
+                  {daySep && (
+                    <div className="self-center my-1">
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-40 ${c.label} bg-black/5 dark:bg-white/10`}>
+                        {daySep}
+                      </span>
                     </div>
+                  )}
+                  <div className={`flex flex-col gap-0.5 group/msg ${m.role === "user" ? "items-end" : "items-start"}`}>
+                    {!(m.role === "assistant" && !m.content) && (
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${
+                          m.role === "user"
+                            ? "whitespace-pre-wrap bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-primary)] shadow-sm"
+                            : `${c.text} opacity-90`
+                        }`}
+                      >
+                        {m.role === "assistant" ? renderAssistant(m.content, inProgress, c.label, m.sources) : m.content}
+                      </div>
+                    )}
                     {!inProgress && m.role === "assistant" && m.sources && m.sources.length > 0 && (
                       <SourcesList sources={m.sources} labelClass={c.label} textClass={c.text} />
                     )}
-                    {inProgress && (
-                      <span className={`px-1 text-[10px] ${c.text} opacity-45`}>
-                        {m.content
-                          ? (m.content.lastIndexOf("<think>") > m.content.lastIndexOf("</think>") ? "thinking" : "generating")
-                          : (secs >= 3 ? "loading model / thinking" : "thinking")}… {secs.toFixed(1)}s
-                      </span>
-                    )}
+                    {inProgress && (() => {
+                      // Honest status: residency-aware before the first byte,
+                      // trail-aware while a think block is open (tool activity
+                      // is "researching", chain-of-thought is "thinking"),
+                      // and a quiet typing indicator once the answer flows.
+                      if (!m.content) {
+                        const label = powerCapable ? (isLoaded ? "processing" : "loading model") : "waiting for model";
+                        return <span className={`px-1 text-[10px] ${c.text} opacity-45`}>{label}… {secs.toFixed(1)}s</span>;
+                      }
+                      const openIdx = m.content.lastIndexOf("<think>");
+                      if (openIdx > m.content.lastIndexOf("</think>")) {
+                        const tail = m.content.slice(openIdx);
+                        const researching = /\u{1F50E}|\u{1F4D6}|\u{1F4CA}|\u{1F9E9}|checking calendar|adding "/u.test(tail);
+                        return (
+                          <span className={`px-1 text-[10px] ${c.text} opacity-45`}>
+                            {researching ? "researching" : "thinking"}… {secs.toFixed(1)}s
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="px-1 flex items-center gap-1" aria-label="typing">
+                          {[0, 1, 2].map(j => (
+                            <span
+                              key={j}
+                              className={`w-1.5 h-1.5 rounded-full bg-current opacity-40 animate-pulse ${c.text}`}
+                              style={{ animationDelay: `${j * 200}ms` }}
+                            />
+                          ))}
+                        </span>
+                      );
+                    })()}
                     <div className="flex items-center gap-2 px-1">
+                      {!inProgress && m.at != null && (
+                        <span className={`text-[9px] tabular-nums ${c.text} opacity-35`}>{msgTime(m.at)}</span>
+                      )}
                       {!inProgress && m.role === "assistant" && m.stats && m.stats.tokens > 0 && (
-                        <span className={`text-[10px] ${c.text} opacity-40`}>
+                        <span className={`text-[10px] ${c.text} opacity-0 group-hover/msg:opacity-40 [@media(hover:none)]:opacity-40 transition-opacity`}>
                           {m.stats.tps.toFixed(1)} tok/s · {m.stats.tokens} tokens · {m.stats.total.toFixed(1)}s
                           {m.stats.ttft >= 0.05 ? ` · ${m.stats.ttft.toFixed(1)}s to first` : ""}
                         </span>
@@ -1895,8 +1975,10 @@ export default function ChatWidget({
                       )}
                     </div>
                   </div>
+                  </Fragment>
                 );
-              })
+              })}
+              </>
             )}
             {error && <p className="text-red-400 text-xs">{error}</p>}
           </div>
@@ -1929,16 +2011,6 @@ export default function ChatWidget({
                   >
                     <Database size={14} />
                   </button>
-                  {config.useDashboard && (
-                    <button
-                      onClick={() => setShowContext(true)}
-                      disabled={!ctx?.length}
-                      title="View the data the model can read"
-                      className={`p-1.5 rounded-full ${dashCtrlCls} disabled:!opacity-25`}
-                    >
-                      <Eye size={14} />
-                    </button>
-                  )}
                   {config.useDashboard && (
                     <button
                       onClick={() => refreshContext()}
