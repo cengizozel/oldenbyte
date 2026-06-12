@@ -15,8 +15,8 @@ The cache is keyed by date so it is reused for the rest of the day and refreshed
 
 Two-level selection:
 
-1. **Field** — a broad research area (e.g. "Computer Science", "Physics"). Defined in `CATEGORY_GROUPS`, each with a label and an array of subcategories.
-2. **Topic** — a specific arXiv category within that field (e.g. `cs.AI`, `physics.optics`).
+1. **Field** - a broad research area (e.g. "Computer Science", "Physics"). Defined in `CATEGORY_GROUPS`, each with a label and an array of subcategories.
+2. **Topic** - a specific arXiv category within that field (e.g. `cs.AI`, `physics.optics`).
 
 Available groups:
 
@@ -54,8 +54,8 @@ arXiv RSS `<description>` fields contain HTML-encoded text with "Authors:" and "
 
 The list and detail panels use the same absolute-position slide pattern as Reddit and HF Daily: both panels sit side-by-side in an `overflow-hidden` container and slide in/out via CSS `translate-x` transitions.
 
-- **List** — 25 paper titles, each with an external link icon on hover
-- **Detail** — authors, publication date, and abstract; scroll fades on both panels
+- **List** - 25 paper titles, each with an external link icon on hover
+- **Detail** - authors, publication date, and abstract; scroll fades on both panels
 
 ## Scroll Fades
 

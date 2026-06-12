@@ -1,10 +1,12 @@
 # Ideas
 
-A scratchpad for thinking out loud — half-formed ideas, future directions, things worth revisiting. Nothing here is planned or committed.
+A scratchpad for thinking out loud - half-formed ideas, future directions, things worth revisiting. Nothing here is planned or committed.
 
 ---
 
 ## Community Widget Bank
+
+> **Shipped (June 2026).** Built together with the UI component library below as a single declarative engine: see [widget-bank.md](widget-bank.md) and `lib/widgetBank.ts`. Two differences from the sketch here: the `items` mapping survived as a shorthand that compiles to one `list` primitive (full layouts use the primitive library directly), and the bank lives in `widget-bank/` at the repo root, validated and served at runtime by `/api/widget-bank` instead of being read from `public/` at build time.
 
 The goal is to let third-party devs or community contributors add widgets without writing React components. Each widget is a declarative config file that lives in a directory and automatically shows up in the widget picker.
 
@@ -36,18 +38,18 @@ A new `custom` widget type backed by a `public/widget-bank/` directory. Each fil
 }
 ```
 
-The `items` block is a path mapping — it tells the widget how to extract a list of items from the JSON response and which fields map to title, subtitle, link, and meta. No arbitrary code execution, no HTML injection.
+The `items` block is a path mapping - it tells the widget how to extract a list of items from the JSON response and which fields map to title, subtitle, link, and meta. No arbitrary code execution, no HTML injection.
 
 ### Pieces to build
 
-1. **`CustomWidget.tsx`** — fetches the URL server-side (via `/api/proxy` or a dedicated `/api/custom` route), maps the response using the `items` schema, renders with the existing card/list UI and color system
-2. **`public/widget-bank/*.json`** — the community directory; each file is one widget definition
-3. **Widget picker update** — reads bank files at build time and shows them as a separate section alongside built-in widgets
-4. **`digestable` default** — false for custom widgets unless explicitly set in the config
+1. **`CustomWidget.tsx`** - fetches the URL server-side (via `/api/proxy` or a dedicated `/api/custom` route), maps the response using the `items` schema, renders with the existing card/list UI and color system
+2. **`public/widget-bank/*.json`** - the community directory; each file is one widget definition
+3. **Widget picker update** - reads bank files at build time and shows them as a separate section alongside built-in widgets
+4. **`digestable` default** - false for custom widgets unless explicitly set in the config
 
 ### Contributor flow
 
-Submit a PR with a single JSON file. No React knowledge required, no code review needed for security — just a config that declares what to fetch and how to map it.
+Submit a PR with a single JSON file. No React knowledge required, no code review needed for security - just a config that declares what to fetch and how to map it.
 
 ### Constraints
 
@@ -57,7 +59,9 @@ The `items` mapping schema handles list-style feeds well (trending repos, leader
 
 ## UI Component Library for Widget Configs
 
-Instead of locking widget configs into a flat list/card layout, expose a library of safe, themeable UI primitives that widget authors can compose declaratively. No arbitrary code — just references to named components with data paths wired in.
+> **Shipped (June 2026).** Not built as a separate system: it landed inside the widget bank engine above (`lib/widgetBank.ts`, rendered by `BankWidget.tsx`). One engine validates a config and renders either a full `layout` array or the `items` shorthand, which compiles to a single `list` primitive. All seven starting primitives below exist, plus `list`, and unknown component names skip gracefully as planned. See [widget-bank.md](widget-bank.md).
+
+Instead of locking widget configs into a flat list/card layout, expose a library of safe, themeable UI primitives that widget authors can compose declaratively. No arbitrary code - just references to named components with data paths wired in.
 
 ```json
 {
@@ -73,17 +77,17 @@ Instead of locking widget configs into a flat list/card layout, expose a library
 }
 ```
 
-Each primitive is a React component that already understands the color system and dark mode. Widget authors reference them by name and bind data using `$.field` path expressions. The component library is the extension surface — start with a small set and grow it based on what community configs can't express.
+Each primitive is a React component that already understands the color system and dark mode. Widget authors reference them by name and bind data using `$.field` path expressions. The component library is the extension surface - start with a small set and grow it based on what community configs can't express.
 
 ### Starting primitives
 
-- `label` — text, supports size/color/weight
-- `progress-bar` — value + max, themed
-- `stat-row` — horizontal label/value pairs
-- `badge-list` — list of colored tags
-- `image` — URL to an image with optional caption
-- `divider` — horizontal rule
-- `sparkline` — small inline chart from an array of numbers
+- `label` - text, supports size/color/weight
+- `progress-bar` - value + max, themed
+- `stat-row` - horizontal label/value pairs
+- `badge-list` - list of colored tags
+- `image` - URL to an image with optional caption
+- `divider` - horizontal rule
+- `sparkline` - small inline chart from an array of numbers
 
 ### Growth model
 
@@ -97,11 +101,11 @@ Open source the core so anyone can self-host. Run a hosted version at a proper d
 
 ### The hosted service
 
-- **Landing page** — explains the concept, shows the dashboard in action, clear call to action
-- **Smart onboarding** — instead of dropping users into a blank grid, ask 3–5 questions (interests, field of work, content sources) and auto-generate a sensible starting layout from the widget bank. Eliminates the blank canvas problem and demonstrates the product immediately
-- **Account system** — OAuth (Google, GitHub) for low-friction signup, persistent layouts and settings tied to account
-- **Free tier** — core dashboard, limited widgets, no AI digest
-- **Paid tier** — full widget count, AI digest (no need to bring your own OpenAI key), widget bank access, possibly custom domain
+- **Landing page** - explains the concept, shows the dashboard in action, clear call to action
+- **Smart onboarding** - instead of dropping users into a blank grid, ask 3–5 questions (interests, field of work, content sources) and auto-generate a sensible starting layout from the widget bank. Eliminates the blank canvas problem and demonstrates the product immediately
+- **Account system** - OAuth (Google, GitHub) for low-friction signup, persistent layouts and settings tied to account
+- **Free tier** - core dashboard, limited widgets, no AI digest
+- **Paid tier** - full widget count, AI digest (no need to bring your own OpenAI key), widget bank access, possibly custom domain
 
 ### The moat
 
@@ -109,7 +113,7 @@ The code being public doesn't undermine the hosted service. Self-hosters still h
 
 ### Smart onboarding detail
 
-User picks interests from a tag list or types free-form. The system maps those to widget presets from the bank and generates a layout config — either rule-based (interest tags → widget types) or AI-assisted. This is also a strong marketing moment: the dashboard looks immediately useful on first load rather than requiring 20 minutes of configuration.
+User picks interests from a tag list or types free-form. The system maps those to widget presets from the bank and generates a layout config - either rule-based (interest tags → widget types) or AI-assisted. This is also a strong marketing moment: the dashboard looks immediately useful on first load rather than requiring 20 minutes of configuration.
 
 ### Revenue model
 
@@ -121,7 +125,7 @@ User picks interests from a tag list or types free-form. The system maps those t
 
 ## Academic Research Angle
 
-The productivity angle could support an academic paper, primarily in **Human-Computer Interaction (HCI)** — specifically Personal Information Management (PIM) and ambient information displays. Natural venues: CHI or CSCW.
+The productivity angle could support an academic paper, primarily in **Human-Computer Interaction (HCI)** - specifically Personal Information Management (PIM) and ambient information displays. Natural venues: CHI or CSCW.
 
 ### Research questions worth pursuing
 
@@ -131,11 +135,11 @@ The productivity angle could support an academic paper, primarily in **Human-Com
 
 ### What a conference-worthy study needs
 
-- **Participants** — 16–24 for a controlled study, 8–12 for qualitative
-- **Longitudinal design** — days or weeks, not a one-hour lab session; CHI reviewers weight this heavily
-- **Measurable outcomes** — tab switch count, NASA-TLX cognitive load scale, time-on-task, information recall, daily active use over time
-- **Qualitative component** — semi-structured interviews to explain the "why" behind numbers
-- **IRB approval** — required before collecting any data
-- **A counterintuitive finding** — something that changes how people think about the design space (e.g. unified display increases source diversity, not reduces it; more customization correlates with higher abandonment). Confirming the obvious doesn't get accepted.
+- **Participants** - 16–24 for a controlled study, 8–12 for qualitative
+- **Longitudinal design** - days or weeks, not a one-hour lab session; CHI reviewers weight this heavily
+- **Measurable outcomes** - tab switch count, NASA-TLX cognitive load scale, time-on-task, information recall, daily active use over time
+- **Qualitative component** - semi-structured interviews to explain the "why" behind numbers
+- **IRB approval** - required before collecting any data
+- **A counterintuitive finding** - something that changes how people think about the design space (e.g. unified display increases source diversity, not reduces it; more customization correlates with higher abandonment). Confirming the obvious doesn't get accepted.
 
 Realistic timeline from study design to publication: 12–18 months. UIST or IMWUT are slightly more accessible venues for a first paper in this space.

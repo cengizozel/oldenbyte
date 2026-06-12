@@ -1,6 +1,6 @@
 # Tracker Widget
 
-Times how long you spend on each of a set of named activities. Only one activity runs at a time: clicking an activity starts (or resumes) its stopwatch and pauses whichever was running. A donut chart shows the proportion of time spent on each activity, and a history log breaks down past days. Times reset daily.
+Times how long you spend on each of a set of named activities. Only one activity runs at a time: clicking an activity starts (or resumes) its stopwatch and pauses whichever was running. A donut chart shows today's split, flames mark streaks, and a history overlay adds a 14-day chart, insights, and per-day time editing.
 
 ## Storage Keys
 
@@ -13,57 +13,53 @@ Times how long you spend on each of a set of named activities. Only one activity
 
 Two keys with different lifetimes:
 
-- **`tracker-config-{id}`** — the activity list plus the "what's running" pointer (`activeId` + `since`, an epoch-ms timestamp). This persists across days, so a stopwatch left running keeps running into the next day.
-- **`tracker-days-{id}`** — every day's accumulated seconds per activity, keyed by date. `today`'s slice is the live bucket (mirrored in the `elapsed` state); a new day simply starts with no entry, which is the daily reset. Past days are retained — that's what the history log reads. *(An earlier version stored one key per day, `tracker-day-{id}-{date}`; on load that today-key is migrated into this consolidated store.)*
+- **`tracker-config-{id}`**: the activity list plus the "what's running" pointer (`activeId` + `since`, an epoch-ms timestamp). This persists across days, so a stopwatch left running keeps running into the next day.
+- **`tracker-days-{id}`**: every day's accumulated seconds per activity, keyed by local date. Past days are retained; the history overlay reads them. (An earlier version stored one key per day, `tracker-day-{id}-{date}`; on load that today-key is migrated into this consolidated store.)
 
-## Timing Model
+## Day Boundary: Local Midnight
 
-`elapsed` holds *committed* seconds only — it never includes the segment currently being timed. The live value of the running activity is computed on the fly:
+Days are keyed by the user's local calendar date (`localDateStr()`), not UTC: a timer running at 23:59 belongs to the day the user experienced. `today` is recomputed on every render and a 1-second tick runs while a timer is active, so the whole view rolls over within a second of local midnight.
 
-```
-liveSecs(item) = elapsed[item] + (item === activeId ? now - max(since, todayStart) : 0)
-```
+## Timing Model and Cross-Midnight Splitting
 
-A 1-second interval (`setInterval`) advances a `now` state value while an activity is running, re-rendering the live number and the chart. The interval is cleared when nothing is running.
+`days` holds committed seconds only. The running segment is never persisted per tick; it is reconstructed from `since` on load, so reloading or closing the tab mid-run loses no time.
 
-State transitions go through `commit()`, which folds the running segment into `elapsed` before the pointer changes:
+`splitAcrossDays(fromMs, toMs)` divides a segment into per-local-day parts, so time that crosses midnight is credited to the day it actually happened in. Both views of the data go through it:
 
-- **Click an idle activity** — commit the current one (if any), then set `activeId` to the clicked item and `since` to now.
-- **Click the running activity** — commit it, then clear `activeId`/`since` (pause).
-- **Switch** is just the two combined: the previous activity is committed and paused while the new one starts.
+- **`liveDays()`**: the committed days plus the live running segment, split across days. Everything on screen (rows, chart, streaks, history) derives from this, so a timer crossing midnight is always displayed on the correct days while still running.
+- **`commitDays()`**: folds the running segment into committed storage on every transition. A segment spanning midnight lands in each day it touched rather than being dumped into one bucket.
 
-Both keys are persisted on every transition. The running segment itself is *not* persisted each tick — it is reconstructed from `since` on load, so reloading or closing the tab mid-run loses no time.
+Transitions: clicking an idle activity commits the current one (if any) and starts the clicked one (`since` = now); clicking the running activity commits it and pauses. Both keys are persisted on each transition.
 
-## Overnight Clamp
+## Main View
 
-Because the running pointer survives across days, a segment started yesterday must not dump all of yesterday's elapsed time into today's bucket. Both `runningSecs()` and `commit()` clamp the segment start to `todayStart` (today's UTC midnight):
+- **Donut**: hand-rolled SVG arcs (a shared `Donut` component, reused by the history day tiles). Hovering a segment dims the others and shows that activity's share (`%`) and name in the center; otherwise the center shows the day's total. Colors come from `tagColor(id)`, stable per activity id.
+- **Activity rows** are ordered by time spent today, highest first, reordering live while a timer runs. Each row shows its color dot, name, today's time, and a play/pause indicator.
+- **Streak badge**: an activity tracked on 2 or more consecutive days shows a flame with the streak count.
 
-```
-seconds = (now - max(since, todayStart)) / 1000
-```
+## Streaks
 
-So today's bucket only ever accrues time from midnight onward. (Day boundaries use the same UTC `toISOString()` date string as the other date-keyed widgets.)
-
-## Donut Chart
-
-Hand-rolled SVG (no chart library). Each activity with non-zero live time is drawn as an arc on a shared `<circle>` using `stroke-dasharray`/`stroke-dashoffset`, accumulating an offset so the segments sit end to end. A faint full-circle track sits behind them, and the day's total time is shown in the center. Colors come from a fixed 12-entry palette indexed by the activity's position; the same palette colors the legend dots and the settings rows.
-
-**Hover:** hovering a segment dims the others and replaces the center text with that activity's name and its share (`%`); with no hover the center shows the day's total. The center overlay is `pointer-events-none` so hovers reach the arcs beneath it.
+`streakFor()` counts consecutive days with time on the activity, ending today. If today has nothing yet, the count ends at yesterday instead, so an unbroken run keeps its number all day rather than dropping to zero at midnight.
 
 ## Settings
 
-The card flips (the same `rotateY` flip used by the YouTube/RSS widgets) to a settings panel where activities are added (text field + `Plus`), renamed inline, and removed (`×`). Edits are staged in a `draft` list and applied on save (`Check`). On save, removed activities are dropped from *today's* bucket and the active list (the stopwatch stops if the running activity was removed) — but their **past-day history is kept** (it's keyed by id), so removing an activity never erases its record.
+The card flips to a settings panel where activities are added (text field + `Plus`), renamed inline, and removed (`×`). Edits are staged in a draft and applied on save. On save, removed activities are dropped from today's bucket and the running pointer (the stopwatch stops if the running activity was removed), but their past-day history is kept: per-day time is keyed by activity **id**, so renaming keeps history intact and a removed activity's past time still appears (labeled `(removed)`, neutral dot).
 
-## History
+The settings footer's reset button zeroes today's bucket (keeping the activity list). If something is running, its `since` resets to now so it continues cleanly from zero.
 
-The header's `History` (clock) button opens an overlay listing every past day that has tracked time, newest first. Each day shows its total plus a per-activity breakdown (color dot, name, time, sorted by time), with a `Trash2` button to delete that day.
+## History and Insights
 
-Per-day time is keyed by activity **id**, not name. So renaming an activity keeps its history intact, and a removed activity's past time still appears (labeled `(removed)`, with a neutral dot). Persistent ids with mutable names keep historical data stable for future statistics.
+The header's clock icon opens an overlay:
 
-## Reset
+- **14-day chart**: one polyline per activity (the top 6 by time in the window), scaled to the window's largest value, with start/end date labels and a color-dot legend.
+- **Week-over-week insight**: the last 7 days' total, with the percent change versus the 7 days before (green for up, red for down). The delta is omitted when the prior week is empty.
+- **Best streaks**: up to 3 activities with a streak of 2+ days, each as a flame, count, and name.
+- **Day grid**: a 3-column grid of mini donuts, one per day that has tracked time, newest first, labeled with the date and total. Click a day to drill in.
 
-The settings footer has a **reset times** button (`RotateCcw`) that zeroes the day's `elapsed` (keeping the activity list). If something is running, its `since` is reset to now so it continues cleanly from zero.
+## Day Detail and Time Editing
 
-## Digest
+A day's detail view shows its donut and a per-activity breakdown. Every current activity is listed even at zero (so a forgotten day can be backfilled); removed activities appear if they have time. The pencil on a row opens hours/minutes inputs to set the recorded time to an exact value ("I forgot to stop the timer"): Enter saves, Escape cancels, and 0 removes the entry. Editing the running activity pauses it first, so the stored value is exactly what was typed. The trash icon deletes the whole day; deleting today while a timer runs resets its `since` to now.
 
-`digestable: false` — numeric time data is not useful for the narrative `/digest` briefing, so the Tracker is excluded from it.
+## Digest and Chat
+
+`digestable: false`: numeric time data is not useful for the narrative `/digest` briefing, so the Tracker is excluded from it. The Chat widget's dashboard lookup **does** include it: the most recent 7 days that have entries, per activity, as text.

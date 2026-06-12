@@ -88,4 +88,4 @@ npm run dev
 
 The app runs at `http://localhost:3000`. A local SQLite database is created at `prisma/dev.db` on first run (the `DATABASE_URL` default in `lib/prisma.ts`).
 
-No `.env` file is required for local development — `DASHBOARD_PASSWORD` and `SESSION_SECRET` are optional and fall back to insecure defaults.
+No `.env` file is required for local development - `DASHBOARD_PASSWORD` and `SESSION_SECRET` are optional and fall back to insecure defaults.

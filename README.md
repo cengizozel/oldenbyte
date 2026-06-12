@@ -1,6 +1,6 @@
 # oldenbyte
 
-A personal dashboard built with Next.js. Widgets are draggable, resizable, and persist their state to a local SQLite database. Responsive for mobile portrait view.
+A personal dashboard built with Next.js. Widgets are draggable, resizable, and persist their state to a local SQLite database. Multiple named dashboards, each with its own layout and widgets, switchable from the top bar. Responsive for mobile portrait view.
 
 ![screenshot](public/screenshot.png)
 
@@ -12,30 +12,36 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 - **Feed** - subscribe to any RSS feed, configurable item count, refetches on every page load
 - **Reddit** - top posts from one or more subreddits, selectable time period and post count, interleaved across subreddits, refetches on every page load
 - **YouTube** - latest videos from one or more channels, sorted newest-first with a "new" badge for uploads under 24 hours, refetches on every page load
+- **Weather** - current conditions and a daily forecast for any place (search by name, °C/°F toggle), refreshed every 30 minutes
 - **F1** - next race details with countdown and current top 5 driver standings, updated hourly
 - **arXiv** - latest papers from a chosen research field (CS, Math, Physics, and more), with abstract view on click, refetches on every page load
 - **HF Daily** - trending AI papers curated by Hugging Face, sorted by upvotes, refetches on every page load
-- **Tracker** - time how long you spend on each activity with a one-tap stopwatch (only one runs at a time) and a donut chart of the breakdown; resets daily
+- **Calendar** - upcoming events from any CalDAV server (Nextcloud, Radicale, ...); connect once, pick which calendars to show, and set the agenda window
+- **Tracker** - time how long you spend on each activity with a one-tap stopwatch (only one runs at a time) and a donut chart of the day's breakdown; keeps a full per-day history with streaks, week-over-week stats, and editable past durations, and time that crosses midnight is credited to the day it happened in
 - **Chess** - play an ongoing game against the Stockfish engine with an adjustable Elo difficulty; the game persists between visits
 - **Kiwix** - search an offline [Kiwix](https://kiwix.org/) library (Wikipedia, WikiHow, …) running on your network; enter the server URL, pick a book, and full-text search results link straight to the article
 - **Anytype** - browse and search your own [Anytype](https://anytype.io/) spaces; pair once with the local desktop app (a 4-digit code), pick a space, then search your objects with results that open straight in Anytype
 - **Chat** - chat with any OpenAI-compatible model (Ollama, LM Studio, llama.cpp, vLLM, OpenAI, …) by entering the API URL and model name; responses stream in real-time and the conversation persists. Highlights:
-  - **Dashboard data** toggle feeds your notes, feeds, and tracked time to the model ("what's new on arXiv?", "what did I note last Tuesday?")
+  - **Dashboard lookup** toggle hands the model `read_widget` and `search_dashboard` tools so it reads your notes, feeds, and tracked time on demand ("what's new on arXiv?", "what did I note last Tuesday?"), with paging and keyword-find for long content; you choose per widget what it may read. A separate **calendar** toggle lets it list and create events through the Calendar widget's account
   - **Kiwix lookup** toggle hands the model search tools for an offline [Kiwix](https://kiwix.org/) library (agentic RAG) so it can look facts up mid-conversation and cite what it read
-  - **Anytype lookup** toggle does the same for your own [Anytype](https://anytype.io/) notes — it searches, reads (with `find`/page navigation for long notes), and can map-reduce **summarize** a whole journal too big to fit in context, while honouring each note's dates and metadata
-  - **Characters** — create personas, each with its own system prompt and a private, *scoped* long-term memory: give one a focus (e.g. an education coach) and it auto-remembers what you tell it that fits (your studies) while ignoring the rest (your trip)
-  - **Model control** — for Ollama/LM Studio, a status pill shows whether the model is loaded and lets you set how long it lingers in VRAM, pin it, or unload it on demand
+  - **Anytype lookup** toggle does the same for your own [Anytype](https://anytype.io/) notes - it searches, reads (with `find`/page navigation for long notes), and can map-reduce **summarize** a whole journal too big to fit in context, while honouring each note's dates and metadata
+  - **Characters** - create personas, each with its own system prompt and a private, *scoped* long-term memory: give one a focus (e.g. an education coach) and it auto-remembers what you tell it that fits (your studies) while ignoring the rest (your trip)
+  - **Model control** - for Ollama/LM Studio, a status pill shows whether the model is loaded and lets you set how long it lingers in VRAM, pin it, or unload it on demand
   - Regenerate a reply from any of your messages, edit your past messages to rewind, and an auto-growing composer for multi-line input
+
+## Community widget bank
+
+Widgets can also be defined as single JSON files in `widget-bank/`: declare a URL to fetch and map fields onto a small set of themed primitives (lists, stat rows, sparklines, ...), no React required. Valid definitions appear in the edit-mode picker under **Community**; invalid ones are skipped with reported errors. See [docs/widget-bank.md](docs/widget-bank.md).
 
 ## Morning digest
 
 <img src="public/digest.gif" width="400" />
 
-`/digest` is a separate page that reads today's cached widget data and generates a newspaper-style AI briefing using any OpenAI-compatible model — a local one (Ollama, LM Studio, llama.cpp) or a hosted provider. Set the endpoint URL, model, and optional API key via the **model** control in the masthead (stored in `localStorage`). Each widget section gets its own API call, running in parallel. A streaming mode toggle streams each section's text in real-time as it's generated. Accessible from the main dashboard via the newspaper icon in the top bar.
+`/digest` is a separate page that reads today's cached widget data and generates a newspaper-style AI briefing using any OpenAI-compatible model - a local one (Ollama, LM Studio, llama.cpp) or a hosted provider. Set the endpoint URL, model, and optional API key via the **model** control in the masthead (stored in `localStorage`). Each widget section gets its own API call, running in parallel. A streaming mode toggle streams each section's text in real-time as it's generated. Accessible from the main dashboard via the newspaper icon in the top bar.
 
 ## Top bar
 
-The left and right text fields are editable and can display either a static string or a live value fetched from any URL that returns plain text (for example a weather or IP address endpoint). The center shows a configurable date or clock with the action buttons (digest, dark mode, layout edit) grouped below it. Dark mode preference is persisted to the database, and pressing **Shift+D** toggles it from anywhere (except while typing in a field).
+The left and right text fields are editable and can display either a static string or a live value fetched from any URL that returns plain text (for example a weather or IP address endpoint). The center shows a configurable date or clock with the action buttons (dashboard switcher, digest, layout edit, settings) grouped below it. The switcher creates, renames, and deletes dashboards; the settings panel holds the dark mode toggle. Dark mode preference is persisted to the database, and pressing **Shift+D** toggles it from anywhere (except while typing in a field).
 
 ## Stack
 

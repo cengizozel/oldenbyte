@@ -28,10 +28,10 @@ The resolved `channelId` and `name` are stored in the config so the resolution s
 
 `GET /api/youtube?channelId={id}&limit={n}` fetches videos using a two-step strategy:
 
-**Primary — RSS:** `https://www.youtube.com/feeds/videos.xml?channel_id={id}`  
+**Primary - RSS:** `https://www.youtube.com/feeds/videos.xml?channel_id={id}`  
 Parsed with regex: finds `<entry>` blocks and extracts `<title>`, `<link href>`, and `<published>`.
 
-**Fallback — Channel page scrape:** If the RSS request returns a non-2xx status (YouTube sometimes returns 404), the route fetches `https://www.youtube.com/channel/{id}/videos` with a browser `User-Agent`, extracts the `ytInitialData` JSON blob from the page `<script>` tags, and navigates the nested structure to find `videoRenderer` objects. Each renderer provides a `videoId`, `title.runs[0].text`, and `publishedTimeText.simpleText` (relative string like "2 days ago"). Relative times are converted to approximate ISO timestamps via `relToIso()`.
+**Fallback - Channel page scrape:** If the RSS request returns a non-2xx status (YouTube sometimes returns 404), the route fetches `https://www.youtube.com/channel/{id}/videos` with a browser `User-Agent`, extracts the `ytInitialData` JSON blob from the page `<script>` tags, and navigates the nested structure to find `videoRenderer` objects. Each renderer provides a `videoId`, `title.runs[0].text`, and `publishedTimeText.simpleText` (relative string like "2 days ago"). Relative times are converted to approximate ISO timestamps via `relToIso()`.
 
 Videos from multiple channels are interleaved round-robin.
 

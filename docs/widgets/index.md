@@ -11,7 +11,7 @@ All widget types are defined in `lib/widgets.ts`:
 ```ts
 type Widget = {
   id: string;           // unique instance ID (e.g. "notebook", "rss-1776129788318")
-  type: WidgetType;     // "notebook" | "ebook" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix" | "anytype"
+  type: WidgetType;     // "notebook" | "ebook" | "text" | "rss" | "reddit" | "youtube" | "f1" | "weather" | "calendar" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix" | "anytype" | "custom" | ...
   color: WidgetColor;   // "amber" | "sky" | "neutral" | "rose" | "teal" | "orange"
   title: string;
   description: string;
@@ -19,7 +19,7 @@ type Widget = {
 };
 ```
 
-`digestable` defaults to `true` — widgets appear in the digest unless explicitly set to `false`. Currently `notebook`, `ebook`, `tracker`, `chess`, `chat`, `kiwix`, and `anytype` are `false`. The `/digest` page looks up each widget's definition at runtime to apply this filter.
+`digestable` defaults to `true` - widgets appear in the digest unless explicitly set to `false`. Currently `notebook`, `ebook`, `tracker`, `chess`, `chat`, `kiwix`, and `anytype` are `false`. The `/digest` page looks up each widget's definition at runtime to apply this filter.
 
 The `colorMap` in `lib/widgets.ts` maps each color to a set of Tailwind CSS variable classes (`bg`, `border`, `label`, `text`, `fade`, `glow`) that all widget components consume.
 
@@ -27,8 +27,8 @@ The `colorMap` in `lib/widgets.ts` maps each color to a set of Tailwind CSS vari
 
 The grid layout is persisted in two separate storage keys:
 
-- **`widget-layout`** — array of `TabLayoutItem` objects (extends `react-grid-layout`'s `LayoutItem` with an optional `tabs` field), each with `i` (instance ID), `x`, `y`, `w`, `h`, and optionally `tabs`
-- **`widget-instances`** — object mapping instance ID → full `Widget` config
+- **`widget-layout`** - array of `TabLayoutItem` objects (extends `react-grid-layout`'s `LayoutItem` with an optional `tabs` field), each with `i` (instance ID), `x`, `y`, `w`, `h`, and optionally `tabs`
+- **`widget-instances`** - object mapping instance ID → full `Widget` config
 
 These are loaded from the database on hydration and saved on every layout change. The `tabs` array is preserved across drag/resize by merging it back in `onLayoutChange`.
 
@@ -52,6 +52,8 @@ Default sizes per type:
 | reddit | 1 | 3 |
 | youtube | 1 | 3 |
 | f1 | 1 | 2 |
+| weather | 1 | 3 |
+| calendar | 1 | 3 |
 | arxiv | 2 | 3 |
 | hf | 2 | 3 |
 | tracker | 1 | 3 |
@@ -59,6 +61,10 @@ Default sizes per type:
 | chat | 1 | 4 |
 | kiwix | 1 | 4 |
 | anytype | 1 | 4 |
+
+## Community Widgets
+
+Widgets do not have to be React components. A JSON file dropped into `widget-bank/` defines a fetch-and-display widget (type `custom`) that the dashboard renders with the same card chrome, colors, and dark mode as built-ins, with no code execution. See [Widget Bank](../widget-bank.md).
 
 ## Tab Grouping
 
@@ -73,8 +79,8 @@ type TabLayoutItem = LayoutItem & { tabs?: string[] };
 The layout item with ID `i` is the container. `tabs` holds the IDs of additional widgets grouped into it. `activeTabs: Record<string, string>` tracks which tab is currently visible per container (defaults to `i` itself).
 
 **Grouping flow:**
-1. Click the `Layers` icon on any widget — it enters grouping mode (highlighted with a blue border)
-2. Click another widget's "Add as tab" overlay — the source widget is removed from the layout and added to the target's `tabs` array
+1. Click the `Layers` icon on any widget - it enters grouping mode (highlighted with a blue border)
+2. Click another widget's "Add as tab" overlay - the source widget is removed from the layout and added to the target's `tabs` array
 3. Click the same `Layers` icon again to cancel
 
 **Ungrouping:**
@@ -113,4 +119,4 @@ amber: {
 
 The `fade` class is used for scroll fade gradients that blend into the widget background.
 
-The `icon` class is the single source of truth for small action-icon colors (the pencil, history, settings, clear icons in widget headers). It uses each palette's `text` tone, which is the higher-contrast-against-background shade in **both** modes — darker than `label` in light mode, lighter than `label` in dark mode — so icons stay clearly visible on every widget regardless of hue. Change icon contrast here, not in each widget.
+The `icon` class is the single source of truth for small action-icon colors (the pencil, history, settings, clear icons in widget headers). It uses each palette's `text` tone, which is the higher-contrast-against-background shade in **both** modes - darker than `label` in light mode, lighter than `label` in dark mode - so icons stay clearly visible on every widget regardless of hue. Change icon contrast here, not in each widget.

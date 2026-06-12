@@ -31,7 +31,7 @@ const sig = await hmac(secret, payload);
 return `${payload}.${sig}`;
 ```
 
-The Web Crypto API (`crypto.subtle`) is used directly — no third-party JWT or session library.
+The Web Crypto API (`crypto.subtle`) is used directly - no third-party JWT or session library.
 
 ## Cookie Properties
 
@@ -57,6 +57,6 @@ matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.png$).*)"]
 | Variable | Description |
 |---|---|
 | `DASHBOARD_PASSWORD` | The login password |
-| `SESSION_SECRET` | Secret used to sign session tokens — generate with `openssl rand -hex 32` |
+| `SESSION_SECRET` | Secret used to sign session tokens - generate with `openssl rand -hex 32` |
 
 Neither variable has a safe default in production. If `SESSION_SECRET` is not set, the code falls back to `"fallback-secret"`, which is insecure and should never be used in a deployed environment.

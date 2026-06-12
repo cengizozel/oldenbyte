@@ -50,8 +50,8 @@ Each subreddit is assigned a color from a fixed palette (`SUB_COLORS`) cycling t
 
 On load, the saved config is migrated from two older formats:
 
-- `subreddits` was previously `string[]` — migrated to `SubEntry[]` using a top-level `period` field as the default
-- `SubEntry` previously had no `period` — migrated from the top-level `period` field
+- `subreddits` was previously `string[]` - migrated to `SubEntry[]` using a top-level `period` field as the default
+- `SubEntry` previously had no `period` - migrated from the top-level `period` field
 
 ## Scroll Fades
 

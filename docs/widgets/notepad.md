@@ -18,7 +18,7 @@ Notes are only editable when `viewDate === today`. Past dates are read-only.
 
 ## Cross-Instance History (Tabs)
 
-When viewing a past date, the widget queries the global `notepad-registry` to find all notepad instances that have ever existed. It loads each instance's notes for that date and shows numbered tabs — one per instance that had content on that day.
+When viewing a past date, the widget queries the global `notepad-registry` to find all notepad instances that have ever existed. It loads each instance's notes for that date and shows numbered tabs - one per instance that had content on that day.
 
 This means even if a notepad instance was deleted and a new one created, the historical notes from the old instance remain accessible via the tab system when viewing past dates.
 

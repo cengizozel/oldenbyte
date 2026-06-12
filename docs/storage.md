@@ -12,7 +12,7 @@ model Setting {
 }
 ```
 
-This is a flat key-value store. All values are JSON strings. There is no schema enforcement beyond the key being unique — widget components are responsible for serializing and deserializing their own config.
+This is a flat key-value store. All values are JSON strings. There is no schema enforcement beyond the key being unique - widget components are responsible for serializing and deserializing their own config.
 
 ## Client API
 
