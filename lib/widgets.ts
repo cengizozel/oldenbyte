@@ -2,6 +2,16 @@ export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "redd
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
+export type WidgetCategory = "tools" | "feeds" | "knowledge" | "ai";
+
+// Picker display order and labels for template categories.
+export const WIDGET_CATEGORIES: { id: WidgetCategory; label: string }[] = [
+  { id: "feeds",     label: "Feeds" },
+  { id: "tools",     label: "Tools" },
+  { id: "knowledge", label: "Knowledge" },
+  { id: "ai",        label: "AI" },
+];
+
 export type Widget = {
   id: string;
   title: string;
@@ -9,9 +19,10 @@ export type Widget = {
   type: WidgetType;
   color: WidgetColor;
   digestable?: boolean;
+  category?: WidgetCategory;
 };
 
-export const colorMap: Record<WidgetColor, {
+export type ColorClasses = {
   bg: string;
   border: string;
   label: string;
@@ -19,7 +30,9 @@ export const colorMap: Record<WidgetColor, {
   fade: string;
   glow: string;
   icon: string;
-}> = {
+};
+
+export const colorMap: Record<WidgetColor, ColorClasses> = {
   // `icon` is the color for small action icons (pencil, history, settings…),
   // using each palette's `text` tone — the higher-contrast-against-bg shade in
   // both modes. (Firefox doesn't repaint these icons' SVG `currentColor` on a
@@ -37,6 +50,7 @@ export const widgets: Widget[] = [
   {
     id: "notebook",
     type: "notebook",
+    category: "tools",
     color: "amber",
     title: "Notepad",
     description: "A simple place for temporary notes.",
@@ -45,6 +59,7 @@ export const widgets: Widget[] = [
   {
     id: "ebook",
     type: "ebook",
+    category: "tools",
     color: "sky",
     title: "Reader",
     description: "Read a PDF or EPUB file.",
@@ -53,6 +68,7 @@ export const widgets: Widget[] = [
   {
     id: "text",
     type: "text",
+    category: "tools",
     color: "rose",
     title: "Text",
     description: "A word, quote, or live string.",
@@ -60,6 +76,7 @@ export const widgets: Widget[] = [
   {
     id: "rss",
     type: "rss",
+    category: "feeds",
     color: "teal",
     title: "Feed",
     description: "Headlines from any RSS feed.",
@@ -67,6 +84,7 @@ export const widgets: Widget[] = [
   {
     id: "reddit",
     type: "reddit",
+    category: "feeds",
     color: "orange",
     title: "Reddit",
     description: "Top posts from your chosen subreddits.",
@@ -74,6 +92,7 @@ export const widgets: Widget[] = [
   {
     id: "youtube",
     type: "youtube",
+    category: "feeds",
     color: "rose",
     title: "YouTube",
     description: "Latest videos from your chosen channels.",
@@ -81,6 +100,7 @@ export const widgets: Widget[] = [
   {
     id: "f1",
     type: "f1",
+    category: "feeds",
     color: "rose",
     title: "F1",
     description: "Next race and driver standings.",
@@ -88,6 +108,7 @@ export const widgets: Widget[] = [
   {
     id: "arxiv",
     type: "arxiv",
+    category: "feeds",
     color: "sky",
     title: "arXiv",
     description: "Latest papers from a chosen research field.",
@@ -95,6 +116,7 @@ export const widgets: Widget[] = [
   {
     id: "hf",
     type: "hf",
+    category: "feeds",
     color: "orange",
     title: "HF Daily",
     description: "Trending AI papers curated by Hugging Face.",
@@ -102,6 +124,7 @@ export const widgets: Widget[] = [
   {
     id: "tracker",
     type: "tracker",
+    category: "tools",
     color: "teal",
     title: "Tracker",
     description: "Time how long you spend on each activity.",
@@ -110,6 +133,7 @@ export const widgets: Widget[] = [
   {
     id: "chess",
     type: "chess",
+    category: "tools",
     color: "neutral",
     title: "Chess",
     description: "Play an ongoing game against Stockfish.",
@@ -118,6 +142,7 @@ export const widgets: Widget[] = [
   {
     id: "chat",
     type: "chat",
+    category: "ai",
     color: "sky",
     title: "Chat",
     description: "Chat with a local or OpenAI-compatible model.",
@@ -126,6 +151,7 @@ export const widgets: Widget[] = [
   {
     id: "kiwix",
     type: "kiwix",
+    category: "knowledge",
     color: "teal",
     title: "Kiwix",
     description: "Search an offline Kiwix library (Wikipedia, etc.).",
@@ -134,6 +160,7 @@ export const widgets: Widget[] = [
   {
     id: "anytype",
     type: "anytype",
+    category: "knowledge",
     color: "sky",
     title: "Anytype",
     description: "Browse and search your Anytype spaces.",

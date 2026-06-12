@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import * as storage from "@/lib/storage";
-import { RotateCcw, GripVertical, Download, Upload, Layers } from "lucide-react";
+import { Layers } from "lucide-react";
 import GridLayout from "react-grid-layout";
 import type { Layout as LayoutItem } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -10,6 +10,7 @@ import "react-resizable/css/styles.css";
 import type { Widget } from "@/lib/widgets";
 import { colorMap, widgets as widgetDefs } from "@/lib/widgets";
 import WidgetCard from "./WidgetCard";
+import WidgetShelf from "./WidgetShelf";
 import NotebookWidget from "./NotepadWidget";
 import TextWidget from "./TextWidget";
 import RssWidget from "./RssWidget";
@@ -121,49 +122,6 @@ export default function WidgetGrid({
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
-  // Draggable shelf
-  const shelfRef = useRef<HTMLDivElement>(null);
-  const [shelfPos, setShelfPos] = useState<{ x: number; y: number } | null>(null);
-  const isDragging = useRef(false);
-  const dragOffset = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    function onMove(e: MouseEvent) {
-      if (!isDragging.current || !shelfRef.current) return;
-      setShelfPos({
-        x: Math.max(0, Math.min(window.innerWidth  - shelfRef.current.offsetWidth,  e.clientX - dragOffset.current.x)),
-        y: Math.max(0, Math.min(window.innerHeight - shelfRef.current.offsetHeight, e.clientY - dragOffset.current.y)),
-      });
-    }
-    function onTouchMove(e: TouchEvent) {
-      if (!isDragging.current || !shelfRef.current) return;
-      const t = e.touches[0];
-      setShelfPos({
-        x: Math.max(0, Math.min(window.innerWidth  - shelfRef.current.offsetWidth,  t.clientX - dragOffset.current.x)),
-        y: Math.max(0, Math.min(window.innerHeight - shelfRef.current.offsetHeight, t.clientY - dragOffset.current.y)),
-      });
-      e.preventDefault();
-    }
-    function onUp() { isDragging.current = false; }
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-    document.addEventListener("touchmove", onTouchMove, { passive: false });
-    document.addEventListener("touchend", onUp);
-    return () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      document.removeEventListener("touchmove", onTouchMove);
-      document.removeEventListener("touchend", onUp);
-    };
-  }, []);
-
-  function startShelfDrag(clientX: number, clientY: number, currentTarget: HTMLDivElement) {
-    const rect = currentTarget.getBoundingClientRect();
-    dragOffset.current = { x: clientX - rect.left, y: clientY - rect.top };
-    if (shelfPos === null) setShelfPos({ x: rect.left, y: rect.top });
-    isDragging.current = true;
-  }
-
   useEffect(() => {
     if (!containerRef.current) return;
     const ro = new ResizeObserver(([entry]) => {
@@ -202,6 +160,15 @@ export default function WidgetGrid({
 
   const isMobile = size.width > 0 && size.width < 600;
 
+  // View-mode layout band: full 4-col grid that fits the viewport, a scrolling
+  // 2-col reflow for narrow windows, and a stacked list on phones.
+  const viewMode: "stack" | "two" | "full" =
+    size.width === 0 ? "full" : size.width < 600 ? "stack" : size.width < 900 ? "two" : "full";
+
+  // Whether the grid should fill the viewport height (no page scroll) vs.
+  // grow with content and let the page scroll.
+  const fillViewport = editing ? !isMobile : viewMode === "full";
+
   const numRows = Math.max(...layout.map(l => l.y + l.h), 1);
   const rowHeight = size.height > 0
     ? Math.floor((size.height - (numRows - 1) * GAP) / numRows)
@@ -228,10 +195,7 @@ export default function WidgetGrid({
     URL.revokeObjectURL(url);
   }
 
-  const importRef = useRef<HTMLInputElement>(null);
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function handleImport(file: File) {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
@@ -242,7 +206,6 @@ export default function WidgetGrid({
       });
       window.location.reload();
     } catch {}
-    e.target.value = "";
   }
 
   function removeWidget(instanceId: string) {
@@ -458,72 +421,25 @@ export default function WidgetGrid({
     <>
     {/* Fixed shelf — outside the flex column so it never shifts children indices */}
     {editing && (
-      <div
-        ref={shelfRef}
-        onMouseDown={e => {
-          if ((e.target as HTMLElement).closest("button,[draggable]")) return;
-          e.preventDefault();
-          startShelfDrag(e.clientX, e.clientY, e.currentTarget);
+      <WidgetShelf
+        templates={widgets}
+        onAdd={addWidget}
+        onTemplateDragStart={template => {
+          const id = `${template.id}-${Date.now()}`;
+          setInstances(prev => ({ ...prev, [id]: { ...template, id } }));
+          setDroppingId(id);
         }}
-        onTouchStart={e => {
-          if ((e.target as HTMLElement).closest("button,[draggable]")) return;
-          startShelfDrag(e.touches[0].clientX, e.touches[0].clientY, e.currentTarget);
-        }}
-        className={`fixed z-50 flex items-center gap-2 bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-2xl shadow-lg px-3 py-2.5 select-none cursor-grab active:cursor-grabbing ${shelfPos === null ? "bottom-6 left-1/2 -translate-x-1/2" : ""}`}
-        style={shelfPos !== null ? { left: shelfPos.x, top: shelfPos.y } : undefined}
-      >
-        <GripVertical size={14} className="text-neutral-300 shrink-0 cursor-grab" />
-        <div className="w-px h-4 bg-neutral-200 mx-0.5" />
-        {widgets.map(template => {
-          const c = colorMap[template.color];
-          return (
-            <div
-              key={template.id}
-              draggable
-              onDragStart={() => {
-                const id = `${template.id}-${Date.now()}`;
-                setInstances(prev => ({ ...prev, [id]: { ...template, id } }));
-                setDroppingId(id);
-              }}
-              onDragEnd={() => setDroppingId(null)}
-              onClick={() => addWidget(template)}
-              className={`flex flex-col gap-0.5 px-3 py-2 rounded-xl border cursor-grab select-none ${c.bg} ${c.border}`}
-            >
-              <span className={`text-xs font-semibold ${c.label}`}>{template.title}</span>
-            </div>
-          );
-        })}
-        <div className="w-px h-4 bg-neutral-200 mx-1" />
-        <button
-          onClick={handleExport}
-          className="p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-          title="Export backup"
-        >
-          <Download size={13} />
-        </button>
-        <button
-          onClick={() => importRef.current?.click()}
-          className="p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-          title="Import backup"
-        >
-          <Upload size={13} />
-        </button>
-        <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
-        <div className="w-px h-4 bg-neutral-200 mx-1" />
-        <button
-          onClick={reset}
-          className="p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-          title="Reset layout"
-        >
-          <RotateCcw size={13} />
-        </button>
-      </div>
+        onTemplateDragEnd={() => setDroppingId(null)}
+        onExport={handleExport}
+        onImportFile={handleImport}
+        onReset={reset}
+      />
     )}
 
-    <div className={`flex flex-col gap-2 ${isMobile ? "" : "flex-1 min-h-0"}`}>
+    <div className={`flex flex-col gap-2 ${fillViewport ? "flex-1 min-h-0" : ""}`}>
 
       {/* Grid */}
-      <div ref={containerRef} className={`relative ${isMobile ? "" : "flex-1 min-h-0"} ${editing && !gridReady ? "[&_.react-grid-item]:!transition-none" : ""}`}>
+      <div ref={containerRef} className={`relative ${fillViewport ? "flex-1 min-h-0" : ""} ${editing && !gridReady ? "[&_.react-grid-item]:!transition-none" : ""}`}>
         {editing && size.width > 0 && (
           <div
             className="absolute inset-0 pointer-events-none z-0"
@@ -689,7 +605,7 @@ export default function WidgetGrid({
               })}
             </GridLayout>
           )
-        ) : isMobile ? (
+        ) : viewMode === "stack" ? (
           <div className="flex flex-col gap-4 pb-4">
             {[...layout]
               .sort((a, b) => a.y === b.y ? a.x - b.x : a.y - b.y)
@@ -703,12 +619,43 @@ export default function WidgetGrid({
                 );
               })}
           </div>
+        ) : viewMode === "two" ? (
+          <div
+            className="grid gap-4 pb-4"
+            style={{
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gridAutoRows: "120px",
+              gridAutoFlow: "row dense",
+            }}
+          >
+            {[...layout]
+              .sort((a, b) => a.y === b.y ? a.x - b.x : a.y - b.y)
+              .map((item) => {
+                const widget = instances[item.i];
+                if (!widget) return null;
+                return (
+                  <div
+                    key={item.i}
+                    className="min-h-0 min-w-0"
+                    style={{
+                      gridColumn: `span ${Math.min(item.w, 2)}`,
+                      gridRow: `span ${item.h}`,
+                    }}
+                  >
+                    {renderWithTabs(item, false)}
+                  </div>
+                );
+              })}
+          </div>
         ) : (
           <div
             className="h-full grid gap-4"
             style={{
-              gridTemplateColumns: `repeat(${COLS}, 1fr)`,
-              gridTemplateRows: `repeat(${numRows}, 1fr)`,
+              // minmax(0, 1fr) keeps every track the same width even when a
+              // widget's content is intrinsically wide; paired with min-w-0 on
+              // cells so no widget can stop shrinking and squeeze the others.
+              gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${numRows}, minmax(0, 1fr))`,
             }}
           >
             {layout.map((item) => {
@@ -717,7 +664,7 @@ export default function WidgetGrid({
               return (
                 <div
                   key={item.i}
-                  className="min-h-0"
+                  className="min-h-0 min-w-0"
                   style={{
                     gridColumn: `${item.x + 1} / span ${item.w}`,
                     gridRow: `${item.y + 1} / span ${item.h}`,
