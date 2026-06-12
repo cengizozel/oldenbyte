@@ -8,6 +8,7 @@
 // thing users want to ask about.
 
 import * as storage from "@/lib/storage";
+import { getActiveDataKeys } from "@/lib/dashboards";
 
 type TabLayoutItem = { i: string; tabs?: string[] };
 type WidgetInstance = { id: string; type: string; title: string };
@@ -299,9 +300,10 @@ export type DashboardContext = { text: string; chars: number; sections: number }
  * Returns empty text when nothing is configured.
  */
 export async function gatherDashboardContext(): Promise<DashboardContext> {
+  const keys = await getActiveDataKeys();
   const [layout, instances] = await Promise.all([
-    readJSON<TabLayoutItem[]>("widget-layout"),
-    readJSON<Record<string, WidgetInstance>>("widget-instances"),
+    readJSON<TabLayoutItem[]>(keys.layout),
+    readJSON<Record<string, WidgetInstance>>(keys.instances),
   ]);
 
   const blocks: string[] = [];

@@ -9,6 +9,7 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import type { Widget } from "@/lib/widgets";
 import { colorMap, widgets as widgetDefs } from "@/lib/widgets";
+import { layoutKey, instancesKey } from "@/lib/dashboards";
 import WidgetCard from "./WidgetCard";
 import WidgetShelf from "./WidgetShelf";
 import NotebookWidget from "./NotepadWidget";
@@ -77,11 +78,15 @@ export default function WidgetGrid({
   widgets,
   editing = false,
   onToggleEdit,
+  dashboardId = "default",
 }: {
   widgets: Widget[];
   editing?: boolean;
   onToggleEdit?: () => void;
+  dashboardId?: string;
 }) {
+  const LAYOUT_KEY = layoutKey(dashboardId);
+  const INSTANCES_KEY = instancesKey(dashboardId);
 
   const [layout, setLayout] = useState<TabLayoutItem[]>(initialLayout);
   const [instances, setInstances] = useState<Record<string, Widget>>(initialInstances);
@@ -93,8 +98,8 @@ export default function WidgetGrid({
   // Load persisted layout from DB after hydration
   useEffect(() => {
     Promise.all([
-      storage.getItem("widget-layout"),
-      storage.getItem("widget-instances"),
+      storage.getItem(LAYOUT_KEY),
+      storage.getItem(INSTANCES_KEY),
     ]).then(([savedLayout, savedInstances]) => {
       try {
         if (savedInstances) {
@@ -136,12 +141,12 @@ export default function WidgetGrid({
 
   useEffect(() => {
     if (!loaded) return;
-    storage.setItem("widget-layout", JSON.stringify(layout));
+    storage.setItem(LAYOUT_KEY, JSON.stringify(layout));
   }, [layout, loaded]);
 
   useEffect(() => {
     if (!loaded) return;
-    storage.setItem("widget-instances", JSON.stringify(instances));
+    storage.setItem(INSTANCES_KEY, JSON.stringify(instances));
   }, [instances, loaded]);
 
   // Cancel grouping mode when edit mode is turned off
@@ -179,8 +184,8 @@ export default function WidgetGrid({
     setInstances(initialInstances);
     setActiveTabs({});
     setGroupingSource(null);
-    storage.removeItem("widget-layout");
-    storage.removeItem("widget-instances");
+    storage.removeItem(LAYOUT_KEY);
+    storage.removeItem(INSTANCES_KEY);
   }
 
   async function handleExport() {

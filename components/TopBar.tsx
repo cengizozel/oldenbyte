@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings } from "lucide-react";
+import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, Plus, Pencil } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { isDark, toggleTheme, THEME_EVENT } from "@/lib/theme";
+import { layoutKey, instancesKey, type DashboardsState } from "@/lib/dashboards";
 
 // ── EditableField ─────────────────────────────────────────────────────────
 
@@ -415,14 +416,141 @@ function SettingsPanel({
   );
 }
 
+// ── DashboardSwitcher ──────────────────────────────────────────────────────
+
+function DashboardSwitcher({
+  dashboards,
+  onChange,
+}: {
+  dashboards: DashboardsState;
+  onChange: (next: DashboardsState) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const active = dashboards.list.find(d => d.id === dashboards.activeId) ?? dashboards.list[0];
+
+  function addDashboard() {
+    const id = `dash-${Date.now()}`;
+    // Seed empty layout so the new dashboard starts blank instead of falling
+    // back to the default starter widgets.
+    storage.setItem(layoutKey(id), "[]");
+    storage.setItem(instancesKey(id), "{}");
+    onChange({
+      list: [...dashboards.list, { id, name: `Dashboard ${dashboards.list.length + 1}` }],
+      activeId: id,
+    });
+    setOpen(false);
+  }
+
+  function removeDashboard(id: string) {
+    if (dashboards.list.length <= 1) return;
+    storage.removeItem(layoutKey(id));
+    storage.removeItem(instancesKey(id));
+    const list = dashboards.list.filter(d => d.id !== id);
+    onChange({ list, activeId: dashboards.activeId === id ? list[0].id : dashboards.activeId });
+  }
+
+  function commitRename(id: string) {
+    const name = draft.trim();
+    if (name) onChange({ ...dashboards, list: dashboards.list.map(d => (d.id === id ? { ...d, name } : d)) });
+    setRenamingId(null);
+  }
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-[family-name:var(--font-dm-mono)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+        title="Switch dashboard"
+      >
+        {active.name}
+        <ChevronDown size={10} />
+      </button>
+      {open && (
+        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 w-48 bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-xl shadow-lg p-1">
+          {dashboards.list.map(d => (
+            <div key={d.id} className="group/dash flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5">
+              {renamingId === d.id ? (
+                <input
+                  value={draft}
+                  autoFocus
+                  onChange={e => setDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") commitRename(d.id);
+                    if (e.key === "Escape") setRenamingId(null);
+                  }}
+                  onBlur={() => commitRename(d.id)}
+                  className="flex-1 min-w-0 text-xs px-2 py-1.5 bg-transparent outline-none text-[var(--text-primary)]"
+                />
+              ) : (
+                <button
+                  onClick={() => { onChange({ ...dashboards, activeId: d.id }); setOpen(false); }}
+                  className={`flex-1 min-w-0 truncate text-left text-xs px-2 py-1.5 ${
+                    d.id === dashboards.activeId
+                      ? "text-[var(--text-primary)] font-medium"
+                      : "text-[var(--text-secondary)]"
+                  }`}
+                >
+                  {d.name}
+                </button>
+              )}
+              <button
+                onClick={() => { setRenamingId(d.id); setDraft(d.name); }}
+                className="opacity-0 group-hover/dash:opacity-60 hover:!opacity-100 text-[var(--text-secondary)] shrink-0"
+                title="Rename"
+              >
+                <Pencil size={11} />
+              </button>
+              {dashboards.list.length > 1 && (
+                <button
+                  onClick={() => removeDashboard(d.id)}
+                  className="opacity-0 group-hover/dash:opacity-60 hover:!opacity-100 text-[var(--text-secondary)] shrink-0 mr-1.5"
+                  title="Delete dashboard"
+                >
+                  <X size={11} />
+                </button>
+              )}
+            </div>
+          ))}
+          <div className="border-t border-[var(--surface-border)] mt-1 pt-1">
+            <button
+              onClick={addDashboard}
+              className="w-full flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5"
+            >
+              <Plus size={11} />
+              New dashboard
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── TopBar ─────────────────────────────────────────────────────────────────
 
 export default function TopBar({
   editing = false,
   onToggleEdit,
+  dashboards,
+  onDashboardsChange,
 }: {
   editing?: boolean;
   onToggleEdit?: () => void;
+  dashboards?: DashboardsState | null;
+  onDashboardsChange?: (next: DashboardsState) => void;
 }) {
   const [dark, setDark] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -461,6 +589,9 @@ export default function TopBar({
       <div className="flex flex-col items-center justify-center gap-1.5">
         <DateDisplay />
         <div className="flex items-center gap-3">
+          {dashboards && onDashboardsChange && (
+            <DashboardSwitcher dashboards={dashboards} onChange={onDashboardsChange} />
+          )}
           <a
             href="/digest"
             className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
