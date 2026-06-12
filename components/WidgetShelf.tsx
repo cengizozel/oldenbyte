@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { GripVertical, Download, Upload, RotateCcw, Search } from "lucide-react";
+import { GripVertical, Download, Upload, RotateCcw, Search, Undo2, Redo2, Trash2 } from "lucide-react";
 import type { Widget } from "@/lib/widgets";
 import { colorMap, WIDGET_CATEGORIES } from "@/lib/widgets";
 
@@ -17,6 +17,11 @@ export default function WidgetShelf({
   onExport,
   onImportFile,
   onReset,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
+  onWipe,
 }: {
   templates: Widget[];
   bankTemplates?: Widget[];
@@ -26,6 +31,11 @@ export default function WidgetShelf({
   onExport: () => void;
   onImportFile: (file: File) => void;
   onReset: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onWipe?: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -142,6 +152,23 @@ export default function WidgetShelf({
       {/* Actions */}
       <div className="flex items-center justify-end gap-1 px-3 py-1.5 border-t border-[var(--surface-border)]">
         <button
+          onClick={onUndo}
+          disabled={!canUndo}
+          className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-25"
+          title="Undo layout change"
+        >
+          <Undo2 size={13} />
+        </button>
+        <button
+          onClick={onRedo}
+          disabled={!canRedo}
+          className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-25"
+          title="Redo layout change"
+        >
+          <Redo2 size={13} />
+        </button>
+        <div className="w-px h-4 bg-[var(--surface-border)] mx-0.5" />
+        <button
           onClick={onExport}
           className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           title="Export backup"
@@ -167,9 +194,16 @@ export default function WidgetShelf({
           }}
         />
         <button
+          onClick={onWipe}
+          className="p-2 rounded-xl text-[var(--text-muted)] hover:text-red-500 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          title="Clear the dashboard (undoable)"
+        >
+          <Trash2 size={13} />
+        </button>
+        <button
           onClick={onReset}
           className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-          title="Reset layout"
+          title="Reset to the default layout (undoable)"
         >
           <RotateCcw size={13} />
         </button>

@@ -558,11 +558,13 @@ function DashboardSwitcher({
 export default function TopBar({
   editing = false,
   onToggleEdit,
+  onCancelEdit,
   dashboards,
   onDashboardsChange,
 }: {
   editing?: boolean;
   onToggleEdit?: () => void;
+  onCancelEdit?: () => void;
   dashboards?: DashboardsState | null;
   onDashboardsChange?: (next: DashboardsState) => void;
 }) {
@@ -605,6 +607,15 @@ export default function TopBar({
         <div className="flex items-center gap-3">
           {dashboards && onDashboardsChange && (
             <DashboardSwitcher dashboards={dashboards} onChange={onDashboardsChange} />
+          )}
+          {editing && onCancelEdit && (
+            <button
+              onClick={onCancelEdit}
+              className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              title="Cancel layout changes"
+            >
+              <X size={14} />
+            </button>
           )}
           <button
             onClick={onToggleEdit}

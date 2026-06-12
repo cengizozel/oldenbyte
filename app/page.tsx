@@ -1,17 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import TopBar from "@/components/TopBar";
 import WidgetGrid from "@/components/WidgetGrid";
 import { widgets } from "@/lib/widgets";
 import { getDashboards, saveDashboards, type DashboardsState } from "@/lib/dashboards";
+import { maybeSeedFirstRun } from "@/lib/seed";
 
 export default function Home() {
   const [editing, setEditing] = useState(false);
   const [dashboards, setDashboards] = useState<DashboardsState | null>(null);
+  const editControls = useRef<{ cancel: () => void } | null>(null);
 
   useEffect(() => {
-    getDashboards().then(setDashboards);
+    // A true first run gets the seeded demo dashboards; everyone else loads
+    // whatever they already have.
+    maybeSeedFirstRun()
+      .then(seeded => (seeded ? setDashboards(seeded) : getDashboards().then(setDashboards)))
+      .catch(() => getDashboards().then(setDashboards));
   }, []);
 
   function handleDashboardsChange(next: DashboardsState) {
@@ -24,6 +30,7 @@ export default function Home() {
       <TopBar
         editing={editing}
         onToggleEdit={() => setEditing(e => !e)}
+        onCancelEdit={() => { editControls.current?.cancel(); setEditing(false); }}
         dashboards={dashboards}
         onDashboardsChange={handleDashboardsChange}
       />
@@ -34,6 +41,7 @@ export default function Home() {
           widgets={widgets}
           editing={editing}
           onToggleEdit={() => setEditing(e => !e)}
+          onRegisterEditControls={c => { editControls.current = c; }}
         />
       )}
     </div>

@@ -85,11 +85,14 @@ export default function WidgetGrid({
   widgets,
   editing = false,
   onToggleEdit,
+  onRegisterEditControls,
   dashboardId = "default",
 }: {
   widgets: Widget[];
   editing?: boolean;
   onToggleEdit?: () => void;
+  // Lets the TopBar cancel an edit session (revert to the pre-edit layout).
+  onRegisterEditControls?: (controls: { cancel: () => void }) => void;
   dashboardId?: string;
 }) {
   const LAYOUT_KEY = layoutKey(dashboardId);
@@ -131,6 +134,82 @@ export default function WidgetGrid({
   const [gridReady, setGridReady] = useState(false);
   const [groupingSource, setGroupingSource] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
+
+  // ── Edit-session history (undo/redo) and cancel-revert ────────────────────
+  type Snap = { layout: TabLayoutItem[]; instances: Record<string, Widget>; activeTabs: Record<string, string> };
+  const historyRef = useRef<{ past: Snap[]; future: Snap[] }>({ past: [], future: [] });
+  const editStartRef = useRef<Snap | null>(null);
+  const [histVersion, setHistVersion] = useState(0);
+  const layoutRef = useRef(layout);
+  const instancesRef = useRef(instances);
+  const activeTabsRef = useRef(activeTabs);
+  useEffect(() => { layoutRef.current = layout; }, [layout]);
+  useEffect(() => { instancesRef.current = instances; }, [instances]);
+  useEffect(() => { activeTabsRef.current = activeTabs; }, [activeTabs]);
+
+  const takeSnap = (): Snap => structuredClone({
+    layout: layoutRef.current,
+    instances: instancesRef.current,
+    activeTabs: activeTabsRef.current,
+  });
+
+  function pushHistory() {
+    historyRef.current.past.push(takeSnap());
+    if (historyRef.current.past.length > 50) historyRef.current.past.shift();
+    historyRef.current.future = [];
+    setHistVersion(v => v + 1);
+  }
+
+  function applySnap(snap: Snap) {
+    setLayout(snap.layout);
+    setInstances(snap.instances);
+    setActiveTabs(snap.activeTabs);
+  }
+
+  function undo() {
+    const h = historyRef.current;
+    if (!h.past.length) return;
+    h.future.push(takeSnap());
+    applySnap(h.past.pop()!);
+    setHistVersion(v => v + 1);
+  }
+
+  function redo() {
+    const h = historyRef.current;
+    if (!h.future.length) return;
+    h.past.push(takeSnap());
+    applySnap(h.future.pop()!);
+    setHistVersion(v => v + 1);
+  }
+
+  // Wipe the dashboard empty (undoable, like everything else in the session).
+  function wipe() {
+    pushHistory();
+    setLayout([]);
+    setInstances({});
+    setActiveTabs({});
+    setGroupingSource(null);
+  }
+
+  // Entering edit mode records the revert point and clears the session history.
+  useEffect(() => {
+    if (editing) {
+      editStartRef.current = takeSnap();
+      historyRef.current = { past: [], future: [] };
+      setHistVersion(v => v + 1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  useEffect(() => {
+    onRegisterEditControls?.({
+      cancel: () => {
+        if (editStartRef.current) applySnap(editStartRef.current);
+        historyRef.current = { past: [], future: [] };
+      },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onRegisterEditControls]);
 
   // Load persisted layout from DB after hydration
   useEffect(() => {
@@ -217,6 +296,7 @@ export default function WidgetGrid({
     : 200;
 
   function reset() {
+    pushHistory();
     setLayout(initialLayout);
     setInstances(initialInstances);
     setActiveTabs({});
@@ -251,6 +331,7 @@ export default function WidgetGrid({
   }
 
   function removeWidget(instanceId: string) {
+    pushHistory();
     const item = layout.find(l => l.i === instanceId) as TabLayoutItem | undefined;
     const tabsToRemove = item?.tabs ?? [];
     setLayout(l => l.filter(li => li.i !== instanceId));
@@ -339,6 +420,7 @@ export default function WidgetGrid({
   }
 
   function addWidget(template: Widget, instanceId?: string) {
+    pushHistory();
     const id = instanceId ?? `${template.id}-${Date.now()}`;
     const { w: dw, h: dh } = template.type === "custom"
       ? (template.bankId ? bankDefs[template.bankId]?.defaultSize : undefined) ?? { w: 1, h: 3 }
@@ -371,6 +453,7 @@ export default function WidgetGrid({
       return;
     }
     const sourceId = groupingSource;
+    pushHistory();
     setLayout(prev => {
       // If the source is itself a tab group, carry its tabs into the target
       // instead of dropping them (the source cell is removed below).
@@ -393,6 +476,7 @@ export default function WidgetGrid({
   }
 
   function handleUngroupTab(containerId: string, tabId: string) {
+    pushHistory();
     setLayout(prev => {
       const updated = prev.map(item =>
         item.i === containerId
@@ -474,6 +558,11 @@ export default function WidgetGrid({
         templates={widgets}
         bankTemplates={bankTemplates}
         onAdd={addWidget}
+        onUndo={undo}
+        onRedo={redo}
+        canUndo={historyRef.current.past.length > 0 && histVersion >= 0}
+        canRedo={historyRef.current.future.length > 0}
+        onWipe={wipe}
         onTemplateDragStart={template => {
           const id = `${template.id}-${Date.now()}`;
           setInstances(prev => ({ ...prev, [id]: { ...template, id } }));
@@ -529,9 +618,12 @@ export default function WidgetGrid({
               isDraggable
               isResizable
               isDroppable
+              onDragStart={() => pushHistory()}
+              onResizeStart={() => pushHistory()}
               droppingItem={droppingId ? { i: droppingId, w: 1, h: 1 } : undefined}
               onDrop={(newLayout) => {
                 if (!droppingId) return;
+                pushHistory();
                 setLayout(newLayout.map(l =>
                   l.i === droppingId
                     ? { ...l, minW: 1, minH: 1, maxW: 4, maxH: 6 }
