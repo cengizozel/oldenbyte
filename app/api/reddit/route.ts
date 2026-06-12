@@ -26,10 +26,14 @@ export async function GET(request: NextRequest) {
   if (!subreddit) return NextResponse.json({ error: "Missing subreddit" }, { status: 400 });
 
   try {
-    const res = await fetch(
-      `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/top.rss?t=${encodeURIComponent(period)}&limit=${limit}`,
-      { headers: { "User-Agent": UA }, signal: request.signal, next: { revalidate: 900 } }
-    );
+    const url = `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/top.rss?t=${encodeURIComponent(period)}&limit=${limit}`;
+    const opts = { headers: { "User-Agent": UA }, signal: request.signal, next: { revalidate: 900 } };
+    let res = await fetch(url, opts);
+    if (res.status === 429) {
+      // Rate-limited burst; one spaced retry usually clears it.
+      await new Promise(r => setTimeout(r, 1500));
+      res = await fetch(url, opts);
+    }
     if (!res.ok) throw new Error(`Reddit ${res.status}`);
 
     const xml = await res.text();

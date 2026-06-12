@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, Loader, Plug } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { isDemoMode } from "@/lib/demo";
 import { formatDate } from "@/lib/format";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
@@ -25,6 +26,20 @@ type CalendarConfig = {
 };
 
 const DEFAULT: CalendarConfig = { baseUrl: "", username: "", password: "", calendars: [], days: 7 };
+
+// Demo mode seeds a fake "demo" account (lib/demo.ts) since the sandbox can't
+// reach a real CalDAV server; answer it with a believable agenda instead.
+function demoEvents(): CalEvent[] {
+  const day = (n: number) => localDate(new Date(Date.now() + n * 86400000));
+  return [
+    { uid: "demo-1", calendar: "Personal", title: "Gym", start: `${day(0)}T18:30`, end: `${day(0)}T19:30`, allDay: false },
+    { uid: "demo-2", calendar: "Personal", title: "Dentist", start: `${day(1)}T09:00`, end: `${day(1)}T09:30`, allDay: false, location: "Smile Clinic" },
+    { uid: "demo-3", calendar: "Work", title: "Sprint planning", start: `${day(1)}T13:00`, end: `${day(1)}T14:00`, allDay: false },
+    { uid: "demo-4", calendar: "Personal", title: "Rent due", start: day(2), end: day(2), allDay: true },
+    { uid: "demo-5", calendar: "Work", title: "Design review", start: `${day(3)}T11:00`, end: `${day(3)}T11:45`, allDay: false },
+    { uid: "demo-6", calendar: "Personal", title: "Dinner with Deniz", start: `${day(4)}T19:30`, end: `${day(4)}T21:00`, allDay: false, location: "Karakoy" },
+  ];
+}
 
 function localDate(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
@@ -64,6 +79,10 @@ export default function CalendarWidget({
 
   const fetchEvents = useCallback(async (cfg: CalendarConfig) => {
     if (!configured(cfg)) return;
+    if (isDemoMode() && cfg.baseUrl === "demo") {
+      setEvents(demoEvents());
+      return;
+    }
     setLoading(true);
     setError("");
     try {

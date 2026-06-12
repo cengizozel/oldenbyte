@@ -110,12 +110,20 @@ export default function RedditWidget({
     setError("");
     try {
       const results = await Promise.all(
-        cfg.subreddits.map(async sub => {
-          const params = new URLSearchParams({ subreddit: sub.name, period: sub.period, limit: String(sub.limit) });
-          const res = await fetch(`/api/reddit?${params}`);
-          if (!res.ok) throw new Error();
-          const items: Post[] = await res.json();
-          return items;
+        cfg.subreddits.map(async (sub, i) => {
+          // Stagger the volley: Reddit rate-limits unauthenticated RSS hard,
+          // and N feeds fired at once trip it.
+          if (i) await new Promise(r => setTimeout(r, i * 400));
+          try {
+            const params = new URLSearchParams({ subreddit: sub.name, period: sub.period, limit: String(sub.limit) });
+            const res = await fetch(`/api/reddit?${params}`);
+            if (!res.ok) throw new Error();
+            const items: Post[] = await res.json();
+            return items;
+          } catch {
+            // One bad feed must not blank the others.
+            return [] as Post[];
+          }
         })
       );
       const all: Post[] = results.flat();

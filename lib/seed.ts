@@ -33,6 +33,9 @@ export function buildSeed(): Record<string, unknown> {
   const d2 = dayOffset(-2);
   const d3 = dayOffset(-3);
   const d4 = dayOffset(-4);
+  const now = Date.now();
+  const H = 3600000;
+  const M = 60000;
 
   return {
     // ── Home dashboard: a clean 4x2 grid of equal cells ─────────────────────
@@ -84,15 +87,15 @@ export function buildSeed(): Record<string, unknown> {
     "notepad-registry": ["notebook-home", "notebook-research"],
     "notebook-notebook-home-name": "Daily notes",
     "notebook-notebook-home-dates": {
-      [today]: "groceries after work: coffee beans, olive oil, lemons<div>call the bike shop about the rear brake</div>",
-      [d1]: "really good walk in the evening, should make that a habit<div>the balcony plants need bigger pots</div>",
-      [d3]: "weekend plan: try the new bakery, finish the bookshelf, backup the NAS",
+      [today]: "groceries after work: <b>coffee beans</b>, olive oil, lemons<div>call the bike shop about the <u>rear brake</u></div>",
+      [d1]: "really good walk in the evening, <i>should make that a habit</i><div>the balcony plants need bigger pots</div>",
+      [d3]: "weekend plan:<ul><li>try the new bakery</li><li>finish the bookshelf</li><li><b>backup the NAS</b></li></ul>",
     },
     "notebook-notebook-research-name": "Research notes",
     "notebook-notebook-research-dates": {
-      [today]: "reading about retrieval-augmented agents, the tool-use evals look weak<div>idea: compare embedding models on my own notes</div>",
-      [d2]: "watched the new 3blue1brown video, the attention visualization is the clearest I have seen<div>queued two papers from HF daily</div>",
-      [d4]: "set up a folder for papers to re-read monthly",
+      [today]: "reading about <b>retrieval-augmented agents</b>, the tool-use evals look weak<div><i>idea: compare embedding models on my own notes</i></div>",
+      [d2]: "watched the new 3blue1brown video, the attention visualization is <u>the clearest I have seen</u><div>queued two papers from HF daily</div>",
+      [d4]: "to re-read monthly:<ul><li>attention is all you need</li><li>lost in the middle</li></ul>",
     },
 
     "tracker-config-tracker-home": {
@@ -118,6 +121,40 @@ export function buildSeed(): Record<string, unknown> {
       subreddits: [
         { name: "selfhosted", limit: 5, period: "week" },
         { name: "programming", limit: 5, period: "week" },
+        { name: "technology", limit: 5, period: "week" },
+        { name: "MachineLearning", limit: 5, period: "week" },
+        { name: "dataisbeautiful", limit: 5, period: "week" },
+        { name: "todayilearned", limit: 5, period: "week" },
+      ],
+    },
+    "chat-widget-chat-home": {
+      config: { sourcesVersion: 2 },
+      activeId: "seed-chat-2",
+      conversations: [
+        {
+          id: "seed-chat-1",
+          title: "Sourdough troubleshooting",
+          renamed: true,
+          updatedAt: now - 25 * H,
+          messages: [
+            { role: "user", at: now - 26 * H, content: "my first sourdough came out dense and the crumb is tight at the bottom, what went wrong?" },
+            { role: "assistant", at: now - 26 * H + 1 * M, content: "Dense with a tight bottom crumb usually points to underproofing. Two checks: did the dough roughly double during bulk fermentation, and did it pass the poke test before shaping? A young starter can also lack strength. Try extending bulk by an hour and adding one more fold." },
+            { role: "user", at: now - 25 * H, content: "starter is two weeks old, doubles in about 5 hours" },
+            { role: "assistant", at: now - 25 * H + 1 * M, content: "That is on the slower side but workable. Feed it twice a day for a few days and bake once it doubles in 3 to 4 hours. For the next loaf, push bulk longer and shape only when the dough feels airy throughout, not just on top." },
+          ],
+        },
+        {
+          id: "seed-chat-2",
+          title: "Lisbon long weekend",
+          renamed: true,
+          updatedAt: now - 2 * H,
+          messages: [
+            { role: "user", at: now - 3 * H, content: "thinking about a long weekend in lisbon in early july, worth it?" },
+            { role: "assistant", at: now - 3 * H + 1 * M, content: "Definitely. Early July is warm but not peak August heat. Three days covers a lot: Alfama and the castle one day, Belem and the MAAT another, and a day trip to Sintra if you start early.", memory: ["Planning a long weekend in Lisbon in early July"] },
+            { role: "user", at: now - 2 * H, content: "how do i get around, is the metro enough?" },
+            { role: "assistant", at: now - 2 * H + 1 * M, content: "Metro plus walking covers the center, and tram 28 is worth one ride even if it is touristy. Get a Viva Viagem card and load it with zapping credit, it works on the metro, trams, buses and the Sintra train." },
+          ],
+        },
       ],
     },
     "text-widget-text-home": { source: { type: "text", value: "make something small every day" }, font: "serif" },
@@ -127,8 +164,11 @@ export function buildSeed(): Record<string, unknown> {
     "hf-widget-hf-research": { limit: 25 },
     "youtube-widget-youtube-research": {
       channels: [
-        { channelId: "UCYO_jab_esuFRV4b17AJtAw", name: "3Blue1Brown", limit: 5 },
-        { channelId: "UCbfYPyITQ-7l4upoX8nvctg", name: "Two Minute Papers", limit: 5 },
+        { channelId: "UCYO_jab_esuFRV4b17AJtAw", name: "3Blue1Brown", limit: 3 },
+        { channelId: "UCbfYPyITQ-7l4upoX8nvctg", name: "Two Minute Papers", limit: 3 },
+        { channelId: "UCHnyfMqiRRG1u-2MsSQLbXA", name: "Veritasium", limit: 3 },
+        { channelId: "UC9-y-6csu5WGm29I7JiwpnA", name: "Computerphile", limit: 3 },
+        { channelId: "UCsBjURrPoezykLs9EqgamOA", name: "Fireship", limit: 3 },
       ],
     },
   };

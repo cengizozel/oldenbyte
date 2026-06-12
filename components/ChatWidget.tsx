@@ -2172,7 +2172,7 @@ export default function ChatWidget({
         /* Chat view */
         <>
           <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-            {!configured ? (
+            {!configured && messages.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 px-4">
                 <Bot size={20} className={`opacity-40 ${c.text}`} />
                 <p className={`text-xs opacity-45 ${c.text}`}>

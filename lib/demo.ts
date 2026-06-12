@@ -50,6 +50,22 @@ function demoStore(): Map<string, string> {
       store.set(key, typeof value === "string" ? value : JSON.stringify(value));
     }
     store.set("dashboards", JSON.stringify(SEEDED_DASHBOARDS));
+    // Demo-only keys that must never reach a real first-run install: the
+    // calendar gets a fake "demo" account that CalendarWidget answers with a
+    // synthesized agenda instead of a CalDAV fetch.
+    store.set(
+      "calendar-widget-calendar-home",
+      JSON.stringify({
+        baseUrl: "demo",
+        username: "demo",
+        password: "",
+        calendars: [
+          { name: "Personal", url: "demo:personal" },
+          { name: "Work", url: "demo:work" },
+        ],
+        days: 7,
+      })
+    );
   }
   return store;
 }
