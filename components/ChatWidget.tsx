@@ -1021,25 +1021,33 @@ export default function ChatWidget({
     return parts.join("\n\n");
   }
 
-  // After a reply, quietly review the exchange and save NEW durable facts about
-  // the user that are relevant to this character's focus (ignoring off-topic
-  // stuff). Runs only for characters that have a focus. Fire-and-forget; a second,
+  // After a reply, quietly revise this character's memory from the exchange:
+  // add facts the user stated, update memories they corrected, remove ones they
+  // retracted. Runs only for characters with a focus. Fire-and-forget; a second,
   // non-streaming model call that never blocks the reply.
   async function extractMemories(character: Character, userMsg: string, reply: string) {
     if (!character.focus.trim() || !configured || !userMsg.trim() || !reply.trim()) return;
     try {
+      const current = charactersRef.current.find(ch => ch.id === character.id);
+      if (!current) return;
+      const memList = current.memories.length
+        ? current.memories.map((m, i) => `${i + 1}. ${m}`).join("\n")
+        : "(none)";
       const sys =
-        `You maintain the long-term memory of "${character.name}", an assistant focused on: ${character.focus.trim()}. ` +
-        `From the exchange below, extract NEW, durable facts ABOUT THE USER that are relevant to that focus. ` +
-        `Record only what the user explicitly stated in THIS exchange, with their wording for specifics (dates, scores, names); never infer, embellish, or merge with already-known facts. ` +
-        `Ignore anything off-topic or outside the focus, transient/one-off details, the assistant's own statements, and anything already known. ` +
-        `Output ONLY a JSON array of short factual strings (e.g. ["Has a CS degree"]); output [] if nothing qualifies.` +
-        (character.memories.length ? ` Already known: ${JSON.stringify(character.memories)}.` : "");
+        `You maintain the long-term memory of "${character.name}", an assistant focused on: ${character.focus.trim()}.\n` +
+        `Current memories:\n${memList}\n\n` +
+        `From the exchange below, decide how the memory should change:\n` +
+        `- "add": NEW durable facts ABOUT THE USER, relevant to the focus, that they explicitly stated in THIS exchange. Keep their wording for specifics (dates, scores, names); never infer, embellish, or merge with existing memories.\n` +
+        `- "update": when the user corrects or supersedes a numbered memory, map its number to the corrected text (e.g. they say a score was actually different).\n` +
+        `- "remove": numbers of memories the user retracted, declared no longer true, or asked you to forget or disregard.\n` +
+        `Ignore off-topic content, transient details, and the assistant's own statements. Never touch memories unrelated to this exchange. ` +
+        `A correction is an update ONLY, never also an add. Never add a fact that overlaps or duplicates an existing or updated memory; fold it into the update instead. Every "add" entry must be a complete sentence about the user, never a bare number or fragment.\n` +
+        `Output ONLY JSON in this shape: {"add":["fact"],"update":{"2":"corrected fact"},"remove":[3]} - use empty values when nothing changes.`;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.model, stream: false, maxTokens: 300,
+          baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.model, stream: false, maxTokens: 350,
           // Reasoning would eat the whole token budget and starve the JSON
           // output; disable it on local backends (hosted APIs reject the param).
           reasoningEffort: /(openai|anthropic|googleapis|mistral|groq)\.com/i.test(config.baseUrl) ? "" : "none",
@@ -1048,25 +1056,76 @@ export default function ChatWidget({
       });
       if (!res.ok) return;
       const raw = stripThinking(String((await res.json()).content ?? ""));
-      const a = raw.indexOf("["), b = raw.lastIndexOf("]");
-      if (a === -1 || b <= a) return;
-      let facts: unknown;
-      try { facts = JSON.parse(raw.slice(a, b + 1)); } catch { return; }
-      if (!Array.isArray(facts)) return;
-      const clean = facts.map(f => String(f).trim()).filter(f => f.length > 1 && f.length < 200);
-      if (!clean.length) return;
-      const current = charactersRef.current.find(ch => ch.id === character.id);
-      if (!current) return;
-      const have = new Set(current.memories.map(m => m.toLowerCase()));
-      const added = clean.filter(f => !have.has(f.toLowerCase()));
-      if (!added.length) return;
+      // Accept the op object, or a bare array (treated as adds) from models
+      // that fall back to the old shape.
+      let ops: { add?: unknown; update?: unknown; remove?: unknown } = {};
+      const oA = raw.indexOf("{"), oB = raw.lastIndexOf("}");
+      const aA = raw.indexOf("["), aB = raw.lastIndexOf("]");
+      try {
+        if (oA !== -1 && oB > oA) ops = JSON.parse(raw.slice(oA, oB + 1));
+        else if (aA !== -1 && aB > aA) ops = { add: JSON.parse(raw.slice(aA, aB + 1)) };
+        else return;
+      } catch { return; }
+
+      const fresh = charactersRef.current.find(ch => ch.id === character.id);
+      if (!fresh) return;
+      const baseMems = fresh.memories;
+      const sane = (v: unknown) => {
+        const t = String(v ?? "").trim();
+        return t.length > 1 && t.length < 200 ? t : "";
+      };
+      const updates: Record<number, string> = {};
+      if (ops.update && typeof ops.update === "object" && !Array.isArray(ops.update)) {
+        for (const [k, v] of Object.entries(ops.update as Record<string, unknown>)) {
+          const idx = parseInt(k);
+          const text = sane(v);
+          if (idx >= 1 && idx <= baseMems.length && text && text !== baseMems[idx - 1]) updates[idx] = text;
+        }
+      }
+      const removals = new Set(
+        (Array.isArray(ops.remove) ? ops.remove : [])
+          .map(n => parseInt(String(n)))
+          .filter(n => n >= 1 && n <= baseMems.length && !updates[n])
+      );
+      const changes: string[] = [];
+      let nextMems: string[] = [];
+      baseMems.forEach((m, i) => {
+        const n = i + 1;
+        if (removals.has(n)) { changes.push(`forgot: ${m}`); return; }
+        if (updates[n]) { changes.push(`updated: ${updates[n]}`); nextMems.push(updates[n]); return; }
+        nextMems.push(m);
+      });
+      const have = new Set(nextMems.map(m => m.toLowerCase()));
+      const updatedTexts = Object.values(updates).map(t => t.toLowerCase());
+      for (const f of (Array.isArray(ops.add) ? ops.add : [])) {
+        const text = sane(f);
+        // Reject fragments: a memory needs words, not a stray number, and an
+        // add that is contained in an update is the same correction twice.
+        if (!/[a-zA-Z]/.test(text) || text.split(/\s+/).length < 2) continue;
+        if (updatedTexts.some(u => u.includes(text.toLowerCase()))) continue;
+        // Semantic near-duplicate: if almost all of the add's significant words
+        // already live in one memory, it is the same fact reworded.
+        const words = text.toLowerCase().match(/[a-z0-9-]{3,}/g) ?? [];
+        const dupe = words.length > 0 && [...nextMems].some(m => {
+          const mw = new Set(m.toLowerCase().match(/[a-z0-9-]{3,}/g) ?? []);
+          return words.filter(w => mw.has(w)).length / words.length >= 0.8;
+        });
+        if (dupe) continue;
+        if (text && !have.has(text.toLowerCase())) {
+          have.add(text.toLowerCase());
+          nextMems.push(text);
+          changes.push(`remembered: ${text}`);
+        }
+      }
+      if (!changes.length) return;
+      nextMems = nextMems.slice(-40); // cap memory size
       const next = charactersRef.current.map(ch =>
-        ch.id === character.id ? { ...ch, memories: [...ch.memories, ...added].slice(-40) } : ch // cap memory size
+        ch.id === character.id ? { ...ch, memories: nextMems } : ch
       );
       setCharacters(next);
       persistCharacters(next, activeCharacterIdRef.current);
-      // Show what was learned instead of saving silently.
-      setMemoryNotice({ charId: character.id, name: character.name, facts: added });
+      // Show what changed instead of revising silently.
+      setMemoryNotice({ charId: character.id, name: character.name, facts: changes });
       window.clearTimeout(memNoticeTimer.current);
       memNoticeTimer.current = window.setTimeout(() => setMemoryNotice(null), 8000);
     } catch { /* memory is best-effort */ }
@@ -2065,9 +2124,9 @@ export default function ChatWidget({
               >
                 <Brain size={12} className={`shrink-0 ${c.label}`} />
                 <span className="flex-1 min-w-0 truncate">
-                  {memoryNotice.name} remembered{memoryNotice.facts.length > 1
-                    ? ` ${memoryNotice.facts.length} things`
-                    : `: ${memoryNotice.facts[0]}`}
+                  {memoryNotice.facts.length > 1
+                    ? `${memoryNotice.name}: ${memoryNotice.facts.length} memory changes`
+                    : `${memoryNotice.name} ${memoryNotice.facts[0]}`}
                 </span>
                 <span
                   onClick={e => { e.stopPropagation(); setMemoryNotice(null); }}
