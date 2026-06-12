@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { stripThinking } from "@/lib/citations";
 
 const SYSTEM =
   "You are a seasoned newspaper editor crafting a personal morning briefing. " +
@@ -22,7 +23,7 @@ function normalizeBase(baseUrl: string) {
   return baseUrl.trim().replace(/\/+$/, "");
 }
 
-function buildBody(content: string, stream: boolean, model: string) {
+function buildBody(content: string, stream: boolean, model: string, noThink: boolean) {
   return JSON.stringify({
     model,
     messages: [
@@ -32,8 +33,14 @@ function buildBody(content: string, stream: boolean, model: string) {
     max_tokens: 2500,
     temperature: 0.7,
     stream,
+    // Local reasoning models can burn the whole token budget thinking and
+    // return an empty summary; prose this simple needs no chain-of-thought.
+    // Hosted APIs reject the param on non-reasoning models, so it is local-only.
+    ...(noThink ? { reasoning_effort: "none" } : {}),
   });
 }
+
+const HOSTED = /(openai|anthropic|googleapis|mistral|groq)\.com/i;
 
 export async function POST(request: NextRequest) {
   // Works with any OpenAI-compatible endpoint (local Ollama/LM Studio/llama.cpp
@@ -54,6 +61,7 @@ export async function POST(request: NextRequest) {
 
   const url = `${normalizeBase(baseUrl)}/chat/completions`;
   const finalKey = apiKey ?? key ?? "";
+  const noThink = !HOSTED.test(baseUrl);
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (finalKey) headers["Authorization"] = `Bearer ${finalKey}`;
 
@@ -61,7 +69,7 @@ export async function POST(request: NextRequest) {
     const res = await fetch(url, {
       method: "POST",
       headers,
-      body: buildBody(content, true, model),
+      body: buildBody(content, true, model, noThink),
       signal: request.signal, // cancel the upstream LLM call if the client disconnects
     });
 
@@ -107,7 +115,7 @@ export async function POST(request: NextRequest) {
     const res = await fetch(url, {
       method: "POST",
       headers,
-      body: buildBody(content, false, model),
+      body: buildBody(content, false, model, noThink),
       signal: request.signal, // cancel the upstream LLM call if the client disconnects
     });
 
@@ -120,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await res.json();
-    const summary = data.choices?.[0]?.message?.content ?? "";
+    const summary = stripThinking(data.choices?.[0]?.message?.content ?? "").trim();
     return NextResponse.json({ summary });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
