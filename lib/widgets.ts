@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix" | "anytype" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -98,6 +98,14 @@ export const widgets: Widget[] = [
     color: "rose",
     title: "YouTube",
     description: "Latest videos from your chosen channels.",
+  },
+  {
+    id: "weather",
+    type: "weather",
+    category: "feeds",
+    color: "sky",
+    title: "Weather",
+    description: "Current conditions and forecast for a place.",
   },
   {
     id: "f1",

@@ -73,10 +73,10 @@ export function SaveCancelRow({
         </button>
       ) : <span />}
       <div className="flex gap-3">
-        <button onClick={onCancel} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+        <button onClick={onCancel} title="Cancel" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
           <X size={14} />
         </button>
-        <button onClick={onSave} disabled={saving} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40">
+        <button onClick={onSave} disabled={saving} title="Save" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40">
           {saving ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
         </button>
       </div>

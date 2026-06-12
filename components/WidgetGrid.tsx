@@ -25,6 +25,7 @@ import dynamic from "next/dynamic";
 import ChatWidget from "./ChatWidget";
 import KiwixWidget from "./KiwixWidget";
 import AnytypeWidget from "./AnytypeWidget";
+import WeatherWidget from "./WeatherWidget";
 import BankWidget from "./BankWidget";
 import type { BankWidgetDef } from "@/lib/widgetBank";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
@@ -67,6 +68,7 @@ function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, 
   if (widget.type === "youtube")  return <YoutubeWidget  widget={widget} className={cls} />;
   if (widget.type === "ebook")    return <ReaderWidget   widget={widget} className={cls} />;
   if (widget.type === "f1")       return <F1Widget       widget={widget} className={cls} />;
+  if (widget.type === "weather")  return <WeatherWidget  widget={widget} className={cls} />;
   if (widget.type === "arxiv")    return <ArxivWidget    widget={widget} className={cls} />;
   if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className={cls} />;
   if (widget.type === "tracker")  return <TrackerWidget   widget={widget} className={cls} />;
@@ -271,6 +273,7 @@ export default function WidgetGrid({
     reddit:   { w: 1, h: 3 },
     youtube:  { w: 1, h: 3 },
     f1:       { w: 1, h: 2 },
+    weather:  { w: 1, h: 3 },
     arxiv:    { w: 2, h: 3 },
     hf:       { w: 2, h: 3 },
     tracker:  { w: 1, h: 3 },

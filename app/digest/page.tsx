@@ -7,6 +7,7 @@ import * as storage from "@/lib/storage";
 import { widgets as widgetDefs } from "@/lib/widgets";
 import { normalizeCitations } from "@/lib/citations";
 import { getActiveDataKeys } from "@/lib/dashboards";
+import { summarizeForecast } from "@/lib/weather";
 
 type TabLayoutItem = { i: string; tabs?: string[] };
 type WidgetInstance = { id: string; type: string; title: string };
@@ -389,6 +390,7 @@ export default function DigestPage() {
     switch (widget.type) {
       case "notebook": return loadNotepad(id, widget);
       case "text":     return loadText(id, widget);
+      case "weather":  return loadWeather(id, widget);
       case "f1":       return loadF1(widget);
       case "rss":      return loadRss(id, widget);
       case "reddit":   return loadReddit(id, widget);
@@ -422,6 +424,22 @@ export default function DigestPage() {
       const text = res.ok ? (await res.text()).trim() : null;
       if (!text) return null;
       return { id, label: widget.title, type: "text", entries: [{ text }] };
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadWeather(id: string, widget: WidgetInstance): Promise<Section | null> {
+    const raw = await storage.getItem(`weather-widget-${id}`);
+    if (!raw) return null;
+    try {
+      const cfg = JSON.parse(raw) as { name: string; lat: number; lon: number; unit?: "c" | "f" };
+      if (!isFinite(cfg.lat) || !isFinite(cfg.lon)) return null;
+      const res = await fetch(`/api/weather?lat=${cfg.lat}&lon=${cfg.lon}&unit=${cfg.unit ?? "c"}`);
+      if (!res.ok) return null;
+      const lines = summarizeForecast(cfg.name, cfg.unit ?? "c", await res.json());
+      if (!lines.length) return null;
+      return { id, label: widget.title || "Weather", type: "weather", entries: [{ text: lines.join("\n") }] };
     } catch {
       return null;
     }

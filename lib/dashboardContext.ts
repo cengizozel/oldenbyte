@@ -9,13 +9,14 @@
 
 import * as storage from "@/lib/storage";
 import { getActiveDataKeys } from "@/lib/dashboards";
+import { summarizeForecast } from "@/lib/weather";
 
 type TabLayoutItem = { i: string; tabs?: string[] };
 type WidgetInstance = { id: string; type: string; title: string };
 
 // Widget types worth feeding to the model as text. Notebook is handled
 // separately (full history); reader/chess/chat/empty have no useful text.
-const FEED_TYPES = new Set(["text", "f1", "rss", "reddit", "youtube", "arxiv", "hf", "tracker"]);
+const FEED_TYPES = new Set(["text", "f1", "weather", "rss", "reddit", "youtube", "arxiv", "hf", "tracker"]);
 
 const today = () => new Date().toISOString().split("T")[0];
 
@@ -91,6 +92,17 @@ async function gatherText(id: string, title: string): Promise<string | null> {
     const res = await fetch(`/api/proxy?url=${encodeURIComponent(config.source.value)}`);
     const text = res.ok ? (await res.text()).trim() : "";
     return text ? `## ${title} (Text)\n${truncate(text, 500)}` : null;
+  } catch { return null; }
+}
+
+async function gatherWeather(id: string, title: string): Promise<string | null> {
+  const config = await readJSON<{ name: string; lat: number; lon: number; unit?: "c" | "f" }>(`weather-widget-${id}`);
+  if (!config || !isFinite(config.lat) || !isFinite(config.lon)) return null;
+  try {
+    const res = await fetch(`/api/weather?lat=${config.lat}&lon=${config.lon}&unit=${config.unit ?? "c"}`);
+    if (!res.ok) return null;
+    const lines = summarizeForecast(config.name, config.unit ?? "c", await res.json());
+    return lines.length ? `## ${title} (Weather)\n${lines.join("\n")}` : null;
   } catch { return null; }
 }
 
@@ -268,6 +280,7 @@ async function gatherWidget(id: string, w: WidgetInstance): Promise<string | nul
   switch (w.type) {
     case "notebook": return gatherNotebook(id, w.title);
     case "text":    return gatherText(id, w.title);
+    case "weather": return gatherWeather(id, w.title);
     case "f1":      return gatherF1(w.title);
     case "rss":     return gatherRss(id, w.title);
     case "reddit":  return gatherReddit(id, w.title);
