@@ -2080,7 +2080,7 @@ export default function ChatWidget({
                 type="url"
                 value={draft.kiwixUrl}
                 onChange={e => setDraft(d => ({ ...d, kiwixUrl: e.target.value }))}
-                placeholder="Kiwix URL, e.g. http://192.168.1.24:3702"
+                placeholder="Kiwix URL, e.g. http://192.168.1.10:8080"
               />
               {kiwixSources.length > 0 && (
                 <p className="text-[10px] text-[var(--text-muted)] mt-1">

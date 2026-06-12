@@ -318,7 +318,7 @@ export default function KiwixWidget({
             type="url"
             value={draft.baseUrl}
             onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value }))}
-            placeholder="http://192.168.1.24:3702"
+            placeholder="http://192.168.1.10:8080"
           />
           <div className="flex items-center gap-2">
             <button
