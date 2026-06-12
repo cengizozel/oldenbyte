@@ -273,7 +273,7 @@ export default function AnytypeWidget({
                       ))}
                     </ul>
                   ) : (
-                    <EmptyState c={c}>{searched ? "No objects found." : "No recent objects."}</EmptyState>
+                    <EmptyState c={c}>{searched ? "no objects found" : "no recent objects"}</EmptyState>
                   )}
                 </div>
                 <ScrollFades c={c} top={topFade} bottom={bottomFade} />

@@ -39,14 +39,17 @@ export function LoadingState({ c }: { c: ColorClasses }) {
   );
 }
 
-// Standard empty-state copy: pass `action` to get the canonical
-// "hover and click the pencil to {action}" phrasing, or children for
-// fully custom copy (e.g. Notepad's placeholder).
+// Standard empty-state copy, one style everywhere: centered in the widget
+// body, lowercase, no trailing punctuation. Pass `action` for the canonical
+// "hover and click the pencil to {action}" phrasing, or children for custom
+// copy (which should follow the same casing rules).
 export function EmptyState({ c, action, children }: { c: ColorClasses; action?: string; children?: ReactNode }) {
   return (
-    <p className={`text-xs opacity-45 ${c.text}`}>
-      {children ?? `hover and click the pencil to ${action}`}
-    </p>
+    <div className="flex-1 h-full min-h-0 flex items-center justify-center text-center px-4">
+      <p className={`text-xs opacity-45 ${c.text}`}>
+        {children ?? `hover and click the pencil to ${action}`}
+      </p>
+    </div>
   );
 }
 

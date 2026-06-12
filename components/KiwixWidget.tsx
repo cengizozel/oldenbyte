@@ -267,7 +267,7 @@ export default function KiwixWidget({
                         ))}
                       </ul>
                     ) : (
-                      <p className={`text-xs opacity-45 ${c.text}`}>{searched ? "No results." : "Type a query and press Enter."}</p>
+                      <EmptyState c={c}>{searched ? "no results" : "type a query and press Enter"}</EmptyState>
                     )}
                   </div>
                   <ScrollFades c={c} top={resultsFade.topFade} bottom={resultsFade.bottomFade} />

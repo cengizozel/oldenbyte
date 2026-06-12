@@ -191,7 +191,7 @@ export default function CalendarWidget({
         <div className="flex-1 min-h-0 relative">
           <div ref={ref} onScroll={onScroll} className="absolute inset-0 overflow-y-auto pr-3 flex flex-col gap-3">
             {byDay.size === 0 ? (
-              <p className={`text-xs opacity-45 ${c.text}`}>nothing scheduled in the next {config.days} days</p>
+              <EmptyState c={c}>nothing scheduled in the next {config.days} days</EmptyState>
             ) : (
               [...byDay.entries()].map(([day, list]) => (
                 <div key={day} className="flex flex-col gap-1">

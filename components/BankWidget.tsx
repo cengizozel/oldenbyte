@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Puzzle, RefreshCw } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -20,6 +20,35 @@ function defaultsFor(def: BankWidgetDef): BankConfig {
   const out: BankConfig = {};
   for (const f of def.config ?? []) out[f.key] = f.default ?? (f.type === "number" ? 0 : "");
   return out;
+}
+
+// Caption under an image primitive: clamped to two lines, click to expand
+// (xkcd alt text is the joke; it should never be lost to the clamp). Only
+// behaves like a button when the text is actually truncated.
+function ExpandableCaption({ text, className }: { text: string; className: string }) {
+  const [open, setOpen] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const ref = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setClamped(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, open]);
+  const expandable = clamped || open;
+  return (
+    <figcaption
+      ref={ref as React.RefObject<HTMLElement>}
+      onClick={expandable ? () => setOpen(o => !o) : undefined}
+      title={expandable ? (open ? "Collapse" : "Show full text") : undefined}
+      className={`${className} ${expandable ? "cursor-pointer" : ""} ${open ? "" : "line-clamp-2"}`}
+    >
+      {text}
+    </figcaption>
+  );
 }
 
 export default function BankWidget({
@@ -182,10 +211,12 @@ export default function BankWidget({
         if (!src || !/^https:\/\//.test(src)) return null;
         const caption = p.caption ? resolveText(p.caption, data) : "";
         return (
-          <figure key={i} className="flex flex-col items-center gap-1">
+          // Fill the card's remaining height and contain the image inside it,
+          // so a tall comic scales down instead of forcing the card to scroll.
+          <figure key={i} className="flex-1 min-h-0 flex flex-col items-center gap-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt={caption || resolveText(p.src, data)} className="max-w-full max-h-48 object-contain rounded-lg" />
-            {caption && <figcaption className={`text-[10px] text-center opacity-50 ${c.text}`}>{caption}</figcaption>}
+            <img src={src} alt={caption || resolveText(p.src, data)} className="w-full flex-1 min-h-0 object-contain rounded-lg" />
+            {caption && <ExpandableCaption text={caption} className={`shrink-0 text-[10px] text-center opacity-50 ${c.text}`} />}
           </figure>
         );
       }
