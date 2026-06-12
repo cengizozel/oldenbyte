@@ -6,6 +6,7 @@ import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { gatherWidgetEntries, listDashboardWidgets, getCalendarAccount, type WidgetEntry, type WidgetRosterItem, type CalendarAccount } from "@/lib/dashboardContext";
 import { SettingsInput, SettingsSelect, SettingsTextarea } from "./ui/Field";
+import { stripThinking } from "@/lib/citations";
 import Markdown from "./Markdown";
 
 type Role = "user" | "assistant";
@@ -1015,12 +1016,15 @@ export default function ChatWidget({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.model, stream: false, maxTokens: 220,
+          baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.model, stream: false, maxTokens: 300,
+          // Reasoning would eat the whole token budget and starve the JSON
+          // output; disable it on local backends (hosted APIs reject the param).
+          reasoningEffort: /(openai|anthropic|googleapis|mistral|groq)\.com/i.test(config.baseUrl) ? "" : "none",
           messages: [{ role: "system", content: sys }, { role: "user", content: `User: ${userMsg}\nAssistant: ${reply}` }],
         }),
       });
       if (!res.ok) return;
-      const raw = String((await res.json()).content ?? "").replace(/<think>[\s\S]*?<\/think>/gi, "");
+      const raw = stripThinking(String((await res.json()).content ?? ""));
       const a = raw.indexOf("["), b = raw.lastIndexOf("]");
       if (a === -1 || b <= a) return;
       let facts: unknown;
