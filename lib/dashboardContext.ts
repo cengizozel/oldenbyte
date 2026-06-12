@@ -63,35 +63,21 @@ async function readJSON<T>(key: string): Promise<T | null> {
   try { return JSON.parse(raw) as T; } catch { return null; }
 }
 
-// ── Notes: full history across every notepad instance, newest first ──────────
-async function gatherNotes(): Promise<string | null> {
-  const ids = (await readJSON<string[]>("notepad-registry")) ?? [];
-  if (!ids.length) return null;
-
-  const perId = await Promise.all(
-    ids.map(async (id, i) => {
-      const [dates, name] = await Promise.all([
-        readJSON<Record<string, string>>(`notebook-${id}-dates`),
-        storage.getItem(`notebook-${id}-name`),
-      ]);
-      return { name: name?.trim() || `Notepad ${i + 1}`, dates: dates ?? {} };
-    })
-  );
-
-  const entries: { date: string; name: string; text: string }[] = [];
-  for (const { name, dates } of perId) {
-    for (const [date, html] of Object.entries(dates)) {
-      const text = clean(html);
-      if (text) entries.push({ date, name, text });
-    }
-  }
+// ── Notes: full history of one notepad instance, newest first ────────────────
+async function gatherNotebook(id: string, title: string): Promise<string | null> {
+  const [dates, name] = await Promise.all([
+    readJSON<Record<string, string>>(`notebook-${id}-dates`),
+    storage.getItem(`notebook-${id}-name`),
+  ]);
+  if (!dates) return null;
+  const entries = Object.entries(dates)
+    .map(([date, html]) => ({ date, text: clean(html) }))
+    .filter(e => e.text)
+    .sort((a, b) => b.date.localeCompare(a.date));
   if (!entries.length) return null;
-
-  entries.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
-  const body = entries
-    .map(e => `### ${e.date} · ${e.name}\n${truncate(e.text, 1500)}`)
-    .join("\n\n");
-  return `## Notes (${entries.length} entries)\n${body}`;
+  const label = name?.trim() || title;
+  const body = entries.map(e => `### ${e.date}\n${truncate(e.text, 1500)}`).join("\n\n");
+  return `## ${label} (Notes, ${entries.length} entries)\n${body}`;
 }
 
 // ── Per-widget feed snapshots ────────────────────────────────────────────────
@@ -280,6 +266,7 @@ async function gatherTracker(id: string, title: string): Promise<string | null> 
 
 async function gatherWidget(id: string, w: WidgetInstance): Promise<string | null> {
   switch (w.type) {
+    case "notebook": return gatherNotebook(id, w.title);
     case "text":    return gatherText(id, w.title);
     case "f1":      return gatherF1(w.title);
     case "rss":     return gatherRss(id, w.title);
@@ -293,40 +280,80 @@ async function gatherWidget(id: string, w: WidgetInstance): Promise<string | nul
 }
 
 export type DashboardContext = { text: string; chars: number; sections: number };
+export type WidgetEntry = { id: string; title: string; type: string; text: string };
+
+// Types that can produce queryable text. Notebook included: each notepad on
+// the active dashboard becomes its own entry (so it gets its own checkbox in
+// the chat's data sources).
+const ENTRY_TYPES = new Set([...FEED_TYPES, "notebook"]);
+
+export type WidgetRosterItem = { id: string; title: string; type: string };
 
 /**
- * Build a single text block describing the current dashboard. Notes (full
- * history) come first, then each feed widget's latest snapshot in layout order.
- * Returns empty text when nothing is configured.
+ * Just the roster of data-bearing widgets on the active dashboard (no content
+ * fetching). Drives the chat's data-source checkbox list.
  */
-export async function gatherDashboardContext(): Promise<DashboardContext> {
+export async function listDashboardWidgets(): Promise<WidgetRosterItem[]> {
   const keys = await getActiveDataKeys();
   const [layout, instances] = await Promise.all([
     readJSON<TabLayoutItem[]>(keys.layout),
     readJSON<Record<string, WidgetInstance>>(keys.instances),
   ]);
+  if (!layout || !instances) return [];
+  const ids: string[] = [];
+  for (const item of layout) {
+    ids.push(item.i);
+    for (const tab of item.tabs ?? []) ids.push(tab);
+  }
+  return ids
+    .filter(id => instances[id] && ENTRY_TYPES.has(instances[id].type))
+    .map(id => ({ id, title: instances[id].title, type: instances[id].type }));
+}
 
-  const blocks: string[] = [];
+/**
+ * Gather one entry per data-bearing widget on the active dashboard, in layout
+ * order (tab-grouped widgets included). `include` lets the caller filter by
+ * instance id before any fetching happens (the chat's checkbox list).
+ */
+export async function gatherWidgetEntries(
+  include?: (id: string, type: string) => boolean
+): Promise<WidgetEntry[]> {
+  const keys = await getActiveDataKeys();
+  const [layout, instances] = await Promise.all([
+    readJSON<TabLayoutItem[]>(keys.layout),
+    readJSON<Record<string, WidgetInstance>>(keys.instances),
+  ]);
+  if (!layout || !instances) return [];
 
-  const notes = await gatherNotes();
-  if (notes) blocks.push(notes);
-
-  if (layout && instances) {
-    const ids: string[] = [];
-    for (const item of layout) {
-      ids.push(item.i);
-      for (const tab of item.tabs ?? []) ids.push(tab);
-    }
-    const feedBlocks = await Promise.allSettled(
-      ids
-        .filter(id => instances[id] && FEED_TYPES.has(instances[id].type))
-        .map(id => gatherWidget(id, instances[id]))
-    );
-    for (const b of feedBlocks) {
-      if (b.status === "fulfilled" && b.value) blocks.push(b.value);
-    }
+  const ids: string[] = [];
+  for (const item of layout) {
+    ids.push(item.i);
+    for (const tab of item.tabs ?? []) ids.push(tab);
   }
 
-  const text = blocks.join("\n\n");
-  return { text, chars: text.length, sections: blocks.length };
+  const settled = await Promise.allSettled(
+    ids
+      .filter(id => instances[id] && ENTRY_TYPES.has(instances[id].type))
+      .filter(id => !include || include(id, instances[id].type))
+      .map(async id => ({
+        id,
+        title: instances[id].title,
+        type: instances[id].type,
+        text: (await gatherWidget(id, instances[id])) ?? "",
+      }))
+  );
+  return settled
+    .filter((r): r is PromiseFulfilledResult<WidgetEntry> => r.status === "fulfilled")
+    .map(r => r.value)
+    .filter(e => e.text);
+}
+
+/**
+ * Build a single text block describing the current dashboard, one section per
+ * widget in layout order. Returns empty text when nothing is configured.
+ */
+export async function gatherDashboardContext(): Promise<DashboardContext> {
+  const entries = await gatherWidgetEntries();
+  const text = entries.map(e => e.text).join("\n\n");
+  return { text, chars: text.length, sections: entries.length };
 }

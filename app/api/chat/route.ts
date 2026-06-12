@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { search as kiwixSearch, articleExtract } from "@/lib/kiwix";
+import { search as kiwixSearch, searchAllBooks, articleExtract } from "@/lib/kiwix";
 import { anytypeSearch, anytypeReadObject, anytypeDeepLink } from "@/lib/anytype";
 
 // Server-side proxy to any OpenAI-compatible chat endpoint (Ollama, LM Studio,
@@ -15,8 +15,15 @@ import { anytypeSearch, anytypeReadObject, anytypeDeepLink } from "@/lib/anytype
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ChatMessage = { role: string; content: string } & Record<string, any>;
-type Kiwix = { baseUrl: string; source: string; sourceTitle?: string };
+// `source` empty/missing means search ALL books on the server (grouped by
+// language under the hood); set it to pin the search to one ZIM.
+type Kiwix = { baseUrl: string; source?: string; sourceTitle?: string };
 type Anytype = { baseUrl: string; apiKey: string; spaceId: string; spaceName?: string };
+// Widget data gathered client-side (the browser has live access to every
+// widget's content) and shipped with the request. Only the roster line goes
+// into the model's context; the texts stay server-side until a tool reads them.
+type DashWidget = { id: string; title: string; type: string; text: string };
+type Dashboard = { widgets: DashWidget[] };
 
 // Strip trailing slashes so we can safely append "/chat/completions" etc.
 function normalizeBase(baseUrl: string): string {
@@ -54,7 +61,9 @@ export async function GET(request: NextRequest) {
 
 // ── Kiwix tools ──────────────────────────────────────────────────────────────
 function kiwixTools(sourceTitle?: string) {
-  const where = sourceTitle ? ` (currently: ${sourceTitle})` : "";
+  const where = sourceTitle
+    ? ` (currently: ${sourceTitle})`
+    : " (searches every book on the server at once: Wikipedia, WikiHow, and anything else installed)";
   return [
     {
       type: "function",
@@ -161,6 +170,97 @@ function anytypeTools(spaceName?: string) {
   ];
 }
 
+// ── Dashboard tools ──────────────────────────────────────────────────────────
+function dashboardTools(widgets: DashWidget[]) {
+  const roster = widgets
+    .map(w => `- ${w.id}: "${w.title}" (${w.type}, ${(w.text || "").length} chars)`)
+    .join("\n");
+  return [
+    {
+      type: "function",
+      function: {
+        name: "read_widget",
+        description:
+          "Read the live content of one widget on the user's dashboard (notes, feeds, tracker, headlines...). " +
+          "Long content is returned in parts: use find=\"keywords\" to jump to matching sections, or page=N " +
+          "to read sequentially. Widgets available right now:\n" + roster,
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Widget id from the list above" },
+            find: { type: "string", description: "Optional: jump to sections matching these keywords" },
+            page: { type: "integer", description: "Optional: which part to read (1-based)" },
+          },
+          required: ["id"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "search_dashboard",
+        description:
+          "Search across ALL dashboard widgets at once. Returns matching sections labeled with their " +
+          "widget ids. Use this when you don't know which widget holds the answer (e.g. \"where did I " +
+          "mention the dentist\").",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Concise keywords to find" },
+          },
+          required: ["query"],
+        },
+      },
+    },
+  ];
+}
+
+// Cross-widget keyword search: phrase first, then individual terms, up to 3
+// merged ±200-char windows per widget, ~3000 chars total.
+function searchWidgets(widgets: DashWidget[], query: string): { text: string; hitIds: string[] } {
+  const phrase = query.toLowerCase().trim();
+  const terms = [phrase, ...phrase.split(/\s+/).filter(t => t.length >= 3 && t !== phrase)];
+  const out: string[] = [];
+  const hitIds: string[] = [];
+  let budget = 3000;
+  for (const w of widgets) {
+    const text = w.text || "";
+    const hay = text.toLowerCase();
+    const windows: [number, number][] = [];
+    for (const t of terms) {
+      let idx = hay.indexOf(t);
+      while (idx !== -1 && windows.length < 3) {
+        windows.push([Math.max(0, idx - 200), Math.min(text.length, idx + t.length + 200)]);
+        idx = hay.indexOf(t, idx + t.length);
+      }
+      if (windows.length) break; // phrase tier matched; skip looser term tiers
+    }
+    if (!windows.length) continue;
+    windows.sort((a, b) => a[0] - b[0]);
+    const merged: [number, number][] = [];
+    for (const r of windows) {
+      const last = merged[merged.length - 1];
+      if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+      else merged.push(r);
+    }
+    const body = merged
+      .map(([a, b]) => `${a > 0 ? "…" : ""}${text.slice(a, b)}${b < text.length ? "…" : ""}`)
+      .join("\n");
+    const seg = `## ${w.id} "${w.title}" (${w.type})\n${body}`;
+    if (seg.length > budget) break;
+    out.push(seg);
+    hitIds.push(w.id);
+    budget -= seg.length;
+  }
+  if (!out.length) {
+    return {
+      text: `No matches for "${query}" in any widget. Try read_widget on a likely widget, or different keywords.`,
+      hitIds,
+    };
+  }
+  return { text: out.join("\n\n"), hitIds };
+}
+
 // Window a long object body so it never floods the model's context. With `find`,
 // return the sections matching the keywords (±context, merged); otherwise return
 // the requested ~READ_CAP-char page with a header saying how to read further.
@@ -224,6 +324,8 @@ type SearchHit = { title: string; ref: string; link: string; snippet: string; me
 type ToolResult =
   | { kind: "search"; source: "kiwix" | "anytype"; query: string; results: SearchHit[] }
   | { kind: "article"; title: string; link: string; text: string; meta?: string }
+  // Dashboard reads: full text goes to the model, only `note` shows in the trail.
+  | { kind: "widget"; note: string; text: string }
   | { kind: "message"; text: string };
 
 // Execute a tool call by calling the source libs directly (NOT via /api/* — a
@@ -234,14 +336,39 @@ async function runTool(
   name: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any,
-  ctx: { kiwix?: Kiwix; anytype?: Anytype },
+  ctx: { kiwix?: Kiwix; anytype?: Anytype; dashboard?: Dashboard },
   signal: AbortSignal,
 ): Promise<ToolResult> {
   try {
+    if (name === "read_widget" && ctx.dashboard) {
+      const id = String(args?.id ?? "").trim();
+      const w =
+        ctx.dashboard.widgets.find(x => x.id === id) ??
+        // Forgiving fallbacks: models sometimes pass the title or type instead.
+        ctx.dashboard.widgets.find(x => x.title.toLowerCase() === id.toLowerCase()) ??
+        ctx.dashboard.widgets.find(x => x.type === id.toLowerCase());
+      if (!w) {
+        return { kind: "message", text: `No widget "${id}". Valid ids: ${ctx.dashboard.widgets.map(x => x.id).join(", ")}` };
+      }
+      const win = windowMarkdown(w.text || "", args?.find ? String(args.find) : undefined, args?.page ? Number(args.page) : undefined);
+      const text = (win.header ? win.header + "\n" : "") + (win.text || "(this widget has no content right now)");
+      return { kind: "widget", note: `reading widget "${w.title}"`, text: `Widget "${w.title}" (${w.type}):\n${text}` };
+    }
+    if (name === "search_dashboard" && ctx.dashboard) {
+      const q = String(args?.query ?? "").trim();
+      if (!q) return { kind: "message", text: "No query provided." };
+      const { text, hitIds } = searchWidgets(ctx.dashboard.widgets, q);
+      const note = hitIds.length
+        ? `searching dashboard for "${q}" — matches in ${hitIds.join(", ")}`
+        : `searching dashboard for "${q}" — no matches`;
+      return { kind: "widget", note, text };
+    }
     if (name === "search_kiwix" && ctx.kiwix) {
       const q = String(args?.query ?? "").trim();
       if (!q) return { kind: "message", text: "No query provided." };
-      const results = await kiwixSearch(ctx.kiwix.baseUrl, ctx.kiwix.source, q, 6, signal);
+      const results = ctx.kiwix.source
+        ? await kiwixSearch(ctx.kiwix.baseUrl, ctx.kiwix.source, q, 6, signal)
+        : await searchAllBooks(ctx.kiwix.baseUrl, q, 6, signal);
       return { kind: "search", source: "kiwix", query: q, results: results.map(r => ({ title: r.title, ref: r.url, link: r.url, snippet: r.snippet })) };
     }
     if (name === "get_article" && ctx.kiwix) {
@@ -294,11 +421,13 @@ export async function POST(request: NextRequest) {
     reasoningEffort = "",
     kiwix = null,
     anytype = null,
+    dashboard = null,
     ttl = 0,
   }: {
     baseUrl: string; apiKey?: string; model: string; messages: ChatMessage[];
     stream?: boolean; maxTokens?: number; reasoningEffort?: string; kiwix?: Kiwix | null;
     anytype?: Anytype | null;
+    dashboard?: Dashboard | null;
     ttl?: number; // LM Studio idle-unload, in seconds; set the model's linger per request
   } = await request.json();
 
@@ -316,12 +445,18 @@ export async function POST(request: NextRequest) {
     ...(Number(ttl) > 0 ? { ttl: Math.floor(Number(ttl)) } : {}),
   };
 
-  // ── Agentic path: model can call Kiwix and/or Anytype search tools ──────────
-  const useKiwix = !!(kiwix && kiwix.baseUrl && kiwix.source);
+  // ── Agentic path: model can call Kiwix/Anytype/dashboard tools ──────────────
+  const useKiwix = !!(kiwix && kiwix.baseUrl);
   const useAnytype = !!(anytype && anytype.baseUrl && anytype.apiKey && anytype.spaceId);
-  if (useKiwix || useAnytype) {
-    const toolCtx = { kiwix: useKiwix ? kiwix! : undefined, anytype: useAnytype ? anytype! : undefined };
+  const useDashboard = !!(dashboard && dashboard.widgets?.length);
+  if (useKiwix || useAnytype || useDashboard) {
+    const toolCtx = {
+      kiwix: useKiwix ? kiwix! : undefined,
+      anytype: useAnytype ? anytype! : undefined,
+      dashboard: useDashboard ? dashboard! : undefined,
+    };
     const tools = [
+      ...(useDashboard ? dashboardTools(dashboard!.widgets) : []),
       ...(useKiwix ? kiwixTools(kiwix!.sourceTitle) : []),
       ...(useAnytype ? anytypeTools(anytype!.spaceName) : []),
     ];
@@ -540,6 +675,10 @@ export async function POST(request: NextRequest) {
                 opened.add(n); // actually read → a real source regardless of inline [n]
                 emit(`\n📖 reading [${n}] ${out.title}\n`);
                 toolText = `[${n}] ${out.title}\n${out.meta ? out.meta + "\n\n" : ""}${out.text}`;
+              } else if (out.kind === "widget") {
+                // Dashboard data is the user's own; it is not a citeable source.
+                emit(`\n📊 ${out.note}\n`);
+                toolText = out.text;
               } else {
                 toolText = out.text;
                 emit(out.text + "\n");

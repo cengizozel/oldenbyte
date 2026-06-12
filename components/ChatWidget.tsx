@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Bot, Pencil, Send, Square, Check, X, RotateCcw, RefreshCw, Loader, Database, Eye, MessageSquare, Plus, ChevronRight, Library, Power, Layers, Users, Trash2 } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { gatherDashboardContext } from "@/lib/dashboardContext";
+import { gatherWidgetEntries, listDashboardWidgets, type WidgetEntry, type WidgetRosterItem } from "@/lib/dashboardContext";
+import { SettingsInput, SettingsSelect, SettingsTextarea } from "./ui/Field";
 import Markdown from "./Markdown";
 
 type Role = "user" | "assistant";
@@ -156,12 +157,15 @@ type ChatConfig = {
   model: string;
   system: string;
   useDashboard: boolean;
+  // Which widgets the dashboard lookup may read, by instance id. Missing key =
+  // included, so newly added widgets are searchable by default.
+  dashboardWidgets: Record<string, boolean>;
   maxTokens: number; // cap on response length; 0 = no limit (server default)
   length: Length;    // response-style preset: brevity instruction + suggested cap
   effort: Effort;    // reasoning-model thinking budget
   useKiwix: boolean;       // let the model search the Kiwix library via tools
-  kiwixUrl: string;        // kiwix-serve base URL
-  kiwixSource: string;     // selected ZIM content-route id
+  kiwixUrl: string;        // kiwix-serve base URL; lookups search ALL books on it
+  kiwixSource: string;     // legacy single-book pin (no longer set by the UI)
   kiwixSourceTitle: string;
   useAnytype: boolean;     // let the model search the user's Anytype via tools
   anytypeUrl: string;      // Anytype local API base (default 127.0.0.1:31009)
@@ -212,6 +216,7 @@ const DEFAULT_CONFIG: ChatConfig = {
   model: "",
   system: "",
   useDashboard: false,
+  dashboardWidgets: {},
   maxTokens: 0,
   length: "default",
   effort: "default",
@@ -296,11 +301,16 @@ export default function ChatWidget({
   const [anytypeBusy, setAnytypeBusy] = useState(false);
   const [anytypeError, setAnytypeError] = useState("");
 
-  // Dashboard context — gathered snapshot of the user's notes/feeds, injected
-  // when `config.useDashboard` is on. Cached so we don't re-fetch every message.
-  const [ctx, setCtx] = useState<{ text: string; chars: number; sections: number } | null>(null);
+  // Dashboard data — gathered per-widget when `config.useDashboard` is on and
+  // shipped with each request for the model's read_widget/search_dashboard
+  // tools (only a small roster enters the model's context). Cached so we don't
+  // re-fetch every message.
+  const [ctx, setCtx] = useState<WidgetEntry[] | null>(null);
   const [gathering, setGathering] = useState(false);
   const [showContext, setShowContext] = useState(false);
+  // Roster for the settings checkbox list (no content fetching).
+  const [roster, setRoster] = useState<WidgetRosterItem[]>([]);
+  const ctxChars = ctx ? ctx.reduce((n, e) => n + e.text.length, 0) : 0;
   // Dashboard tools (data toggle / view / refresh) tuck behind a "+" by the send button.
   const [toolsOpen, setToolsOpen] = useState(false);
 
@@ -351,11 +361,12 @@ export default function ChatWidget({
   const refreshContext = useCallback(async () => {
     setGathering(true);
     try {
-      const result = await gatherDashboardContext();
+      const excluded = configRef.current.dashboardWidgets;
+      const result = await gatherWidgetEntries(id => excluded[id] !== false);
       setCtx(result);
       return result;
     } catch {
-      const empty = { text: "", chars: 0, sections: 0 };
+      const empty: WidgetEntry[] = [];
       setCtx(empty);
       return empty;
     } finally {
@@ -376,6 +387,7 @@ export default function ChatWidget({
           const parsed: ChatState = JSON.parse(saved);
           cfg = { ...DEFAULT_CONFIG, ...parsed.config };
           setConfig(cfg);
+          configRef.current = cfg; // before refreshContext, so the gather respects saved checkboxes
           if (parsed.conversations?.length) {
             convs = parsed.conversations;
             active = parsed.activeId && convs.some(c => c.id === parsed.activeId) ? parsed.activeId : convs[0].id;
@@ -590,7 +602,9 @@ export default function ChatWidget({
     }
   }
 
-  async function loadKiwixSources(kiwixUrl: string, preferred: string) {
+  // List the server's books for the settings status line. Lookups always search
+  // every book, so there is nothing to pick here anymore.
+  async function loadKiwixSources(kiwixUrl: string) {
     if (!kiwixUrl.startsWith("http")) return;
     setLoadingKiwix(true);
     setKiwixError("");
@@ -599,11 +613,7 @@ export default function ChatWidget({
       const res = await fetch(`/api/kiwix?baseUrl=${encodeURIComponent(kiwixUrl)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      const list: { title: string; id: string }[] = data.sources ?? [];
-      setKiwixSources(list);
-      const keep = list.find(s => s.id === preferred);
-      const pick = keep ?? list[0];
-      if (pick) setDraft(d => ({ ...d, kiwixSource: pick.id, kiwixSourceTitle: pick.title }));
+      setKiwixSources(data.sources ?? []);
     } catch (e) {
       setKiwixError(String((e as Error).message ?? e));
     } finally {
@@ -685,8 +695,10 @@ export default function ChatWidget({
     setSettingsOpen(true);
     // Auto-load the model list so the dropdown is ready (keeps the chosen model).
     if (config.baseUrl) fetchModels(config);
-    if (config.kiwixUrl) loadKiwixSources(config.kiwixUrl, config.kiwixSource);
+    if (config.kiwixUrl) loadKiwixSources(config.kiwixUrl);
     if (config.anytypeUrl && config.anytypeApiKey) loadAnytypeSpaces(config.anytypeUrl, config.anytypeApiKey, config.anytypeSpaceId);
+    // Roster for the dashboard checkbox list (names only, no data fetching).
+    listDashboardWidgets().then(setRoster).catch(() => setRoster([]));
   }
 
   function saveSettings() {
@@ -699,8 +711,12 @@ export default function ChatWidget({
       kiwixUrl: draft.kiwixUrl.trim(),
     };
     setConfig(next);
+    configRef.current = next;
     persist(next, messages);
     setSettingsOpen(false);
+    // Checkbox changes invalidate the cached gather; rebuild if lookup is on.
+    setCtx(null);
+    if (next.useDashboard) refreshContext();
   }
 
   function clearChat() {
@@ -901,10 +917,10 @@ export default function ChatWidget({
     }
   }
 
-  // Combine the user's system prompt with a snapshot of dashboard data when the
-  // toggle is on, so the model can answer questions about the user's own notes
-  // and feeds.
-  function buildSystemContent(dash: typeof ctx): string {
+  // Combine the user's system prompt with tool guidance. Dashboard data itself
+  // never enters the prompt: the model reads it on demand through the
+  // read_widget/search_dashboard tools (the request carries the data).
+  function buildSystemContent(dash: WidgetEntry[] | null): string {
     const parts: string[] = [BASE_IDENTITY];
     // The active character's persona (the default Assistant's persona is the
     // config system prompt, so editing it in settings still works) + its memory.
@@ -920,25 +936,21 @@ export default function ChatWidget({
     }
     const styleHint = LENGTH_PRESETS[config.length].instruction;
     if (styleHint) parts.push(styleHint);
-    if (config.useDashboard && dash?.text) {
+    if (config.useDashboard && dash?.length) {
       const todayStr = new Date().toISOString().split("T")[0];
       parts.push(
-        `The user has turned on dashboard access. Inside <dashboard> below is a live snapshot of their dashboard, captured just now. Today is ${todayStr}.\n\n` +
-        `Each section is headed by its source and type in parentheses, and means:\n` +
-        `- "Notes": the user's own notepad entries, grouped by date, newest first — their personal writing and memory. Quote them faithfully.\n` +
-        `- "Feed", "Reddit", "YouTube", "arXiv", "HF Daily": the latest items from external sources the user follows, newest first, usually with links — the material for "what's new" questions.\n` +
-        `- "F1": the upcoming race and current driver standings.\n` +
-        `- "Tracker (time spent)": how much time the user has logged per activity, by date.\n` +
-        `- "Text": a small custom value the user pinned.\n\n` +
-        `Your job is to help the user make sense of their own dashboard: answer questions about their notes and the things they follow, recall what they wrote on a given date, summarize or highlight what's new or notable, and connect related items. ` +
-        `Refer to specific dates, titles, and links from the data when relevant. ` +
-        `This snapshot is everything you can see — if the answer isn't in it, say so plainly rather than guessing or inventing entries, and don't assume anything beyond what's shown.\n\n` +
-        `<dashboard>\n${dash.text}\n</dashboard>`
+        `The user has turned on dashboard access. Today is ${todayStr}. You can read their dashboard through two tools:\n` +
+        `- read_widget(id): read one widget's current content. The tool description lists every widget available right now (their notes, feeds, tracker, headlines...). Long content comes back in parts; use find="keywords" to jump to matching sections or page=N to read sequentially.\n` +
+        `- search_dashboard(query): keyword-search across ALL widgets at once, when you don't know which widget holds the answer.\n\n` +
+        `When the user asks about their notes, what they wrote, their tracked time, or what's new in the things they follow, use these tools rather than guessing. ` +
+        `Typical flow: for "what's new on X" read that widget directly; for "where did I mention Y" search the dashboard first, then read the matching widget for context. ` +
+        `Notes are the user's own writing: quote them faithfully, with their dates. ` +
+        `What the tools return is everything you can see. If the answer isn't there, say so plainly rather than inventing entries.`
       );
     }
-    if (config.useKiwix && config.kiwixUrl && config.kiwixSource) {
+    if (config.useKiwix && config.kiwixUrl) {
       parts.push(
-        `You have access to the user's offline Kiwix reference library${config.kiwixSourceTitle ? ` (${config.kiwixSourceTitle})` : ""} through the search_kiwix and get_article tools. ` +
+        `You have access to the user's offline Kiwix reference library through the search_kiwix and get_article tools. It spans every book installed on their server (Wikipedia, WikiHow, and more), searched all at once. ` +
         `For factual, encyclopedic, or how-to questions — or when asked to look something up or verify something — use the tools rather than guessing. For casual chat or things you know well, just answer directly.\n\n` +
         `Work as a research loop, one step at a time, thinking between every step:\n` +
         `1. PLAN: restate the goal and what facts you still need. Pick the single best next action. For a question with several parts, the best source is usually ONE overview/list/hub page that contains them all, not separate searches per item.\n` +
@@ -1060,11 +1072,14 @@ export default function ChatWidget({
           maxTokens: config.maxTokens,
           reasoningEffort: config.effort === "default" ? "" : config.effort,
           stream: true,
-          kiwix: config.useKiwix && config.kiwixUrl && config.kiwixSource
-            ? { baseUrl: config.kiwixUrl, source: config.kiwixSource, sourceTitle: config.kiwixSourceTitle }
+          kiwix: config.useKiwix && config.kiwixUrl
+            ? { baseUrl: config.kiwixUrl } // no source: search every book on the server
             : null,
           anytype: config.useAnytype && config.anytypeUrl && config.anytypeApiKey && config.anytypeSpaceId
             ? { baseUrl: config.anytypeUrl, apiKey: config.anytypeApiKey, spaceId: config.anytypeSpaceId, spaceName: config.anytypeSpaceName }
+            : null,
+          dashboard: dash?.length
+            ? { widgets: dash.map(e => ({ id: e.id, title: e.title, type: e.type, text: e.text })) }
             : null,
           // LM Studio sets its idle-unload from the request itself; pass the
           // chosen linger as ttl seconds (Ollama uses its own keep_alive path).
@@ -1171,7 +1186,7 @@ export default function ChatWidget({
           {/* Active character — click to switch/manage personas */}
           <button
             onClick={() => setCharactersOpen(true)}
-            title={activeCharacter ? `Talking to ${activeCharacter.name} — click to switch character` : "Characters"}
+            title={activeCharacter ? `Talking to ${activeCharacter.name}, click to switch character` : "Characters"}
             className="shrink-0 text-sm leading-none hover:opacity-70 transition-opacity"
           >
             {activeCharacter && activeCharacter.id !== DEFAULT_CHARACTER_ID ? activeCharacter.emoji : <Bot size={14} className="opacity-60" />}
@@ -1211,7 +1226,7 @@ export default function ChatWidget({
               <div className="relative">
                 <button
                   onClick={() => setPowerOpen(o => !o)}
-                  title={isLoaded ? `Model loaded on ${backend} — click to control how long it stays` : "Model not loaded"}
+                  title={isLoaded ? `Model loaded on ${backend}: click to control how long it stays` : "Model not loaded"}
                   className={`flex items-center gap-1 text-[10px] leading-none rounded-full px-1.5 py-1 border transition-colors ${
                     isLoaded
                       ? "border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
@@ -1296,9 +1311,9 @@ export default function ChatWidget({
         <div className={`shrink-0 px-4 pb-1.5 text-[10px] truncate ${c.label} opacity-45`}>
           {gathering
             ? "gathering your dashboard data…"
-            : ctx?.sections
-              ? `using your dashboard · ${ctx.sections} section${ctx.sections === 1 ? "" : "s"} · ~${Math.round(ctx.chars / 1000)}k chars`
-              : "using your dashboard · no data found"}
+            : ctx?.length
+              ? `dashboard lookup on · ${ctx.length} widget${ctx.length === 1 ? "" : "s"} · ~${Math.round(ctxChars / 1000)}k chars readable`
+              : "dashboard lookup on · no data found"}
         </div>
       )}
 
@@ -1431,33 +1446,33 @@ export default function ChatWidget({
           </div>
           <div className="flex-1 min-h-0 overflow-auto p-4 flex flex-col gap-3">
             <div className="flex gap-2">
-              <input value={charDraft.emoji} onChange={e => setCharDraft(d => (d ? { ...d, emoji: e.target.value } : d))} placeholder="🎓" maxLength={8} className="w-14 text-center text-lg border border-neutral-200 rounded-xl px-2 py-2 outline-none bg-white" />
-              <input value={charDraft.name} onChange={e => setCharDraft(d => (d ? { ...d, name: e.target.value } : d))} placeholder="Education Coach" className="flex-1 text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white" />
+              <SettingsInput value={charDraft.emoji} onChange={e => setCharDraft(d => (d ? { ...d, emoji: e.target.value } : d))} placeholder="🎓" maxLength={8} className="!w-14 text-center text-lg px-2" />
+              <SettingsInput value={charDraft.name} onChange={e => setCharDraft(d => (d ? { ...d, name: e.target.value } : d))} placeholder="Education Coach" className="flex-1" />
             </div>
             {charDraft.id === DEFAULT_CHARACTER_ID ? (
-              <p className="text-[11px] text-neutral-400 leading-relaxed">This is the default Assistant. Edit its system prompt in Settings; it doesn&apos;t keep memory. Create a new character for a persona with its own scoped memory.</p>
+              <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">This is the default Assistant. Edit its system prompt in Settings; it doesn&apos;t keep memory. Create a new character for a persona with its own scoped memory.</p>
             ) : (
               <>
                 <div>
                   <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Persona <span className="opacity-60">(its system prompt)</span></p>
-                  <textarea value={charDraft.persona} onChange={e => setCharDraft(d => (d ? { ...d, persona: e.target.value } : d))} rows={4} placeholder="You are my education coach. Help me plan, stay accountable, and learn effectively." className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white resize-none" />
+                  <SettingsTextarea value={charDraft.persona} onChange={e => setCharDraft(d => (d ? { ...d, persona: e.target.value } : d))} rows={4} placeholder="You are my education coach. Help me plan, stay accountable, and learn effectively." />
                 </div>
                 <div>
-                  <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Remembers <span className="opacity-60">(what it cares about — empty = no memory)</span></p>
-                  <input value={charDraft.focus} onChange={e => setCharDraft(d => (d ? { ...d, focus: e.target.value } : d))} placeholder="my education, goals, academic background" className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white" />
+                  <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Remembers <span className="opacity-60">(what it cares about; empty = no memory)</span></p>
+                  <SettingsInput value={charDraft.focus} onChange={e => setCharDraft(d => (d ? { ...d, focus: e.target.value } : d))} placeholder="my education, goals, academic background" />
                 </div>
                 <div>
                   <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Memories <span className="opacity-60">({charDraft.memories.length})</span></p>
                   <div className="flex flex-col gap-1">
                     {charDraft.memories.map((m, i) => (
                       <div key={i} className="flex items-center gap-2">
-                        <input value={m} onChange={e => setCharDraft(d => { if (!d) return d; const mem = [...d.memories]; mem[i] = e.target.value; return { ...d, memories: mem }; })} className="flex-1 text-xs border border-neutral-200 rounded-lg px-2 py-1.5 outline-none focus:border-neutral-300 text-neutral-700 bg-white" />
-                        <button onClick={() => setCharDraft(d => (d ? { ...d, memories: d.memories.filter((_, j) => j !== i) } : d))} className="shrink-0 text-neutral-400 hover:text-red-400"><Trash2 size={13} /></button>
+                        <input value={m} onChange={e => setCharDraft(d => { if (!d) return d; const mem = [...d.memories]; mem[i] = e.target.value; return { ...d, memories: mem }; })} className="flex-1 text-xs border border-[var(--surface-border)] rounded-lg px-2 py-1.5 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] bg-[var(--surface)]" />
+                        <button onClick={() => setCharDraft(d => (d ? { ...d, memories: d.memories.filter((_, j) => j !== i) } : d))} className="shrink-0 text-[var(--text-muted)] hover:text-red-400"><Trash2 size={13} /></button>
                       </div>
                     ))}
-                    <button onClick={() => setCharDraft(d => (d ? { ...d, memories: [...d.memories, ""] } : d))} className="self-start text-[11px] text-neutral-400 hover:text-neutral-600 flex items-center gap-1 mt-0.5"><Plus size={11} /> add memory</button>
+                    <button onClick={() => setCharDraft(d => (d ? { ...d, memories: [...d.memories, ""] } : d))} className="self-start text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] flex items-center gap-1 mt-0.5"><Plus size={11} /> add memory</button>
                   </div>
-                  <p className="text-[10px] text-neutral-400 mt-1">It also adds to these automatically after chats, based on what you share that fits its focus.</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">It also adds to these automatically after chats, based on what you share that fits its focus.</p>
                 </div>
               </>
             )}
@@ -1465,14 +1480,14 @@ export default function ChatWidget({
         </div>
       )}
 
-      {/* Context viewer overlay — the full system message sent to the model
-          (framing + system prompt + style hint + the <dashboard> data block) */}
+      {/* Context viewer overlay: the system message, then the widget data the
+          model can reach through its tools */}
       {showContext && (
         <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
           <div className={`flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b ${c.border}`}>
             <span className={`flex items-center gap-1.5 text-xs font-medium opacity-70 ${c.label}`}>
               <Database size={13} />
-              Context sent to the model{ctx ? ` · ${ctx.sections} section${ctx.sections === 1 ? "" : "s"} · ~${Math.round(ctx.chars / 1000)}k chars` : ""}
+              Model context{ctx ? ` · ${ctx.length} widget${ctx.length === 1 ? "" : "s"} · ~${Math.round(ctxChars / 1000)}k chars readable` : ""}
             </span>
             <button onClick={() => setShowContext(false)} title="Close" className={`opacity-50 hover:opacity-90 ${c.label}`}>
               <X size={14} />
@@ -1481,25 +1496,29 @@ export default function ChatWidget({
           <div className="flex-1 min-h-0 overflow-auto p-4">
             <pre className={`text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono ${c.text} opacity-90`}>
               {buildSystemContent(ctx) || "No context gathered."}
+              {ctx?.length
+                ? "\n\n──── data readable through tools (not in the prompt) ────\n\n" + ctx.map(e => e.text).join("\n\n")
+                : ""}
             </pre>
           </div>
         </div>
       )}
 
       {settingsOpen ? (
-        /* Settings panel */
+        /* Settings panel: Model, Behavior, Data sources */
         <div className="flex flex-col gap-3 flex-1 min-h-0 p-4">
-          <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-1">
+          <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
+
+            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 ${c.label}`}>Model</p>
 
             <div>
               <p className={`text-xs mb-1 opacity-50 ${c.label}`}>API URL</p>
-              <input
+              <SettingsInput
                 autoFocus
                 type="url"
                 value={draft.baseUrl}
                 onChange={e => setDraft(d => ({ ...d, baseUrl: e.target.value }))}
                 placeholder="http://localhost:11434/v1"
-                className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
               />
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {PRESETS.map(p => (
@@ -1520,7 +1539,7 @@ export default function ChatWidget({
                 <button
                   onClick={() => fetchModels(draft)}
                   disabled={loadingModels}
-                  className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-neutral-600 disabled:opacity-40"
+                  className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:opacity-40"
                   title="Load models from server"
                 >
                   {loadingModels ? <Loader size={10} className="animate-spin" /> : <RefreshCw size={10} />}
@@ -1528,131 +1547,37 @@ export default function ChatWidget({
                 </button>
               </div>
               {models.length > 0 ? (
-                <select
+                <SettingsSelect
                   value={draft.model}
                   onChange={e => setDraft(d => ({ ...d, model: e.target.value }))}
-                  className="w-full text-sm border border-neutral-200 rounded-xl px-2.5 py-2 outline-none focus:border-neutral-300 text-neutral-700 bg-white"
                 >
                   <option value="" disabled>Select a model…</option>
                   {draft.model && !models.includes(draft.model) && (
                     <option value={draft.model}>{draft.model} (custom)</option>
                   )}
                   {models.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
+                </SettingsSelect>
               ) : (
-                <input
+                <SettingsInput
                   type="text"
                   value={draft.model}
                   onChange={e => setDraft(d => ({ ...d, model: e.target.value }))}
-                  placeholder="e.g. llama3.2 — or click Load models"
-                  className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
+                  placeholder="e.g. llama3.2, or click Load models"
                 />
               )}
               {modelsError && <p className="text-red-400 text-[11px] mt-1">{modelsError}</p>}
             </div>
 
+            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 mt-1 ${c.label}`}>Behavior</p>
+
             <div>
               <p className={`text-xs mb-1 opacity-50 ${c.label}`}>System prompt <span className="opacity-60">(optional)</span></p>
-              <textarea
+              <SettingsTextarea
                 value={draft.system}
                 onChange={e => setDraft(d => ({ ...d, system: e.target.value }))}
                 placeholder="You are a helpful assistant."
                 rows={2}
-                className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white resize-none"
               />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <p className={`text-xs opacity-50 ${c.label}`}>Kiwix lookup <span className="opacity-60">(optional)</span></p>
-                <button
-                  onClick={() => loadKiwixSources(draft.kiwixUrl, draft.kiwixSource)}
-                  disabled={loadingKiwix || !draft.kiwixUrl.startsWith("http")}
-                  className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-neutral-600 disabled:opacity-40"
-                  title="Load libraries from the Kiwix server"
-                >
-                  {loadingKiwix ? <Loader size={10} className="animate-spin" /> : <RefreshCw size={10} />}
-                  Load sources
-                </button>
-              </div>
-              <input
-                type="url"
-                value={draft.kiwixUrl}
-                onChange={e => setDraft(d => ({ ...d, kiwixUrl: e.target.value }))}
-                placeholder="Kiwix URL — e.g. http://192.168.1.24:3702"
-                className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
-              />
-              {kiwixSources.length > 0 && (
-                <select
-                  value={draft.kiwixSource}
-                  onChange={e => {
-                    const s = kiwixSources.find(x => x.id === e.target.value);
-                    setDraft(d => ({ ...d, kiwixSource: e.target.value, kiwixSourceTitle: s?.title ?? "" }));
-                  }}
-                  className="w-full mt-1.5 text-sm border border-neutral-200 rounded-xl px-2.5 py-2 outline-none focus:border-neutral-300 text-neutral-700 bg-white"
-                >
-                  {kiwixSources.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-                </select>
-              )}
-              {kiwixError && <p className="text-red-400 text-[11px] mt-1">{kiwixError}</p>}
-              <p className="text-[10px] text-neutral-400 mt-1">Turn lookup on with the library icon by the send button.</p>
-            </div>
-
-            <div>
-              <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Anytype lookup <span className="opacity-60">(optional)</span></p>
-              <input
-                type="url"
-                value={draft.anytypeUrl}
-                onChange={e => setDraft(d => ({ ...d, anytypeUrl: e.target.value, anytypeApiKey: "" }))}
-                placeholder="http://127.0.0.1:31009"
-                className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
-              />
-              {draft.anytypeApiKey ? (
-                anytypeSpaces.length > 0 ? (
-                  <select
-                    value={draft.anytypeSpaceId}
-                    onChange={e => {
-                      const s = anytypeSpaces.find(x => x.id === e.target.value);
-                      setDraft(d => ({ ...d, anytypeSpaceId: e.target.value, anytypeSpaceName: s?.name ?? "" }));
-                    }}
-                    className="w-full mt-1.5 text-sm border border-neutral-200 rounded-xl px-2.5 py-2 outline-none focus:border-neutral-300 text-neutral-700 bg-white"
-                  >
-                    {anytypeSpaces.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                ) : (
-                  <p className="text-[10px] text-neutral-400 mt-1.5 flex items-center gap-1">
-                    {anytypeBusy && <Loader size={10} className="animate-spin" />} paired ✓ {draft.anytypeSpaceName && `· ${draft.anytypeSpaceName}`}
-                  </p>
-                )
-              ) : anytypePairing === "awaiting-code" ? (
-                <div className="flex items-center gap-2 mt-1.5">
-                  <input
-                    inputMode="numeric"
-                    value={anytypeCode}
-                    onChange={e => setAnytypeCode(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && confirmAnytypeCode()}
-                    placeholder="4-digit code from Anytype"
-                    className="flex-1 text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white tracking-widest"
-                  />
-                  <button
-                    onClick={confirmAnytypeCode}
-                    disabled={anytypeBusy || !anytypeCode.trim()}
-                    className="text-xs px-3 py-2 rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:text-neutral-900 disabled:opacity-40 shrink-0"
-                  >
-                    {anytypeBusy ? <Loader size={12} className="animate-spin" /> : "Confirm"}
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={startAnytypePairing}
-                  disabled={anytypeBusy || !draft.anytypeUrl.startsWith("http")}
-                  className="mt-1.5 text-xs px-3 py-1.5 rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:text-neutral-900 disabled:opacity-40"
-                >
-                  {anytypeBusy ? <span className="flex items-center gap-1.5"><Loader size={12} className="animate-spin" /> contacting…</span> : "Pair with Anytype"}
-                </button>
-              )}
-              {anytypeError && <p className="text-red-400 text-[11px] mt-1">{anytypeError}</p>}
-              <p className="text-[10px] text-neutral-400 mt-1">Pair, pick a space, then turn lookup on with the box icon by the send button.</p>
             </div>
 
             <div>
@@ -1682,7 +1607,7 @@ export default function ChatWidget({
                   <button
                     key={opt.value}
                     onClick={() => setDraft(d => ({ ...d, effort: opt.value }))}
-                    title={opt.value === "none" ? "Disable the model's chain-of-thought — fastest" : opt.value === "default" ? "Use the model's default" : `reasoning_effort: ${opt.value}`}
+                    title={opt.value === "none" ? "Disable the model's chain-of-thought (fastest)" : opt.value === "default" ? "Use the model's default" : `reasoning_effort: ${opt.value}`}
                     className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
                       draft.effort === opt.value
                         ? "border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)]"
@@ -1697,14 +1622,13 @@ export default function ChatWidget({
 
             <div>
               <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Max response length <span className="opacity-60">(tokens, 0 = no limit)</span></p>
-              <input
+              <SettingsInput
                 type="number"
                 min={0}
                 step={50}
                 value={draft.maxTokens || ""}
                 onChange={e => setDraft(d => ({ ...d, maxTokens: Number(e.target.value) }))}
                 placeholder="0"
-                className="w-full text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-300 text-neutral-700 placeholder:text-neutral-300 bg-white"
               />
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {[128, 256, 512, 1024].map(n => (
@@ -1721,6 +1645,118 @@ export default function ChatWidget({
                   </button>
                 ))}
               </div>
+            </div>
+
+            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 mt-1 ${c.label}`}>Data sources</p>
+
+            <div>
+              <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Dashboard widgets the model may read</p>
+              {roster.length === 0 ? (
+                <p className="text-[10px] text-[var(--text-muted)]">No data widgets on the active dashboard.</p>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {roster.map(w => {
+                    const on = draft.dashboardWidgets[w.id] !== false;
+                    return (
+                      <label key={w.id} className={`flex items-center gap-2 text-xs cursor-pointer ${c.text} ${on ? "opacity-85" : "opacity-45"}`}>
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          onChange={() => setDraft(d => ({ ...d, dashboardWidgets: { ...d.dashboardWidgets, [w.id]: !on } }))}
+                          className="accent-current"
+                        />
+                        <span className="truncate">{w.title}</span>
+                        <span className={`text-[10px] opacity-60 ${c.label}`}>{w.type}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-[10px] text-[var(--text-muted)] mt-1">Turn lookup on with the database icon by the send button.</p>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <p className={`text-xs opacity-50 ${c.label}`}>Kiwix library <span className="opacity-60">(all books are searched)</span></p>
+                <button
+                  onClick={() => loadKiwixSources(draft.kiwixUrl)}
+                  disabled={loadingKiwix || !draft.kiwixUrl.startsWith("http")}
+                  className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:opacity-40"
+                  title="List the books on the server"
+                >
+                  {loadingKiwix ? <Loader size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                  Check server
+                </button>
+              </div>
+              <SettingsInput
+                type="url"
+                value={draft.kiwixUrl}
+                onChange={e => setDraft(d => ({ ...d, kiwixUrl: e.target.value }))}
+                placeholder="Kiwix URL, e.g. http://192.168.1.24:3702"
+              />
+              {kiwixSources.length > 0 && (
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                  {kiwixSources.length} book{kiwixSources.length === 1 ? "" : "s"}: {kiwixSources.map(s => s.title).join(", ")}
+                </p>
+              )}
+              {kiwixError && <p className="text-red-400 text-[11px] mt-1">{kiwixError}</p>}
+              <p className="text-[10px] text-[var(--text-muted)] mt-1">Adding books to the server widens the search automatically. Turn lookup on with the library icon by the send button.</p>
+            </div>
+
+            <div>
+              <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Anytype</p>
+              <SettingsInput
+                type="url"
+                value={draft.anytypeUrl}
+                onChange={e => setDraft(d => ({ ...d, anytypeUrl: e.target.value, anytypeApiKey: "" }))}
+                placeholder="http://127.0.0.1:31009"
+              />
+              {draft.anytypeApiKey ? (
+                anytypeSpaces.length > 0 ? (
+                  <SettingsSelect
+                    value={draft.anytypeSpaceId}
+                    onChange={e => {
+                      const s = anytypeSpaces.find(x => x.id === e.target.value);
+                      setDraft(d => ({ ...d, anytypeSpaceId: e.target.value, anytypeSpaceName: s?.name ?? "" }));
+                    }}
+                    className="mt-1.5"
+                  >
+                    {anytypeSpaces.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </SettingsSelect>
+                ) : (
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1.5 flex items-center gap-1">
+                    {anytypeBusy && <Loader size={10} className="animate-spin" />} paired ✓ {draft.anytypeSpaceName && `· ${draft.anytypeSpaceName}`}
+                  </p>
+                )
+              ) : anytypePairing === "awaiting-code" ? (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <SettingsInput
+                    inputMode="numeric"
+                    value={anytypeCode}
+                    onChange={e => setAnytypeCode(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && confirmAnytypeCode()}
+                    placeholder="4-digit code from Anytype"
+                    className="flex-1 tracking-widest"
+                  />
+                  <button
+                    onClick={confirmAnytypeCode}
+                    disabled={anytypeBusy || !anytypeCode.trim()}
+                    className="text-xs px-3 py-2 rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-primary)] hover:border-[var(--surface-border-focus)] disabled:opacity-40 shrink-0"
+                  >
+                    {anytypeBusy ? <Loader size={12} className="animate-spin" /> : "Confirm"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={startAnytypePairing}
+                  disabled={anytypeBusy || !draft.anytypeUrl.startsWith("http")}
+                  className="mt-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-primary)] hover:border-[var(--surface-border-focus)] disabled:opacity-40"
+                >
+                  {anytypeBusy ? <span className="flex items-center gap-1.5"><Loader size={12} className="animate-spin" /> contacting…</span> : "Pair with Anytype"}
+                </button>
+              )}
+              {anytypeError && <p className="text-red-400 text-[11px] mt-1">{anytypeError}</p>}
+              <p className="text-[10px] text-[var(--text-muted)] mt-1">Pair, pick a space, then turn lookup on with the box icon by the send button.</p>
             </div>
 
           </div>
@@ -1857,14 +1893,14 @@ export default function ChatWidget({
                 disabled={!configured || !loaded}
                 rows={1}
                 placeholder={configured ? "Message…" : "Configure a model first"}
-                className="flex-1 resize-none overflow-y-auto text-sm outline-none text-neutral-700 placeholder:text-neutral-300 bg-transparent py-1 disabled:opacity-50"
+                className="flex-1 resize-none overflow-y-auto text-sm outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-transparent py-1 disabled:opacity-50"
               />
               {/* Dashboard tools, revealed by the "+" toggle */}
               {toolsOpen && (
                 <div className="flex items-center shrink-0">
                   <button
                     onClick={toggleDashboard}
-                    title={config.useDashboard ? "Using dashboard data — click to turn off" : "Answer using my dashboard data"}
+                    title={config.useDashboard ? "Using dashboard data: click to turn off" : "Answer using my dashboard data"}
                     className={`p-1.5 rounded-full ${config.useDashboard ? toolOnCls : dashCtrlCls}`}
                   >
                     <Database size={14} />
@@ -1872,8 +1908,8 @@ export default function ChatWidget({
                   {config.useDashboard && (
                     <button
                       onClick={() => setShowContext(true)}
-                      disabled={!ctx?.text}
-                      title="View the data sent to the model"
+                      disabled={!ctx?.length}
+                      title="View the data the model can read"
                       className={`p-1.5 rounded-full ${dashCtrlCls} disabled:!opacity-25`}
                     >
                       <Eye size={14} />
@@ -1890,15 +1926,15 @@ export default function ChatWidget({
                     </button>
                   )}
                   <button
-                    onClick={() => (config.kiwixUrl && config.kiwixSource ? toggleKiwix() : openSettings())}
+                    onClick={() => (config.kiwixUrl ? toggleKiwix() : openSettings())}
                     title={
-                      !config.kiwixUrl || !config.kiwixSource
-                        ? "Set up Kiwix lookup in settings"
+                      !config.kiwixUrl
+                        ? "Set up the Kiwix library in settings"
                         : config.useKiwix
-                          ? `Kiwix lookup on (${config.kiwixSourceTitle || "library"}) — click to turn off`
+                          ? "Kiwix lookup on (all books): click to turn off"
                           : "Let me look things up in your Kiwix library"
                     }
-                    className={`p-1.5 rounded-full ${config.useKiwix ? toolOnCls : dashCtrlCls} ${(!config.kiwixUrl || !config.kiwixSource) ? "opacity-30" : ""}`}
+                    className={`p-1.5 rounded-full ${config.useKiwix ? toolOnCls : dashCtrlCls} ${!config.kiwixUrl ? "opacity-30" : ""}`}
                   >
                     <Library size={14} />
                   </button>

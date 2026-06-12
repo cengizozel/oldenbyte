@@ -72,6 +72,17 @@ export async function listSources(baseUrl: string, signal?: AbortSignal): Promis
     .filter((s) => s.id);
 }
 
+function parseResults(xml: string, base: string): KiwixResult[] {
+  return blocks(xml, "item").map((item) => {
+    const link = tagText(item, "link"); // e.g. /content/<source>/A/Article
+    return {
+      title: cleanField(tagText(item, "title")),
+      url: link.startsWith("http") ? link : `${base}${link.startsWith("/") ? "" : "/"}${link}`,
+      snippet: cleanField(tagText(item, "description")),
+    };
+  });
+}
+
 // Full-text search within one source. `limit` is clamped to 1–20.
 export async function search(
   baseUrl: string,
@@ -93,14 +104,98 @@ export async function search(
     throw new Error(`Search failed (HTTP ${res.status}) — is the source available on the server?`);
   }
   const xml = await res.text();
-  return blocks(xml, "item").map((item) => {
-    const link = tagText(item, "link"); // e.g. /content/<source>/A/Article
-    return {
-      title: cleanField(tagText(item, "title")),
-      url: link.startsWith("http") ? link : `${base}${link.startsWith("/") ? "" : "/"}${link}`,
-      snippet: cleanField(tagText(item, "description")),
-    };
+  return parseResults(xml, base);
+}
+
+// Search several books in ONE request via repeated books.name params.
+// kiwix-serve merges and ranks server-side, but rejects sets that mix
+// languages, so callers must group by language first.
+async function searchBooks(
+  base: string,
+  bookIds: string[],
+  query: string,
+  limit: number,
+  signal?: AbortSignal
+): Promise<KiwixResult[]> {
+  const params = new URLSearchParams({
+    pattern: query,
+    format: "xml",
+    pageLength: String(Math.min(Math.max(limit, 1), 20)),
   });
+  for (const id of bookIds) params.append("books.name", id);
+  const res = await fetch(`${base}/search?${params}`, { signal });
+  if (!res.ok) throw new Error(`Search failed (HTTP ${res.status})`);
+  return parseResults(await res.text(), base);
+}
+
+// Language of a ZIM, inferred from its id ("wikipedia_en_all_maxi_2024-01" →
+// "en"). Unknown layouts fall into their own group so a bad guess can only
+// fail its own request.
+function sourceLang(id: string): string {
+  const m = id.match(/^[^_]+_([a-z]{2,3})(?:[_-]|$)/i);
+  return m ? m[1].toLowerCase() : `solo:${id}`;
+}
+
+// Catalog cache so all-books search doesn't re-fetch OPDS on every tool call.
+let catalogCache: { base: string; at: number; sources: KiwixSource[] } | null = null;
+const CATALOG_TTL = 5 * 60 * 1000;
+
+async function cachedSources(base: string, signal?: AbortSignal): Promise<KiwixSource[]> {
+  if (catalogCache && catalogCache.base === base && Date.now() - catalogCache.at < CATALOG_TTL) {
+    return catalogCache.sources;
+  }
+  const sources = await listSources(base, signal);
+  catalogCache = { base, at: Date.now(), sources };
+  return sources;
+}
+
+// Full-text search across EVERY book on the server: one request per language
+// group, round-robin merged so a single huge book doesn't drown the others.
+// Adding a ZIM to the server widens the searchable area with no config change.
+export async function searchAllBooks(
+  baseUrl: string,
+  query: string,
+  limit = 8,
+  signal?: AbortSignal
+): Promise<KiwixResult[]> {
+  const base = normalizeBase(baseUrl);
+  const sources = await cachedSources(base, signal);
+  if (!sources.length) return [];
+
+  const groups = new Map<string, KiwixSource[]>();
+  for (const s of sources) {
+    const lang = sourceLang(s.id);
+    const g = groups.get(lang) ?? [];
+    g.push(s);
+    groups.set(lang, g);
+  }
+
+  const settled = await Promise.allSettled(
+    [...groups.values()].map(g => searchBooks(base, g.map(s => s.id), query, limit, signal))
+  );
+  const lists = settled
+    .filter((r): r is PromiseFulfilledResult<KiwixResult[]> => r.status === "fulfilled")
+    .map(r => r.value)
+    .filter(l => l.length);
+  if (!lists.length) return [];
+
+  const merged: KiwixResult[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; merged.length < limit; i++) {
+    let any = false;
+    for (const list of lists) {
+      if (i >= list.length) continue;
+      any = true;
+      const r = list[i];
+      if (!seen.has(r.url)) {
+        seen.add(r.url);
+        merged.push(r);
+        if (merged.length >= limit) break;
+      }
+    }
+    if (!any) break;
+  }
+  return merged;
 }
 
 // Strip tags (cells separated by spaces), decode, drop citation markers, tidy.
