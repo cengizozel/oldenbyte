@@ -10,6 +10,7 @@ import { colorMap, WIDGET_CATEGORIES } from "@/lib/widgets";
 // Templates can be dragged into the grid or clicked to add.
 export default function WidgetShelf({
   templates,
+  bankTemplates = [],
   onAdd,
   onTemplateDragStart,
   onTemplateDragEnd,
@@ -18,6 +19,7 @@ export default function WidgetShelf({
   onReset,
 }: {
   templates: Widget[];
+  bankTemplates?: Widget[];
   onAdd: (template: Widget) => void;
   onTemplateDragStart: (template: Widget) => void;
   onTemplateDragEnd: () => void;
@@ -64,13 +66,15 @@ export default function WidgetShelf({
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const matches = q
-      ? templates.filter(t => t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q))
-      : templates;
-    return WIDGET_CATEGORIES
-      .map(cat => ({ ...cat, items: matches.filter(t => (t.category ?? "tools") === cat.id) }))
-      .filter(g => g.items.length > 0);
-  }, [templates, query]);
+    const match = (t: Widget) =>
+      !q || t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q);
+    const matches = templates.filter(match);
+    const built = WIDGET_CATEGORIES
+      .map(cat => ({ id: cat.id as string, label: cat.label, items: matches.filter(t => (t.category ?? "tools") === cat.id) }));
+    // Community widgets come from the widget bank (JSON defs, not code).
+    built.push({ id: "community", label: "Community", items: bankTemplates.filter(match) });
+    return built.filter(g => g.items.length > 0);
+  }, [templates, bankTemplates, query]);
 
   return (
     <div

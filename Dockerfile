@@ -28,6 +28,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Community widget definitions (read from disk at runtime, not bundled)
+COPY --from=builder /app/widget-bank ./widget-bank
+
 # Copy native better-sqlite3 module (not included in standalone output)
 COPY --from=builder /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 COPY --from=builder /app/node_modules/bindings ./node_modules/bindings

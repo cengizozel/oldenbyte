@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix" | "anytype";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix" | "anytype" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -20,6 +20,8 @@ export type Widget = {
   color: WidgetColor;
   digestable?: boolean;
   category?: WidgetCategory;
+  // For type "custom": which widget-bank definition renders this instance.
+  bankId?: string;
 };
 
 export type ColorClasses = {

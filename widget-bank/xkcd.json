@@ -1,0 +1,15 @@
+{
+  "id": "xkcd",
+  "title": "xkcd",
+  "description": "Today's xkcd comic.",
+  "color": "neutral",
+  "defaultSize": { "w": 1, "h": 3 },
+  "fetch": {
+    "url": "https://xkcd.com/info.0.json",
+    "cacheMinutes": 360
+  },
+  "layout": [
+    { "component": "label", "value": "$.title", "size": "sm" },
+    { "component": "image", "src": "$.img", "caption": "$.alt" }
+  ]
+}

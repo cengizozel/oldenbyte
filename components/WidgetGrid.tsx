@@ -25,6 +25,8 @@ import dynamic from "next/dynamic";
 import ChatWidget from "./ChatWidget";
 import KiwixWidget from "./KiwixWidget";
 import AnytypeWidget from "./AnytypeWidget";
+import BankWidget from "./BankWidget";
+import type { BankWidgetDef } from "@/lib/widgetBank";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 const ChessWidget = dynamic(() => import("./ChessWidget"), { ssr: false });
 
@@ -55,8 +57,9 @@ const initialInstances: Record<string, Widget> = {
   "chat-default":  { id: "chat-default",  type: "chat",     color: "sky",    title: "Chat",     description: "Chat with a local or OpenAI-compatible model." },
 };
 
-function renderWidget(widget: Widget, extraClass = "") {
+function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, BankWidgetDef> = {}) {
   const cls = `h-full ${extraClass}`;
+  if (widget.type === "custom")   return <BankWidget widget={widget} def={widget.bankId ? bankDefs[widget.bankId] : undefined} className={cls} />;
   if (widget.type === "notebook") return <NotebookWidget widget={widget} className={cls} />;
   if (widget.type === "text")     return <TextWidget     widget={widget} className={cls} />;
   if (widget.type === "rss")      return <RssWidget      widget={widget} className={cls} />;
@@ -91,6 +94,36 @@ export default function WidgetGrid({
   const [layout, setLayout] = useState<TabLayoutItem[]>(initialLayout);
   const [instances, setInstances] = useState<Record<string, Widget>>(initialInstances);
   const [loaded, setLoaded] = useState(false);
+
+  // Community widget-bank definitions: render existing instances and offer
+  // templates in the shelf's Community group.
+  const [bankDefs, setBankDefs] = useState<Record<string, BankWidgetDef>>({});
+  const [bankTemplates, setBankTemplates] = useState<Widget[]>([]);
+  useEffect(() => {
+    fetch("/api/widget-bank")
+      .then(r => r.json())
+      .then((d: { widgets?: BankWidgetDef[] }) => {
+        const defs: Record<string, BankWidgetDef> = {};
+        const templates: Widget[] = [];
+        for (const def of d.widgets ?? []) {
+          defs[def.id] = def;
+          templates.push({
+            id: def.id,
+            type: "custom",
+            bankId: def.id,
+            color: def.color ?? "neutral",
+            title: def.title,
+            description: def.description,
+            digestable: def.digestable ?? false,
+          });
+        }
+        setBankDefs(defs);
+        setBankTemplates(templates);
+      })
+      .catch(() => {});
+  }, []);
+
+  const renderW = (w: Widget, extraClass = "") => renderWidget(w, extraClass, bankDefs);
   const [gridReady, setGridReady] = useState(false);
   const [groupingSource, setGroupingSource] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
@@ -301,7 +334,9 @@ export default function WidgetGrid({
 
   function addWidget(template: Widget, instanceId?: string) {
     const id = instanceId ?? `${template.id}-${Date.now()}`;
-    const { w: dw, h: dh } = DEFAULT_SIZE[template.type] ?? { w: 2, h: 2 };
+    const { w: dw, h: dh } = template.type === "custom"
+      ? (template.bankId ? bankDefs[template.bankId]?.defaultSize : undefined) ?? { w: 1, h: 3 }
+      : DEFAULT_SIZE[template.type] ?? { w: 2, h: 2 };
     const { x, y, w, h } = findNextPosition(layout, dw, dh);
 
     const layoutIds = new Set(layout.map(l => l.i));
@@ -372,7 +407,7 @@ export default function WidgetGrid({
     if (!hasTabs) {
       const widget = instances[item.i];
       if (!widget) return null;
-      return renderWidget(widget);
+      return renderW(widget);
     }
     const activeId = activeTabs[item.i] ?? item.i;
     const activeWidget = instances[activeId];
@@ -413,7 +448,7 @@ export default function WidgetGrid({
             if (!w) return null;
             return (
               <div key={tabId} className="absolute inset-0" style={{ display: tabId === activeId ? "block" : "none" }}>
-                {renderWidget(w, "!rounded-none !border-0 !shadow-none")}
+                {renderW(w, "!rounded-none !border-0 !shadow-none")}
               </div>
             );
           })}
@@ -428,6 +463,7 @@ export default function WidgetGrid({
     {editing && (
       <WidgetShelf
         templates={widgets}
+        bankTemplates={bankTemplates}
         onAdd={addWidget}
         onTemplateDragStart={template => {
           const id = `${template.id}-${Date.now()}`;
@@ -553,14 +589,14 @@ export default function WidgetGrid({
                         const hasTabs = (item.tabs?.length ?? 0) > 0;
                         if (!hasTabs) {
                           const w = instances[item.i];
-                          return w ? renderWidget(w) : null;
+                          return w ? renderW(w) : null;
                         }
                         return [item.i, ...(item.tabs ?? [])].map(tabId => {
                           const w = instances[tabId];
                           if (!w) return null;
                           return (
                             <div key={tabId} className="absolute inset-0" style={{ display: tabId === activeId ? "block" : "none" }}>
-                              {renderWidget(w, "!rounded-none !border-0 !shadow-none")}
+                              {renderW(w, "!rounded-none !border-0 !shadow-none")}
                             </div>
                           );
                         });

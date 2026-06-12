@@ -1,0 +1,18 @@
+{
+  "id": "hacker-news",
+  "title": "Hacker News",
+  "description": "Front page stories right now.",
+  "color": "orange",
+  "defaultSize": { "w": 1, "h": 3 },
+  "fetch": {
+    "url": "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=15",
+    "cacheMinutes": 30
+  },
+  "items": {
+    "path": "$.hits",
+    "title": "$.title",
+    "link": "$.url",
+    "meta": "$.points | count",
+    "limit": 12
+  }
+}
