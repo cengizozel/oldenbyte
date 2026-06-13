@@ -383,7 +383,11 @@ function SettingsPanel({
   timezone: string;
   onChangeTimezone: (tz: string) => void;
 }) {
-  const zones = timezoneOptions();
+  // Build the zone list on the client only: Node's and the browser's ICU
+  // timezone databases differ (e.g. Asmera vs Asmara), so computing it during
+  // SSR and again on the client mismatches and breaks hydration.
+  const [zones, setZones] = useState<string[]>([]);
+  useEffect(() => { setZones(timezoneOptions()); }, []);
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
