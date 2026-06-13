@@ -417,11 +417,14 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: str
               className="w-full bg-transparent text-xs outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
             />
           </div>
-          <div className="max-h-56 overflow-y-auto flex flex-col">
+          {/* Plain block flow, not flex: a capped flex column would shrink the
+              rows (flex-shrink) and `truncate`'s overflow:hidden would then clip
+              the squished text into thin slices. */}
+          <div className="max-h-56 overflow-y-auto">
             {autoMatches && (
               <button
                 onClick={() => pick(TZ_AUTO)}
-                className={`text-left text-xs px-2 py-1.5 rounded-lg text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 ${value === "" ? "font-medium bg-black/5 dark:bg-white/10" : ""}`}
+                className={`block w-full text-left text-xs leading-normal px-2 py-2 rounded-lg text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 ${value === "" ? "bg-black/5 dark:bg-white/10 font-medium" : ""}`}
               >
                 Automatic
               </button>
@@ -430,7 +433,7 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: str
               <button
                 key={z}
                 onClick={() => pick(z)}
-                className={`text-left text-xs px-2 py-1.5 rounded-lg truncate text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 ${z === value ? "font-medium bg-black/5 dark:bg-white/10" : ""}`}
+                className={`block w-full text-left text-xs leading-normal px-2 py-2 rounded-lg truncate text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 ${z === value ? "bg-black/5 dark:bg-white/10 font-medium" : ""}`}
               >
                 {z}
               </button>
