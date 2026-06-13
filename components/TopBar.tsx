@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, Plus, Pencil } from "lucide-react";
+import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, Plus, Pencil, Search } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { isDark, toggleTheme, THEME_EVENT } from "@/lib/theme";
 import { layoutKey, instancesKey, type DashboardsState } from "@/lib/dashboards";
@@ -362,6 +362,89 @@ function DateDisplay({ timezone }: { timezone: string }) {
   );
 }
 
+// ── TimezoneSelect ───────────────────────────────────────────────────────────
+
+// A searchable timezone picker: type to filter, scroll a height-capped list.
+// Replaces the native 400-option <select>. The zone list is built on the client
+// only (Node and the browser ship different ICU databases, which would mismatch
+// during hydration).
+function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: string) => void }) {
+  const [zones, setZones] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setZones(timezoneOptions()); }, []);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q ? zones.filter(z => z.toLowerCase().includes(q)) : zones;
+  const autoMatches = !q || "automatic".includes(q);
+
+  function pick(tz: string) { onChange(tz); setOpen(false); setQuery(""); }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => { setOpen(o => !o); setQuery(""); }}
+        className="flex items-center gap-1 max-w-[11rem] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+        title="Change timezone"
+      >
+        <span className="truncate">{value || "Automatic"}</span>
+        <ChevronDown size={11} className="shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-[var(--surface)] border border-[var(--surface-border)] rounded-xl shadow-lg p-1">
+          <div className="flex items-center gap-1.5 px-2 py-1 mb-1 border-b border-[var(--surface-border)]">
+            <Search size={12} className="text-[var(--text-muted)] shrink-0" />
+            <input
+              autoFocus
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Escape") { setOpen(false); return; }
+                if (e.key === "Enter") {
+                  if (filtered.length) pick(filtered[0]);
+                  else if (autoMatches) pick(TZ_AUTO);
+                }
+              }}
+              placeholder="Search zones"
+              className="w-full bg-transparent text-xs outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto flex flex-col">
+            {autoMatches && (
+              <button
+                onClick={() => pick(TZ_AUTO)}
+                className={`text-left text-xs px-2 py-1.5 rounded-lg text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 ${value === "" ? "font-medium bg-black/5 dark:bg-white/10" : ""}`}
+              >
+                Automatic
+              </button>
+            )}
+            {filtered.map(z => (
+              <button
+                key={z}
+                onClick={() => pick(z)}
+                className={`text-left text-xs px-2 py-1.5 rounded-lg truncate text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 ${z === value ? "font-medium bg-black/5 dark:bg-white/10" : ""}`}
+              >
+                {z}
+              </button>
+            ))}
+            {!autoMatches && filtered.length === 0 && (
+              <p className="text-xs text-[var(--text-muted)] px-2 py-2">no matches</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── SettingsPanel ──────────────────────────────────────────────────────────
 
 function SettingsPanel({
@@ -383,11 +466,6 @@ function SettingsPanel({
   timezone: string;
   onChangeTimezone: (tz: string) => void;
 }) {
-  // Build the zone list on the client only: Node's and the browser's ICU
-  // timezone databases differ (e.g. Asmera vs Asmara), so computing it during
-  // SSR and again on the client mismatches and breaks hydration.
-  const [zones, setZones] = useState<string[]>([]);
-  useEffect(() => { setZones(timezoneOptions()); }, []);
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -431,17 +509,10 @@ function SettingsPanel({
 
           <section className="flex flex-col gap-2">
             <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Time</span>
-            <label className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-[var(--text-secondary)] shrink-0">Timezone</span>
-              <select
-                value={timezone}
-                onChange={e => onChangeTimezone(e.target.value)}
-                className="min-w-0 flex-1 text-xs text-right bg-transparent text-[var(--text-secondary)] outline-none cursor-pointer truncate"
-              >
-                <option value={TZ_AUTO}>Automatic</option>
-                {zones.map(z => <option key={z} value={z}>{z}</option>)}
-              </select>
-            </label>
+              <TimezoneSelect value={timezone} onChange={onChangeTimezone} />
+            </div>
           </section>
 
           <section className="flex flex-col gap-3">
