@@ -153,6 +153,55 @@ async function readTracker(id: string, title: string): Promise<string> {
   }).join("\n");
 }
 
+async function readRhythm(id: string, title: string): Promise<string> {
+  type Item = { id: string; name: string; kind?: "moment" | "session"; mode?: "build" | "reduce"; target?: number };
+  const [config, logData] = await Promise.all([
+    readJSON<{ items: Item[] }>(`rhythm-config-${id}`),
+    readJSON<{ events?: Record<string, number[]>; sessions?: Record<string, [number, number][]> }>(`rhythm-log-${id}`),
+  ]);
+  if (!config?.items?.length) return "The rhythm widget has no items yet.";
+  const events = logData?.events ?? {};
+  const sessions = logData?.sessions ?? {};
+  const DAY = 86400000;
+  const windowStart = Date.now() - 30 * DAY;
+  const minutesOfDay = (ms: number) => { const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
+  const meanTime = (mins: number[]): string | null => {
+    if (!mins.length) return null;
+    let sx = 0, sy = 0;
+    for (const m of mins) { const a = (m / 1440) * 2 * Math.PI; sx += Math.cos(a); sy += Math.sin(a); }
+    let mean = Math.atan2(sy / mins.length, sx / mins.length);
+    if (mean < 0) mean += 2 * Math.PI;
+    const t = Math.round((mean / (2 * Math.PI)) * 1440) % 1440;
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  };
+  const since = (ms: number) => {
+    const h = Math.floor((Date.now() - ms) / 3600000);
+    if (h < 1) return "under an hour ago";
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+  const lines = config.items.map(it => {
+    const goal = it.mode === "reduce" ? "reducing" : "building";
+    if ((it.kind ?? "moment") === "session") {
+      const sess = (sessions[it.id] ?? []).filter(s => s[0] >= windowStart);
+      if (!sess.length) return `- ${it.name} (session, ${goal}): nothing logged in 30 days`;
+      const avg = sess.reduce((a, s) => a + (s[1] - s[0]), 0) / sess.length / 1000;
+      const h = Math.floor(avg / 3600), m = Math.floor((avg % 3600) / 60);
+      const bed = meanTime(sess.map(s => minutesOfDay(s[0])));
+      const wake = meanTime(sess.map(s => minutesOfDay(s[1])));
+      const lastEnd = Math.max(...sess.map(s => s[1]));
+      return `- ${it.name} (session, ${goal}): ${sess.length} in 30 days, average ${h}h ${m}m, typically ${bed} to ${wake}, last ended ${since(lastEnd)}`;
+    }
+    const evs = (events[it.id] ?? []).filter(t => t >= windowStart);
+    if (!evs.length) return `- ${it.name} (${goal}): nothing logged in 30 days`;
+    const last7 = evs.filter(t => t >= Date.now() - 7 * DAY).length;
+    const last = Math.max(...evs);
+    const tgt = it.target != null ? `, ${it.mode === "reduce" ? "limit" : "target"} ${it.target}/day` : "";
+    return `- ${it.name} (${goal}${tgt}): ${(last7 / 7).toFixed(1)}x/day over the last week, ${evs.length} in 30 days, last ${since(last)}`;
+  });
+  return `## ${title} (Rhythm, habit logging)\nToday is ${today()}. Times are local.\n` + lines.join("\n");
+}
+
 async function readF1(title: string): Promise<string> {
   // The F1 widget caches hourly; read today's freshest snapshot.
   const rows = await prisma.setting.findMany({
@@ -260,6 +309,7 @@ export async function readWidgetData(id: string, type: string, title: string): P
       case "weather":  return await readWeather(id, title);
       case "calendar": return await readCalendar(id, title);
       case "tracker":  return await readTracker(id, title);
+      case "rhythm":   return await readRhythm(id, title);
       case "f1":       return await readF1(title);
       case "rss":      return await readRss(id, title);
       case "reddit":   return await readReddit(id, title);

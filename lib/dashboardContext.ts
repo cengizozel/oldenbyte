@@ -16,7 +16,7 @@ type WidgetInstance = { id: string; type: string; title: string };
 
 // Widget types worth feeding to the model as text. Notebook is handled
 // separately (full history); reader/chess/chat/empty have no useful text.
-const FEED_TYPES = new Set(["text", "f1", "weather", "calendar", "rss", "reddit", "youtube", "arxiv", "hf", "tracker"]);
+const FEED_TYPES = new Set(["text", "f1", "weather", "calendar", "rss", "reddit", "youtube", "arxiv", "hf", "tracker", "rhythm"]);
 
 const today = () => new Date().toISOString().split("T")[0];
 
@@ -300,6 +300,51 @@ async function gatherTracker(id: string, title: string): Promise<string | null> 
   return `## ${title} (Tracker — time spent)\n${blocks.join("\n")}`;
 }
 
+async function gatherRhythm(id: string, title: string): Promise<string | null> {
+  type Item = { id: string; name: string; kind?: "moment" | "session"; mode?: "build" | "reduce"; target?: number };
+  const [config, logData] = await Promise.all([
+    readJSON<{ items: Item[] }>(`rhythm-config-${id}`),
+    readJSON<{ events?: Record<string, number[]>; sessions?: Record<string, [number, number][]> }>(`rhythm-log-${id}`),
+  ]);
+  if (!config?.items?.length) return null;
+  const events = logData?.events ?? {};
+  const sessions = logData?.sessions ?? {};
+  const DAY = 86400000;
+  const windowStart = Date.now() - 30 * DAY;
+  const minutesOfDay = (ms: number) => { const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
+  const meanTime = (mins: number[]): string | null => {
+    if (!mins.length) return null;
+    let sx = 0, sy = 0;
+    for (const m of mins) { const a = (m / 1440) * 2 * Math.PI; sx += Math.cos(a); sy += Math.sin(a); }
+    let mean = Math.atan2(sy / mins.length, sx / mins.length);
+    if (mean < 0) mean += 2 * Math.PI;
+    const t = Math.round((mean / (2 * Math.PI)) * 1440) % 1440;
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  };
+  const since = (ms: number) => {
+    const h = Math.floor((Date.now() - ms) / 3600000);
+    if (h < 1) return "under an hour ago";
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+  const lines = config.items.map(it => {
+    const goal = it.mode === "reduce" ? "reducing" : "building";
+    if ((it.kind ?? "moment") === "session") {
+      const sess = (sessions[it.id] ?? []).filter(s => s[0] >= windowStart);
+      if (!sess.length) return `- ${it.name} (session, ${goal}): nothing logged in 30 days`;
+      const avg = sess.reduce((a, s) => a + (s[1] - s[0]), 0) / sess.length / 1000;
+      const h = Math.floor(avg / 3600), m = Math.floor((avg % 3600) / 60);
+      return `- ${it.name} (session, ${goal}): ${sess.length} in 30 days, average ${h}h ${m}m, typically ${meanTime(sess.map(s => minutesOfDay(s[0])))} to ${meanTime(sess.map(s => minutesOfDay(s[1])))}, last ended ${since(Math.max(...sess.map(s => s[1])))}`;
+    }
+    const evs = (events[it.id] ?? []).filter(t => t >= windowStart);
+    if (!evs.length) return `- ${it.name} (${goal}): nothing logged in 30 days`;
+    const last7 = evs.filter(t => t >= Date.now() - 7 * DAY).length;
+    const tgt = it.target != null ? `, ${it.mode === "reduce" ? "limit" : "target"} ${it.target}/day` : "";
+    return `- ${it.name} (${goal}${tgt}): ${(last7 / 7).toFixed(1)}x/day over the last week, ${evs.length} in 30 days, last ${since(Math.max(...evs))}`;
+  });
+  return `## ${title} (Rhythm — habit logging)\nToday is ${today()}. Times are local.\n${lines.join("\n")}`;
+}
+
 async function gatherWidget(id: string, w: WidgetInstance): Promise<string | null> {
   switch (w.type) {
     case "notebook": return gatherNotebook(id, w.title);
@@ -313,6 +358,7 @@ async function gatherWidget(id: string, w: WidgetInstance): Promise<string | nul
     case "arxiv":   return gatherArxiv(id, w.title);
     case "hf":      return gatherHf(id, w.title);
     case "tracker": return gatherTracker(id, w.title);
+    case "rhythm":  return gatherRhythm(id, w.title);
     default:        return null;
   }
 }

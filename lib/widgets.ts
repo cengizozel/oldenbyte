@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -146,6 +146,15 @@ export const widgets: Widget[] = [
     color: "teal",
     title: "Tracker",
     description: "Time how long you spend on each activity.",
+    digestable: false,
+  },
+  {
+    id: "rhythm",
+    type: "rhythm",
+    category: "tools",
+    color: "rose",
+    title: "Rhythm",
+    description: "Tap to log habits and see how often and when you do them.",
     digestable: false,
   },
   {

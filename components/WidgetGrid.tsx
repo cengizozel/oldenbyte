@@ -22,6 +22,7 @@ import F1Widget from "./F1Widget";
 import ArxivWidget from "./ArxivWidget";
 import HuggingFaceWidget from "./HuggingFaceWidget";
 import TrackerWidget from "./TrackerWidget";
+import RhythmWidget from "./RhythmWidget";
 import dynamic from "next/dynamic";
 import ChatWidget from "./ChatWidget";
 import KiwixWidget from "./KiwixWidget";
@@ -75,6 +76,7 @@ function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, 
   if (widget.type === "arxiv")    return <ArxivWidget    widget={widget} className={cls} />;
   if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className={cls} />;
   if (widget.type === "tracker")  return <TrackerWidget   widget={widget} className={cls} />;
+  if (widget.type === "rhythm")   return <RhythmWidget    widget={widget} className={cls} />;
   if (widget.type === "chess")    return <ChessWidget     widget={widget} className={cls} />;
   if (widget.type === "chat")     return <ChatWidget      widget={widget} className={cls} />;
   if (widget.type === "kiwix")    return <KiwixWidget     widget={widget} className={cls} />;
@@ -352,6 +354,7 @@ export default function WidgetGrid({
     arxiv:    { w: 2, h: 3 },
     hf:       { w: 2, h: 3 },
     tracker:  { w: 1, h: 3 },
+    rhythm:   { w: 1, h: 3 },
     chess:    { w: 2, h: 4 },
     chat:     { w: 1, h: 4 },
     kiwix:    { w: 1, h: 4 },
