@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Plus, Play, Square, History, Trash2, X, Flame, ChevronLeft, Undo2 } from "lucide-react";
+import { Activity, Plus, Minus, Play, Square, History, Trash2, X, Flame, ChevronLeft } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { tagColor } from "@/lib/colors";
@@ -215,9 +215,6 @@ export default function RhythmWidget({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [detailDate, setDetailDate] = useState<string | null>(null);
 
-  // After a tap, the row offers a few seconds to undo a misclick.
-  const [justLogged, setJustLogged] = useState<{ id: string; t: number } | null>(null);
-
   const today = localDateStr();
 
   useEffect(() => {
@@ -263,13 +260,14 @@ export default function RhythmWidget({
     const t = Date.now();
     const events = { ...log.events, [id]: [...(log.events[id] ?? []), t].sort((a, b) => a - b) };
     persistLog({ ...log, events });
-    setJustLogged({ id, t });
   }
 
-  function undoLast(id: string, t: number) {
-    const list = (log.events[id] ?? []).filter(x => x !== t);
-    persistLog({ ...log, events: { ...log.events, [id]: list } });
-    setJustLogged(null);
+  // Drop the most recent tap (events stay sorted, so it is the last element) —
+  // the quick correction for an accidental tap.
+  function removeLastMoment(id: string) {
+    const list = log.events[id] ?? [];
+    if (!list.length) return;
+    persistLog({ ...log, events: { ...log.events, [id]: list.slice(0, -1) } });
   }
 
   function toggleSession(id: string) {
@@ -290,13 +288,6 @@ export default function RhythmWidget({
       persistConfig(items, nextOpen);
     }
   }
-
-  // Clear the undo affordance a few seconds after the tap.
-  useEffect(() => {
-    if (!justLogged) return;
-    const t = setTimeout(() => setJustLogged(null), 4000);
-    return () => clearTimeout(t);
-  }, [justLogged]);
 
   // ── Settings ─────────────────────────────────────────────────────────────
   function addItem() {
@@ -515,44 +506,51 @@ export default function RhythmWidget({
                 );
               }
 
-              const showUndo = justLogged?.id === it.id;
-
               return (
                 <li key={it.id}>
-                  <button
-                    onClick={() => (isSession ? toggleSession(it.id) : logMoment(it.id))}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                  <div
+                    className={`group/r flex items-center rounded-lg transition-colors ${
                       isOpen ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"
                     }`}
                   >
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: dot }} />
-                    <span className="flex-1 min-w-0">
-                      <span className="flex items-center gap-1.5">
-                        <span className={`truncate text-sm ${c.text}`}>{it.name}</span>
-                        {streak >= 2 && (
-                          <span className={`flex items-center gap-0.5 text-[10px] tabular-nums shrink-0 ${c.label} opacity-60`} title={`${streak}-day ${it.mode === "reduce" ? "clean " : ""}streak`}>
-                            <Flame size={10} />{streak}
-                          </span>
-                        )}
+                    <button
+                      onClick={() => (isSession ? toggleSession(it.id) : logMoment(it.id))}
+                      className="flex-1 min-w-0 flex items-center gap-2 pl-2 py-1.5 text-left"
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: dot }} />
+                      <span className="flex-1 min-w-0">
+                        <span className="flex items-center gap-1.5">
+                          <span className={`truncate text-sm ${c.text}`}>{it.name}</span>
+                          {streak >= 2 && (
+                            <span className={`flex items-center gap-0.5 text-[10px] tabular-nums shrink-0 ${c.label} opacity-60`} title={`${streak}-day ${it.mode === "reduce" ? "clean " : ""}streak`}>
+                              <Flame size={10} />{streak}
+                            </span>
+                          )}
+                        </span>
+                        <span className={`block text-[10px] leading-tight ${c.label} opacity-55 truncate`}>{secondary}</span>
                       </span>
-                      <span className={`block text-[10px] leading-tight ${c.label} opacity-55 truncate`}>
-                        {showUndo ? (
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={e => { e.stopPropagation(); undoLast(it.id, justLogged!.t); }}
-                            className="inline-flex items-center gap-0.5 hover:opacity-100 opacity-80"
-                          >
-                            <Undo2 size={9} /> logged · undo
-                          </span>
-                        ) : secondary}
-                      </span>
-                    </span>
-                    {primary}
-                    <span className={isOpen ? c.label : `opacity-35 ${c.label}`}>
+                      {primary}
+                    </button>
+                    {/* Stepper: minus removes the last tap, the action adds one
+                        (sessions start/stop instead). */}
+                    {!isSession && (
+                      <button
+                        onClick={() => removeLastMoment(it.id)}
+                        disabled={count === 0}
+                        title="Remove last entry"
+                        className={`shrink-0 px-1.5 py-1.5 ${c.label} opacity-40 hover:!opacity-90 disabled:opacity-0 disabled:pointer-events-none`}
+                      >
+                        <Minus size={13} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => (isSession ? toggleSession(it.id) : logMoment(it.id))}
+                      title={isSession ? (isOpen ? "Stop" : "Start") : "Add one"}
+                      className={`shrink-0 pr-2 pl-0.5 py-1.5 ${isOpen ? c.label : `opacity-40 hover:opacity-90 ${c.label}`}`}
+                    >
                       {isSession ? (isOpen ? <Square size={13} /> : <Play size={13} />) : <Plus size={14} />}
-                    </span>
-                  </button>
+                    </button>
+                  </div>
                 </li>
               );
             })}
