@@ -400,12 +400,12 @@ async function runTool(
   name: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any,
-  ctx: { kiwix?: Kiwix; anytype?: Anytype; dashboard?: Dashboard; caldav?: Caldav },
+  ctx: { kiwix?: Kiwix; anytype?: Anytype; dashboard?: Dashboard; caldav?: Caldav; today?: string },
   signal: AbortSignal,
 ): Promise<ToolResult> {
   try {
     if (name === "list_calendar_events" && ctx.caldav) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = ctx.today ?? new Date().toISOString().slice(0, 10);
       const start = /^\d{4}-\d{2}-\d{2}$/.test(String(args?.start_date ?? "")) ? String(args.start_date) : today;
       const end = /^\d{4}-\d{2}-\d{2}$/.test(String(args?.end_date ?? ""))
         ? String(args.end_date)
@@ -538,6 +538,7 @@ export async function POST(request: NextRequest) {
     anytype = null,
     dashboard = null,
     caldav = null,
+    today = "",
     ttl = 0,
   }: {
     baseUrl: string; apiKey?: string; model: string; messages: ChatMessage[];
@@ -545,6 +546,7 @@ export async function POST(request: NextRequest) {
     anytype?: Anytype | null;
     dashboard?: Dashboard | null;
     caldav?: Caldav | null;
+    today?: string; // the client's local date (YYYY-MM-DD), for calendar anchoring
     ttl?: number; // LM Studio idle-unload, in seconds; set the model's linger per request
   } = await request.json();
 
@@ -573,6 +575,7 @@ export async function POST(request: NextRequest) {
       anytype: useAnytype ? anytype! : undefined,
       dashboard: useDashboard ? dashboard! : undefined,
       caldav: useCaldav ? caldav! : undefined,
+      today: /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : undefined,
     };
     const tools = [
       ...(useDashboard ? dashboardTools(dashboard!.widgets) : []),

@@ -6,6 +6,7 @@ import * as storage from "@/lib/storage";
 import { isDark, toggleTheme, THEME_EVENT } from "@/lib/theme";
 import { layoutKey, instancesKey, type DashboardsState } from "@/lib/dashboards";
 import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
+import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, TZ_AUTO } from "@/lib/timezone";
 
 // ── EditableField ─────────────────────────────────────────────────────────
 
@@ -265,12 +266,15 @@ const FORMAT_OPTIONS: { value: DateFormat; label: string }[] = [
 
 const NEEDS_SECONDS: DateFormat[] = ["time-12", "time-24", "datetime-12", "datetime-24", "analog"];
 
-function DateDisplay() {
+function DateDisplay({ timezone }: { timezone: string }) {
   const [format, setFormat] = useState<DateFormat>("date-long");
   const [now, setNow] = useState(() => new Date());
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateFormat>("date-long");
   const ref = useRef<HTMLDivElement>(null);
+
+  // Render the chosen zone's wall clock (empty timezone = device).
+  const shown = zonedDate(now, effectiveTimezone(timezone));
 
   useEffect(() => {
     storage.getItem("topbar-date-format").then(saved => {
@@ -313,8 +317,8 @@ function DateDisplay() {
         title="Change format"
       >
         {format === "analog"
-          ? <AnalogClock time={now} size={48} />
-          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center [font-family:var(--font-dm-mono)]" suppressHydrationWarning>{fmt(now, format)}</span>
+          ? <AnalogClock time={shown} size={48} />
+          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center [font-family:var(--font-dm-mono)]" suppressHydrationWarning>{fmt(shown, format)}</span>
         }
       </button>
 
@@ -332,8 +336,8 @@ function DateDisplay() {
                 }`}
               >
                 {opt.value === "analog"
-                  ? <><AnalogClock time={now} size={18} /><span>Analog clock</span></>
-                  : fmt(now, opt.value)
+                  ? <><AnalogClock time={shown} size={18} /><span>Analog clock</span></>
+                  : fmt(shown, opt.value)
                 }
               </button>
             ))}
@@ -367,6 +371,8 @@ function SettingsPanel({
   onToggleDark,
   demo,
   onToggleDemo,
+  timezone,
+  onChangeTimezone,
 }: {
   open: boolean;
   onClose: () => void;
@@ -374,7 +380,10 @@ function SettingsPanel({
   onToggleDark: () => void;
   demo: boolean;
   onToggleDemo: () => void;
+  timezone: string;
+  onChangeTimezone: (tz: string) => void;
 }) {
+  const zones = timezoneOptions();
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -414,6 +423,21 @@ function SettingsPanel({
                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${dark ? "translate-x-4" : "translate-x-0"}`} />
               </button>
             </div>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Time</span>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-sm text-[var(--text-secondary)] shrink-0">Timezone</span>
+              <select
+                value={timezone}
+                onChange={e => onChangeTimezone(e.target.value)}
+                className="min-w-0 flex-1 text-xs text-right bg-transparent text-[var(--text-secondary)] outline-none cursor-pointer truncate"
+              >
+                <option value={TZ_AUTO}>Automatic</option>
+                {zones.map(z => <option key={z} value={z}>{z}</option>)}
+              </select>
+            </label>
           </section>
 
           <section className="flex flex-col gap-3">
@@ -593,10 +617,15 @@ export default function TopBar({
   const [dark, setDark] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [demo, setDemo] = useState(false);
+  const [timezone, setTz] = useState("");
 
   // Demo state comes from sessionStorage, so it can only be read client-side.
   useEffect(() => {
     setDemo(isDemoMode());
+  }, []);
+
+  useEffect(() => {
+    storage.getItem("timezone").then(v => setTz(v ?? ""));
   }, []);
 
   // Resolve the initial theme (DB wins, else whatever the FOUC script set) and
@@ -633,7 +662,7 @@ export default function TopBar({
         />
       </div>
       <div className="flex flex-col items-center justify-center gap-1.5">
-        <DateDisplay />
+        <DateDisplay timezone={timezone} />
         <div className="flex items-center gap-3">
           {dashboards && onDashboardsChange && (
             <DashboardSwitcher dashboards={dashboards} onChange={onDashboardsChange} />
@@ -700,6 +729,8 @@ export default function TopBar({
       onToggleDark={toggleDark}
       demo={demo}
       onToggleDemo={() => (demo ? exitDemoMode() : enterDemoMode())}
+      timezone={timezone}
+      onChangeTimezone={tz => { setTz(tz); setTimezone(tz); }}
     />
     </>
   );

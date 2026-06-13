@@ -6,6 +6,7 @@ import { Bot, Pencil, Send, Square, Check, X, RefreshCw, Loader, Database, Messa
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
+import { effectiveTimezone, nowLine, todayIn, TZ_EVENT } from "@/lib/timezone";
 import { listDashboardWidgets, getCalendarAccount, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
 import { SettingsInput, SettingsSelect, SettingsTextarea } from "./ui/Field";
 import { EmptyState } from "./ui/WidgetChrome";
@@ -412,6 +413,16 @@ export default function ChatWidget({
   const [charactersOpen, setCharactersOpen] = useState(false);   // characters list overlay
   const [editingCharId, setEditingCharId] = useState<string | null>(null); // editor overlay (null = closed)
   const [charDraft, setCharDraft] = useState<Character | null>(null);
+
+  // Timezone preference, so the prompt's date/time matches the user's clock.
+  // Kept in a ref read at send time, refreshed if changed in Settings.
+  const tzRef = useRef("");
+  useEffect(() => {
+    storage.getItem("timezone").then(v => { tzRef.current = v ?? ""; });
+    const onTz = (e: Event) => { tzRef.current = (e as CustomEvent).detail ?? ""; };
+    window.addEventListener(TZ_EVENT, onTz);
+    return () => window.removeEventListener(TZ_EVENT, onTz);
+  }, []);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -1178,7 +1189,9 @@ export default function ChatWidget({
   // never enters the prompt: the model reads it on demand through the
   // read_widget/search_dashboard tools (the request carries the data).
   function buildSystemContent(dash: WidgetRosterItem[] | null): string {
-    const parts: string[] = [BASE_IDENTITY];
+    const tz = effectiveTimezone(tzRef.current);
+    const todayStr = todayIn(tz);
+    const parts: string[] = [BASE_IDENTITY, `The current date and time is ${nowLine(tz)}. Use this for any "today", "now", or scheduling reasoning.`];
     // The active character's persona (the default Assistant's persona is the
     // config system prompt, so editing it in settings still works) + its memory.
     const ch = activeCharacter;
@@ -1194,7 +1207,6 @@ export default function ChatWidget({
     const styleHint = LENGTH_PRESETS[config.length].instruction;
     if (styleHint) parts.push(styleHint);
     if (dash?.length) {
-      const todayStr = new Date().toISOString().split("T")[0];
       parts.push(
         `The user has turned on dashboard access. Today is ${todayStr}. You can read their dashboard through two tools:\n` +
         `- read_widget(id): read one widget's current content. The tool description lists every widget available right now (their notes, feeds, tracker, headlines...). Long content comes back in parts; use find="keywords" to jump to matching sections or page=N to read sequentially.\n` +
@@ -1209,7 +1221,7 @@ export default function ChatWidget({
     if (calendarOn) {
       parts.push(
         `You can read and write the user's calendar through list_calendar_events and create_calendar_event. ` +
-        `Use list_calendar_events for any question about their schedule, free time, or upcoming events; today's date is ${new Date().toISOString().split("T")[0]}. ` +
+        `Use list_calendar_events for any question about their schedule, free time, or upcoming events; today's date is ${todayStr}. ` +
         `create_calendar_event NEVER writes directly: it shows the user a confirmation card and they decide. Only propose an event when the user explicitly asks to add or schedule something, and afterwards tell them it awaits their confirmation. ` +
         `If a create fails on a read-only calendar, say so and suggest a writable one.`
       );
@@ -1447,6 +1459,9 @@ export default function ChatWidget({
             ? { widgets: dash.map(w => ({ id: w.id, title: w.title, type: w.type })) }
             : null,
           caldav: !cont && calendarOn ? calSource!.account : null,
+          // The user's local date, so server-side calendar results anchor to the
+          // same "today" the prompt states (not the server's UTC date).
+          today: todayIn(effectiveTimezone(tzRef.current)),
           // LM Studio sets its idle-unload from the request itself; pass the
           // chosen linger as ttl seconds (Ollama uses its own keep_alive path).
           ttl: backend === "lmstudio" ? ttlSeconds(config.keepAlive) : 0,
