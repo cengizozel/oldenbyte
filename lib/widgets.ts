@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -155,6 +155,15 @@ export const widgets: Widget[] = [
     color: "rose",
     title: "Rhythm",
     description: "Tap to log habits and see how often and when you do them.",
+    digestable: false,
+  },
+  {
+    id: "upkeep",
+    type: "upkeep",
+    category: "tools",
+    color: "orange",
+    title: "Upkeep",
+    description: "Check off daily essentials and keep your day's score at 100.",
     digestable: false,
   },
   {

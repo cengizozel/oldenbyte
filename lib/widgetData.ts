@@ -202,6 +202,36 @@ async function readRhythm(id: string, title: string): Promise<string> {
   return `## ${title} (Rhythm, habit logging)\nToday is ${today()}. Times are local.\n` + lines.join("\n");
 }
 
+async function readUpkeep(id: string, title: string): Promise<string> {
+  type Item = { id: string; name: string; weight: number };
+  const [config, daysMap] = await Promise.all([
+    readJSON<{ items: Item[] }>(`upkeep-config-${id}`),
+    readJSON<Record<string, string[]>>(`upkeep-days-${id}`),
+  ]);
+  if (!config?.items?.length) return "The upkeep widget has no items yet.";
+  const items = config.items.map(i => ({ ...i, weight: i.weight > 0 ? i.weight : 1 }));
+  const days = daysMap ?? {};
+  const createdDay = (iid: string) => {
+    const ms = parseInt(iid.split("-")[0], 10);
+    return Number.isFinite(ms) ? new Date(ms).toISOString().split("T")[0] : "1970-01-01";
+  };
+  const score = (date: string): number | null => {
+    const active = items.filter(it => createdDay(it.id) <= date);
+    const total = active.reduce((a, it) => a + it.weight, 0);
+    if (total <= 0) return null;
+    const checked = new Set(days[date] ?? []);
+    const done = active.filter(it => checked.has(it.id)).reduce((a, it) => a + it.weight, 0);
+    return Math.round((done / total) * 100);
+  };
+  const t = today();
+  const checkedToday = new Set(days[t] ?? []);
+  const todayLines = items.map(it => `  ${it.name} (${it.weight}pts): ${checkedToday.has(it.id) ? "done" : "not yet"}`);
+  const recent = Object.keys(days).filter(d => d < t).sort((a, b) => b.localeCompare(a)).slice(0, 6)
+    .map(d => `  ${d}: ${score(d) ?? "—"}/100`);
+  const recentBlock = recent.length ? `\n### Recent days\n${recent.join("\n")}` : "";
+  return `## ${title} (Upkeep, daily essentials score)\nToday is ${t}. Score ${score(t) ?? "—"}/100.\n${todayLines.join("\n")}${recentBlock}`;
+}
+
 async function readF1(title: string): Promise<string> {
   // The F1 widget caches hourly; read today's freshest snapshot.
   const rows = await prisma.setting.findMany({
@@ -310,6 +340,7 @@ export async function readWidgetData(id: string, type: string, title: string): P
       case "calendar": return await readCalendar(id, title);
       case "tracker":  return await readTracker(id, title);
       case "rhythm":   return await readRhythm(id, title);
+      case "upkeep":   return await readUpkeep(id, title);
       case "f1":       return await readF1(title);
       case "rss":      return await readRss(id, title);
       case "reddit":   return await readReddit(id, title);
