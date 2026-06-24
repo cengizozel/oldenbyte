@@ -46,17 +46,30 @@ res.cookies.set(SESSION_COOKIE, token, {
 
 ## Middleware
 
-`proxy.ts` runs on every request except `/login` and `/api/auth`. The matcher explicitly excludes Next.js static assets, images, and favicon:
+`proxy.ts` is the Next.js 16 middleware (the renamed `middleware` convention). It runs on every request except `/login` and `/api/auth`. The matcher explicitly excludes Next.js static assets, images, and favicon:
 
 ```ts
 matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.png$).*)"]
 ```
+
+A request is allowed through if it carries a valid session cookie **or** a valid bearer token (see below). Otherwise API routes return `401 {"error":"Unauthorized"}` and page requests redirect to `/login`.
+
+## Headless / Bearer token
+
+For scripts and automation (e.g. configuring the dashboard via `/api/config`), set the `API_KEY` env var and send it as a bearer token:
+
+```
+Authorization: Bearer <API_KEY>
+```
+
+The middleware accepts this on any route, granting the same access as a logged-in session. The token path is **disabled** unless `API_KEY` is set. The key is compared in constant time (`lib/auth.ts` → `apiKeyValid`).
 
 ## Environment Variables
 
 | Variable | Description |
 |---|---|
 | `DASHBOARD_PASSWORD` | The login password |
-| `SESSION_SECRET` | Secret used to sign session tokens - generate with `openssl rand -hex 32` |
+| `SESSION_SECRET` | Secret used to sign session tokens - generate with `openssl rand -hex 32`. **Required in production** |
+| `API_KEY` | Optional bearer token for headless access. Unset = token auth disabled |
 
-Neither variable has a safe default in production. If `SESSION_SECRET` is not set, the code falls back to `"fallback-secret"`, which is insecure and should never be used in a deployed environment.
+`SESSION_SECRET` has no safe default in production: if it is unset the app **refuses to start** (`instrumentation.ts`), because the cookie would otherwise be signed with a constant that is public in this repo and therefore trivially forgeable. In development an unset secret falls back to a throwaway value so a local checkout runs without configuration.

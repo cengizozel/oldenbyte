@@ -1,6 +1,33 @@
 # API Reference
 
-All routes are under `/api`. Routes that read or write user data are protected by the session middleware.
+All routes are under `/api`. Every route except `/api/auth` is protected by the middleware (`proxy.ts`): send a valid session cookie, or — for scripts — an `Authorization: Bearer <API_KEY>` header (see [auth.md](./auth.md)). Unauthenticated API calls return `401 {"error":"Unauthorized"}`.
+
+---
+
+## Config (dashboard as JSON)
+
+The whole dashboard — every dashboard's layout, widget instances, and per-widget content, plus global settings like theme and timezone — lives in the key/value store. `/api/config` exposes it as a single hand-authorable JSON document. Unlike `/api/settings/export`, values are JSON-decoded (so `widget-layout` is a real array, not an escaped string) and re-encoded on the way back in.
+
+### `GET /api/config`
+Returns all non-cache config as `{ key: value, ... }` with each value parsed from JSON where possible.
+
+### `PUT /api/config` (also `POST`)
+Writes config from a JSON object. Non-string values are JSON-stringified before storage; cache keys in the body are ignored.
+
+- `?mode=merge` (default): upserts the provided keys, leaving everything else untouched.
+- `?mode=replace`: in addition, deletes existing config keys **not** present in the body, so the dashboard ends up matching the document exactly (cache keys are never deleted). Send the *complete* config; an empty body is refused (`400`) rather than wiping everything.
+
+Response: `{ "ok": true, "written": <n>, "deleted": <n>, "mode": "merge" | "replace" }`.
+
+```bash
+# Export, edit, re-import a dashboard
+curl -H "Authorization: Bearer $API_KEY" https://host/api/config > dash.json
+# ...edit dash.json (see lib/seed.ts for the full shape)...
+curl -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
+     -X PUT --data @dash.json "https://host/api/config?mode=replace"
+```
+
+The minimum to define a dashboard: `dashboards` (the list + active id), `widget-layout[:id]` (grid positions), `widget-instances[:id]` (the widgets), and each widget's own config key (e.g. `weather-widget-<id>`, `bookmarks-config-<id>`). See [storage.md](./storage.md) for the per-widget key reference.
 
 ---
 
