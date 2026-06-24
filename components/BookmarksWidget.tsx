@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bookmark, Plus, LayoutGrid, LayoutList, AlignJustify, ExternalLink } from "lucide-react";
+import { Bookmark, Plus, Minus, GripVertical, LayoutGrid, LayoutList, AlignJustify, ExternalLink } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { tagColor } from "@/lib/colors";
@@ -18,9 +18,11 @@ import { PencilButton, EmptyState, SaveCancelRow, ScrollFades } from "./ui/Widge
 
 type View = "icon" | "row" | "name";
 type Bookmark = { id: string; url: string; name: string; icon?: string };
-type Config = { bookmarks: Bookmark[]; view: View };
+type Config = { bookmarks: Bookmark[]; view: View; iconSize?: number };
 
-const DEFAULT: Config = { bookmarks: [], view: "row" };
+// Icon-view tile size, adjustable from the header (clamped, stepped).
+const ICON_MIN = 28, ICON_MAX = 80, ICON_STEP = 8, ICON_DEFAULT = 44;
+const clampIcon = (n: number) => Math.max(ICON_MIN, Math.min(ICON_MAX, n));
 
 function newId() {
   return `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -152,11 +154,13 @@ export default function BookmarksWidget({
 
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [view, setView] = useState<View>("row");
+  const [iconSize, setIconSize] = useState(ICON_DEFAULT);
   const [loaded, setLoaded] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<Bookmark[]>([]);
   const [urlInput, setUrlInput] = useState("");
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   const { ref, onScroll, topFade, bottomFade } = useScrollFade<HTMLDivElement>([bookmarks, view]);
 
@@ -169,6 +173,7 @@ export default function BookmarksWidget({
           setBookmarks(list);
           setDraft(list);
           if (cfg.view === "icon" || cfg.view === "row" || cfg.view === "name") setView(cfg.view);
+          if (typeof cfg.iconSize === "number") setIconSize(clampIcon(cfg.iconSize));
         } catch {}
       }
       setLoaded(true);
@@ -176,13 +181,31 @@ export default function BookmarksWidget({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.id]);
 
-  function persist(list: Bookmark[], v: View) {
-    storage.setItem(configKey, JSON.stringify({ bookmarks: list, view: v }));
+  function persist(list: Bookmark[], v: View, size: number) {
+    storage.setItem(configKey, JSON.stringify({ bookmarks: list, view: v, iconSize: size }));
   }
 
   function changeView(v: View) {
     setView(v);
-    persist(bookmarks, v);
+    persist(bookmarks, v, iconSize);
+  }
+
+  function changeIconSize(delta: number) {
+    const next = clampIcon(iconSize + delta);
+    if (next === iconSize) return;
+    setIconSize(next);
+    persist(bookmarks, view, next);
+  }
+
+  // Reorder happens on the draft and commits with the rest of the edits on save.
+  function reorder(from: number, to: number) {
+    if (from === to) return;
+    setDraft(d => {
+      const a = [...d];
+      const [moved] = a.splice(from, 1);
+      a.splice(to, 0, moved);
+      return a;
+    });
   }
 
   function addDraft() {
@@ -197,7 +220,7 @@ export default function BookmarksWidget({
       .map(b => ({ ...b, url: normalizeUrl(b.url), name: b.name.trim(), icon: b.icon?.trim() || undefined }))
       .filter(b => b.url);
     setBookmarks(clean);
-    persist(clean, view);
+    persist(clean, view, iconSize);
     setSettingsOpen(false);
   }
 
@@ -209,7 +232,27 @@ export default function BookmarksWidget({
           <span className="opacity-50"><Bookmark size={14} /></span>
           <span className="text-xs font-medium opacity-60 truncate">{widget.title}</span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {view === "icon" && bookmarks.length > 0 && (
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => changeIconSize(-ICON_STEP)}
+                disabled={iconSize <= ICON_MIN}
+                title="Smaller icons"
+                className={`p-1 rounded-md ${c.icon} opacity-40 hover:opacity-80 disabled:opacity-15 transition-opacity`}
+              >
+                <Minus size={12} />
+              </button>
+              <button
+                onClick={() => changeIconSize(ICON_STEP)}
+                disabled={iconSize >= ICON_MAX}
+                title="Larger icons"
+                className={`p-1 rounded-md ${c.icon} opacity-40 hover:opacity-80 disabled:opacity-15 transition-opacity`}
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+          )}
           {bookmarks.length > 0 && <ViewToggle c={c} view={view} onChange={changeView} />}
           <PencilButton c={c} onClick={() => { setDraft(bookmarks); setSettingsOpen(true); }} title="Edit bookmarks" />
         </div>
@@ -221,7 +264,7 @@ export default function BookmarksWidget({
         <div className="flex-1 min-h-0 relative">
           <div ref={ref} onScroll={onScroll} className="absolute inset-0 overflow-y-auto pr-3">
             {view === "icon" && (
-              <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(52px,1fr))]">
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${iconSize + 12}px, 1fr))` }}>
                 {bookmarks.map(bm => (
                   <a
                     key={bm.id}
@@ -231,7 +274,7 @@ export default function BookmarksWidget({
                     title={displayName(bm)}
                     className="flex items-center justify-center p-1 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   >
-                    <Favicon bm={bm} size={40} />
+                    <Favicon bm={bm} size={iconSize} />
                   </a>
                 ))}
               </div>
@@ -302,11 +345,29 @@ export default function BookmarksWidget({
           </button>
         </div>
 
+        {draft.length > 1 && (
+          <p className={`text-[10px] opacity-40 -mt-1 ${c.text}`}>Drag the handle to reorder.</p>
+        )}
+
         {draft.length > 0 && (
           <div className="flex flex-col gap-2">
-            {draft.map(bm => (
-              <div key={bm.id} className="flex flex-col gap-1.5 px-2 py-2 rounded-lg bg-black/5 dark:bg-white/10">
+            {draft.map((bm, i) => (
+              <div
+                key={bm.id}
+                onDragOver={e => { if (dragIdx !== null) e.preventDefault(); }}
+                onDrop={() => { if (dragIdx !== null) reorder(dragIdx, i); setDragIdx(null); }}
+                className={`flex flex-col gap-1.5 px-2 py-2 rounded-lg bg-black/5 dark:bg-white/10 transition-opacity ${dragIdx === i ? "opacity-40" : ""}`}
+              >
                 <div className="flex items-center gap-2">
+                  <span
+                    draggable
+                    onDragStart={() => setDragIdx(i)}
+                    onDragEnd={() => setDragIdx(null)}
+                    title="Drag to reorder"
+                    className={`shrink-0 cursor-grab active:cursor-grabbing ${c.label} opacity-30 hover:opacity-70`}
+                  >
+                    <GripVertical size={13} />
+                  </span>
                   <Favicon bm={bm} size={22} />
                   <input
                     value={bm.name}
