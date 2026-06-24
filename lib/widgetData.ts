@@ -329,6 +329,16 @@ async function readHf(id: string, title: string): Promise<string> {
   })));
 }
 
+async function readBookmarks(id: string, title: string): Promise<string> {
+  type BM = { url: string; name?: string };
+  const config = await readJSON<{ bookmarks: BM[] }>(`bookmarks-config-${id}`);
+  if (!config?.bookmarks?.length) return "The bookmarks widget has no links yet.";
+  const domainOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
+  return `## ${title} (Bookmarks, saved links)\n` + formatItems(config.bookmarks
+    .filter(b => b.url)
+    .map(b => ({ title: (b.name || "").trim() || domainOf(b.url), link: b.url })));
+}
+
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 export async function readWidgetData(id: string, type: string, title: string): Promise<string> {
@@ -341,6 +351,7 @@ export async function readWidgetData(id: string, type: string, title: string): P
       case "tracker":  return await readTracker(id, title);
       case "rhythm":   return await readRhythm(id, title);
       case "upkeep":   return await readUpkeep(id, title);
+      case "bookmarks": return await readBookmarks(id, title);
       case "f1":       return await readF1(title);
       case "rss":      return await readRss(id, title);
       case "reddit":   return await readReddit(id, title);

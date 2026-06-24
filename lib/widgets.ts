@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "bookmarks" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -164,6 +164,15 @@ export const widgets: Widget[] = [
     color: "orange",
     title: "Upkeep",
     description: "Check off daily essentials and keep your day's score at 100.",
+    digestable: false,
+  },
+  {
+    id: "bookmarks",
+    type: "bookmarks",
+    category: "tools",
+    color: "sky",
+    title: "Bookmarks",
+    description: "Your favorite links as icon tiles, rows, or a compact list.",
     digestable: false,
   },
   {

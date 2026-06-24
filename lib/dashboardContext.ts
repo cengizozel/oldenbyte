@@ -16,7 +16,7 @@ type WidgetInstance = { id: string; type: string; title: string };
 
 // Widget types worth feeding to the model as text. Notebook is handled
 // separately (full history); reader/chess/chat/empty have no useful text.
-const FEED_TYPES = new Set(["text", "f1", "weather", "calendar", "rss", "reddit", "youtube", "arxiv", "hf", "tracker", "rhythm", "upkeep"]);
+const FEED_TYPES = new Set(["text", "f1", "weather", "calendar", "rss", "reddit", "youtube", "arxiv", "hf", "tracker", "rhythm", "upkeep", "bookmarks"]);
 
 const today = () => new Date().toISOString().split("T")[0];
 
@@ -375,6 +375,17 @@ async function gatherUpkeep(id: string, title: string): Promise<string | null> {
   return `## ${title} (Upkeep — daily essentials score)\nToday is ${t}. Score ${score(t) ?? "—"}/100.\n${todayLines.join("\n")}${recentBlock}`;
 }
 
+async function gatherBookmarks(id: string, title: string): Promise<string | null> {
+  type BM = { url: string; name?: string };
+  const config = await readJSON<{ bookmarks: BM[] }>(`bookmarks-config-${id}`);
+  if (!config?.bookmarks?.length) return null;
+  const domainOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
+  const body = formatItems(config.bookmarks
+    .filter(b => b.url)
+    .map(b => ({ title: (b.name || "").trim() || domainOf(b.url), link: b.url })));
+  return `## ${title} (Bookmarks — saved links)\n${body}`;
+}
+
 async function gatherWidget(id: string, w: WidgetInstance): Promise<string | null> {
   switch (w.type) {
     case "notebook": return gatherNotebook(id, w.title);
@@ -390,6 +401,7 @@ async function gatherWidget(id: string, w: WidgetInstance): Promise<string | nul
     case "tracker": return gatherTracker(id, w.title);
     case "rhythm":  return gatherRhythm(id, w.title);
     case "upkeep":  return gatherUpkeep(id, w.title);
+    case "bookmarks": return gatherBookmarks(id, w.title);
     default:        return null;
   }
 }
