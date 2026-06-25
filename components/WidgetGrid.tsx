@@ -25,6 +25,7 @@ import TrackerWidget from "./TrackerWidget";
 import RhythmWidget from "./RhythmWidget";
 import UpkeepWidget from "./UpkeepWidget";
 import BookmarksWidget from "./BookmarksWidget";
+import TypingWidget from "./TypingWidget";
 import dynamic from "next/dynamic";
 import ChatWidget from "./ChatWidget";
 import KiwixWidget from "./KiwixWidget";
@@ -81,6 +82,7 @@ function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, 
   if (widget.type === "rhythm")   return <RhythmWidget    widget={widget} className={cls} />;
   if (widget.type === "upkeep")   return <UpkeepWidget    widget={widget} className={cls} />;
   if (widget.type === "bookmarks") return <BookmarksWidget widget={widget} className={cls} />;
+  if (widget.type === "typing")   return <TypingWidget    widget={widget} className={cls} />;
   if (widget.type === "chess")    return <ChessWidget     widget={widget} className={cls} />;
   if (widget.type === "chat")     return <ChatWidget      widget={widget} className={cls} />;
   if (widget.type === "kiwix")    return <KiwixWidget     widget={widget} className={cls} />;
@@ -361,6 +363,7 @@ export default function WidgetGrid({
     rhythm:   { w: 1, h: 3 },
     upkeep:   { w: 1, h: 3 },
     bookmarks: { w: 1, h: 3 },
+    typing:   { w: 2, h: 3 },
     chess:    { w: 2, h: 4 },
     chat:     { w: 1, h: 4 },
     kiwix:    { w: 1, h: 4 },
