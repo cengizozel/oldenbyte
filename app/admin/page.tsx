@@ -41,7 +41,7 @@ function CopyBox({ value }: { value: string }) {
     <button
       onClick={copy}
       title="Copy"
-      className="inline-flex items-center gap-1.5 [font-family:var(--font-dm-mono)] text-xs bg-[var(--w-amber-bg)] border border-[var(--w-amber-border)] text-[var(--w-amber-text)] rounded-lg px-2 py-1 hover:opacity-80 transition-opacity"
+      className="inline-flex items-center gap-1.5 font-[family-name:var(--font-dm-mono)] text-xs bg-[var(--w-amber-bg)] border border-[var(--w-amber-border)] text-[var(--w-amber-text)] rounded-lg px-2 py-1 hover:opacity-80 transition-opacity"
     >
       {copied ? <Check size={12} /> : <Copy size={12} />}
       <span>{value}</span>
@@ -199,7 +199,7 @@ export default function AdminPage() {
     <main className="min-h-screen bg-[var(--page-bg)] px-5 py-8">
       <div className="max-w-2xl mx-auto flex flex-col gap-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-medium text-[var(--text-primary)] [font-family:var(--font-playfair)]">
+          <h1 className="text-xl font-medium text-[var(--text-primary)] font-[family-name:var(--font-playfair)]">
             User management
           </h1>
           <a href="/" className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">

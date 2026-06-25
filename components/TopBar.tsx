@@ -318,7 +318,7 @@ function DateDisplay({ timezone }: { timezone: string }) {
       >
         {format === "analog"
           ? <AnalogClock time={shown} size={48} />
-          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center [font-family:var(--font-dm-mono)]" suppressHydrationWarning>{fmt(shown, format)}</span>
+          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center font-[family-name:var(--font-dm-mono)]" suppressHydrationWarning>{fmt(shown, format)}</span>
         }
       </button>
 
@@ -877,7 +877,7 @@ export default function TopBar({
         <EditableField
           storageKey="topbar-phrase"
           defaultValue="oldenbyte"
-          className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none [font-family:var(--font-playfair)]"
+          className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none font-[family-name:var(--font-playfair)]"
         />
       </div>
       <div className="flex flex-col items-center justify-center gap-1.5">
@@ -936,7 +936,7 @@ export default function TopBar({
         <EditableField
           storageKey="topbar-mood"
           defaultValue="feeling quiet"
-          className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none [font-family:var(--font-playfair)]"
+          className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none font-[family-name:var(--font-playfair)]"
           align="right"
         />
       </div>
