@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+
   const limit = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "50"), 50);
 
   try {

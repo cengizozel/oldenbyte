@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 import { readdir, readFile } from "fs/promises";
 import path from "path";
 import { validateDef, type BankWidgetDef } from "@/lib/widgetBank";
@@ -9,7 +10,10 @@ import { validateDef, type BankWidgetDef } from "@/lib/widgetBank";
 let cache: { at: number; widgets: BankWidgetDef[]; errors: Record<string, string[]> } | null = null;
 const TTL = 5 * 60 * 1000;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   if (process.env.NODE_ENV === "production" && cache && Date.now() - cache.at < TTL) {
     return NextResponse.json({ widgets: cache.widgets, errors: cache.errors });
   }

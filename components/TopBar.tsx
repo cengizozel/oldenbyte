@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, Plus, Pencil, Search } from "lucide-react";
+import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, Plus, Pencil, Search, LogOut, Shield } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { isDark, toggleTheme, THEME_EVENT } from "@/lib/theme";
 import { layoutKey, instancesKey, type DashboardsState } from "@/lib/dashboards";
@@ -448,6 +448,145 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: str
   );
 }
 
+// ── AccountSection ─────────────────────────────────────────────────────────
+
+type Me = { id: string; username: string; role: string; mustChangePassword: boolean };
+
+// Lives inside the settings drawer. Fetches the current session user when the
+// drawer opens and offers logout + an inline password-change disclosure.
+function AccountSection({ open }: { open: boolean }) {
+  const [me, setMe] = useState<Me | null>(null);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  // Refetch each time the drawer opens so the panel reflects the live session.
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    fetch("/api/me")
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (alive) setMe(data); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [open]);
+
+  async function logout() {
+    await fetch("/api/auth", { method: "DELETE" });
+    window.location.href = "/login";
+  }
+
+  async function changePassword() {
+    setError("");
+    setDone(false);
+    if (!current || !next) { setError("Both fields are required."); return; }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/account/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body?.error || "Could not change password.");
+        return;
+      }
+      setDone(true);
+      setCurrent("");
+      setNext("");
+      setMe(m => (m ? { ...m, mustChangePassword: false } : m));
+    } catch {
+      setError("Could not change password.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!me) return null;
+
+  return (
+    <section className="flex flex-col gap-3">
+      <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Account</span>
+
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-[var(--text-secondary)] truncate" title={me.username}>{me.username}</span>
+        <button
+          onClick={logout}
+          title="Log out"
+          className="flex items-center gap-1 shrink-0 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+        >
+          <LogOut size={12} />
+          Log out
+        </button>
+      </div>
+
+      {me.role === "admin" && (
+        <a
+          href="/admin"
+          className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+        >
+          <Shield size={12} />
+          Admin
+        </a>
+      )}
+
+      {me.mustChangePassword && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-2.5 py-2 leading-relaxed">
+          You are using a temporary password. Please change it below.
+        </p>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={() => { setPwOpen(o => !o); setError(""); setDone(false); }}
+          className="flex items-center justify-between text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+        >
+          <span>Change password</span>
+          <ChevronDown size={13} className={`transition-transform ${pwOpen ? "rotate-180" : ""}`} />
+        </button>
+
+        {pwOpen && (
+          <div className="flex flex-col gap-2">
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={current}
+              onChange={e => setCurrent(e.target.value)}
+              placeholder="Current password"
+              className="w-full text-sm border border-[var(--surface-border)] rounded-xl px-3 py-2 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
+            />
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={next}
+              onChange={e => setNext(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && changePassword()}
+              placeholder="New password"
+              className="w-full text-sm border border-[var(--surface-border)] rounded-xl px-3 py-2 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
+            />
+
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+            {done && <p className="text-xs text-[var(--text-secondary)]">Password changed.</p>}
+
+            <button
+              onClick={changePassword}
+              disabled={saving}
+              className="self-end flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 transition-colors"
+            >
+              {saving ? <Loader size={13} className="animate-spin" /> : <Check size={13} />}
+              Save
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ── SettingsPanel ──────────────────────────────────────────────────────────
 
 function SettingsPanel({
@@ -493,6 +632,8 @@ function SettingsPanel({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-6">
+          <AccountSection open={open} />
+
           <section className="flex flex-col gap-3">
             <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Appearance</span>
             <div className="flex items-center justify-between">

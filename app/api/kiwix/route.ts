@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 import { isValidBase, listSources, search, articleExtract } from "@/lib/kiwix";
 
 // Server-side proxy to a kiwix-serve instance (https://github.com/kiwix/kiwix-tools).
@@ -11,6 +12,9 @@ import { isValidBase, listSources, search, articleExtract } from "@/lib/kiwix";
 //   GET ?baseUrl=…&article=<url>            → fetch + extract one article's text
 
 export async function GET(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   const p = request.nextUrl.searchParams;
   const baseUrl = p.get("baseUrl");
   if (!isValidBase(baseUrl)) {

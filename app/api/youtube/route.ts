@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+// A user-supplied http(s) channel URL must point at YouTube; reject anything else
+// so this route cannot be turned into an open fetcher of arbitrary hosts.
+function isYouTubeHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === "youtube.com" || h === "www.youtube.com" || h === "m.youtube.com" || h.endsWith(".youtube.com") || h === "youtu.be";
+}
 
 function decodeEntities(str: string): string {
   return str
@@ -227,6 +235,17 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; nam
   if (!trimmed.startsWith("http")) {
     const handle = trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
     pageUrl = `https://www.youtube.com/${handle}`;
+  } else {
+    // User passed a full URL: only allow YouTube hosts so this can't fetch arbitrary URLs.
+    let parsed: URL;
+    try {
+      parsed = new URL(pageUrl);
+    } catch {
+      throw new Error("Invalid channel URL");
+    }
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !isYouTubeHost(parsed.hostname)) {
+      throw new Error("Only youtube.com channel URLs are allowed");
+    }
   }
 
   const res = await fetch(pageUrl, { headers: { "User-Agent": UA }, redirect: "follow" });
@@ -244,6 +263,9 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; nam
 }
 
 export async function GET(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   // Single-video detail mode (description + metadata) for the widget's click view.
   const video = request.nextUrl.searchParams.get("video");
   if (video) {

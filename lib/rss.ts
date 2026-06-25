@@ -32,7 +32,12 @@ export async function fetchFeed(url: string, limit: number, signal?: AbortSignal
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-  const xml = await res.text();
+  return parseFeed(await res.text(), limit);
+}
+
+// Parse already-fetched RSS/Atom XML. Split out so SSRF-sensitive callers (the
+// /api/rss route) can fetch the user-supplied URL via safeFetch and then parse.
+export function parseFeed(xml: string, limit: number): FeedItem[] {
   const items: FeedItem[] = [];
 
   // Detect format: Atom uses <entry>, RSS uses <item>

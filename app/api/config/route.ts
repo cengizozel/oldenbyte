@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/http";
 
 // Programmatic dashboard configuration. Mirrors the UI's export/import but in a
 // hand-authorable shape: GET returns every config key with its value already
 // parsed from JSON (so `widget-layout` is a real array, not an escaped string),
 // and PUT/POST accepts the same shape, re-stringifying non-string values before
-// storing. Auth is handled by proxy.ts (session cookie or Bearer API_KEY).
+// storing. requireUser gates every handler (session cookie, or a Bearer API_KEY
+// that resolves to the admin user), and all config is scoped to that user.
 //
 //   curl -H "Authorization: Bearer $API_KEY" https://host/api/config > dash.json
 //   curl -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
@@ -38,8 +40,11 @@ function encode(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
-export async function GET() {
-  const all = await prisma.setting.findMany();
+export async function GET(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
+  const all = await prisma.setting.findMany({ where: { userId: user.id } });
   const data: Record<string, unknown> = {};
   for (const { key, value } of all) {
     if (!isCache(key)) data[key] = decode(value);
@@ -48,6 +53,9 @@ export async function GET() {
 }
 
 async function applyConfig(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   const replace = new URL(request.url).searchParams.get("mode") === "replace";
 
   let data: unknown;
@@ -78,15 +86,19 @@ async function applyConfig(request: NextRequest) {
   // Replace mode prunes existing config keys absent from the payload (caches are
   // left untouched), so the dashboard ends up exactly matching the config.
   const toDelete = replace
-    ? (await prisma.setting.findMany({ select: { key: true } }))
+    ? (await prisma.setting.findMany({ where: { userId: user.id }, select: { key: true } }))
         .map(e => e.key)
         .filter(k => !isCache(k) && !keep.has(k))
     : [];
 
   const ops = [
-    ...(toDelete.length ? [prisma.setting.deleteMany({ where: { key: { in: toDelete } } })] : []),
+    ...(toDelete.length ? [prisma.setting.deleteMany({ where: { userId: user.id, key: { in: toDelete } } })] : []),
     ...entries.map(([key, value]) =>
-      prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } })
+      prisma.setting.upsert({
+        where: { userId_key: { userId: user.id, key } },
+        update: { value },
+        create: { userId: user.id, key, value },
+      })
     ),
   ];
   await prisma.$transaction(ops);

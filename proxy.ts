@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken, apiKeyValid, SESSION_COOKIE } from "@/lib/auth";
 
-// Next.js 16 middleware (renamed to `proxy`). Gates every matched route behind
-// either a valid session cookie (the browser login) or, for headless callers,
-// an `Authorization: Bearer <API_KEY>` token. Unauthenticated API calls get a
-// 401 JSON response; page requests redirect to the login screen.
+// Paths reachable without a session: the login page and the unauthenticated
+// auth endpoints (state probe, login, logout, first-run setup, registration).
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/setup", "/api/register"];
+
+function isPublic(pathname: string): boolean {
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
+// Next.js 16 middleware (renamed to `proxy`). Edge-runtime gate: a cheap,
+// stateless check that decides "looks authenticated" vs "go to login". The
+// authoritative session/user check (revocation, role) happens in the route
+// handlers via lib/session. Headless callers may instead present
+// Authorization: Bearer <API_KEY>.
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Login page and the auth endpoint are always reachable.
-  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
+  if (isPublic(pathname)) {
     return NextResponse.next();
   }
 
@@ -20,7 +28,7 @@ export async function proxy(request: NextRequest) {
   }
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (token && await verifySessionToken(token)) {
+  if (token && (await verifySessionToken(token))) {
     return NextResponse.next();
   }
 

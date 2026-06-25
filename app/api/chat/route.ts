@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 import { search as kiwixSearch, searchAllBooks, articleExtract } from "@/lib/kiwix";
 import { anytypeSearch, anytypeReadObject, anytypeDeepLink } from "@/lib/anytype";
 import { listEvents, type CalDAVCalendar } from "@/lib/caldav";
@@ -41,6 +42,9 @@ function authHeaders(apiKey: string): Record<string, string> {
 
 // GET /api/chat?baseUrl=…&apiKey=… — list available models from {baseUrl}/models
 export async function GET(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   const baseUrl = request.nextUrl.searchParams.get("baseUrl");
   const apiKey = request.nextUrl.searchParams.get("apiKey") ?? "";
 
@@ -400,7 +404,7 @@ async function runTool(
   name: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any,
-  ctx: { kiwix?: Kiwix; anytype?: Anytype; dashboard?: Dashboard; caldav?: Caldav; today?: string },
+  ctx: { userId: string; kiwix?: Kiwix; anytype?: Anytype; dashboard?: Dashboard; caldav?: Caldav; today?: string },
   signal: AbortSignal,
 ): Promise<ToolResult> {
   try {
@@ -454,7 +458,7 @@ async function runTool(
       if (!w) {
         return { kind: "message", text: `No widget "${id}". Valid ids: ${ctx.dashboard.widgets.map(x => x.id).join(", ")}` };
       }
-      const data = await readWidgetData(w.id, w.type, w.title);
+      const data = await readWidgetData(ctx.userId, w.id, w.type, w.title);
       const win = windowMarkdown(data, args?.find ? String(args.find) : undefined, args?.page ? Number(args.page) : undefined);
       const text = (win.header ? win.header + "\n" : "") + (win.text || "(this widget has no content right now)");
       return { kind: "widget", note: `reading widget "${w.title}"`, text };
@@ -466,7 +470,7 @@ async function runTool(
       const settled = await Promise.allSettled(
         ctx.dashboard.widgets.slice(0, 20).map(async w => ({
           id: w.id, title: w.title, type: w.type,
-          text: await readWidgetData(w.id, w.type, w.title),
+          text: await readWidgetData(ctx.userId, w.id, w.type, w.title),
         }))
       );
       const filled = settled
@@ -526,6 +530,9 @@ async function runTool(
 }
 
 export async function POST(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   const {
     baseUrl,
     apiKey = "",
@@ -571,6 +578,7 @@ export async function POST(request: NextRequest) {
   const useCaldav = !!(caldav && caldav.baseUrl && caldav.username && caldav.calendars?.length);
   if (useKiwix || useAnytype || useDashboard || useCaldav) {
     const toolCtx = {
+      userId: user.id,
       kiwix: useKiwix ? kiwix! : undefined,
       anytype: useAnytype ? anytype! : undefined,
       dashboard: useDashboard ? dashboard! : undefined,

@@ -7,8 +7,34 @@ datasource db {
   provider = "sqlite"
 }
 
+model User {
+  id                 String   @id @default(uuid())
+  username           String   @unique
+  passwordHash       String
+  role               String   @default("user") // "admin" | "user"
+  mustChangePassword Boolean  @default(false)
+  createdAt          DateTime @default(now())
+}
+
+model Session {
+  id        String   @id // sha256 hex of the cookie's random session id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model Setting {
-  key       String   @id
+  userId    String
+  key       String
   value     String
   updatedAt DateTime @updatedAt
+
+  @@id([userId, key])
+}
+
+model AppConfig {
+  key   String @id
+  value String
 }

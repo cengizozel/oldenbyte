@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 
 // Open-Meteo proxy (keyless). Two operations:
 //   GET /api/weather?q=istanbul        — geocoding search, top 5 matches
@@ -7,6 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 const UA = { "User-Agent": "oldenbyte-dashboard" };
 
 export async function GET(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   const { searchParams } = request.nextUrl;
   const q = searchParams.get("q");
 

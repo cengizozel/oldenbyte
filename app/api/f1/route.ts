@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 
 // Unified shape returned to the widget
 type Race = {
@@ -83,7 +84,10 @@ async function fromJolpi(): Promise<F1Data> {
   return { race, standings };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   for (const source of [fromF1Api, fromJolpi]) {
     try {
       const data = await source();

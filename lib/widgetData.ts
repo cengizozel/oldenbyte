@@ -13,13 +13,13 @@ import { fetchFeed } from "@/lib/rss";
 import { listEvents, type CalDAVCalendar } from "@/lib/caldav";
 import { summarizeForecast } from "@/lib/weather";
 
-async function read(key: string): Promise<string | null> {
-  const row = await prisma.setting.findUnique({ where: { key } });
+async function read(userId: string, key: string): Promise<string | null> {
+  const row = await prisma.setting.findUnique({ where: { userId_key: { userId, key } } });
   return row?.value ?? null;
 }
 
-async function readJSON<T>(key: string): Promise<T | null> {
-  const raw = await read(key);
+async function readJSON<T>(userId: string, key: string): Promise<T | null> {
+  const raw = await read(userId, key);
   if (!raw) return null;
   try { return JSON.parse(raw) as T; } catch { return null; }
 }
@@ -53,10 +53,10 @@ function formatItems(items: { title: string; meta?: string; body?: string; link?
 
 // ── Per-type readers ─────────────────────────────────────────────────────────
 
-async function readNotebook(id: string, title: string): Promise<string> {
+async function readNotebook(userId: string, id: string, title: string): Promise<string> {
   const [dates, name] = await Promise.all([
-    readJSON<Record<string, string>>(`notebook-${id}-dates`),
-    read(`notebook-${id}-name`),
+    readJSON<Record<string, string>>(userId, `notebook-${id}-dates`),
+    read(userId, `notebook-${id}-name`),
   ]);
   if (!dates) return "This notepad has no entries.";
   const entries = Object.entries(dates)
@@ -69,8 +69,8 @@ async function readNotebook(id: string, title: string): Promise<string> {
     entries.map(e => `### ${e.date}\n${truncate(e.text, 1500)}`).join("\n\n");
 }
 
-async function readText(id: string, title: string): Promise<string> {
-  const config = await readJSON<{ source: { type: string; value: string } }>(`text-widget-${id}`);
+async function readText(userId: string, id: string, title: string): Promise<string> {
+  const config = await readJSON<{ source: { type: string; value: string } }>(userId, `text-widget-${id}`);
   if (!config?.source?.value) return "This text widget is empty.";
   if (config.source.type === "text") return `## ${title} (Text)\n${config.source.value}`;
   try {
@@ -82,8 +82,8 @@ async function readText(id: string, title: string): Promise<string> {
   }
 }
 
-async function readWeather(id: string, title: string): Promise<string> {
-  const cfg = await readJSON<{ name: string; lat: number; lon: number; unit?: "c" | "f" }>(`weather-widget-${id}`);
+async function readWeather(userId: string, id: string, title: string): Promise<string> {
+  const cfg = await readJSON<{ name: string; lat: number; lon: number; unit?: "c" | "f" }>(userId, `weather-widget-${id}`);
   if (!cfg || !isFinite(cfg.lat) || !isFinite(cfg.lon)) return "The weather widget has no location configured.";
   const params = new URLSearchParams({
     latitude: String(cfg.lat), longitude: String(cfg.lon),
@@ -109,11 +109,11 @@ async function readWeather(id: string, title: string): Promise<string> {
   return `## ${title} (Weather)\n${summarizeForecast(cfg.name, cfg.unit ?? "c", shaped).join("\n")}`;
 }
 
-async function readCalendar(id: string, title: string): Promise<string> {
+async function readCalendar(userId: string, id: string, title: string): Promise<string> {
   const cfg = await readJSON<{
     baseUrl: string; username: string; password: string;
     calendars: CalDAVCalendar[]; days?: number;
-  }>(`calendar-widget-${id}`);
+  }>(userId, `calendar-widget-${id}`);
   if (!cfg?.baseUrl || !cfg.username || !cfg.calendars?.length) return "The calendar widget is not connected.";
   const days = cfg.days ?? 7;
   const start = today();
@@ -128,10 +128,10 @@ async function readCalendar(id: string, title: string): Promise<string> {
     .join("\n");
 }
 
-async function readTracker(id: string, title: string): Promise<string> {
+async function readTracker(userId: string, id: string, title: string): Promise<string> {
   const [config, daysMap] = await Promise.all([
-    readJSON<{ items: { id: string; name: string }[] }>(`tracker-config-${id}`),
-    readJSON<Record<string, Record<string, number>>>(`tracker-days-${id}`),
+    readJSON<{ items: { id: string; name: string }[] }>(userId, `tracker-config-${id}`),
+    readJSON<Record<string, Record<string, number>>>(userId, `tracker-days-${id}`),
   ]);
   if (!config?.items?.length || !daysMap) return "The tracker has no recorded time.";
   const name = Object.fromEntries(config.items.map(i => [i.id, i.name]));
@@ -153,11 +153,11 @@ async function readTracker(id: string, title: string): Promise<string> {
   }).join("\n");
 }
 
-async function readRhythm(id: string, title: string): Promise<string> {
+async function readRhythm(userId: string, id: string, title: string): Promise<string> {
   type Item = { id: string; name: string; kind?: "moment" | "session"; mode?: "build" | "reduce"; target?: number };
   const [config, logData] = await Promise.all([
-    readJSON<{ items: Item[] }>(`rhythm-config-${id}`),
-    readJSON<{ events?: Record<string, number[]>; sessions?: Record<string, [number, number][]> }>(`rhythm-log-${id}`),
+    readJSON<{ items: Item[] }>(userId, `rhythm-config-${id}`),
+    readJSON<{ events?: Record<string, number[]>; sessions?: Record<string, [number, number][]> }>(userId, `rhythm-log-${id}`),
   ]);
   if (!config?.items?.length) return "The rhythm widget has no items yet.";
   const events = logData?.events ?? {};
@@ -202,11 +202,11 @@ async function readRhythm(id: string, title: string): Promise<string> {
   return `## ${title} (Rhythm, habit logging)\nToday is ${today()}. Times are local.\n` + lines.join("\n");
 }
 
-async function readUpkeep(id: string, title: string): Promise<string> {
+async function readUpkeep(userId: string, id: string, title: string): Promise<string> {
   type Item = { id: string; name: string; weight: number };
   const [config, daysMap] = await Promise.all([
-    readJSON<{ items: Item[] }>(`upkeep-config-${id}`),
-    readJSON<Record<string, string[]>>(`upkeep-days-${id}`),
+    readJSON<{ items: Item[] }>(userId, `upkeep-config-${id}`),
+    readJSON<Record<string, string[]>>(userId, `upkeep-days-${id}`),
   ]);
   if (!config?.items?.length) return "The upkeep widget has no items yet.";
   const items = config.items.map(i => ({ ...i, weight: i.weight > 0 ? i.weight : 1 }));
@@ -232,10 +232,10 @@ async function readUpkeep(id: string, title: string): Promise<string> {
   return `## ${title} (Upkeep, daily essentials score)\nToday is ${t}. Score ${score(t) ?? "—"}/100.\n${todayLines.join("\n")}${recentBlock}`;
 }
 
-async function readF1(title: string): Promise<string> {
+async function readF1(userId: string, title: string): Promise<string> {
   // The F1 widget caches hourly; read today's freshest snapshot.
   const rows = await prisma.setting.findMany({
-    where: { key: { startsWith: `f1-cache-${today()}` } },
+    where: { userId, key: { startsWith: `f1-cache-${today()}` } },
     orderBy: { key: "desc" },
     take: 1,
   });
@@ -258,8 +258,8 @@ async function readF1(title: string): Promise<string> {
   return lines.length ? `## ${title} (F1)\n${lines.join("\n")}` : "No F1 data available.";
 }
 
-async function readRss(id: string, title: string): Promise<string> {
-  const config = await readJSON<{ url: string; limit: number; name?: string }>(`rss-widget-${id}`);
+async function readRss(userId: string, id: string, title: string): Promise<string> {
+  const config = await readJSON<{ url: string; limit: number; name?: string }>(userId, `rss-widget-${id}`);
   if (!config?.url) return "This feed widget has no URL configured.";
   const items = await fetchFeed(config.url, config.limit || 5);
   if (!items.length) return "The feed returned no items.";
@@ -269,8 +269,8 @@ async function readRss(id: string, title: string): Promise<string> {
   })));
 }
 
-async function readReddit(id: string, title: string): Promise<string> {
-  const config = await readJSON<{ subreddits: { name: string; limit: number; period: string }[] }>(`reddit-widget-${id}`);
+async function readReddit(userId: string, id: string, title: string): Promise<string> {
+  const config = await readJSON<{ subreddits: { name: string; limit: number; period: string }[] }>(userId, `reddit-widget-${id}`);
   if (!config?.subreddits?.length) return "The Reddit widget has no subreddits configured.";
   const settled = await Promise.allSettled(config.subreddits.map(async sub => {
     const items = await fetchFeed(`https://www.reddit.com/r/${sub.name}/top.rss?t=${sub.period}&limit=${sub.limit}`, sub.limit);
@@ -280,8 +280,8 @@ async function readReddit(id: string, title: string): Promise<string> {
   return items.length ? `## ${title} (Reddit)\n${formatItems(items)}` : "Reddit returned no posts.";
 }
 
-async function readYoutube(id: string, title: string): Promise<string> {
-  const config = await readJSON<{ channels: { channelId: string; name: string; limit: number }[] }>(`youtube-widget-${id}`);
+async function readYoutube(userId: string, id: string, title: string): Promise<string> {
+  const config = await readJSON<{ channels: { channelId: string; name: string; limit: number }[] }>(userId, `youtube-widget-${id}`);
   if (!config?.channels?.length) return "The YouTube widget has no channels configured.";
   const settled = await Promise.allSettled(config.channels.map(async ch => {
     const items = await fetchFeed(`https://www.youtube.com/feeds/videos.xml?channel_id=${ch.channelId}`, ch.limit || 5);
@@ -291,8 +291,8 @@ async function readYoutube(id: string, title: string): Promise<string> {
   return items.length ? `## ${title} (YouTube)\n${formatItems(items)}` : "No videos found.";
 }
 
-async function readArxiv(id: string, title: string): Promise<string> {
-  const config = await readJSON<{ category?: string }>(`arxiv-widget-${id}`);
+async function readArxiv(userId: string, id: string, title: string): Promise<string> {
+  const config = await readJSON<{ category?: string }>(userId, `arxiv-widget-${id}`);
   const category = config?.category ?? "cs.AI";
   const papers = await fetchFeed(`https://rss.arxiv.org/rss/${category}`, 20);
   if (!papers.length) return "arXiv returned no papers.";
@@ -303,8 +303,8 @@ async function readArxiv(id: string, title: string): Promise<string> {
   }));
 }
 
-async function readHf(id: string, title: string): Promise<string> {
-  const config = await readJSON<{ limit?: number }>(`hf-widget-${id}`);
+async function readHf(userId: string, id: string, title: string): Promise<string> {
+  const config = await readJSON<{ limit?: number }>(userId, `hf-widget-${id}`);
   const limit = config?.limit ?? 25;
   const res = await fetch("https://huggingface.co/api/daily_papers", {
     headers: { "User-Agent": "Mozilla/5.0 (compatible)" },
@@ -329,9 +329,9 @@ async function readHf(id: string, title: string): Promise<string> {
   })));
 }
 
-async function readBookmarks(id: string, title: string): Promise<string> {
+async function readBookmarks(userId: string, id: string, title: string): Promise<string> {
   type BM = { url: string; name?: string };
-  const config = await readJSON<{ bookmarks: BM[] }>(`bookmarks-config-${id}`);
+  const config = await readJSON<{ bookmarks: BM[] }>(userId, `bookmarks-config-${id}`);
   if (!config?.bookmarks?.length) return "The bookmarks widget has no links yet.";
   const domainOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
   return `## ${title} (Bookmarks, saved links)\n` + formatItems(config.bookmarks
@@ -341,23 +341,23 @@ async function readBookmarks(id: string, title: string): Promise<string> {
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-export async function readWidgetData(id: string, type: string, title: string): Promise<string> {
+export async function readWidgetData(userId: string, id: string, type: string, title: string): Promise<string> {
   try {
     switch (type) {
-      case "notebook": return await readNotebook(id, title);
-      case "text":     return await readText(id, title);
-      case "weather":  return await readWeather(id, title);
-      case "calendar": return await readCalendar(id, title);
-      case "tracker":  return await readTracker(id, title);
-      case "rhythm":   return await readRhythm(id, title);
-      case "upkeep":   return await readUpkeep(id, title);
-      case "bookmarks": return await readBookmarks(id, title);
-      case "f1":       return await readF1(title);
-      case "rss":      return await readRss(id, title);
-      case "reddit":   return await readReddit(id, title);
-      case "youtube":  return await readYoutube(id, title);
-      case "arxiv":    return await readArxiv(id, title);
-      case "hf":       return await readHf(id, title);
+      case "notebook": return await readNotebook(userId, id, title);
+      case "text":     return await readText(userId, id, title);
+      case "weather":  return await readWeather(userId, id, title);
+      case "calendar": return await readCalendar(userId, id, title);
+      case "tracker":  return await readTracker(userId, id, title);
+      case "rhythm":   return await readRhythm(userId, id, title);
+      case "upkeep":   return await readUpkeep(userId, id, title);
+      case "bookmarks": return await readBookmarks(userId, id, title);
+      case "f1":       return await readF1(userId, title);
+      case "rss":      return await readRss(userId, id, title);
+      case "reddit":   return await readReddit(userId, id, title);
+      case "youtube":  return await readYoutube(userId, id, title);
+      case "arxiv":    return await readArxiv(userId, id, title);
+      case "hf":       return await readHf(userId, id, title);
       default:         return `Widget type "${type}" has no readable data.`;
     }
   } catch (err) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 import { listCalendars, listEvents, createEvent, deleteEvent, type CalDAVAccount, type CalDAVCalendar } from "@/lib/caldav";
 
 // CalDAV proxy (Nextcloud, Radicale, any RFC 4791 server). Server-side for
@@ -10,6 +11,9 @@ import { listCalendars, listEvents, createEvent, deleteEvent, type CalDAVAccount
 //   POST { op: "delete", baseUrl, username, password, href }
 
 export async function POST(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let body: any;
   try { body = await request.json(); } catch {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 
 // Reddit blocks its JSON endpoints for non-browser clients (403), but the RSS
 // feeds still serve with a browser User-Agent, so posts come from top.rss.
@@ -19,11 +20,17 @@ function decodeEntities(s: string): string {
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+
   const subreddit = request.nextUrl.searchParams.get("subreddit");
   const period    = request.nextUrl.searchParams.get("period") ?? "week";
   const limit     = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "5"), 25);
 
-  if (!subreddit) return NextResponse.json({ error: "Missing subreddit" }, { status: 400 });
+  // Restrict to a valid subreddit name so it can't manipulate the request path.
+  if (!subreddit || !/^[A-Za-z0-9_]{1,50}$/.test(subreddit)) {
+    return NextResponse.json({ error: "Missing or invalid subreddit" }, { status: 400 });
+  }
 
   try {
     const url = `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/top.rss?t=${encodeURIComponent(period)}&limit=${limit}`;

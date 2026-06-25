@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 
 // Backend-aware model-residency control. Local model servers manage VRAM
 // differently, so this probes for a known one and adapts:
@@ -63,6 +64,9 @@ async function lmstudioStatus(root: string, signal: AbortSignal): Promise<Status
 // Ollama's /api/ps and LM Studio's /api/v1/models are each unique to that
 // server, so probing in turn can't false-positive on the other.
 export async function GET(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   const baseUrl = request.nextUrl.searchParams.get("baseUrl");
   if (!baseUrl || !/^https?:\/\//.test(baseUrl)) {
     return NextResponse.json({ backend: null, error: "Missing or invalid baseUrl" }, { status: 400 });
@@ -115,6 +119,9 @@ export async function GET(request: NextRequest) {
 //             action "unload" → /api/v1/models/unload (instance_id = model)
 //             (duration linger is a ttl on the chat request — handled in /api/chat)
 export async function POST(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   const { baseUrl, backend, model, action, keepAlive } = await request.json();
   if (!baseUrl || !/^https?:\/\//.test(baseUrl) || !model || !backend) {
     return NextResponse.json({ error: "Missing baseUrl, backend, or model" }, { status: 400 });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 import { stripThinking } from "@/lib/citations";
 
 const SYSTEM =
@@ -43,9 +44,18 @@ function buildBody(content: string, stream: boolean, model: string, noThink: boo
 const HOSTED = /(openai|anthropic|googleapis|mistral|groq)\.com/i;
 
 export async function POST(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   // Works with any OpenAI-compatible endpoint (local Ollama/LM Studio/llama.cpp
   // or a hosted provider). Defaults to OpenAI for backward compatibility; `key`
   // is accepted as a legacy alias for `apiKey`.
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const {
     content,
     stream = false,
@@ -53,7 +63,7 @@ export async function POST(request: NextRequest) {
     model = "gpt-4o-mini",
     apiKey,
     key,
-  } = await request.json();
+  } = body;
 
   if (!content) {
     return NextResponse.json({ error: "Missing content" }, { status: 400 });

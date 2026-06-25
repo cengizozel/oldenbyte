@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/http";
 import { anytypeSearch, ANYTYPE_VERSION } from "@/lib/anytype";
 
 // Proxy to the Anytype local API (embedded in the Anytype desktop app, default
@@ -34,6 +35,9 @@ async function errMsg(res: Response): Promise<string> {
 
 // GET reads: ?op=spaces | ?op=search&q=&spaceId=&limit=
 export async function GET(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   const sp = request.nextUrl.searchParams;
   const baseUrl = sp.get("baseUrl");
   const apiKey = sp.get("apiKey") ?? "";
@@ -67,6 +71,9 @@ export async function GET(request: NextRequest) {
 // POST auth: {op:"challenge", baseUrl} → {challengeId}
 //            {op:"key", baseUrl, challengeId, code} → {apiKey}
 export async function POST(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user instanceof NextResponse) return user;
+
   const { op, baseUrl, challengeId, code } = await request.json();
   if (!baseUrl || !/^https?:\/\//.test(baseUrl)) {
     return NextResponse.json({ error: "Missing or invalid baseUrl" }, { status: 400 });
