@@ -46,7 +46,7 @@ export default function LoginPage() {
       const endpoint = mode === "setup" ? "/api/setup" : mode === "register" ? "/api/register" : "/api/auth";
       const body =
         mode === "register"
-          ? { username, password, code: invite }
+          ? { username, password, invite }
           : { username, password };
       const res = await fetch(endpoint, {
         method: "POST",
