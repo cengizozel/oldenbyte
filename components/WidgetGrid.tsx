@@ -110,6 +110,13 @@ export default function WidgetGrid({
   const [layout, setLayout] = useState<TabLayoutItem[]>(initialLayout);
   const [instances, setInstances] = useState<Record<string, Widget>>(initialInstances);
   const [loaded, setLoaded] = useState(false);
+  // layout/instances start at the starter defaults. A missing or failed read
+  // (absent key, or a 401/network blip) leaves them at those defaults, and the
+  // persist effects below fire on the load transition, which would overwrite a
+  // real dashboard with the starter. Skip that first post-load write and only
+  // save genuine later edits, so a bad read can never clobber saved data.
+  const layoutHydrated = useRef(false);
+  const instancesHydrated = useRef(false);
 
   // Community widget-bank definitions: render existing instances and offer
   // templates in the shelf's Community group.
@@ -266,11 +273,13 @@ export default function WidgetGrid({
 
   useEffect(() => {
     if (!loaded) return;
+    if (!layoutHydrated.current) { layoutHydrated.current = true; return; }
     storage.setItem(LAYOUT_KEY, JSON.stringify(layout));
   }, [layout, loaded]);
 
   useEffect(() => {
     if (!loaded) return;
+    if (!instancesHydrated.current) { instancesHydrated.current = true; return; }
     storage.setItem(INSTANCES_KEY, JSON.stringify(instances));
   }, [instances, loaded]);
 
