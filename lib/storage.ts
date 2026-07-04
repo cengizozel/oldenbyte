@@ -13,14 +13,24 @@ function check401(res: Response): Response {
 }
 
 export async function getItem(key: string): Promise<string | null> {
-  if (isDemoMode()) return demoGetItem(key);
+  return (await getItemResult(key)).value;
+}
+
+// Like getItem, but reports whether the read actually SUCCEEDED. `getItem`
+// returns null both for a genuinely-absent key and for a failed request (server
+// restarting mid-deploy, network blip, 401). Callers that would otherwise treat
+// null as "no data yet" and then overwrite storage with a default MUST use this
+// and skip the write when `ok` is false — otherwise a transient read failure
+// silently clobbers real data (e.g. resets the dashboard to the seed).
+export async function getItemResult(key: string): Promise<{ ok: boolean; value: string | null }> {
+  if (isDemoMode()) return { ok: true, value: demoGetItem(key) };
   try {
     const res = check401(await fetch(`/api/settings?key=${encodeURIComponent(key)}`));
-    if (!res.ok) return null;
+    if (!res.ok) return { ok: false, value: null };
     const data = await res.json();
-    return data.value ?? null;
+    return { ok: true, value: data.value ?? null };
   } catch {
-    return null;
+    return { ok: false, value: null };
   }
 }
 

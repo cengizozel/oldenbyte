@@ -180,10 +180,14 @@ export function buildSeed(): Record<string, unknown> {
  */
 export async function maybeSeedFirstRun(): Promise<DashboardsState | null> {
   const [dashboards, legacyLayout] = await Promise.all([
-    storage.getItem("dashboards"),
-    storage.getItem("widget-layout"),
+    storage.getItemResult("dashboards"),
+    storage.getItemResult("widget-layout"),
   ]);
-  if (dashboards !== null || legacyLayout !== null) return null;
+  // Only seed when the store is CONFIRMED empty. If either read failed (server
+  // restarting during a deploy, network blip), do nothing — seeding here would
+  // overwrite a real dashboard with the demo default.
+  if (!dashboards.ok || !legacyLayout.ok) return null;
+  if (dashboards.value !== null || legacyLayout.value !== null) return null;
 
   const seed = buildSeed();
   await Promise.all(

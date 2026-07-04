@@ -227,12 +227,18 @@ export default function WidgetGrid({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onRegisterEditControls]);
 
-  // Load persisted layout from DB after hydration
+  // Load persisted layout from DB after hydration. Only mark loaded (which
+  // enables the persist effects below) once the reads SUCCEED — a failed read
+  // must not let the in-memory default get written over real, momentarily
+  // unreachable data (e.g. during a deploy restart). It retries on next mount.
   useEffect(() => {
     Promise.all([
-      storage.getItem(LAYOUT_KEY),
-      storage.getItem(INSTANCES_KEY),
-    ]).then(([savedLayout, savedInstances]) => {
+      storage.getItemResult(LAYOUT_KEY),
+      storage.getItemResult(INSTANCES_KEY),
+    ]).then(([layoutR, instR]) => {
+      if (!layoutR.ok || !instR.ok) return; // read failed: leave state alone, don't persist
+      const savedLayout = layoutR.value;
+      const savedInstances = instR.value;
       try {
         if (savedInstances) {
           const parsed: Record<string, Widget> = JSON.parse(savedInstances);
@@ -252,7 +258,8 @@ export default function WidgetGrid({
           setLayout(JSON.parse(savedLayout));
         }
       } catch {}
-    }).finally(() => setLoaded(true));
+      setLoaded(true);
+    });
   }, []);
 
   const [droppingId, setDroppingId] = useState<string | null>(null);
