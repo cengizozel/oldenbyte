@@ -145,7 +145,7 @@ export default function LoginPage() {
         <input
           autoFocus
           type="text"
-          autoCapitalize="off"
+          autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
           value={username}
@@ -172,7 +172,7 @@ export default function LoginPage() {
         {mode === "register" && (
           <input
             type="text"
-            autoCapitalize="off"
+            autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
             value={invite}
