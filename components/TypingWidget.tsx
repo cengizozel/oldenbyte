@@ -563,11 +563,13 @@ export default function TypingWidget({
     const fontCls = big ? "text-2xl leading-[2.6rem]" : "text-[15px] leading-8";
     return (
       <div ref={wrapRef} className={`relative font-mono ${fontCls} tracking-wide flex flex-wrap gap-x-[0.55ch] gap-y-1 select-none transition-opacity ${focused ? "" : "opacity-50 blur-[1.5px]"}`}>
-        {/* single caret that glides between characters */}
+        {/* single caret that glides between characters — nudged 2px left into
+            the inter-character gap and kept translucent so it never obscures
+            the glyph it precedes */}
         <span
           aria-hidden
           className={`absolute left-0 top-0 w-[2px] rounded-full bg-current ${c.text} pointer-events-none will-change-transform transition-[transform,height] duration-75 ease-out ${started ? "" : "animate-pulse"}`}
-          style={{ transform: `translate(${caret.x}px, ${caret.y}px)`, height: caret.h || undefined, opacity: caret.show ? (focused ? 0.9 : 0.35) : 0 }}
+          style={{ transform: `translate(${caret.x - 2}px, ${caret.y}px)`, height: caret.h || undefined, opacity: caret.show ? (focused ? 0.6 : 0.3) : 0 }}
         />
         {words.map((w, wi) => {
           const typedW = wi < typedWords.length ? typedWords[wi] : wi === activeWi ? cur : undefined;
