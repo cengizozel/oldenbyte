@@ -24,6 +24,8 @@ type Config = {
   length: number;
   drill: DrillId;
   custom: string;
+  customScramble: boolean; // custom drill: random strings of the letters
+  customWords: boolean;    // custom drill: real words containing the letters
   countdown: number; // get-ready seconds before a run (0 = off)
   bpm: number;
   sound: boolean;
@@ -37,7 +39,7 @@ type Stats = {
   keyMiss: Record<string, number>;
 };
 
-const DEFAULT_CONFIG: Config = { mode: "words", length: 25, drill: "custom", custom: "zxc", countdown: 3, bpm: 100, sound: true, dynamic: false, endless: false };
+const DEFAULT_CONFIG: Config = { mode: "words", length: 25, drill: "custom", custom: "zxc", customScramble: true, customWords: false, countdown: 3, bpm: 100, sound: true, dynamic: false, endless: false };
 
 const BPM_MIN = 40;
 const BPM_MAX = 300;
@@ -88,19 +90,41 @@ function pickWords(n: number): string {
   return out.slice(0, n).join(" ");
 }
 
-// Random pseudo-words built from ONLY the letters the user supplied (e.g. "zxc"
-// -> "xcz zx cxzc ..."), for targeted finger drills.
-function buildCustom(raw: string): string {
-  const letters = [...new Set((raw || "").toLowerCase().replace(/[^a-z0-9]/g, "").split(""))];
+// The top real words for a set of trouble letters: words containing ALL the
+// letters rank first, then the closest approximations — more of the letters
+// present wins, ties broken by how much of the word is made of them.
+function wordsForLetters(letters: string[]): string[] {
+  return WORDS
+    .map(w => ({
+      w,
+      present: letters.filter(l => w.includes(l)).length,
+      density: w.split("").filter(ch => letters.includes(ch)).length / w.length,
+    }))
+    .sort((a, b) => b.present - a.present || b.density - a.density)
+    .slice(0, 50)
+    .map(x => x.w);
+}
+
+// Custom drill text from the user's letters: scrambles (random strings of only
+// those letters), real words containing them, or a random mix of both.
+function buildCustom(cfg: Config): string {
+  const letters = [...new Set((cfg.custom || "").toLowerCase().replace(/[^a-z0-9]/g, "").split(""))];
   if (letters.length === 0) return "asdf jkl; fdsa ;lkj asdf jkl;";
-  const words: string[] = [];
+  const useWords = cfg.customWords;
+  const useScramble = cfg.customScramble || !useWords; // never neither
+  const pool = useWords ? wordsForLetters(letters) : [];
+  const out: string[] = [];
   for (let i = 0; i < 28; i++) {
-    const len = 2 + Math.floor(Math.random() * 3); // 2–4 chars
-    let w = "";
-    for (let j = 0; j < len; j++) w += letters[Math.floor(Math.random() * letters.length)];
-    words.push(w);
+    if (useWords && (!useScramble || Math.random() < 0.5)) {
+      out.push(pool[Math.floor(Math.random() * pool.length)]);
+    } else {
+      const len = 2 + Math.floor(Math.random() * 3); // 2–4 chars
+      let w = "";
+      for (let j = 0; j < len; j++) w += letters[Math.floor(Math.random() * letters.length)];
+      out.push(w);
+    }
   }
-  return words.join(" ");
+  return out.join(" ");
 }
 
 // Build the text to type for the current config.
@@ -109,7 +133,7 @@ function buildTarget(cfg: Config, stats: Stats): string {
   if (cfg.mode === "metro") return pickWords(cfg.length);
   if (cfg.mode === "time") return pickWords(80); // generous buffer; extended on demand
   // drills
-  if (cfg.drill === "custom") return buildCustom(cfg.custom);
+  if (cfg.drill === "custom") return buildCustom(cfg);
   if (cfg.drill === "home") {
     return Array(6).fill("asdf jkl; fdsa ;lkj jfjf dkdk slsl a;a;").join(" ");
   }
@@ -124,7 +148,7 @@ function buildTarget(cfg: Config, stats: Stats): string {
       .sort((a, b) => b.miss / b.total - a.miss / a.total)
       .slice(0, 5)
       .map(x => x.k);
-    if (!weak.length) return buildCustom(cfg.custom); // nothing learned yet — fall back to your own keys
+    if (!weak.length) return buildCustom(cfg); // nothing learned yet — fall back to your own keys
     const seqs: string[] = [];
     for (const k of weak) {
       seqs.push(`f${k}f`, `j${k}j`, `${k}${k}${k}`);
@@ -134,7 +158,7 @@ function buildTarget(cfg: Config, stats: Stats): string {
     return Array(2).fill(shuffle(seqs).join(" ")).join(" ");
   }
   // default: your own custom letters
-  return buildCustom(cfg.custom);
+  return buildCustom(cfg);
 }
 
 function optionsFor(m: Mode): number[] {
@@ -620,13 +644,29 @@ export default function TypingWidget({
             <button key={d.id} onClick={() => applyConfig({ ...config, drill: d.id })} className={chip(config.drill === d.id)}>{d.label}</button>
           ))}
           {config.mode === "drill" && config.drill === "custom" && (
-            <input
-              value={config.custom}
-              onChange={e => applyConfig({ ...config, custom: e.target.value })}
-              placeholder="letters e.g. zxc"
-              spellCheck={false}
-              className={`w-28 px-2 py-0.5 rounded-md text-[11px] font-mono bg-black/5 dark:bg-white/10 outline-none ${c.text} placeholder:opacity-40`}
-            />
+            <>
+              <input
+                value={config.custom}
+                onChange={e => applyConfig({ ...config, custom: e.target.value })}
+                placeholder="letters e.g. zxc"
+                spellCheck={false}
+                className={`w-28 px-2 py-0.5 rounded-md text-[11px] font-mono bg-black/5 dark:bg-white/10 outline-none ${c.text} placeholder:opacity-40`}
+              />
+              <button
+                onClick={() => { if (config.customWords) applyConfig({ ...config, customScramble: !config.customScramble }); }}
+                className={chip(config.customScramble)}
+                title="Random strings of your letters"
+              >
+                scramble
+              </button>
+              <button
+                onClick={() => { if (config.customScramble) applyConfig({ ...config, customWords: !config.customWords }); }}
+                className={chip(config.customWords)}
+                title="Real words containing your letters"
+              >
+                words
+              </button>
+            </>
           )}
           {config.mode === "metro" && <span className={`opacity-20 ${c.label}`}>|</span>}
           {config.mode === "metro" && (
@@ -701,13 +741,15 @@ export default function TypingWidget({
               )}
 
               {/* idle hint */}
+              {/* pointer-events-none: a focusable overlay would steal the first
+                  click's focus and unmount mid-click, eating the click — let it
+                  fall through to the field itself. */}
               {idle && !focused && (
-                <button
-                  onClick={startClick}
-                  className={`absolute inset-0 flex items-center justify-center text-xs ${c.label} opacity-80`}
+                <div
+                  className={`absolute inset-0 flex items-center justify-center text-xs ${c.label} opacity-80 pointer-events-none`}
                 >
                   {config.countdown > 0 ? "click, then press space to start" : "click here, then type"}
-                </button>
+                </div>
               )}
               {idle && focused && config.countdown > 0 && (
                 <div className={`absolute inset-x-0 bottom-0 flex items-center justify-center text-[11px] ${c.label} opacity-60 pointer-events-none`}>
