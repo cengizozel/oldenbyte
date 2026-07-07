@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react
 import { createPortal } from "react-dom";
 import { Keyboard, RotateCcw, Target, Maximize2, Minimize2, Volume2, VolumeX, Music } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
+import { TYPING_WORDS } from "@/lib/typingWords";
 import * as storage from "@/lib/storage";
 
 // A Monkeytype-style typing trainer. Input is word-based: you type a word and
@@ -56,17 +57,12 @@ const TIME_LENGTHS = [15, 30, 60];
 const METRO_LENGTHS = [15, 25, 40];
 const COUNTDOWNS = [0, 3, 5];
 
-// A compact common-word pool (lowercase, no punctuation) — enough variety for
-// words/time modes and to seed weak-key drills.
-const WORDS = (
-  "the of and a to in is you that it he was for on are as with his they i at be this have from or one had by " +
-  "word but not what all were we when your can said there use an each which she do how their if will up other " +
-  "about out many then them these so some her would make like him into time has look two more write go see " +
-  "number no way could people my than first water been call who oil its now find long down day did get come " +
-  "made may part over new sound take only little work know place year live me back give most very after thing " +
-  "our just name good sentence man think say great where help through much before line right too mean old any " +
-  "same tell boy follow came want show also around form three small set put end does another well large must big"
-).split(/\s+/).filter(Boolean);
+// Word pools from the bundled frequency-ranked list (lib/typingWords.ts).
+// words/time modes draw from the 1000 most common for a Monkeytype-like feel;
+// letter-matching drills search the full ~10k so any letter combo finds real
+// words, ranked by commonness.
+const WORDS = TYPING_WORDS.slice(0, 1000);
+const MATCH_WORDS = TYPING_WORDS;
 
 // Approximate QWERTY adjacency (horizontal + nearest staggered keys). Used to
 // classify a wrong keystroke as a "neighbour slip".
@@ -92,15 +88,19 @@ function pickWords(n: number): string {
 
 // The top real words for a set of trouble letters: words containing ALL the
 // letters rank first, then the closest approximations — more of the letters
-// present wins, ties broken by how much of the word is made of them.
+// present wins, ties broken by how much of the word is made of them, then by
+// commonness (MATCH_WORDS is frequency-ordered). Words with NONE of the
+// letters never qualify; the list just comes back shorter.
 function wordsForLetters(letters: string[]): string[] {
-  return WORDS
-    .map(w => ({
+  return MATCH_WORDS
+    .map((w, rank) => ({
       w,
+      rank,
       present: letters.filter(l => w.includes(l)).length,
       density: w.split("").filter(ch => letters.includes(ch)).length / w.length,
     }))
-    .sort((a, b) => b.present - a.present || b.density - a.density)
+    .filter(x => x.present > 0)
+    .sort((a, b) => b.present - a.present || b.density - a.density || a.rank - b.rank)
     .slice(0, 50)
     .map(x => x.w);
 }
@@ -110,9 +110,9 @@ function wordsForLetters(letters: string[]): string[] {
 function buildCustom(cfg: Config): string {
   const letters = [...new Set((cfg.custom || "").toLowerCase().replace(/[^a-z0-9]/g, "").split(""))];
   if (letters.length === 0) return "asdf jkl; fdsa ;lkj asdf jkl;";
-  const useWords = cfg.customWords;
+  const pool = cfg.customWords ? wordsForLetters(letters) : [];
+  const useWords = cfg.customWords && pool.length > 0; // no matches at all: scramble instead
   const useScramble = cfg.customScramble || !useWords; // never neither
-  const pool = useWords ? wordsForLetters(letters) : [];
   const out: string[] = [];
   for (let i = 0; i < 28; i++) {
     if (useWords && (!useScramble || Math.random() < 0.5)) {
