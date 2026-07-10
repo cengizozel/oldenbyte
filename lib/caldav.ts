@@ -5,8 +5,12 @@
 //
 // Parsing is dependency-free, namespace-agnostic regex over the XML (like
 // lib/kiwix.ts) and a line-unfolding VEVENT reader for the iCal payloads.
-// Recurring events rely on the server's time-range/expand handling; servers
-// that don't expand return the recurrence master once.
+// All times are timezone-aware: UTC (Z) values and TZID-stamped wall times are
+// converted to the USER's zone (the `tz` argument; server zone when omitted),
+// and recurring events are expanded locally — DAILY/WEEKLY/MONTHLY/YEARLY with
+// INTERVAL, COUNT, UNTIL, BYDAY (incl. monthly ordinals like 2TU/-1FR), EXDATE,
+// and RECURRENCE-ID overrides — so a REPORT that returns only the recurrence
+// master still yields the actual occurrences in range.
 
 export type CalDAVAccount = { baseUrl: string; username: string; password: string };
 export type CalDAVCalendar = { name: string; url: string; readOnly?: boolean; source?: string };
@@ -122,35 +126,106 @@ export async function listCalendars(account: CalDAVAccount, signal?: AbortSignal
   return calendars;
 }
 
-// ── Events ────────────────────────────────────────────────────────────────────
+// ── Timezones ─────────────────────────────────────────────────────────────────
+// Dependency-free zone math via Intl. `tz` is the user's IANA zone; every
+// event's display time comes out in it, and day boundaries are computed in it.
 
-// "20260613T140000Z" / "20260613T140000" / "20260613" → display-oriented ISO.
-function icalToIso(value: string, isDate: boolean): string {
-  if (isDate || /^\d{8}$/.test(value)) {
-    return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+function serverZone(): string {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; }
+}
+
+const partsFmt = new Map<string, Intl.DateTimeFormat>();
+function fmtFor(zone: string): Intl.DateTimeFormat {
+  let f = partsFmt.get(zone);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+    });
+    partsFmt.set(zone, f);
+  }
+  return f;
+}
+
+// Offset (ms) of `zone` at the instant `utcMs`: positive east of UTC.
+function zoneOffsetMs(zone: string, utcMs: number): number {
+  const p = Object.fromEntries(fmtFor(zone).formatToParts(new Date(utcMs)).map(x => [x.type, x.value]));
+  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
+  return asUtc - Math.floor(utcMs / 1000) * 1000;
+}
+
+// Epoch ms of the wall-clock time y-mo-d h:mi:s in `zone` (two-pass for DST).
+function wallToEpoch(y: number, mo: number, d: number, h: number, mi: number, s: number, zone: string): number {
+  const guess = Date.UTC(y, mo - 1, d, h, mi, s);
+  let t = guess - zoneOffsetMs(zone, guess);
+  t = guess - zoneOffsetMs(zone, t);
+  return t;
+}
+
+// "2026-07-10T14:30" / "2026-07-10" rendered in `zone` from an epoch instant.
+function msToIso(ms: number, allDay: boolean, zone: string): string {
+  const p = Object.fromEntries(fmtFor(zone).formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+  const date = `${p.year}-${p.month}-${p.day}`;
+  return allDay ? date : `${date}T${String(+p.hour % 24).padStart(2, "0")}:${p.minute}`;
+}
+
+// Epoch ms of a local-date string's midnight in `zone`.
+function dayStartMs(iso: string, zone: string): number {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return Date.parse(iso);
+  return wallToEpoch(+m[1], +m[2], +m[3], 0, 0, 0, zone);
+}
+
+// An iCal date/date-time value (+ its property params) → epoch ms.
+// UTC (Z) parses directly; TZID wall times convert in that zone; floating
+// times and all-day dates are read in the user's zone.
+function icalValueToMs(value: string, params: string, allDay: boolean, tz: string): number {
+  if (allDay || /^\d{8}$/.test(value)) {
+    return wallToEpoch(+value.slice(0, 4), +value.slice(4, 6), +value.slice(6, 8), 0, 0, 0, tz);
   }
   const m = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z?)$/);
-  if (!m) return value;
-  if (m[7] === "Z") {
-    // Convert UTC to the server's local time for display.
-    const d = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] ?? "00"}Z`);
-    const p = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  if (!m) return Date.parse(value);
+  const [y, mo, d, h, mi, s] = [+m[1], +m[2], +m[3], +m[4], +m[5], +(m[6] ?? "0")];
+  if (m[7] === "Z") return Date.UTC(y, mo - 1, d, h, mi, s);
+  const tzid = params.match(/TZID=([^;:]+)/i)?.[1]?.replace(/^"|"$/g, "");
+  if (tzid) {
+    try { return wallToEpoch(y, mo, d, h, mi, s, tzid); } catch { /* unknown zone: fall through */ }
   }
-  return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}`;
+  return wallToEpoch(y, mo, d, h, mi, s, tz);
+}
+
+// "P1D" / "PT1H30M" / "PT45M" → ms (the common DURATION shapes).
+function durationToMs(v: string): number | null {
+  const m = v.match(/^-?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i);
+  if (!m) return null;
+  const [w, d, h, mi, s] = [m[1], m[2], m[3], m[4], m[5]].map(x => +(x ?? 0));
+  return ((w * 7 + d) * 86400 + h * 3600 + mi * 60 + s) * 1000;
 }
 
 function unescapeIcal(s: string): string {
   return s.replace(/\\n/gi, "\n").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\");
 }
 
-// Parse the VEVENTs out of one iCal document.
-function parseVevents(ics: string, href: string, calendarName: string): CalDAVEvent[] {
+// ── VEVENT parsing + recurrence expansion ─────────────────────────────────────
+// One shared path for DAV calendar objects and subscription ICS feeds: parse
+// each VEVENT to a raw record (epoch times), then expand recurrences into the
+// requested range.
+
+type RawEvent = {
+  uid: string; href: string;
+  title: string; location?: string; description?: string;
+  allDay: boolean; startMs: number; durMs: number;
+  rrule?: string; exdates: number[]; recId?: number;
+};
+
+function parseRawEvents(ics: string, href: string, tz: string): RawEvent[] {
   // Unfold continuation lines (CRLF followed by space/tab).
   const unfolded = ics.replace(/\r?\n[ \t]/g, "");
-  const events: CalDAVEvent[] = [];
+  const raws: RawEvent[] = [];
   for (const block of unfolded.split(/BEGIN:VEVENT/).slice(1)) {
-    const body = block.split(/END:VEVENT/)[0];
+    // Alarms nest their own SUMMARY/DESCRIPTION/TRIGGER — drop them so a
+    // reminder's text never masquerades as the event's.
+    const body = block.split(/END:VEVENT/)[0].replace(/BEGIN:VALARM[\s\S]*?END:VALARM/gi, "");
     const prop = (name: string): { params: string; value: string } | null => {
       const m = body.match(new RegExp(`^${name}((?:;[^:\\n]*)?):(.*)$`, "mi"));
       return m ? { params: m[1] ?? "", value: m[2].trim() } : null;
@@ -158,46 +233,37 @@ function parseVevents(ics: string, href: string, calendarName: string): CalDAVEv
     const dtstart = prop("DTSTART");
     if (!dtstart) continue;
     const allDay = /VALUE=DATE(?:;|$)/i.test(dtstart.params) || /^\d{8}$/.test(dtstart.value);
+    const startMs = icalValueToMs(dtstart.value, dtstart.params, allDay, tz);
     const dtend = prop("DTEND");
-    const start = icalToIso(dtstart.value, allDay);
-    const end = dtend ? icalToIso(dtend.value, allDay) : start;
-    events.push({
+    const durProp = prop("DURATION");
+    let durMs: number;
+    if (dtend) durMs = Math.max(0, icalValueToMs(dtend.value, dtend.params, allDay, tz) - startMs);
+    else if (durProp && durationToMs(durProp.value) != null) durMs = durationToMs(durProp.value)!;
+    else durMs = allDay ? 86400000 : 3600000;
+    const exdates: number[] = [];
+    for (const m of body.matchAll(/^EXDATE((?:;[^:\n]*)?):(.*)$/gim)) {
+      for (const v of m[2].split(",")) {
+        const val = v.trim();
+        if (val) exdates.push(icalValueToMs(val, m[1] ?? "", /^\d{8}$/.test(val), tz));
+      }
+    }
+    const recIdProp = prop("RECURRENCE-ID");
+    raws.push({
       uid: prop("UID")?.value ?? "",
       href,
-      calendar: calendarName,
       title: unescapeIcal(prop("SUMMARY")?.value ?? "(untitled)"),
-      start,
-      end,
-      allDay,
       location: unescapeIcal(prop("LOCATION")?.value ?? "") || undefined,
       description: unescapeIcal(prop("DESCRIPTION")?.value ?? "") || undefined,
-      recurring: !!prop("RRULE") || undefined,
+      allDay, startMs, durMs,
+      rrule: prop("RRULE")?.value,
+      exdates,
+      recId: recIdProp ? icalValueToMs(recIdProp.value, recIdProp.params, /^\d{8}$/.test(recIdProp.value), tz) : undefined,
     });
   }
-  return events;
+  return raws;
 }
-
-// ── Webcal subscriptions ──────────────────────────────────────────────────────
-// Nextcloud (and most servers) expose a subscription as an empty node plus a
-// source URL; the events live in the upstream ICS feed. We fetch the feed and
-// expand recurrences ourselves: DAILY/WEEKLY/MONTHLY/YEARLY with INTERVAL,
-// COUNT, UNTIL, BYDAY (incl. monthly ordinals like 2TU/-1FR), EXDATE, and
-// RECURRENCE-ID overrides. TZID-local times are treated as server-local time;
-// UTC times are converted (good enough when the feed and user share a region).
 
 const WEEKDAYS: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
-
-function icalToMs(value: string, isDate: boolean): number {
-  const iso = icalToIso(value, isDate);
-  return Date.parse(iso.includes("T") ? iso : `${iso}T00:00:00`);
-}
-
-function msToIso(ms: number, allDay: boolean): string {
-  const d = new Date(ms);
-  const p = (n: number) => String(n).padStart(2, "0");
-  const date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  return allDay ? date : `${date}T${p(d.getHours())}:${p(d.getMinutes())}`;
-}
 
 // Occurrence starts (epoch ms) of an RRULE within [rangeStart, rangeEnd).
 function expandRrule(rule: string, startMs: number, rangeStart: number, rangeEnd: number): number[] {
@@ -210,7 +276,9 @@ function expandRrule(rule: string, startMs: number, rangeStart: number, rangeEnd
   if (!freq) return [];
   const interval = Math.max(1, parseInt(parts.INTERVAL ?? "1") || 1);
   let count = parts.COUNT ? parseInt(parts.COUNT) : Infinity;
-  const until = parts.UNTIL ? icalToMs(parts.UNTIL, /^\d{8}$/.test(parts.UNTIL)) + (/^\d{8}$/.test(parts.UNTIL) ? 86399000 : 0) : Infinity;
+  const until = parts.UNTIL
+    ? icalValueToMs(parts.UNTIL, "", /^\d{8}$/.test(parts.UNTIL), serverZone()) + (/^\d{8}$/.test(parts.UNTIL) ? 86399000 : 0)
+    : Infinity;
   const limit = Math.min(rangeEnd, until + 1);
   const out: number[] = [];
   const MAX = 1000;
@@ -286,64 +354,18 @@ function expandRrule(rule: string, startMs: number, rangeStart: number, rangeEnd
   return out;
 }
 
-// Events from a subscription's ICS feed within [startIso, endIso).
-async function listSubscriptionEvents(
-  calendar: CalDAVCalendar, startIso: string, endIso: string, signal?: AbortSignal,
-): Promise<CalDAVEvent[]> {
-  const url = calendar.source!.replace(/^webcal:/i, "https:");
-  const res = await fetch(url, { headers: { "User-Agent": "oldenbyte-dashboard" }, signal });
-  if (!res.ok) throw new Error(`Subscription feed failed (HTTP ${res.status})`);
-  const unfolded = (await res.text()).replace(/\r?\n[ \t]/g, "");
-  const rangeStart = Date.parse(`${startIso}T00:00:00`);
-  const rangeEnd = Date.parse(`${endIso}T00:00:00`);
-
-  type Raw = {
-    uid: string; title: string; location?: string; description?: string;
-    allDay: boolean; startMs: number; durMs: number;
-    rrule?: string; exdates: number[]; recId?: number;
-  };
-  const raws: Raw[] = [];
-  for (const block of unfolded.split(/BEGIN:VEVENT/).slice(1)) {
-    const body = block.split(/END:VEVENT/)[0];
-    const prop = (name: string) => {
-      const m = body.match(new RegExp(`^${name}((?:;[^:\\n]*)?):(.*)$`, "mi"));
-      return m ? { params: m[1] ?? "", value: m[2].trim() } : null;
-    };
-    const dtstart = prop("DTSTART");
-    if (!dtstart) continue;
-    const allDay = /VALUE=DATE(?:;|$)/i.test(dtstart.params) || /^\d{8}$/.test(dtstart.value);
-    const startMs = icalToMs(dtstart.value, allDay);
-    const dtend = prop("DTEND");
-    const endMs = dtend ? icalToMs(dtend.value, allDay) : startMs + (allDay ? 86400000 : 3600000);
-    const exdates: number[] = [];
-    for (const m of body.matchAll(/^EXDATE((?:;[^:\n]*)?):(.*)$/gim)) {
-      for (const v of m[2].split(",")) {
-        const val = v.trim();
-        if (val) exdates.push(icalToMs(val, /^\d{8}$/.test(val)));
-      }
-    }
-    const recIdProp = prop("RECURRENCE-ID");
-    raws.push({
-      uid: prop("UID")?.value ?? "",
-      title: unescapeIcal(prop("SUMMARY")?.value ?? "(untitled)"),
-      location: unescapeIcal(prop("LOCATION")?.value ?? "") || undefined,
-      description: unescapeIcal(prop("DESCRIPTION")?.value ?? "") || undefined,
-      allDay, startMs, durMs: Math.max(0, endMs - startMs),
-      rrule: prop("RRULE")?.value,
-      exdates,
-      recId: recIdProp ? icalToMs(recIdProp.value, /^\d{8}$/.test(recIdProp.value)) : undefined,
-    });
-  }
-
+// Expand a set of raw VEVENTs (masters + overrides) into concrete events
+// within [rangeStart, rangeEnd), rendered in `tz`.
+function expandRaws(raws: RawEvent[], calendarName: string, rangeStart: number, rangeEnd: number, tz: string): CalDAVEvent[] {
   // Occurrences replaced by a RECURRENCE-ID override are dropped from expansion.
   const overridden = new Set(raws.filter(r => r.recId != null).map(r => `${r.uid}:${r.recId}`));
   const events: CalDAVEvent[] = [];
-  const emit = (r: Raw, occStartMs: number) => {
+  const emit = (r: RawEvent, occStartMs: number, recurring: boolean) => {
     events.push({
-      uid: r.uid, href: url, calendar: calendar.name, title: r.title,
-      start: msToIso(occStartMs, r.allDay), end: msToIso(occStartMs + r.durMs, r.allDay),
+      uid: r.uid, href: r.href, calendar: calendarName, title: r.title,
+      start: msToIso(occStartMs, r.allDay, tz), end: msToIso(occStartMs + r.durMs, r.allDay, tz),
       allDay: r.allDay, location: r.location, description: r.description,
-      recurring: !!r.rrule || undefined,
+      recurring: recurring || undefined,
     });
   };
   for (const r of raws) {
@@ -351,40 +373,63 @@ async function listSubscriptionEvents(
       const excluded = new Set(r.exdates);
       for (const t of expandRrule(r.rrule, r.startMs, rangeStart, rangeEnd)) {
         if (excluded.has(t) || overridden.has(`${r.uid}:${t}`)) continue;
-        emit(r, t);
+        emit(r, t, true);
       }
     } else if (r.startMs + r.durMs > rangeStart && r.startMs < rangeEnd) {
-      emit(r, r.startMs);
+      // Single events and RECURRENCE-ID overrides, when they land in range.
+      emit(r, r.startMs, r.recId != null);
     }
   }
   events.sort((a, b) => a.start.localeCompare(b.start));
   return events;
 }
 
-// All events in [startIso, endIso) for one calendar. Dates as "YYYY-MM-DD".
+// ── Webcal subscriptions ──────────────────────────────────────────────────────
+// Nextcloud (and most servers) expose a subscription as an empty node plus a
+// source URL; the events live in the upstream ICS feed. We fetch the feed and
+// expand recurrences ourselves.
+
+async function listSubscriptionEvents(
+  calendar: CalDAVCalendar, rangeStart: number, rangeEnd: number, tz: string, signal?: AbortSignal,
+): Promise<CalDAVEvent[]> {
+  const url = calendar.source!.replace(/^webcal:/i, "https:");
+  const res = await fetch(url, { headers: { "User-Agent": "oldenbyte-dashboard" }, signal });
+  if (!res.ok) throw new Error(`Subscription feed failed (HTTP ${res.status})`);
+  const raws = parseRawEvents(await res.text(), url, tz);
+  return expandRaws(raws, calendar.name, rangeStart, rangeEnd, tz);
+}
+
+// All events in [startIso, endIso) for one calendar. Dates are the user's
+// local "YYYY-MM-DD"; `tz` is their IANA zone (server zone when omitted) —
+// range boundaries and display times both live in it.
 export async function listEvents(
   account: CalDAVAccount, calendar: CalDAVCalendar,
-  startIso: string, endIso: string, signal?: AbortSignal,
+  startIso: string, endIso: string, signal?: AbortSignal, tz?: string,
 ): Promise<CalDAVEvent[]> {
-  if (calendar.source) return listSubscriptionEvents(calendar, startIso, endIso, signal);
-  const fmt = (iso: string) => iso.replace(/-/g, "") + "T000000Z";
+  const zone = tz || serverZone();
+  const rangeStart = dayStartMs(startIso, zone);
+  const rangeEnd = dayStartMs(endIso, zone);
+  if (calendar.source) return listSubscriptionEvents(calendar, rangeStart, rangeEnd, zone, signal);
+
+  // The REPORT filter takes true UTC instants of the user's local midnights.
+  const fmt = (ms: number) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
   const body =
     `<?xml version="1.0"?>` +
     `<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">` +
     `<d:prop><d:getetag/><c:calendar-data/></d:prop>` +
     `<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT">` +
-    `<c:time-range start="${fmt(startIso)}" end="${fmt(endIso)}"/>` +
+    `<c:time-range start="${fmt(rangeStart)}" end="${fmt(rangeEnd)}"/>` +
     `</c:comp-filter></c:comp-filter></c:filter>` +
     `</c:calendar-query>`;
   const xml = await dav(calendar.url, "REPORT", account, body, { Depth: "1" }, signal);
-  const events: CalDAVEvent[] = [];
+  const raws: RawEvent[] = [];
   const missing: string[] = [];
   for (const resp of xmlTags(xml, "response")) {
     const href = decodeXml(xmlText(resp, "href"));
     if (!href || href.endsWith("/")) continue;
     const data = decodeXml(xmlText(resp, "calendar-data"));
     if (data && /BEGIN:VEVENT/i.test(data)) {
-      events.push(...parseVevents(data, resolveHref(account.baseUrl, href), calendar.name));
+      raws.push(...parseRawEvents(data, resolveHref(account.baseUrl, href), zone));
     } else {
       missing.push(href);
     }
@@ -398,12 +443,11 @@ export async function listEvents(
       const url = resolveHref(account.baseUrl, href);
       const res = await fetch(url, { headers: authHeader(account), signal });
       if (!res.ok) return [];
-      return parseVevents(await res.text(), url, calendar.name);
+      return parseRawEvents(await res.text(), url, zone);
     }));
-    for (const r of settled) if (r.status === "fulfilled") events.push(...r.value);
+    for (const r of settled) if (r.status === "fulfilled") raws.push(...r.value);
   }
-  events.sort((a, b) => a.start.localeCompare(b.start));
-  return events;
+  return expandRaws(raws, calendar.name, rangeStart, rangeEnd, zone);
 }
 
 // ── Writes ────────────────────────────────────────────────────────────────────
@@ -412,7 +456,7 @@ function icsEscape(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 }
 
-// "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm" (treated as server-local floating time).
+// "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm" (wall time in the user's zone).
 function isoToIcal(iso: string): { value: string; isDate: boolean } {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/);
   if (!m) throw new Error(`Invalid date "${iso}" (use YYYY-MM-DD or YYYY-MM-DDTHH:mm)`);
@@ -424,12 +468,16 @@ export async function createEvent(
   account: CalDAVAccount, calendar: CalDAVCalendar,
   ev: { title: string; start: string; end?: string; location?: string; description?: string },
   signal?: AbortSignal,
+  // IANA zone the event's wall times live in. With it, timed events carry
+  // TZID (servers know the zone database); without it they stay floating.
+  timezone?: string,
 ): Promise<{ uid: string; href: string }> {
   const uid = `ob-${Date.now()}-${Math.floor(Math.random() * 1e6)}@oldenbyte`;
   const start = isoToIcal(ev.start);
   // Default duration: one hour for timed events, one day for all-day.
   const end = ev.end ? isoToIcal(ev.end) : null;
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const tzParam = !start.isDate && timezone ? `;TZID=${timezone}` : "";
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -437,9 +485,9 @@ export async function createEvent(
     "BEGIN:VEVENT",
     `UID:${uid}`,
     `DTSTAMP:${stamp}`,
-    start.isDate ? `DTSTART;VALUE=DATE:${start.value}` : `DTSTART:${start.value}`,
+    start.isDate ? `DTSTART;VALUE=DATE:${start.value}` : `DTSTART${tzParam}:${start.value}`,
     end
-      ? (end.isDate ? `DTEND;VALUE=DATE:${end.value}` : `DTEND:${end.value}`)
+      ? (end.isDate ? `DTEND;VALUE=DATE:${end.value}` : `DTEND${tzParam}:${end.value}`)
       : (start.isDate ? "" : `DURATION:PT1H`),
     `SUMMARY:${icsEscape(ev.title)}`,
     ev.location ? `LOCATION:${icsEscape(ev.location)}` : "",

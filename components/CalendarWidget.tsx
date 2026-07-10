@@ -96,6 +96,9 @@ export default function CalendarWidget({
           baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password,
           calendars: cfg.calendars,
           start: localDate(start), end: localDate(end),
+          // Convert event times into this device's zone (UTC- and TZID-stamped
+          // times would otherwise show the server's wall clock).
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
       const data = await res.json();

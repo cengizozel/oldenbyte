@@ -37,8 +37,9 @@ export async function POST(request: NextRequest) {
       if (!calendars.length || !/^\d{4}-\d{2}-\d{2}$/.test(start ?? "") || !/^\d{4}-\d{2}-\d{2}$/.test(end ?? "")) {
         return NextResponse.json({ error: "Missing calendars or start/end (YYYY-MM-DD)" }, { status: 400 });
       }
+      const tz = typeof body.timezone === "string" && body.timezone ? body.timezone : undefined;
       const settled = await Promise.allSettled(
-        calendars.slice(0, 20).map(c => listEvents(account, c, start, end, request.signal))
+        calendars.slice(0, 20).map(c => listEvents(account, c, start, end, request.signal, tz))
       );
       const events = settled.flatMap(r => (r.status === "fulfilled" ? r.value : []));
       events.sort((a, b) => a.start.localeCompare(b.start));
@@ -54,7 +55,10 @@ export async function POST(request: NextRequest) {
       if (!calendar?.url || !event.title || !event.start) {
         return NextResponse.json({ error: "Missing calendar or event title/start" }, { status: 400 });
       }
-      const created = await createEvent(account, calendar, event, request.signal);
+      const created = await createEvent(
+        account, calendar, event, request.signal,
+        typeof body.timezone === "string" && body.timezone ? body.timezone : undefined,
+      );
       return NextResponse.json(created);
     }
 

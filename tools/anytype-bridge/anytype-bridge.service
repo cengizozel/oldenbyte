@@ -1,0 +1,22 @@
+# User service so the bridge starts with your session (the Anytype desktop app
+# is a user app, so a system service would outlive its target).
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp anytype-bridge.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now anytype-bridge
+#
+# Adjust WorkingDirectory if the repo lives somewhere else.
+
+[Unit]
+Description=Anytype write bridge for oldenbyte
+After=default.target
+
+[Service]
+WorkingDirectory=%h/Documents/GitHub/oldenbyte/tools/anytype-bridge
+ExecStart=%h/Documents/GitHub/oldenbyte/tools/anytype-bridge/run.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

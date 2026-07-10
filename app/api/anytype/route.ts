@@ -70,11 +70,44 @@ export async function GET(request: NextRequest) {
 
 // POST auth: {op:"challenge", baseUrl} → {challengeId}
 //            {op:"key", baseUrl, challengeId, code} → {apiKey}
+// POST bridge (the write bridge, tools/anytype-bridge — credentials ride each
+// request, same as auth):
+//            {op:"bridge", bridgeUrl, bridgeToken, rpc:{op,...}} → bridge result
+//            {op:"bridge-health", bridgeUrl} → {ok, app_version}
+const BRIDGE_OPS = new Set(["list_types", "style_profile", "create_object", "append_markdown", "read_object", "search", "archive_object"]);
+
 export async function POST(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
 
-  const { op, baseUrl, challengeId, code } = await request.json();
+  const { op, baseUrl, challengeId, code, bridgeUrl, bridgeToken, rpc } = await request.json();
+
+  if (op === "bridge" || op === "bridge-health") {
+    if (!bridgeUrl || !/^https?:\/\//.test(bridgeUrl)) {
+      return NextResponse.json({ error: "Missing or invalid bridgeUrl" }, { status: 400 });
+    }
+    const bridgeBase = root(bridgeUrl);
+    try {
+      if (op === "bridge-health") {
+        const res = await fetch(`${bridgeBase}/health`, { signal: request.signal });
+        return NextResponse.json(await res.json());
+      }
+      if (!rpc?.op || !BRIDGE_OPS.has(rpc.op)) {
+        return NextResponse.json({ error: `Unknown bridge op "${rpc?.op ?? ""}"` }, { status: 400 });
+      }
+      const res = await fetch(`${bridgeBase}/rpc`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${bridgeToken ?? ""}` },
+        body: JSON.stringify(rpc),
+        signal: request.signal,
+      });
+      const data = await res.json().catch(() => ({ error: `bridge HTTP ${res.status}` }));
+      return NextResponse.json(data, { status: res.ok ? 200 : 502 });
+    } catch (err) {
+      return NextResponse.json({ error: `Bridge unreachable: ${String(err instanceof Error ? err.message : err)}` }, { status: 502 });
+    }
+  }
+
   if (!baseUrl || !/^https?:\/\//.test(baseUrl)) {
     return NextResponse.json({ error: "Missing or invalid baseUrl" }, { status: 400 });
   }

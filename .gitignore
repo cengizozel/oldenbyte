@@ -46,3 +46,7 @@ next-env.d.ts
 
 /app/generated/prisma
 dev.db
+
+# Anytype bridge (tools/anytype-bridge)
+tools/anytype-bridge/.venv/
+__pycache__/

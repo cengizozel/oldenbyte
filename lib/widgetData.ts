@@ -109,17 +109,19 @@ async function readWeather(userId: string, id: string, title: string): Promise<s
   return `## ${title} (Weather)\n${summarizeForecast(cfg.name, cfg.unit ?? "c", shaped).join("\n")}`;
 }
 
-async function readCalendar(userId: string, id: string, title: string): Promise<string> {
+async function readCalendar(userId: string, id: string, title: string, opts?: ReadOpts): Promise<string> {
   const cfg = await readJSON<{
     baseUrl: string; username: string; password: string;
     calendars: CalDAVCalendar[]; days?: number;
   }>(userId, `calendar-widget-${id}`);
   if (!cfg?.baseUrl || !cfg.username || !cfg.calendars?.length) return "The calendar widget is not connected.";
   const days = cfg.days ?? 7;
-  const start = today();
-  const end = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+  // Anchor "today" and the window to the USER's day (relayed by the chat
+  // client), not the server's UTC date — at 9pm in a UTC-5 zone those differ.
+  const start = opts?.today && /^\d{4}-\d{2}-\d{2}$/.test(opts.today) ? opts.today : today();
+  const end = new Date(Date.parse(start) + days * 86400000).toISOString().slice(0, 10);
   const account = { baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password };
-  const settled = await Promise.allSettled(cfg.calendars.slice(0, 20).map(c => listEvents(account, c, start, end)));
+  const settled = await Promise.allSettled(cfg.calendars.slice(0, 20).map(c => listEvents(account, c, start, end, undefined, opts?.timezone)));
   const events = settled.flatMap(r => (r.status === "fulfilled" ? r.value : []));
   events.sort((a, b) => a.start.localeCompare(b.start));
   if (!events.length) return `## ${title} (Calendar)\nToday is ${start}. No events in the next ${days} days.`;
@@ -341,13 +343,17 @@ async function readBookmarks(userId: string, id: string, title: string): Promise
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-export async function readWidgetData(userId: string, id: string, type: string, title: string): Promise<string> {
+// The user's local day/zone, relayed by the chat client so date-anchored
+// widgets (calendar) read the same "today" the user sees.
+export type ReadOpts = { today?: string; timezone?: string };
+
+export async function readWidgetData(userId: string, id: string, type: string, title: string, opts?: ReadOpts): Promise<string> {
   try {
     switch (type) {
       case "notebook": return await readNotebook(userId, id, title);
       case "text":     return await readText(userId, id, title);
       case "weather":  return await readWeather(userId, id, title);
-      case "calendar": return await readCalendar(userId, id, title);
+      case "calendar": return await readCalendar(userId, id, title, opts);
       case "tracker":  return await readTracker(userId, id, title);
       case "rhythm":   return await readRhythm(userId, id, title);
       case "upkeep":   return await readUpkeep(userId, id, title);

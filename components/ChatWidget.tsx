@@ -15,14 +15,44 @@ import { tagColor } from "@/lib/colors";
 import Markdown from "./Markdown";
 
 type Role = "user" | "assistant";
+type WriteMode = "confirm" | "auto";
 type MsgStats = { tps: number; tokens: number; total: number; ttft: number };
 type Source = { n: number; title: string; url: string; cited?: boolean };
+// A write the model wants to make, awaiting the user's click. Modern shape is
+// kind/summary/detail/payload; proposals persisted before the generic form
+// carry calendar fields at the top level (kind absent = calendar-create).
+type ProposalKind = "calendar-create" | "calendar-delete" | "anytype-create" | "anytype-append";
 type Proposal = {
-  title: string; start: string; end?: string; location?: string; description?: string;
-  calendarName: string; calendarUrl: string;
+  kind?: ProposalKind;
+  summary?: string;
+  detail?: string;
+  payload?: Record<string, unknown>;
+  // legacy calendar-create fields
+  title?: string; start?: string; end?: string; location?: string; description?: string;
+  calendarName?: string; calendarUrl?: string;
   status: "pending" | "added" | "dismissed" | "failed";
 };
-type ChatMessage = { role: Role; content: string; at?: number; images?: string[]; memory?: string[]; proposals?: Proposal[]; stats?: MsgStats; sources?: Source[] };
+// A write the model already executed (auto mode), shown as a done-chip.
+type ActionChip = { kind: ProposalKind; summary: string; detail?: string };
+
+// One canonical view over both proposal generations.
+function normalizeProposal(pr: Proposal): { kind: ProposalKind; summary: string; detail: string; payload: Record<string, unknown> } {
+  if (pr.kind && pr.payload) {
+    return { kind: pr.kind, summary: pr.summary ?? "", detail: pr.detail ?? "", payload: pr.payload };
+  }
+  // Legacy calendar-create card.
+  const when = (pr.start ?? "").replace("T", " ");
+  return {
+    kind: "calendar-create",
+    summary: `Add "${pr.title ?? ""}"`,
+    detail: [when, pr.calendarName].filter(Boolean).join(" · "),
+    payload: {
+      title: pr.title, start: pr.start, end: pr.end, location: pr.location,
+      description: pr.description, calendarName: pr.calendarName, calendarUrl: pr.calendarUrl,
+    },
+  };
+}
+type ChatMessage = { role: Role; content: string; at?: number; images?: string[]; memory?: string[]; proposals?: Proposal[]; actions?: ActionChip[]; stats?: MsgStats; sources?: Source[] };
 type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number; renamed?: boolean; characterId?: string };
 
 // A persona with its own system prompt and a private, scoped memory about the
@@ -308,6 +338,14 @@ type ChatConfig = {
   anytypeApiKey: string;   // paired Bearer token
   anytypeSpaceId: string;  // selected space
   anytypeSpaceName: string;
+  // Write bridge (tools/anytype-bridge): unlocks creating/appending Anytype
+  // notes with real blocks. Reads work without it.
+  anytypeBridgeUrl: string;
+  anytypeBridgeToken: string;
+  // Per-capability write mode: "confirm" = the model proposes and the user
+  // approves a card (default); "auto" = writes execute immediately.
+  calendarWriteMode: WriteMode;
+  anytypeWriteMode: WriteMode;
   // Ollama only: how long the model lingers in VRAM after a reply. "" = leave
   // it to Ollama's default; "5m"/"30m"/"1h" = that duration; "-1" = stay loaded.
   keepAlive: string;
@@ -366,6 +404,10 @@ const DEFAULT_CONFIG: ChatConfig = {
   anytypeApiKey: "",
   anytypeSpaceId: "",
   anytypeSpaceName: "",
+  anytypeBridgeUrl: "",
+  anytypeBridgeToken: "",
+  calendarWriteMode: "confirm",
+  anytypeWriteMode: "confirm",
   keepAlive: "",
 };
 
@@ -448,6 +490,8 @@ export default function ChatWidget({
   const [anytypeCode, setAnytypeCode] = useState("");
   const [anytypeBusy, setAnytypeBusy] = useState(false);
   const [anytypeError, setAnytypeError] = useState("");
+  // Write-bridge test result (settings panel).
+  const [bridgeStatus, setBridgeStatus] = useState<"" | "checking" | "ok" | "fail">("");
 
   // Roster of readable widgets (names only; content is fetched server-side
   // when the model explicitly calls a tool).
@@ -488,8 +532,10 @@ export default function ChatWidget({
   // configured); enabling that widget's row grants agenda + calendar tools.
   const [calSource, setCalSource] = useState<CalendarSource | null>(null);
   useEffect(() => { getCalendarAccount().then(setCalSource).catch(() => {}); }, []);
-  const anySourceOn = Object.values(config.dashboardWidgets).some(Boolean);
-  const calendarOn = !!(calSource && config.dashboardWidgets[calSource.widgetId]);
+  // v3 semantics: widgets on the dashboard are readable unless explicitly
+  // toggled off — so any roster at all means sources are in play.
+  const sourceOn = (id: string) => config.dashboardWidgets[id] !== false;
+  const calendarOn = !!(calSource && sourceOn(calSource.widgetId));
   // Image attachments: pending (pre-send) data URLs, the lightbox viewer, and
   // whether the selected model can see images (null = backend can't tell us).
   const [pendingImages, setPendingImages] = useState<string[]>([]);
@@ -582,7 +628,7 @@ export default function ChatWidget({
           cfg = { ...DEFAULT_CONFIG, ...parsed.config };
           if ((cfg.sourcesVersion ?? 1) < 2) {
             // v1 had a master useDashboard switch with missing-key = included;
-            // v2 is explicit per-widget opt-in. Materialize the old semantics.
+            // v2 was explicit per-widget opt-in. Materialize the old semantics.
             const roster = await listDashboardWidgets().catch(() => [] as WidgetRosterItem[]);
             const explicit: Record<string, boolean> = {};
             for (const w of roster) {
@@ -591,6 +637,13 @@ export default function ChatWidget({
                 : (cfg.useDashboard ? cfg.dashboardWidgets[w.id] !== false : false);
             }
             cfg = { ...cfg, dashboardWidgets: explicit, sourcesVersion: 2 };
+          }
+          if ((cfg.sourcesVersion ?? 1) < 3) {
+            // v3: a widget ON the dashboard is readable unless explicitly
+            // toggled off (missing entry = on). Existing explicit choices keep
+            // working; widgets added later are visible by default, and widgets
+            // removed from the dashboard drop out of the roster entirely.
+            cfg = { ...cfg, sourcesVersion: 3 };
           }
           setConfig(cfg);
           configRef.current = cfg; // before refreshContext, so the gather respects saved choices
@@ -930,41 +983,89 @@ export default function ChatWidget({
     persist(config, []);
   }
 
-  // Resolve a calendar proposal: only a user click here ever creates the event.
+  // Resolve a write proposal: only a user click here ever executes it. The
+  // executing route gets its credentials from the live widget/chat config, not
+  // from the persisted proposal, so tokens never sit in chat history.
   async function resolveProposal(msgIndex: number, propIndex: number, accept: boolean) {
     const msg = messages[msgIndex];
     const prop = msg?.proposals?.[propIndex];
     if (!prop || prop.status !== "pending") return;
+    const convId = activeIdRef.current;
+    const p = normalizeProposal(prop);
     let status: Proposal["status"] = "dismissed";
     if (accept) {
-      // Calendar writes go to a real CalDAV server, outside the demo sandbox.
+      // Writes reach real external services, outside the demo sandbox.
       if (isDemoMode()) { status = "failed"; }
-      else if (!calSource) { status = "failed"; }
       else {
         try {
-          const res = await fetch("/api/caldav", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              op: "create",
-              baseUrl: calSource.account.baseUrl,
-              username: calSource.account.username,
-              password: calSource.account.password,
-              calendar: { name: prop.calendarName, url: prop.calendarUrl },
-              event: { title: prop.title, start: prop.start, end: prop.end, location: prop.location, description: prop.description },
-            }),
-          });
-          status = res.ok ? "added" : "failed";
+          status = (await executeProposal(p)) ? "added" : "failed";
         } catch { status = "failed"; }
       }
     }
-    const next = messages.map((m, i) =>
-      i === msgIndex
-        ? { ...m, proposals: m.proposals!.map((pr, j) => (j === propIndex ? { ...pr, status } : pr)) }
-        : m
-    );
-    setMessages(next);
-    persist(config, next);
+    // Patch ONLY the targeted proposal, from the freshest state — a stale
+    // snapshot here would roll back other proposals resolved in flight.
+    const patch = (msgs: ChatMessage[]): ChatMessage[] =>
+      msgs.map((m, i) =>
+        i === msgIndex && m.proposals
+          ? { ...m, proposals: m.proposals.map((pr, j) => (j === propIndex ? { ...pr, status } : pr)) }
+          : m
+      );
+    if (activeIdRef.current === convId) {
+      setMessages(prev => {
+        const next = patch(prev);
+        queueMicrotask(() => persist(configRef.current, next));
+        return next;
+      });
+    } else {
+      // The user switched chats while the write ran: record the outcome in the
+      // original conversation without touching the one on screen.
+      const convs = conversationsRef.current.map(cv => (cv.id === convId ? { ...cv, messages: patch(cv.messages) } : cv));
+      conversationsRef.current = convs;
+      setConversations(convs);
+      persistConversations(configRef.current, convs, activeIdRef.current);
+    }
+  }
+
+  // Run one approved proposal against its backing service; true = success.
+  async function executeProposal(p: ReturnType<typeof normalizeProposal>): Promise<boolean> {
+    const pay = p.payload;
+    if (p.kind === "calendar-create" || p.kind === "calendar-delete") {
+      if (!calSource) return false;
+      const account = {
+        baseUrl: calSource.account.baseUrl,
+        username: calSource.account.username,
+        password: calSource.account.password,
+      };
+      const body = p.kind === "calendar-create"
+        ? {
+            op: "create", ...account,
+            calendar: { name: pay.calendarName, url: pay.calendarUrl },
+            event: { title: pay.title, start: pay.start, end: pay.end, location: pay.location, description: pay.description },
+            timezone: pay.timezone ?? effectiveTimezone(tzRef.current),
+          }
+        : { op: "delete", ...account, href: pay.href };
+      const res = await fetch("/api/caldav", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return res.ok;
+    }
+    if (p.kind === "anytype-create" || p.kind === "anytype-append") {
+      if (!config.anytypeBridgeUrl || !config.anytypeBridgeToken) return false;
+      const rpc = p.kind === "anytype-create"
+        ? { op: "create_object", space_id: pay.spaceId, name: pay.name, type_name: pay.typeName, markdown: pay.markdown, icon_emoji: pay.iconEmoji }
+        : { op: "append_markdown", object_id: pay.objectId, markdown: pay.markdown };
+      const res = await fetch("/api/anytype", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "bridge", bridgeUrl: config.anytypeBridgeUrl, bridgeToken: config.anytypeBridgeToken, rpc }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json().catch(() => ({}));
+      return !data.error;
+    }
+    return false;
   }
 
   // Flip one widget's data access; invalidate the cached gather so the next
@@ -972,8 +1073,9 @@ export default function ChatWidget({
   function toggleWidgetAccess(id: string) {
     const next = {
       ...config,
-      sourcesVersion: 2,
-      dashboardWidgets: { ...config.dashboardWidgets, [id]: !config.dashboardWidgets[id] },
+      sourcesVersion: 3,
+      // v3: missing entry = on, so toggling writes the explicit opposite.
+      dashboardWidgets: { ...config.dashboardWidgets, [id]: !sourceOn(id) },
     };
     setConfig(next);
     configRef.current = next;
@@ -1010,7 +1112,9 @@ export default function ChatWidget({
       if (streaming || !configured || !text.trim()) return;
       cancelEdit();
       setError("");
-      generate([...messages.slice(0, i), { role: "user", content: text, at: Date.now() }]);
+      // Keep the message's other fields (image attachments especially) — only
+      // the text was edited.
+      generate([...messages.slice(0, i), { ...messages[i], content: text, at: Date.now() }]);
       return;
     }
     // Editing an assistant reply just rewrites its text in place.
@@ -1219,11 +1323,14 @@ export default function ChatWidget({
       );
     }
     if (calendarOn) {
+      const writeLine = config.calendarWriteMode === "auto"
+        ? `Writes execute IMMEDIATELY: only call them when the user explicitly asks to add, schedule, cancel, or remove something, and afterwards confirm exactly what you did.`
+        : `Writes NEVER execute directly: they show the user a confirmation card and the user decides. Only propose one when the user explicitly asks to add, schedule, cancel, or remove something, and afterwards tell them it awaits their confirmation.`;
       parts.push(
-        `You can read and write the user's calendar through list_calendar_events and create_calendar_event. ` +
-        `Use list_calendar_events for any question about their schedule, free time, or upcoming events; today's date is ${todayStr}. ` +
-        `create_calendar_event NEVER writes directly: it shows the user a confirmation card and they decide. Only propose an event when the user explicitly asks to add or schedule something, and afterwards tell them it awaits their confirmation. ` +
-        `If a create fails on a read-only calendar, say so and suggest a writable one.`
+        `You can read and write the user's calendar. Tools: list_calendar_events (any question about their schedule, free time, or upcoming events; today's date is ${todayStr}), ` +
+        `create_calendar_event (add an event), delete_calendar_event (remove one — ALWAYS call list_calendar_events first and use the ref it assigns, e.g. e3). ` +
+        writeLine +
+        ` Event times are in the user's local time. If a write fails on a read-only calendar, say so and suggest a writable one.`
       );
     }
     if (config.useKiwix && config.kiwixUrl) {
@@ -1253,6 +1360,16 @@ export default function ChatWidget({
         `4. Don't defer back to the user — find it yourself. If nothing relevant exists in their Anytype, say so plainly rather than inventing it.\n\n` +
         `CITE YOUR SOURCES: each search result and object is labeled [1], [2], …. Put the matching number right after each claim drawn from that note, e.g. "You arrived Feb 22 [1]." Only cite objects you actually read; never invent a number.`
       );
+      if (config.anytypeBridgeUrl && config.anytypeBridgeToken) {
+        const writeLine = config.anytypeWriteMode === "auto"
+          ? `Writes execute IMMEDIATELY: only call them when the user explicitly asks to save, note down, or add something, and afterwards confirm exactly what you created.`
+          : `Writes NEVER execute directly: they show the user a confirmation card with the content, and the user decides. Afterwards tell them it awaits their confirmation.`;
+        parts.push(
+          `You can also WRITE to the user's Anytype: create_anytype_object makes a new note (write the body as markdown — ## headings, - bullets, - [ ] checkboxes — it becomes real blocks), and append_to_anytype_object adds to an existing one (search for it first). ` +
+          `Match the user's own style: the create tool's description tells you which object types and block styles their space actually uses — follow it, keep titles short like theirs. ` +
+          writeLine
+        );
+      }
     }
     return parts.join("\n\n");
   }
@@ -1261,7 +1378,7 @@ export default function ChatWidget({
   // add facts the user stated, update memories they corrected, remove ones they
   // retracted. Runs only for characters with a focus. Fire-and-forget; a second,
   // non-streaming model call that never blocks the reply.
-  async function extractMemories(character: Character, userMsg: string, reply: string) {
+  async function extractMemories(character: Character, userMsg: string, reply: string, convId?: string, replyAt?: number) {
     if (!character.focus.trim() || !configured || !userMsg.trim() || !reply.trim()) return;
     try {
       const current = charactersRef.current.find(ch => ch.id === character.id);
@@ -1360,18 +1477,21 @@ export default function ChatWidget({
       );
       setCharacters(next);
       persistCharacters(next, activeCharacterIdRef.current);
-      // Surface what changed as permanent text on the reply that caused it.
-      const convId = activeIdRef.current;
+      // Surface what changed as permanent text on the reply that caused it —
+      // the exact message (by its `at` stamp) in the conversation the exchange
+      // happened in, not whatever is on screen when the extraction finishes.
+      const targetConv = convId ?? activeIdRef.current;
       const attach = (msgs: ChatMessage[]): ChatMessage[] => {
-        const idx = msgs.map(m => m.role).lastIndexOf("assistant");
+        let idx = replyAt != null ? msgs.findIndex(m => m.role === "assistant" && m.at === replyAt) : -1;
+        if (idx === -1) idx = msgs.map(m => m.role).lastIndexOf("assistant");
         if (idx === -1) return msgs;
         return msgs.map((m, i) => (i === idx ? { ...m, memory: [...(m.memory ?? []), ...changes] } : m));
       };
-      const convs = conversationsRef.current.map(cv => (cv.id === convId ? { ...cv, messages: attach(cv.messages) } : cv));
+      const convs = conversationsRef.current.map(cv => (cv.id === targetConv ? { ...cv, messages: attach(cv.messages) } : cv));
       conversationsRef.current = convs;
       setConversations(convs);
       persistConversations(configRef.current, convs, activeIdRef.current);
-      if (convId === activeIdRef.current) setMessages(prev => attach(prev));
+      if (targetConv === activeIdRef.current) setMessages(prev => attach(prev));
     } catch { /* memory is best-effort */ }
   }
 
@@ -1390,6 +1510,9 @@ export default function ChatWidget({
   // streams into the existing last assistant message, tools disabled).
   async function generate(history: ChatMessage[], opts?: { continueFrom?: { base: string } }) {
     const cont = opts?.continueFrom;
+    // The conversation this stream belongs to: abort/error cleanup and the
+    // final persist must never touch a conversation the user switched to.
+    const convAtStart = activeIdRef.current;
     timingRef.current = { start: performance.now(), first: null };
     atBottomRef.current = true; // follow the new turn
     setStreaming(true);
@@ -1398,10 +1521,11 @@ export default function ChatWidget({
     // server-side when the model explicitly reads a widget. An @-mention in
     // the message force-includes that widget even when its toggle is off.
     const lastUserText = [...history].reverse().find(m => m.role === "user")?.content ?? "";
-    const wantsRoster = anySourceOn || lastUserText.includes("@");
-    const rosterNow = wantsRoster && !cont ? await listDashboardWidgets().catch(() => [] as WidgetRosterItem[]) : [];
+    const rosterNow = !cont ? await listDashboardWidgets().catch(() => [] as WidgetRosterItem[]) : [];
+    // Widgets on the dashboard are readable unless toggled off; an @-mention
+    // force-includes one even when its toggle is off.
     const dash = rosterNow.filter(w =>
-      config.dashboardWidgets[w.id] === true || lastUserText.includes(`@${w.title}`)
+      sourceOn(w.id) || lastUserText.includes(`@${w.title}`)
     );
 
     // Continuation streams into the existing message; otherwise append a placeholder.
@@ -1453,15 +1577,22 @@ export default function ChatWidget({
             ? { baseUrl: config.kiwixUrl } // no source: search every book on the server
             : null,
           anytype: !cont && config.useAnytype && config.anytypeUrl && config.anytypeApiKey && config.anytypeSpaceId
-            ? { baseUrl: config.anytypeUrl, apiKey: config.anytypeApiKey, spaceId: config.anytypeSpaceId, spaceName: config.anytypeSpaceName }
+            ? {
+                baseUrl: config.anytypeUrl, apiKey: config.anytypeApiKey,
+                spaceId: config.anytypeSpaceId, spaceName: config.anytypeSpaceName,
+                bridgeUrl: config.anytypeBridgeUrl, bridgeToken: config.anytypeBridgeToken,
+                writeMode: config.anytypeWriteMode,
+              }
             : null,
           dashboard: dash.length
             ? { widgets: dash.map(w => ({ id: w.id, title: w.title, type: w.type })) }
             : null,
-          caldav: !cont && calendarOn ? calSource!.account : null,
-          // The user's local date, so server-side calendar results anchor to the
-          // same "today" the prompt states (not the server's UTC date).
+          caldav: !cont && calendarOn ? { ...calSource!.account, writeMode: config.calendarWriteMode } : null,
+          // The user's local date and zone, so server-side calendar results
+          // anchor to the same "today" the prompt states (not server UTC) and
+          // event times land in the user's wall clock.
           today: todayIn(effectiveTimezone(tzRef.current)),
+          timezone: effectiveTimezone(tzRef.current),
           // LM Studio sets its idle-unload from the request itself; pass the
           // chosen linger as ttl seconds (Ollama uses its own keep_alive path).
           ttl: backend === "lmstudio" ? ttlSeconds(config.keepAlive) : 0,
@@ -1498,6 +1629,7 @@ export default function ChatWidget({
       let tokens = 0;
       let sources: Source[] | undefined;
       let proposals: Proposal[] | undefined;
+      let actions: ActionChip[] | undefined;
       if (sep !== -1) {
         try {
           const trailer = JSON.parse(acc.slice(sep + 1));
@@ -1506,6 +1638,7 @@ export default function ChatWidget({
           if (Array.isArray(trailer.proposals) && trailer.proposals.length) {
             proposals = trailer.proposals.map((pr: Omit<Proposal, "status">) => ({ ...pr, status: "pending" as const }));
           }
+          if (Array.isArray(trailer.actions) && trailer.actions.length) actions = trailer.actions;
         } catch {}
       }
       const end = performance.now();
@@ -1516,6 +1649,7 @@ export default function ChatWidget({
         ? { tokens, ttft, total: (end - start) / 1000, tps: genS > 0 ? tokens / genS : 0 }
         : undefined;
 
+      const replyAt = Date.now();
       const finalMessages: ChatMessage[] = cont
         ? [...history.slice(0, -1), {
             ...history[history.length - 1],
@@ -1524,35 +1658,47 @@ export default function ChatWidget({
               ? { ...stats, tokens: stats.tokens + (history[history.length - 1].stats!.tokens ?? 0) }
               : stats ?? history[history.length - 1].stats,
           }]
-        : [...history, { role: "assistant", content: body, at: Date.now(), stats, sources, ...(proposals ? { proposals } : {}) }];
+        : [...history, { role: "assistant", content: body, at: replyAt, stats, sources, ...(proposals ? { proposals } : {}), ...(actions ? { actions } : {}) }];
       setMessages(finalMessages);
-      persist(config, finalMessages);
+      // configRef, not the closed-over config: settings saved mid-stream must
+      // not be reverted by this persist.
+      persist(configRef.current, finalMessages);
       // Ollama resets to its default keep_alive after a reply — restore the chosen
       // linger so it sticks. (LM Studio's ttl already rode the request above.)
       if (config.keepAlive && backend === "ollama") { postPower({ keepAlive: config.keepAlive }); pollPower(); }
-      // Let the active character quietly remember anything relevant (uses refs so
-      // it tracks the conversation's character even if state shifted mid-stream).
-      const convChar = conversationsRef.current.find(cv => cv.id === activeIdRef.current)?.characterId ?? activeCharacterIdRef.current;
+      // Let the active character quietly remember anything relevant — pinned to
+      // THIS conversation and THIS reply, so a chat switched to while the
+      // extraction runs never receives another chat's memory notes.
+      const convChar = conversationsRef.current.find(cv => cv.id === convAtStart)?.characterId ?? activeCharacterIdRef.current;
       const memCh = charactersRef.current.find(ch => ch.id === convChar);
       const lastUser = [...history].reverse().find(m => m.role === "user")?.content ?? "";
-      if (memCh) extractMemories(memCh, lastUser, body.replace(/<think>[\s\S]*?<\/think>/gi, "").trim());
+      if (memCh) extractMemories(memCh, lastUser, body.replace(/<think>[\s\S]*?<\/think>/gi, "").trim(), convAtStart, replyAt);
     } catch (err) {
+      // The abort may come from switching/clearing chats: `messages` then
+      // belongs to ANOTHER conversation (possibly empty), and this cleanup
+      // must not touch it — slicing would eat that chat's last message.
+      const sameConversation = activeIdRef.current === convAtStart;
       if ((err as Error).name === "AbortError") {
         // Keep whatever streamed so far; drop a trailing empty assistant turn.
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          const next = last?.content === ""
-            ? prev.slice(0, -1)
-            : [...prev.slice(0, -1), { ...last, at: last.at ?? Date.now() }];
-          queueMicrotask(() => persist(config, next));
-          return next;
-        });
+        if (sameConversation) {
+          setMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (!last) return prev;
+            const next = last.content === ""
+              ? prev.slice(0, -1)
+              : [...prev.slice(0, -1), { ...last, at: last.at ?? Date.now() }];
+            queueMicrotask(() => persist(configRef.current, next));
+            return next;
+          });
+        }
       } else {
         const raw = String(err instanceof Error ? err.message : err);
         setError(/image|vision|multimodal|pixel/i.test(raw)
           ? `${config.model} couldn't process the image; it may not support vision. Try another model or remove the image.`
           : raw);
-        setMessages(prev => (prev[prev.length - 1]?.content === "" ? prev.slice(0, -1) : prev));
+        if (sameConversation) {
+          setMessages(prev => (prev[prev.length - 1]?.content === "" ? prev.slice(0, -1) : prev));
+        }
       }
     } finally {
       setStreaming(false);
@@ -1696,7 +1842,7 @@ export default function ChatWidget({
                     {roster.map(w => {
                       const isCal = w.type === "calendar";
                       const ready = !isCal || calSource?.widgetId === w.id;
-                      const on = !!config.dashboardWidgets[w.id];
+                      const on = sourceOn(w.id);
                       return (
                         <button
                           key={w.id}
@@ -2162,6 +2308,76 @@ export default function ChatWidget({
               <p className="text-[10px] text-[var(--text-muted)] mt-1">Pair, pick a space, then turn lookup on with the box icon by the send button.</p>
             </div>
 
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <p className={`text-xs opacity-50 ${c.label}`}>Anytype write bridge <span className="opacity-60">(optional, enables creating notes)</span></p>
+                <button
+                  onClick={async () => {
+                    setBridgeStatus("checking");
+                    try {
+                      const res = await fetch("/api/anytype", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ op: "bridge-health", bridgeUrl: draft.anytypeBridgeUrl }),
+                      });
+                      const d = await res.json();
+                      setBridgeStatus(d.ok ? "ok" : "fail");
+                    } catch { setBridgeStatus("fail"); }
+                  }}
+                  disabled={bridgeStatus === "checking" || !draft.anytypeBridgeUrl.startsWith("http")}
+                  className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:opacity-40"
+                  title="Check the bridge"
+                >
+                  {bridgeStatus === "checking" ? <Loader size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                  Test
+                </button>
+              </div>
+              <SettingsInput
+                type="url"
+                value={draft.anytypeBridgeUrl}
+                onChange={e => { setDraft(d => ({ ...d, anytypeBridgeUrl: e.target.value })); setBridgeStatus(""); }}
+                placeholder="Bridge URL, e.g. http://127.0.0.1:31010"
+              />
+              <SettingsInput
+                type="password"
+                value={draft.anytypeBridgeToken}
+                onChange={e => { setDraft(d => ({ ...d, anytypeBridgeToken: e.target.value })); setBridgeStatus(""); }}
+                placeholder="Bridge token"
+                className="mt-1.5"
+              />
+              {bridgeStatus === "ok" && <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1">bridge reachable ✓</p>}
+              {bridgeStatus === "fail" && <p className="text-red-400 text-[11px] mt-1">bridge not reachable</p>}
+              <p className="text-[10px] text-[var(--text-muted)] mt-1">Runs next to the Anytype app (tools/anytype-bridge in the repo). Without it, Anytype stays read-only.</p>
+            </div>
+
+            <div>
+              <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Assistant writes</p>
+              {([
+                ["calendarWriteMode", "Calendar"],
+                ["anytypeWriteMode", "Anytype"],
+              ] as const).map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between py-0.5">
+                  <span className="text-[11px] text-[var(--text-secondary)]">{label}</span>
+                  <span className="flex items-center gap-1">
+                    {(["confirm", "auto"] as const).map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => setDraft(d => ({ ...d, [key]: mode }))}
+                        className={`text-[10px] px-2 py-0.5 rounded-md border transition-colors ${
+                          draft[key] === mode
+                            ? "border-[var(--surface-border-focus)] bg-black/5 dark:bg-white/10 text-[var(--text-primary)]"
+                            : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                        }`}
+                      >
+                        {mode === "confirm" ? "ask first" : "auto"}
+                      </button>
+                    ))}
+                  </span>
+                </div>
+              ))}
+              <p className="text-[10px] text-[var(--text-muted)] mt-1">ask first = the model proposes and you approve a card. auto = it writes immediately and reports what it did.</p>
+            </div>
+
           </div>
 
           {/* Actions */}
@@ -2293,37 +2509,69 @@ export default function ChatWidget({
                     )}
                     {!inProgress && m.role === "assistant" && (m.proposals?.length ?? 0) > 0 && (
                       <div className="flex flex-col gap-1.5 max-w-[85%]">
-                        {m.proposals!.map((pr, j) => (
-                          <div key={j} className={`rounded-xl border ${c.border} bg-[var(--surface)] px-3 py-2 flex flex-col gap-1`}>
-                            <span className="flex items-center gap-1.5 text-xs text-[var(--text-primary)]">
-                              <CalendarDays size={12} className={`shrink-0 ${c.label}`} />
-                              <span className="font-medium truncate">{pr.title}</span>
-                            </span>
-                            <span className="text-[11px] text-[var(--text-secondary)]">
-                              {pr.start.replace("T", " ")}{pr.end ? ` to ${pr.end.replace("T", " ")}` : ""} · {pr.calendarName}
-                              {pr.location ? ` · ${pr.location}` : ""}
-                            </span>
-                            {pr.status === "pending" ? (
-                              <span className="flex items-center gap-2 mt-0.5">
-                                <button
-                                  onClick={() => resolveProposal(i, j, true)}
-                                  className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-600/90 text-white hover:bg-emerald-600"
-                                >
-                                  Add to calendar
-                                </button>
-                                <button
-                                  onClick={() => resolveProposal(i, j, false)}
-                                  className="text-[11px] px-2.5 py-1 rounded-lg border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                                >
-                                  Dismiss
-                                </button>
+                        {m.proposals!.map((pr, j) => {
+                          const p = normalizeProposal(pr);
+                          const isCalendar = p.kind.startsWith("calendar");
+                          const isDelete = p.kind === "calendar-delete";
+                          const acceptLabel =
+                            p.kind === "calendar-create" ? "Add to calendar" :
+                            p.kind === "calendar-delete" ? "Delete event" :
+                            p.kind === "anytype-append" ? "Append to note" : "Save to Anytype";
+                          const doneLabel =
+                            p.kind === "calendar-create" ? "added to calendar" :
+                            p.kind === "calendar-delete" ? "deleted from calendar" :
+                            p.kind === "anytype-append" ? "appended to the note" : "saved to Anytype";
+                          const failLabel = isDemoMode()
+                            ? "not available in demo mode"
+                            : isCalendar ? "failed (check the calendar widget)" : "failed (check the Anytype bridge in settings)";
+                          const preview = !isCalendar && typeof p.payload.markdown === "string" ? String(p.payload.markdown) : "";
+                          return (
+                            <div key={j} className={`rounded-xl border ${c.border} bg-[var(--surface)] px-3 py-2 flex flex-col gap-1`}>
+                              <span className="flex items-center gap-1.5 text-xs text-[var(--text-primary)]">
+                                {isCalendar
+                                  ? <CalendarDays size={12} className={`shrink-0 ${isDelete ? "text-red-500/80" : c.label}`} />
+                                  : <Database size={12} className={`shrink-0 ${c.label}`} />}
+                                <span className="font-medium truncate">{p.summary}</span>
                               </span>
-                            ) : (
-                              <span className={`text-[10px] ${pr.status === "added" ? "text-emerald-600 dark:text-emerald-400" : pr.status === "failed" ? "text-red-500" : "opacity-50 text-[var(--text-secondary)]"}`}>
-                                {pr.status === "added" ? "added to calendar" : pr.status === "failed" ? (isDemoMode() ? "not available in demo mode" : "could not add (check the calendar widget)") : "dismissed"}
-                              </span>
-                            )}
-                          </div>
+                              {p.detail && <span className="text-[11px] text-[var(--text-secondary)]">{p.detail}</span>}
+                              {preview && (
+                                <details className="text-[11px] text-[var(--text-secondary)]">
+                                  <summary className="cursor-pointer select-none opacity-70 hover:opacity-100">content</summary>
+                                  <pre className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap font-[inherit] text-[11px] leading-relaxed">{preview}</pre>
+                                </details>
+                              )}
+                              {pr.status === "pending" ? (
+                                <span className="flex items-center gap-2 mt-0.5">
+                                  <button
+                                    onClick={() => resolveProposal(i, j, true)}
+                                    className={`text-[11px] px-2.5 py-1 rounded-lg text-white ${isDelete ? "bg-red-600/90 hover:bg-red-600" : "bg-emerald-600/90 hover:bg-emerald-600"}`}
+                                  >
+                                    {acceptLabel}
+                                  </button>
+                                  <button
+                                    onClick={() => resolveProposal(i, j, false)}
+                                    className="text-[11px] px-2.5 py-1 rounded-lg border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                  >
+                                    Dismiss
+                                  </button>
+                                </span>
+                              ) : (
+                                <span className={`text-[10px] ${pr.status === "added" ? "text-emerald-600 dark:text-emerald-400" : pr.status === "failed" ? "text-red-500" : "opacity-50 text-[var(--text-secondary)]"}`}>
+                                  {pr.status === "added" ? doneLabel : pr.status === "failed" ? failLabel : "dismissed"}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {!inProgress && m.role === "assistant" && (m.actions?.length ?? 0) > 0 && (
+                      <div className="flex flex-col gap-0.5 max-w-[85%] px-1">
+                        {m.actions!.map((a, j) => (
+                          <span key={j} className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                            <Check size={10} className="shrink-0" />
+                            <span className="truncate">{a.summary}{a.detail ? ` · ${a.detail}` : ""}</span>
+                          </span>
                         ))}
                       </div>
                     )}
@@ -2479,6 +2727,9 @@ export default function ChatWidget({
                   detectMention(e.target.value, e.target.selectionStart ?? e.target.value.length);
                 }}
                 onKeyDown={e => {
+                  // IME composition: Enter commits the kana/candidate, it must
+                  // never send the message mid-composition.
+                  if (e.nativeEvent.isComposing) return;
                   if (mention && mentionMatches.length) {
                     if (e.key === "ArrowDown") { e.preventDefault(); setMentionIdx(i => (i + 1) % mentionMatches.length); return; }
                     if (e.key === "ArrowUp") { e.preventDefault(); setMentionIdx(i => (i - 1 + mentionMatches.length) % mentionMatches.length); return; }
