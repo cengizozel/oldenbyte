@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CalendarRange, Plus, Pencil, Maximize2, Minimize2, Check, X, Trash2 } from "lucide-react";
+import { CalendarRange, Plus, Pencil, Maximize2, Minimize2, Check, X, Trash2, FileText, Copy } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { SettingsInput, SettingsSelect } from "./ui/Field";
+import { SettingsInput, SettingsSelect, SettingsTextarea } from "./ui/Field";
 
 // A fixed weekly schedule: the same seven-day time grid every week (classes,
 // gym, standing calls), as opposed to the Calendar widget's dated events.
@@ -17,6 +17,7 @@ import { SettingsInput, SettingsSelect } from "./ui/Field";
 type Entry = {
   id: string;
   title: string;
+  description?: string;
   days: number[]; // 0 = Monday … 6 = Sunday; one entry can repeat across days
   start: number;  // minutes from midnight
   end: number;    // minutes from midnight; numerically before start = past midnight
@@ -76,6 +77,7 @@ function layoutDay(entries: Entry[], startHour: number): { ev: Entry; lane: numb
 type EditorState = {
   id: string | null; // null = new entry
   title: string;
+  description: string;
   days: number[];
   start: string;     // "HH:MM" as typed
   end: string;
@@ -149,12 +151,144 @@ export default function ScheduleWidget({
   const [expanded, setExpanded] = useState(false);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [draftStart, setDraftStart] = useState(6);
   const [draftEnd, setDraftEnd] = useState(24);
   // Ticks each minute so the now-line tracks the clock.
   const [, setNowTick] = useState(0);
   const configRef = useRef(config);
   configRef.current = config;
+
+  // ── Drag to move ────────────────────────────────────────────────────────────
+  // Pointer-driven: a press that travels more than a few px becomes a drag with
+  // a snapping ghost; a still press stays a click (opens the editor). Dropping
+  // an instance of a multi-day entry asks before splitting it out of its group.
+  const dragInfo = useRef<{
+    entry: Entry; fromDay: number;
+    startX: number; startY: number;
+    grabOffsetMin: number; durMin: number; moved: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+  const gridInnerRef = useRef<HTMLDivElement | null>(null);
+  const gridMetricsRef = useRef({ hourPx: 40, startHour: 6, hours: 18 });
+  const [drag, setDrag] = useState<{ day: number; startMin: number; durMin: number; color: string; grouped: boolean } | null>(null);
+  const [splitAsk, setSplitAsk] = useState<{ entryId: string; fromDay: number; toDay: number; toStartMin: number } | null>(null);
+
+  const GUTTER_PX = 40; // the time gutter (w-10)
+  const HEADER_PX = 24; // each column's day header (h-6)
+
+  // Pointer position → snapped grid slot (day + minutes on the grid axis).
+  function dragTarget(clientX: number, clientY: number, grabOffsetMin: number, durMin: number) {
+    const inner = gridInnerRef.current;
+    if (!inner) return null;
+    const rect = inner.getBoundingClientRect();
+    const { hourPx, startHour, hours } = gridMetricsRef.current;
+    const colW = (rect.width - GUTTER_PX) / 7;
+    const day = Math.min(6, Math.max(0, Math.floor((clientX - rect.left - GUTTER_PX) / colW)));
+    const yMin = (clientY - rect.top - HEADER_PX) / hourPx * 60 + startHour * 60;
+    let startMin = Math.round((yMin - grabOffsetMin) / 15) * 15;
+    startMin = Math.min(startHour * 60 + hours * 60 - durMin, Math.max(startHour * 60, startMin));
+    return { day, startMin };
+  }
+
+  function beginDrag(e: React.PointerEvent, entry: Entry, fromDay: number) {
+    if (e.button !== 0 || editor || settingsOpen || exportOpen || splitAsk) return;
+    const { hourPx } = gridMetricsRef.current;
+    const blockTop = (e.currentTarget as HTMLElement).getBoundingClientRect().top;
+    dragInfo.current = {
+      entry, fromDay,
+      startX: e.clientX, startY: e.clientY,
+      grabOffsetMin: (e.clientY - blockTop) / hourPx * 60,
+      durMin: normMin(entry.end, configRef.current.startHour) - normMin(entry.start, configRef.current.startHour),
+      moved: false,
+    };
+    // Window-level listeners for the rest of the gesture: they survive
+    // re-renders, work when the pointer leaves the block, and sidestep
+    // pointer-capture quirks. Cleaned up on release.
+    window.addEventListener("pointermove", moveDrag);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", cancelDrag);
+    document.body.classList.add("select-none");
+  }
+
+  function cancelDrag() {
+    dragInfo.current = null;
+    setDrag(null);
+    window.removeEventListener("pointermove", moveDrag);
+    window.removeEventListener("pointerup", endDrag);
+    window.removeEventListener("pointercancel", cancelDrag);
+    document.body.classList.remove("select-none");
+  }
+
+  function moveDrag(e: PointerEvent) {
+    const d = dragInfo.current;
+    if (!d) return;
+    if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;
+    d.moved = true;
+    e.preventDefault(); // no text selection while a block is in hand
+    window.getSelection?.()?.removeAllRanges();
+    const t = dragTarget(e.clientX, e.clientY, d.grabOffsetMin, d.durMin);
+    if (t) setDrag({ ...t, durMin: d.durMin, color: d.entry.color, grouped: d.entry.days.length > 1 });
+  }
+
+  function endDrag(e: PointerEvent) {
+    const d = dragInfo.current;
+    cancelDrag();
+    if (!d || !d.moved) return; // a plain click: the button's onClick opens the editor
+    // Swallow only the click synthesized from THIS release; the flag expires
+    // with the event loop turn so later real clicks work.
+    suppressClickRef.current = true;
+    setTimeout(() => { suppressClickRef.current = false; }, 0);
+    const t = dragTarget(e.clientX, e.clientY, d.grabOffsetMin, d.durMin);
+    if (!t) return;
+    const unchanged = t.day === d.fromDay && t.startMin === normMin(d.entry.start, configRef.current.startHour);
+    if (unchanged) return;
+    if (d.entry.days.length > 1) {
+      // Ask before pulling one day out of a repeating group.
+      setSplitAsk({ entryId: d.entry.id, fromDay: d.fromDay, toDay: t.day, toStartMin: t.startMin });
+    } else {
+      applyMove(d.entry.id, t.day, t.startMin, d.durMin);
+    }
+  }
+
+  // Never leave stray listeners if the widget unmounts mid-drag.
+  useEffect(() => cancelDrag, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function applyMove(entryId: string, toDay: number, toStartMin: number, durMin: number) {
+    const start = toStartMin % 1440;
+    const end = (toStartMin + durMin) % 1440;
+    apply({
+      ...configRef.current,
+      entries: configRef.current.entries.map(en =>
+        en.id === entryId ? { ...en, days: [toDay], start, end } : en
+      ),
+    });
+  }
+
+  function applySplit() {
+    if (!splitAsk) return;
+    const src = configRef.current.entries.find(en => en.id === splitAsk.entryId);
+    if (!src) { setSplitAsk(null); return; }
+    const durMin = normMin(src.end, configRef.current.startHour) - normMin(src.start, configRef.current.startHour);
+    const moved: Entry = {
+      id: `s${Date.now()}${Math.floor(Math.random() * 1e3)}`,
+      title: src.title, color: src.color,
+      days: [splitAsk.toDay],
+      start: splitAsk.toStartMin % 1440,
+      end: (splitAsk.toStartMin + durMin) % 1440,
+    };
+    apply({
+      ...configRef.current,
+      entries: [
+        ...configRef.current.entries.map(en =>
+          en.id === src.id ? { ...en, days: en.days.filter(x => x !== splitAsk.fromDay) } : en
+        ),
+        moved,
+      ],
+    });
+    setSplitAsk(null);
+  }
 
   useEffect(() => setMounted(true), []);
 
@@ -180,22 +314,50 @@ export default function ScheduleWidget({
     return () => clearInterval(id);
   }, []);
 
-  // Escape backs out one layer: editor, then settings, then fullscreen.
+  // Escape backs out one layer: dialog faces first, then fullscreen.
   useEffect(() => {
-    if (!expanded && !editor && !settingsOpen) return;
+    if (!expanded && !editor && !settingsOpen && !exportOpen && !splitAsk) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (editor) setEditor(null);
+      if (splitAsk) setSplitAsk(null);
+      else if (editor) setEditor(null);
+      else if (exportOpen) setExportOpen(false);
       else if (settingsOpen) setSettingsOpen(false);
       else setExpanded(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [expanded, editor, settingsOpen]);
+  }, [expanded, editor, settingsOpen, exportOpen, splitAsk]);
 
   function apply(next: Config) {
     setConfig(next);
     storage.setItem(storageKey, JSON.stringify(next));
+  }
+
+  // ── Export ──────────────────────────────────────────────────────────────────
+  // The whole week as plain, copyable text: per-day sections, entries in time
+  // order, mono-friendly columns.
+  function exportText(): string {
+    const norm = (m: number) => normMin(m, config.startHour);
+    const days = DAYS.map((day, di) => {
+      const rows = config.entries
+        .filter(en => en.days.includes(di))
+        .sort((a, b) => norm(a.start) - norm(b.start))
+        .map(en =>
+          `  ${fmt(en.start)} - ${fmt(en.end)}  ${en.title}` +
+          (en.description ? `\n${en.description.split("\n").map(l => `                 ${l}`).join("\n")}` : "")
+        );
+      return rows.length ? `${day}\n${rows.join("\n")}` : null;
+    }).filter(Boolean);
+    return days.length ? `Weekly schedule\n\n${days.join("\n\n")}` : "Weekly schedule\n\n(nothing planned yet)";
+  }
+
+  async function copyExport() {
+    try {
+      await navigator.clipboard.writeText(exportText());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable; the text is still selectable */ }
   }
 
   // ── Editor ──────────────────────────────────────────────────────────────────
@@ -205,6 +367,7 @@ export default function ScheduleWidget({
     setEditor(entry ? {
       id: entry.id,
       title: entry.title,
+      description: entry.description ?? "",
       days: [...entry.days],
       start: fmt(entry.start),
       end: fmt(entry.end),
@@ -215,6 +378,7 @@ export default function ScheduleWidget({
     } : {
       id: null,
       title: "",
+      description: "",
       days: [prefill?.day ?? todayIdx],
       start: fmt(prefill?.start ?? 18 * 60),
       end: fmt((prefill?.start ?? 18 * 60) + 60),
@@ -248,7 +412,9 @@ export default function ScheduleWidget({
     if (e - s > 16 * 60) return err("Longer than 16 hours — double-check the times.");
     const entry: Entry = {
       id: editor.id ?? `s${Date.now()}${Math.floor(Math.random() * 1e3)}`,
-      title, days: [...editor.days].sort((a, b) => a - b), start, end, color: editor.color,
+      title,
+      description: editor.description.trim() || undefined,
+      days: [...editor.days].sort((a, b) => a - b), start, end, color: editor.color,
     };
     apply({
       ...config,
@@ -274,6 +440,9 @@ export default function ScheduleWidget({
     const now = new Date();
     const nowY = (normMin(now.getHours() * 60 + now.getMinutes(), startHour) - startHour * 60) / 60 * HOUR_PX;
     const labels = big ? DAYS : DAYS_SHORT;
+    // Only one grid is mounted at a time (the tile hides while fullscreen is
+    // open), so drag math can read these without caring which one it is.
+    gridMetricsRef.current = { hourPx: HOUR_PX, startHour, hours };
 
     return (
       <div
@@ -286,7 +455,7 @@ export default function ScheduleWidget({
           el.scrollTop = Math.max(0, nowY - 2 * HOUR_PX);
         }}
       >
-        <div className="flex min-w-[520px]">
+        <div className="flex min-w-[520px]" ref={gridInnerRef} data-schedule-grid>
           {/* time gutter */}
           <div className="w-10 shrink-0 relative" style={{ marginTop: 24, height: hours * HOUR_PX }}>
             {Array.from({ length: hours + 1 }, (_, h) => (
@@ -309,7 +478,9 @@ export default function ScheduleWidget({
                 className="relative border-l border-black/5 dark:border-white/10 cursor-pointer"
                 style={{ height: hours * HOUR_PX }}
                 onClick={e => {
-                  // Click on empty grid: start a new entry at that slot.
+                  // Click on empty grid: start a new entry at that slot (but
+                  // never right after a drag released here).
+                  if (suppressClickRef.current) { suppressClickRef.current = false; return; }
                   const rect = e.currentTarget.getBoundingClientRect();
                   const mins = startHour * 60 + Math.floor((e.clientY - rect.top) / HOUR_PX * 60 / 30) * 30;
                   openEditor(null, { day: dayIdx, start: mins % 1440 });
@@ -328,9 +499,14 @@ export default function ScheduleWidget({
                   return (
                     <button
                       key={ev.id}
-                      onClick={e3 => { e3.stopPropagation(); openEditor(ev); }}
-                      title={`${ev.title} (${fmt(ev.start)}–${fmt(ev.end)})`}
-                      className="absolute rounded-md px-1.5 py-0.5 text-left overflow-hidden text-[#16181c] hover:brightness-110 transition-[filter]"
+                      onPointerDown={e3 => beginDrag(e3, ev, dayIdx)}
+                      onClick={e3 => {
+                        e3.stopPropagation();
+                        if (suppressClickRef.current) { suppressClickRef.current = false; return; }
+                        openEditor(ev);
+                      }}
+                      title={`${ev.title} (${fmt(ev.start)} to ${fmt(ev.end)})${ev.description ? `\n${ev.description}` : ""}\ndrag to move`}
+                      className="absolute rounded-md px-1.5 py-0.5 text-left overflow-hidden text-[#16181c] hover:brightness-110 transition-[filter] touch-none select-none"
                       style={{
                         top, height: Math.max(16, bottom - top - 2),
                         left: `calc(${lane * w}% + 2px)`, width: `calc(${w}% - 4px)`,
@@ -339,12 +515,29 @@ export default function ScheduleWidget({
                     >
                       {big && <span className="block font-mono text-[9px] opacity-70">{fmt(ev.start)}–{fmt(ev.end)}</span>}
                       <span className={`block font-medium truncate ${big ? "text-[11px]" : "text-[10px]"}`}>{ev.title}</span>
+                      {big && ev.description && bottom - top > 56 && (
+                        <span className="block text-[9px] opacity-70 overflow-hidden">{ev.description}</span>
+                      )}
                     </button>
                   );
                 })}
                 {dayIdx === todayIdx && nowY > 0 && nowY < hours * HOUR_PX && (
                   <div className="absolute inset-x-0 border-t-2 border-red-500/80 pointer-events-none z-[5]" style={{ top: nowY }}>
                     <span className="absolute -left-1 -top-[4px] w-1.5 h-1.5 rounded-full bg-red-500/80" />
+                  </div>
+                )}
+                {/* Drag ghost: where the block lands on release */}
+                {drag && drag.day === dayIdx && (
+                  <div
+                    className="absolute left-[2px] right-[2px] rounded-md border-2 border-dashed border-black/40 dark:border-white/50 pointer-events-none z-[7] px-1.5 py-0.5 text-[#16181c]"
+                    style={{
+                      top: (drag.startMin - startHour * 60) / 60 * HOUR_PX,
+                      height: Math.max(16, drag.durMin / 60 * HOUR_PX - 2),
+                      background: drag.color, opacity: 0.75,
+                    }}
+                  >
+                    <span className="block font-mono text-[9px]">{fmt(drag.startMin % 1440)}</span>
+                    {drag.grouped && <span className="block text-[9px] font-medium">splits from group</span>}
                   </div>
                 )}
               </div>
@@ -379,7 +572,14 @@ export default function ScheduleWidget({
               <Plus size={14} />
             </button>
             <button
-              onClick={() => { setDraftStart(config.startHour); setDraftEnd(config.endHour); setEditor(null); setSettingsOpen(o => !o); }}
+              onClick={() => { setEditor(null); setSettingsOpen(false); setCopied(false); setExportOpen(o => !o); }}
+              title="Export as text"
+              className={actionCls}
+            >
+              <FileText size={13} />
+            </button>
+            <button
+              onClick={() => { setDraftStart(config.startHour); setDraftEnd(config.endHour); setEditor(null); setExportOpen(false); setSettingsOpen(o => !o); }}
               title="Grid hours"
               className={actionCls}
             >
@@ -406,6 +606,13 @@ export default function ScheduleWidget({
               onKeyDown={e => e.key === "Enter" && saveEditor()}
               placeholder="Title, e.g. Gym"
               maxLength={60}
+            />
+            <SettingsTextarea
+              value={editor.description}
+              onChange={e => setEditor({ ...editor, description: e.target.value })}
+              placeholder="Description (optional)"
+              rows={2}
+              maxLength={500}
             />
             {/* Days: one entry can repeat across the week — pick them all here
                 instead of adding the same block day by day. */}
@@ -458,6 +665,26 @@ export default function ScheduleWidget({
                   style={{ background: col }}
                 />
               ))}
+              {/* Any-color pick: the native spectrum square, styled as a swatch.
+                  Shows the rainbow until a custom color is chosen, then that color. */}
+              {(() => {
+                const isCustom = !PALETTE.includes(editor.color);
+                return (
+                  <label
+                    title="Custom color"
+                    className={`relative w-5 h-5 rounded-full cursor-pointer transition-transform ${isCustom ? "scale-110 ring-2 ring-[var(--text-secondary)] ring-offset-1 ring-offset-transparent" : "opacity-80 hover:opacity-100"}`}
+                    style={{ background: isCustom ? editor.color : "conic-gradient(#f66, #fd6, #6e6, #6dd, #66f, #d6e, #f66)" }}
+                  >
+                    <input
+                      type="color"
+                      value={/^#[0-9a-fA-F]{6}$/.test(editor.color) ? editor.color : PALETTE[0]}
+                      onChange={e => setEditor({ ...editor, color: e.target.value })}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      aria-label="Custom color"
+                    />
+                  </label>
+                );
+              })()}
             </div>
             {editor.error && <p className="text-red-400 text-[11px]">{editor.error}</p>}
             <div className="flex items-center gap-3 mt-auto">
@@ -514,6 +741,60 @@ export default function ScheduleWidget({
             </div>
           </div>
         )}
+
+        {/* Export as text */}
+        {exportOpen && (
+          <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
+            <div className="flex items-center justify-between">
+              <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 ${c.label}`}>Export</p>
+              <button
+                onClick={copyExport}
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}
+              >
+                {copied ? <Check size={12} /> : <Copy size={12} />}
+                {copied ? "copied" : "copy"}
+              </button>
+            </div>
+            <pre className={`flex-1 min-h-0 overflow-auto text-[11px] leading-relaxed font-mono whitespace-pre rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-primary)] p-3`}>
+              {exportText()}
+            </pre>
+            <div className="flex items-center justify-end">
+              <button onClick={() => setExportOpen(false)} title="Close" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Split-from-group confirmation after dragging one day of a repeating entry */}
+        {splitAsk && (() => {
+          const src = config.entries.find(en => en.id === splitAsk.entryId);
+          if (!src) return null;
+          const groupDays = src.days.map(d => DAYS_SHORT[d]).join(", ");
+          return (
+            <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
+              <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 ${c.label}`}>Split from group</p>
+              <p className={`text-xs leading-relaxed ${c.text} opacity-80`}>
+                "{src.title}" repeats on {groupDays}. Moving this block pulls {DAYS[splitAsk.fromDay]} out of that group:
+                it becomes its own entry at {DAYS[splitAsk.toDay]} {fmt(splitAsk.toStartMin % 1440)}, and the others stay put.
+              </p>
+              <div className="flex items-center justify-end gap-2 mt-auto">
+                <button
+                  onClick={() => setSplitAsk(null)}
+                  className="text-[11px] px-2.5 py-1 rounded-lg border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={applySplit}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}
+                >
+                  Split and move
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </>
     );
   }
