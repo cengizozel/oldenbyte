@@ -176,6 +176,10 @@ def blocks_to_text(view):
     out = []
 
     def walk(bid, depth):
+        # The header branch holds the title/featured-relations chrome; the
+        # title is already reported as `name`.
+        if bid in ("header", "title", "description", "featuredRelations"):
+            return
         b = blocks.get(bid)
         if not b:
             return
@@ -218,6 +222,22 @@ def op_list_types(at, p):
 
 PROFILE_SAMPLE = 12
 
+# Plumbing objects that say nothing about the user's note style.
+SYSTEM_TYPE_NAMES = {
+    "Property", "Type", "Relation option", "Space", "Space member", "Dashboard",
+    "Date", "File", "Image", "Video", "Audio", "Chat", "Template", "Object type",
+}
+
+
+def _type_name(row, types_by_id):
+    """Search rows carry a type field in various shapes across versions."""
+    t = row.get("type")
+    if isinstance(t, dict):
+        return t.get("name", "")
+    if isinstance(t, str):
+        return types_by_id.get(t, {}).get("name", t)
+    return ""
+
 
 def op_style_profile(at, p):
     """A STRUCTURAL profile of the space: which types are in active use, which
@@ -225,17 +245,14 @@ def op_style_profile(at, p):
     text and no titles - safe to hand to a model as style guidance."""
     space = p["space_id"]
     types = {t.get("id"): t for t in at.types.list_types(space)}
-    recent = at.search("", space_id=space, limit=40)
+    recent = [
+        r for r in at.search("", space_id=space, limit=60)
+        if _type_name(r, types) not in SYSTEM_TYPE_NAMES
+    ][:40]
 
     type_counts = {}
     for r in recent:
-        # search rows carry a type field in various shapes across versions
-        tname = ""
-        t = r.get("type")
-        if isinstance(t, dict):
-            tname = t.get("name", "")
-        elif isinstance(t, str):
-            tname = types.get(t, {}).get("name", t)
+        tname = _type_name(r, types)
         if tname:
             type_counts[tname] = type_counts.get(tname, 0) + 1
 
