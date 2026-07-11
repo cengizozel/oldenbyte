@@ -17,9 +17,9 @@ import { SettingsInput, SettingsSelect } from "./ui/Field";
 type Entry = {
   id: string;
   title: string;
-  day: number;   // 0 = Monday … 6 = Sunday
-  start: number; // minutes from midnight
-  end: number;   // minutes from midnight; numerically before start = past midnight
+  days: number[]; // 0 = Monday … 6 = Sunday; one entry can repeat across days
+  start: number;  // minutes from midnight
+  end: number;    // minutes from midnight; numerically before start = past midnight
   color: string;
 };
 type Config = { entries: Entry[]; startHour: number; endHour: number };
@@ -76,7 +76,7 @@ function layoutDay(entries: Entry[], startHour: number): { ev: Entry; lane: numb
 type EditorState = {
   id: string | null; // null = new entry
   title: string;
-  day: number;
+  days: number[];
   start: string;     // "HH:MM" as typed
   end: string;
   minutes: string;   // duration, when byDuration
@@ -84,6 +84,54 @@ type EditorState = {
   color: string;
   error: string;
 };
+
+// Mono time field with 15-minute steppers — no native picker, no AM/PM stub.
+// Free typing is normalized on blur ("8:5" becomes "08:05").
+function TimeField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const shift = (delta: number) => {
+    const t = parseTime(value);
+    if (t !== null) onChange(fmt((t + delta + 1440) % 1440));
+  };
+  return (
+    <div className="flex items-center rounded-xl border border-[var(--surface-border)] bg-[var(--surface)]">
+      <button onClick={() => shift(-15)} className="px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="15 minutes earlier">−</button>
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onBlur={() => {
+          const m = value.trim().match(/^(\d{1,2}):?(\d{2})$/);
+          const t = m ? Math.min(23, +m[1]) * 60 + Math.min(59, +m[2]) : null;
+          if (t !== null) onChange(fmt(t));
+        }}
+        inputMode="numeric"
+        placeholder="18:30"
+        className="w-12 text-center text-sm font-mono bg-transparent outline-none text-[var(--text-primary)] py-1.5"
+      />
+      <button onClick={() => shift(15)} className="px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="15 minutes later">+</button>
+    </div>
+  );
+}
+
+// Duration in minutes, same stepper treatment.
+function DurationField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const shift = (delta: number) => {
+    const v = Math.floor(Number(value)) || 0;
+    onChange(String(Math.min(960, Math.max(5, v + delta))));
+  };
+  return (
+    <div className="flex items-center rounded-xl border border-[var(--surface-border)] bg-[var(--surface)]">
+      <button onClick={() => shift(-15)} className="px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="15 minutes less">−</button>
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value.replace(/[^\d]/g, ""))}
+        inputMode="numeric"
+        className="w-10 text-center text-sm font-mono bg-transparent outline-none text-[var(--text-primary)] py-1.5"
+      />
+      <span className="pr-1 text-[10px] text-[var(--text-muted)]">min</span>
+      <button onClick={() => shift(15)} className="px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="15 minutes more">+</button>
+    </div>
+  );
+}
 
 export default function ScheduleWidget({
   widget,
@@ -115,7 +163,12 @@ export default function ScheduleWidget({
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
-          if (parsed && Array.isArray(parsed.entries)) setConfig({ ...DEFAULT_CONFIG, ...parsed });
+          if (parsed && Array.isArray(parsed.entries)) {
+            // Early entries carried a single `day`; the model is now multi-day.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const entries = parsed.entries.map((e: any) => (Array.isArray(e.days) ? e : { ...e, days: [e.day ?? 0] }));
+            setConfig({ ...DEFAULT_CONFIG, ...parsed, entries });
+          }
         } catch {}
       }
       setLoaded(true);
@@ -152,7 +205,7 @@ export default function ScheduleWidget({
     setEditor(entry ? {
       id: entry.id,
       title: entry.title,
-      day: entry.day,
+      days: [...entry.days],
       start: fmt(entry.start),
       end: fmt(entry.end),
       minutes: String(normMin(entry.end, config.startHour) - normMin(entry.start, config.startHour)),
@@ -162,7 +215,7 @@ export default function ScheduleWidget({
     } : {
       id: null,
       title: "",
-      day: prefill?.day ?? todayIdx,
+      days: [prefill?.day ?? todayIdx],
       start: fmt(prefill?.start ?? 18 * 60),
       end: fmt((prefill?.start ?? 18 * 60) + 60),
       minutes: "60",
@@ -178,6 +231,7 @@ export default function ScheduleWidget({
     const start = parseTime(editor.start);
     const err = (error: string) => setEditor({ ...editor, error });
     if (!title) return err("Give it a title.");
+    if (!editor.days.length) return err("Pick at least one day.");
     if (start === null) return err("Times must be valid HH:MM.");
     let end: number | null;
     if (editor.byDuration) {
@@ -194,7 +248,7 @@ export default function ScheduleWidget({
     if (e - s > 16 * 60) return err("Longer than 16 hours — double-check the times.");
     const entry: Entry = {
       id: editor.id ?? `s${Date.now()}${Math.floor(Math.random() * 1e3)}`,
-      title, day: editor.day, start, end, color: editor.color,
+      title, days: [...editor.days].sort((a, b) => a - b), start, end, color: editor.color,
     };
     apply({
       ...config,
@@ -264,7 +318,7 @@ export default function ScheduleWidget({
                 {Array.from({ length: hours - 1 }, (_, h) => (
                   <div key={h} className="absolute inset-x-0 border-t border-black/5 dark:border-white/10 pointer-events-none" style={{ top: (h + 1) * HOUR_PX }} />
                 ))}
-                {layoutDay(config.entries.filter(en => en.day === dayIdx), startHour).map(({ ev, lane, laneCount }) => {
+                {layoutDay(config.entries.filter(en => en.days.includes(dayIdx)), startHour).map(({ ev, lane, laneCount }) => {
                   const s = normMin(ev.start, startHour) - startHour * 60;
                   const e2 = normMin(ev.end, startHour) - startHour * 60;
                   const top = Math.max(0, s / 60 * HOUR_PX);
@@ -353,39 +407,41 @@ export default function ScheduleWidget({
               placeholder="Title, e.g. Gym"
               maxLength={60}
             />
+            {/* Days: one entry can repeat across the week — pick them all here
+                instead of adding the same block day by day. */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {DAYS_SHORT.map((d, i) => {
+                const on = editor.days.includes(i);
+                return (
+                  <button
+                    key={d}
+                    onClick={() => setEditor({
+                      ...editor, error: "",
+                      days: on ? editor.days.filter(x => x !== i) : [...editor.days, i],
+                    })}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-colors ${
+                      on ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-45 hover:opacity-80`
+                    }`}
+                  >
+                    {d}
+                  </button>
+                );
+              })}
+              <span className={`opacity-20 ${c.label}`}>|</span>
+              <button onClick={() => setEditor({ ...editor, error: "", days: [0, 1, 2, 3, 4] })} className={`text-[10px] ${c.label} opacity-50 hover:opacity-90`}>
+                weekdays
+              </button>
+              <button onClick={() => setEditor({ ...editor, error: "", days: [0, 1, 2, 3, 4, 5, 6] })} className={`text-[10px] ${c.label} opacity-50 hover:opacity-90`}>
+                every day
+              </button>
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <SettingsSelect
-                value={editor.day}
-                onChange={e => setEditor({ ...editor, day: +e.target.value })}
-                className="!w-auto"
-              >
-                {DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
-              </SettingsSelect>
-              <SettingsInput
-                type="time"
-                value={editor.start}
-                onChange={e => setEditor({ ...editor, start: e.target.value })}
-                className="!w-auto font-mono"
-              />
+              <TimeField value={editor.start} onChange={v => setEditor({ ...editor, start: v })} />
               <span className={`opacity-40 text-xs ${c.label}`}>to</span>
               {editor.byDuration ? (
-                <SettingsInput
-                  type="number"
-                  min={5}
-                  max={960}
-                  step={5}
-                  value={editor.minutes}
-                  onChange={e => setEditor({ ...editor, minutes: e.target.value })}
-                  className="!w-24 font-mono"
-                  placeholder="minutes"
-                />
+                <DurationField value={editor.minutes} onChange={v => setEditor({ ...editor, minutes: v })} />
               ) : (
-                <SettingsInput
-                  type="time"
-                  value={editor.end}
-                  onChange={e => setEditor({ ...editor, end: e.target.value })}
-                  className="!w-auto font-mono"
-                />
+                <TimeField value={editor.end} onChange={v => setEditor({ ...editor, end: v })} />
               )}
               <span className="flex items-center gap-1">
                 <button onClick={() => setEditor({ ...editor, byDuration: false })} className={chip(!editor.byDuration)}>end time</button>

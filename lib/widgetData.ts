@@ -131,7 +131,7 @@ async function readCalendar(userId: string, id: string, title: string, opts?: Re
 }
 
 async function readSchedule(userId: string, id: string, title: string): Promise<string> {
-  type Entry = { title: string; day: number; start: number; end: number };
+  type Entry = { title: string; day?: number; days?: number[]; start: number; end: number };
   const cfg = await readJSON<{ entries: Entry[]; startHour?: number }>(userId, `schedule-widget-${id}`);
   if (!cfg?.entries?.length) return "The weekly schedule is empty.";
   const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -141,9 +141,10 @@ async function readSchedule(userId: string, id: string, title: string): Promise<
     return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
   };
   const norm = (m: number) => (m < startHour * 60 ? m + 1440 : m);
+  const onDay = (e: Entry, di: number) => (e.days ?? [e.day ?? 0]).includes(di);
   const blocks = DAYS.map((day, di) => {
     const rows = cfg.entries
-      .filter(e => e.day === di)
+      .filter(e => onDay(e, di))
       .sort((a, b) => norm(a.start) - norm(b.start))
       .map(e => `- ${fmt(e.start)} to ${fmt(e.end)}: ${e.title}`);
     return rows.length ? `### ${day}\n${rows.join("\n")}` : null;
