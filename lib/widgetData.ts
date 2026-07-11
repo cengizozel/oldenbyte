@@ -130,6 +130,27 @@ async function readCalendar(userId: string, id: string, title: string, opts?: Re
     .join("\n");
 }
 
+async function readSchedule(userId: string, id: string, title: string): Promise<string> {
+  type Entry = { title: string; day: number; start: number; end: number };
+  const cfg = await readJSON<{ entries: Entry[]; startHour?: number }>(userId, `schedule-widget-${id}`);
+  if (!cfg?.entries?.length) return "The weekly schedule is empty.";
+  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const startHour = cfg.startHour ?? 6;
+  const fmt = (mins: number) => {
+    const m = ((mins % 1440) + 1440) % 1440;
+    return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  };
+  const norm = (m: number) => (m < startHour * 60 ? m + 1440 : m);
+  const blocks = DAYS.map((day, di) => {
+    const rows = cfg.entries
+      .filter(e => e.day === di)
+      .sort((a, b) => norm(a.start) - norm(b.start))
+      .map(e => `- ${fmt(e.start)} to ${fmt(e.end)}: ${e.title}`);
+    return rows.length ? `### ${day}\n${rows.join("\n")}` : null;
+  }).filter(Boolean);
+  return `## ${title} (Weekly schedule — the same fixed routine every week)\n${blocks.join("\n")}`;
+}
+
 async function readTracker(userId: string, id: string, title: string): Promise<string> {
   const [config, daysMap] = await Promise.all([
     readJSON<{ items: { id: string; name: string }[] }>(userId, `tracker-config-${id}`),
@@ -354,6 +375,7 @@ export async function readWidgetData(userId: string, id: string, type: string, t
       case "text":     return await readText(userId, id, title);
       case "weather":  return await readWeather(userId, id, title);
       case "calendar": return await readCalendar(userId, id, title, opts);
+      case "schedule": return await readSchedule(userId, id, title);
       case "tracker":  return await readTracker(userId, id, title);
       case "rhythm":   return await readRhythm(userId, id, title);
       case "upkeep":   return await readUpkeep(userId, id, title);

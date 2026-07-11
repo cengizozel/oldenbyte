@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -146,6 +146,15 @@ export const widgets: Widget[] = [
     color: "teal",
     title: "Tracker",
     description: "Time how long you spend on each activity.",
+    digestable: false,
+  },
+  {
+    id: "schedule",
+    type: "schedule",
+    category: "tools",
+    color: "sky",
+    title: "Schedule",
+    description: "Your fixed weekly routine on a seven-day time grid.",
     digestable: false,
   },
   {

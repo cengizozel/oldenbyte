@@ -32,6 +32,7 @@ import KiwixWidget from "./KiwixWidget";
 import AnytypeWidget from "./AnytypeWidget";
 import WeatherWidget from "./WeatherWidget";
 import CalendarWidget from "./CalendarWidget";
+import ScheduleWidget from "./ScheduleWidget";
 import BankWidget from "./BankWidget";
 import type { BankWidgetDef } from "@/lib/widgetBank";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
@@ -76,6 +77,7 @@ function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, 
   if (widget.type === "f1")       return <F1Widget       widget={widget} className={cls} />;
   if (widget.type === "weather")  return <WeatherWidget  widget={widget} className={cls} />;
   if (widget.type === "calendar") return <CalendarWidget widget={widget} className={cls} />;
+  if (widget.type === "schedule") return <ScheduleWidget widget={widget} className={cls} />;
   if (widget.type === "arxiv")    return <ArxivWidget    widget={widget} className={cls} />;
   if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className={cls} />;
   if (widget.type === "tracker")  return <TrackerWidget   widget={widget} className={cls} />;
@@ -380,6 +382,7 @@ export default function WidgetGrid({
     upkeep:   { w: 1, h: 3 },
     bookmarks: { w: 1, h: 3 },
     typing:   { w: 2, h: 3 },
+    schedule: { w: 2, h: 4 },
     chess:    { w: 2, h: 4 },
     chat:     { w: 1, h: 4 },
     kiwix:    { w: 1, h: 4 },

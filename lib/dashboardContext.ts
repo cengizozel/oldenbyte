@@ -16,7 +16,7 @@ type WidgetInstance = { id: string; type: string; title: string };
 
 // Widget types worth feeding to the model as text. Notebook is handled
 // separately (full history); reader/chess/chat/empty have no useful text.
-const FEED_TYPES = new Set(["text", "f1", "weather", "calendar", "rss", "reddit", "youtube", "arxiv", "hf", "tracker", "rhythm", "upkeep", "bookmarks"]);
+const FEED_TYPES = new Set(["text", "f1", "weather", "calendar", "schedule", "rss", "reddit", "youtube", "arxiv", "hf", "tracker", "rhythm", "upkeep", "bookmarks"]);
 
 const today = () => new Date().toISOString().split("T")[0];
 
