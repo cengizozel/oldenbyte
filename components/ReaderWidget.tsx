@@ -245,11 +245,17 @@ function EpubViewer({
   cfi,
   onLocationChange,
   fullscreen = false,
+  passive = false,
 }: {
   src: string;
   cfi: string;
   onLocationChange: (cfi: string) => void;
   fullscreen?: boolean;
+  // Passive: follow external position changes but never report its own. The
+  // widget instance goes passive while the fullscreen overlay reads the same
+  // book; both reporting would ping-pong (each normalizes the cfi to its own
+  // page layout) and page turns would cancel themselves out.
+  passive?: boolean;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -258,6 +264,8 @@ function EpubViewer({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bookRef = useRef<any>(null);
   const lastCfiRef = useRef<string>("");
+  const passiveRef = useRef(passive);
+  passiveRef.current = passive;
   const dimsRef = useRef<{ w: number; h: number } | null>(null);
   const [dimsReady, setDimsReady] = useState(false);
   const [percentage, setPercentage] = useState<number | null>(null);
@@ -340,7 +348,7 @@ function EpubViewer({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       rendition.on("relocated", (location: any) => {
         lastCfiRef.current = location.start.cfi;
-        onLocationChange(location.start.cfi);
+        if (!passiveRef.current) onLocationChange(location.start.cfi);
         const pct = book.locations.percentageFromCfi?.(location.start.cfi);
         if (pct != null) setPercentage(Math.round(pct * 100));
       });
@@ -391,14 +399,14 @@ function EpubViewer({
     return () => window.removeEventListener("keydown", handler);
   }, [fullscreen]);
 
-  // Follow position changes made elsewhere (the widget instance keeps running
-  // while the fullscreen overlay reads the same book).
+  // Follow position changes made elsewhere: only the passive instance does
+  // this (the widget while the fullscreen overlay reads the same book).
   useEffect(() => {
-    if (renditionRef.current && cfi && cfi !== lastCfiRef.current) {
+    if (passive && renditionRef.current && cfi && cfi !== lastCfiRef.current) {
       lastCfiRef.current = cfi;
       renditionRef.current.display(cfi);
     }
-  }, [cfi]);
+  }, [cfi, passive]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-2">
@@ -749,6 +757,7 @@ export default function ReaderWidget({
                     src={srcFor(config)}
                     cfi={position}
                     onLocationChange={savePosition}
+                    passive={fullscreen}
                   />
                 )}
               </div>

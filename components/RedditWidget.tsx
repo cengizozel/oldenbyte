@@ -446,12 +446,13 @@ export default function RedditWidget({
           {error && <p className="text-red-400 text-xs">{error}</p>}
 
         </div>
+        {/* Save never blocks on the background fetch: it applies the config
+            and the front paints feeds as they arrive. */}
         <SaveCancelRow
           c={c}
           onSave={handleSave}
           onCancel={() => { setSettingsOpen(false); setError(""); }}
           onReset={handleReset}
-          saving={loading}
         />
         </>
       }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bookmark, Plus, Minus, GripVertical, LayoutGrid, Grid2x2, LayoutList, AlignJustify, ExternalLink } from "lucide-react";
+import { Bookmark, Plus, Minus, GripVertical, LayoutGrid, Grid2x2, LayoutList, AlignJustify, ExternalLink, Eye, EyeOff } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { tagColor } from "@/lib/colors";
@@ -17,7 +17,7 @@ import { PencilButton, EmptyState, SaveCancelRow, ScrollFades } from "./ui/Widge
 // bookmarked site (no third party), matching the project's self-hosted bent.
 
 type View = "icon" | "grid" | "row" | "name";
-type Bookmark = { id: string; url: string; name: string; icon?: string };
+type Bookmark = { id: string; url: string; name: string; icon?: string; hidden?: boolean };
 type Config = { bookmarks: Bookmark[]; view: View; iconSize?: number };
 
 // Icon-view tile size, adjustable from the header (clamped, stepped).
@@ -165,6 +165,9 @@ export default function BookmarksWidget({
 
   const { ref, onScroll, topFade, bottomFade } = useScrollFade<HTMLDivElement>([bookmarks, view]);
 
+  // Hidden bookmarks stay saved and editable but never display.
+  const shown = bookmarks.filter(b => !b.hidden);
+
   useEffect(() => {
     storage.getItem(configKey).then(raw => {
       if (raw) {
@@ -261,12 +264,14 @@ export default function BookmarksWidget({
 
       {!loaded ? null : bookmarks.length === 0 ? (
         <EmptyState c={c} action="add bookmarks" />
+      ) : shown.length === 0 ? (
+        <EmptyState c={c}>all bookmarks hidden</EmptyState>
       ) : (
         <div className="flex-1 min-h-0 relative">
           <div ref={ref} onScroll={onScroll} className="absolute inset-0 overflow-y-auto pr-3">
             {view === "icon" && (
               <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${iconSize + 12}px, 1fr))` }}>
-                {bookmarks.map(bm => (
+                {shown.map(bm => (
                   <a
                     key={bm.id}
                     href={bm.url}
@@ -283,7 +288,7 @@ export default function BookmarksWidget({
 
             {view === "grid" && (
               <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(iconSize + 16, 64)}px, 1fr))` }}>
-                {bookmarks.map(bm => (
+                {shown.map(bm => (
                   <a
                     key={bm.id}
                     href={bm.url}
@@ -301,7 +306,7 @@ export default function BookmarksWidget({
 
             {view === "row" && (
               <div className="flex flex-col gap-0.5">
-                {bookmarks.map(bm => (
+                {shown.map(bm => (
                   <a
                     key={bm.id}
                     href={bm.url}
@@ -320,7 +325,7 @@ export default function BookmarksWidget({
 
             {view === "name" && (
               <div className="flex flex-col">
-                {bookmarks.map(bm => (
+                {shown.map(bm => (
                   <a
                     key={bm.id}
                     href={bm.url}
@@ -394,6 +399,13 @@ export default function BookmarksWidget({
                     placeholder={domainOf(bm.url) || "Name"}
                     className={`flex-1 min-w-0 bg-transparent dark:!bg-transparent text-sm outline-none ${c.text}`}
                   />
+                  <button
+                    onClick={() => setDraft(d => d.map(x => x.id === bm.id ? { ...x, hidden: !x.hidden } : x))}
+                    className={`${bm.hidden ? "opacity-80" : "opacity-40"} hover:opacity-100 ${c.label}`}
+                    title={bm.hidden ? "Hidden: click to show on the widget" : "Shown: click to hide from the widget"}
+                  >
+                    {bm.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
                   <button
                     onClick={() => setDraft(d => d.filter(x => x.id !== bm.id))}
                     className={`opacity-50 hover:opacity-100 leading-none ${c.label}`}
