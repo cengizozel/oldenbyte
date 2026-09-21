@@ -7,7 +7,7 @@ import * as storage from "@/lib/storage";
 import { formatCount, formatDate } from "@/lib/format";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import { PencilButton, ScrollFades, LoadingState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { PencilButton, RefreshButton, ScrollFades, LoadingState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type HFPaper = {
   id: string;
@@ -56,10 +56,10 @@ export default function HuggingFaceWidget({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function fetchPapers(cfg: HFConfig) {
+  async function fetchPapers(cfg: HFConfig, force = false) {
     setLoading(true);
     try {
-      const res = await fetch(`/api/hf?limit=${cfg.limit}`);
+      const res = await fetch(`/api/hf?limit=${cfg.limit}${force ? "&refresh=1" : ""}`);
       if (!res.ok) throw new Error();
       const data: HFPaper[] = await res.json();
       setPapers(data);
@@ -90,7 +90,10 @@ export default function HuggingFaceWidget({
               <span className="text-xs font-medium opacity-60">HF Daily</span>
             </div>
             {!selected && (
-              <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
+              <span className="flex items-center gap-2">
+                <RefreshButton c={c} busy={loading} onClick={() => fetchPapers(config, true)} />
+                <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
+              </span>
             )}
           </div>
 

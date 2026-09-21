@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
+import { cachedFeed } from "@/lib/feedCache";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +9,17 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const limit = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "50"), 50);
+  const force = request.nextUrl.searchParams.get("refresh") === "1";
 
   try {
+    const papers = await cachedFeed(`hf|${limit}`, () => fetchPapers(limit), force);
+    return NextResponse.json(papers);
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
+
+async function fetchPapers(limit: number) {
     const res = await fetch(
       "https://huggingface.co/api/daily_papers",
       {
@@ -33,8 +43,5 @@ export async function GET(request: NextRequest) {
       .filter(p => p.id)
       .sort((a, b) => b.upvotes - a.upvotes)
       .slice(0, limit);
-    return NextResponse.json(papers);
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
+    return papers;
 }

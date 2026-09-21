@@ -8,7 +8,7 @@ import { formatDate } from "@/lib/format";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsSelect } from "@/components/ui/Field";
-import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 const CATEGORY_GROUPS = [
   {
@@ -195,11 +195,11 @@ export default function ArxivWidget({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function fetchPapers(cfg: ArxivConfig) {
+  async function fetchPapers(cfg: ArxivConfig, force = false) {
     setLoading(true);
     try {
       const url = `https://rss.arxiv.org/rss/${cfg.category}`;
-      const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=25`);
+      const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=25${force ? "&refresh=1" : ""}`);
       if (!res.ok) throw new Error();
       const papers: Paper[] = await res.json();
       if (!papers.length) throw new Error();
@@ -241,7 +241,10 @@ export default function ArxivWidget({
               </span>
             </div>
             {!selected && (
-              <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
+              <span className="flex items-center gap-2">
+                <RefreshButton c={c} busy={loading} onClick={() => fetchPapers(config, true)} />
+                <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
+              </span>
             )}
           </div>
 

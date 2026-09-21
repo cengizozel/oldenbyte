@@ -9,7 +9,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
-import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type Period = "day" | "week" | "month" | "year" | "all";
 type SubEntry = { name: string; limit: number; period: Period };
@@ -105,7 +105,7 @@ export default function RedditWidget({
     return `${storageKey}-v3-${today}-${cfg.subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
   }
 
-  async function fetchPosts(cfg: RedditConfig, cacheKey: string): Promise<boolean> {
+  async function fetchPosts(cfg: RedditConfig, cacheKey: string, force = false): Promise<boolean> {
     setLoading(true);
     setError("");
     try {
@@ -115,6 +115,7 @@ export default function RedditWidget({
         cfg.subreddits.map(async sub => {
           try {
             const params = new URLSearchParams({ subreddit: sub.name, period: sub.period, limit: String(sub.limit) });
+            if (force) params.set("refresh", "1");
             const res = await fetch(`/api/reddit?${params}`);
             if (!res.ok) throw new Error();
             const items: Post[] = await res.json();
@@ -188,7 +189,10 @@ export default function RedditWidget({
             <span className="opacity-50"><Flame size={14} /></span>
             <span className="text-xs font-medium opacity-60">Reddit</span>
           </div>
-          <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
+          <span className="flex items-center gap-2">
+            <RefreshButton c={c} busy={loading} onClick={() => fetchPosts(config, cacheKeyFor(config), true)} />
+            <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
+          </span>
         </div>
 
         <div className="flex-1 min-h-0 relative overflow-hidden">

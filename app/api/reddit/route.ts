@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
+import { feedTtlMs } from "@/lib/feedCache";
 
 // Reddit blocks its JSON endpoints for non-browser clients (403), but the RSS
 // feeds still serve with a browser User-Agent. RSS carries no vote counts;
@@ -15,7 +16,6 @@ const UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140
 
 type Post = { title: string; link: string; pubDate: string; score: number; subreddit: string; content: string };
 
-const FRESH_MS = 60 * 60 * 1000;      // young enough to serve without refetching
 const STALE_MS = 24 * 60 * 60 * 1000; // still better than an empty feed
 const SPACING_MS = 15 * 1000;         // gap between upstream fetches
 const ATTEMPTS = 3;                   // 429s requeue for another spaced try
@@ -117,16 +117,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing or invalid subreddit" }, { status: 400 });
   }
 
+  const force = request.nextUrl.searchParams.get("refresh") === "1";
   const key = `${subreddit.toLowerCase()}|${period}|${limit}`;
   const hit = cache.get(key);
 
   // Fresh enough: serve it. A bit old: serve it NOW and refresh in the
   // background, so one widget with many subreddits paints instantly instead of
-  // waiting out the queue.
-  if (hit && Date.now() - hit.at < FRESH_MS) {
+  // waiting out the queue. An explicit refresh skips straight to fetching
+  // (still queue-paced against the rate limit).
+  if (!force && hit && Date.now() - hit.at < await feedTtlMs()) {
     return NextResponse.json(hit.posts);
   }
-  if (hit && Date.now() - hit.at < STALE_MS) {
+  if (!force && hit && Date.now() - hit.at < STALE_MS) {
     void refresh(key, subreddit, period, limit).catch(() => {});
     return NextResponse.json(hit.posts);
   }
@@ -134,6 +136,8 @@ export async function GET(request: NextRequest) {
   try {
     return NextResponse.json(await refresh(key, subreddit, period, limit));
   } catch (err) {
+    // Even a forced refresh prefers yesterday's posts over an empty panel.
+    if (hit && Date.now() - hit.at < STALE_MS) return NextResponse.json(hit.posts);
     return NextResponse.json({ error: String(err) }, { status: 502 });
   }
 }

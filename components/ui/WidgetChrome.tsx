@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Pencil, Check, X, RotateCcw, Loader } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Loader, RefreshCw } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 
 // Small shared pieces of widget chrome: the hover pencil, scroll fades, the
@@ -17,6 +17,21 @@ export function PencilButton({ c, onClick, title }: { c: ColorClasses; onClick: 
       className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
     >
       <Pencil size={14} />
+    </button>
+  );
+}
+
+// Force-refresh for feed widgets: the server caches feeds (admin-set TTL) and
+// serves pages from that cache; this button asks for a real upstream fetch now.
+export function RefreshButton({ c, onClick, busy }: { c: ColorClasses; onClick: () => void; busy?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      title="Refresh now"
+      className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 disabled:opacity-40 ${c.icon}`}
+    >
+      <RefreshCw size={13} className={busy ? "animate-spin" : undefined} />
     </button>
   );
 }

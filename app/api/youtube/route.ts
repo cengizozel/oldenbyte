@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
+import { cachedFeed } from "@/lib/feedCache";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -272,13 +273,15 @@ export async function GET(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
 
+  const force = request.nextUrl.searchParams.get("refresh") === "1";
+
   // Single-video detail mode (description + metadata) for the widget's click view.
   const video = request.nextUrl.searchParams.get("video");
   if (video) {
     const id = extractVideoId(video);
     if (!id) return NextResponse.json({ error: "Invalid video URL or id" }, { status: 400 });
     try {
-      return NextResponse.json(await fetchVideoDetails(id));
+      return NextResponse.json(await cachedFeed(`ytv|${id}`, () => fetchVideoDetails(id), force));
     } catch (err) {
       return NextResponse.json({ error: String(err) }, { status: 502 });
     }
@@ -297,6 +300,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const cacheKey = `yt|${channelId ?? channel}|${filterMembers}|${includeShorts}|${limit}`;
+    const payload = await cachedFeed(cacheKey, async () => {
     let resolvedId: string;
     let resolvedName: string;
 
@@ -356,7 +361,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ channelId: resolvedId, name: resolvedName || name, videos });
+    return { channelId: resolvedId, name: resolvedName || name, videos };
+    }, force);
+    return NextResponse.json(payload);
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

@@ -7,7 +7,7 @@ import * as storage from "@/lib/storage";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
 import { useScrollFade } from "@/lib/useScrollFade";
-import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type RssItem = { title: string; link: string; pubDate: string };
 type RssConfig = { url: string; limit: number; name?: string };
@@ -57,11 +57,11 @@ export default function RssWidget({
     });
   }, [storageKey]);
 
-  async function fetchFeed(url: string, limit: number, cacheKey: string): Promise<boolean> {
+  async function fetchFeed(url: string, limit: number, cacheKey: string, force = false): Promise<boolean> {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${limit}`);
+      const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${limit}${force ? "&refresh=1" : ""}`);
       if (!res.ok) throw new Error();
       const data: RssItem[] = await res.json();
       if (!Array.isArray(data) || !data.length) throw new Error("No items found.");
@@ -111,7 +111,10 @@ export default function RssWidget({
               <span className="opacity-50 shrink-0"><Rss size={14} /></span>
               {config.name && <span className="text-xs font-medium opacity-60 truncate">{config.name}</span>}
             </div>
-            <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
+            <span className="flex items-center gap-2">
+              <RefreshButton c={c} busy={loading} onClick={() => fetchFeed(config.url, config.limit, `${storageKey}-${today}`, true)} />
+              <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
+            </span>
           </div>
           <div className="flex-1 min-h-0 relative">
             <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={onScroll}>

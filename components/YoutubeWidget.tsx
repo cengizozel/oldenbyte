@@ -9,7 +9,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
-import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean };
 type YoutubeConfig  = { channels: YoutubeChannel[] };
@@ -93,7 +93,7 @@ export default function YoutubeWidget({
     return `${storageKey}-${today}-${cfg.channels.map(ch => `${ch.channelId}:${ch.limit}:${ch.filterMembers ? 1 : 0}:${ch.includeShorts ? 1 : 0}`).join(",")}`;
   }
 
-  async function fetchVideos(cfg: YoutubeConfig, cacheKey: string): Promise<boolean> {
+  async function fetchVideos(cfg: YoutubeConfig, cacheKey: string, force = false): Promise<boolean> {
     setLoading(true);
     setError("");
     try {
@@ -102,6 +102,7 @@ export default function YoutubeWidget({
           const params = new URLSearchParams({ channelId: ch.channelId, limit: String(ch.limit) });
           if (ch.filterMembers) params.set("filterMembers", "true");
           if (ch.includeShorts) params.set("includeShorts", "true");
+          if (force) params.set("refresh", "1");
           const res = await fetch(`/api/youtube?${params}`);
           if (!res.ok) throw new Error();
           const data: { videos: { title: string; link: string; published: string }[] } = await res.json();
@@ -190,7 +191,10 @@ export default function YoutubeWidget({
               <span className="text-xs font-medium opacity-60">YouTube</span>
             </div>
             {!selected && (
-              <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
+              <span className="flex items-center gap-2">
+                <RefreshButton c={c} busy={loading} onClick={() => fetchVideos(config, cacheKeyFor(config), true)} />
+                <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
+              </span>
             )}
           </div>
           <div className="flex-1 min-h-0 relative overflow-hidden">

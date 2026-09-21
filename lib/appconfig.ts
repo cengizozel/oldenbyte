@@ -19,6 +19,19 @@ export async function setConfig(key: string, value: string): Promise<void> {
   });
 }
 
+// How long the server-side feed cache serves a feed before refetching it
+// (lib/feedCache). Minutes; clamped to something sane.
+const FEED_TTL = "feedCacheMinutes";
+
+export async function getFeedCacheMinutes(): Promise<number> {
+  const v = Number(await getConfig(FEED_TTL));
+  return Number.isFinite(v) && v >= 1 ? v : 60;
+}
+
+export async function setFeedCacheMinutes(minutes: number): Promise<void> {
+  await setConfig(FEED_TTL, String(Math.min(1440, Math.max(1, Math.floor(minutes)))));
+}
+
 export async function isRegistrationEnabled(): Promise<boolean> {
   return (await getConfig(REG_ENABLED)) === "true";
 }

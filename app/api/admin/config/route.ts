@@ -5,6 +5,8 @@ import {
   hasInviteCode,
   setRegistrationEnabled,
   setInviteCode,
+  getFeedCacheMinutes,
+  setFeedCacheMinutes,
 } from "@/lib/appconfig";
 
 export async function GET(request: NextRequest) {
@@ -14,6 +16,7 @@ export async function GET(request: NextRequest) {
   return json({
     registrationEnabled: await isRegistrationEnabled(),
     hasInvite: await hasInviteCode(),
+    feedCacheMinutes: await getFeedCacheMinutes(),
   });
 }
 
@@ -21,7 +24,7 @@ export async function PUT(request: NextRequest) {
   const admin = await requireAdmin(request);
   if (admin instanceof NextResponse) return admin;
 
-  let body: { registrationEnabled?: boolean; inviteCode?: string };
+  let body: { registrationEnabled?: boolean; inviteCode?: string; feedCacheMinutes?: number };
   try {
     body = await request.json();
   } catch {
@@ -35,10 +38,14 @@ export async function PUT(request: NextRequest) {
   if (typeof body.inviteCode === "string" && body.inviteCode.trim()) {
     await setInviteCode(body.inviteCode.trim());
   }
+  if (typeof body.feedCacheMinutes === "number" && Number.isFinite(body.feedCacheMinutes)) {
+    await setFeedCacheMinutes(body.feedCacheMinutes);
+  }
 
   return json({
     ok: true,
     registrationEnabled: await isRegistrationEnabled(),
     hasInvite: await hasInviteCode(),
+    feedCacheMinutes: await getFeedCacheMinutes(),
   });
 }

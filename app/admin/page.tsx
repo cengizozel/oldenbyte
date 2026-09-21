@@ -13,7 +13,7 @@ type AdminUser = {
   mustChangePassword: boolean;
   createdAt: string;
 };
-type Config = { registrationEnabled: boolean; hasInvite: boolean };
+type Config = { registrationEnabled: boolean; hasInvite: boolean; feedCacheMinutes: number };
 
 const cardClass =
   "bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl p-5 shadow-sm";
@@ -155,6 +155,22 @@ export default function AdminPage() {
     } catch {
       setConfig(c => (c ? { ...c, registrationEnabled: !value } : c));
       setConfigMsg("Could not update.");
+    }
+  }
+
+  async function saveFeedCache(minutes: number) {
+    if (!config || !Number.isFinite(minutes) || minutes < 1) return;
+    try {
+      const res = await fetch("/api/admin/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedCacheMinutes: minutes }),
+      });
+      if (!res.ok) throw new Error();
+      setConfig(await res.json());
+      setConfigMsg("Feed cache updated.");
+    } catch {
+      setConfigMsg("Could not update feed cache.");
     }
   }
 
@@ -335,6 +351,29 @@ export default function AdminPage() {
                   </button>
                 </div>
                 {configMsg && <p className="text-xs text-[var(--text-muted)]">{configMsg}</p>}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-sm text-[var(--text-secondary)]">Feed cache</span>
+                  <span className="text-xs text-[var(--text-muted)]">How long feeds (RSS, Reddit, YouTube, HF, arXiv) are served from the server cache before refetching. Widgets can force a refresh anytime.</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <input
+                    type="number"
+                    min={1}
+                    max={1440}
+                    value={config.feedCacheMinutes}
+                    onChange={e => {
+                      const v = parseInt(e.target.value);
+                      setConfig(c => (c ? { ...c, feedCacheMinutes: Number.isFinite(v) ? v : c.feedCacheMinutes } : c));
+                    }}
+                    onBlur={e => saveFeedCache(parseInt(e.target.value))}
+                    onKeyDown={e => e.key === "Enter" && saveFeedCache(parseInt((e.target as HTMLInputElement).value))}
+                    className={`${inputClass} w-20 text-center`}
+                  />
+                  <span className="text-xs text-[var(--text-muted)]">min</span>
+                </div>
               </div>
             </div>
           )}
