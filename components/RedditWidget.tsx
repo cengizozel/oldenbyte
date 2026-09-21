@@ -80,6 +80,9 @@ export default function RedditWidget({
   // after a pause instead of waiting for the next page load. Bounded budget.
   const retryRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; left: number }>({ timer: null, left: 3 });
   useEffect(() => () => { if (retryRef.current.timer) clearTimeout(retryRef.current.timer); }, []);
+  // Per-subreddit load state for the header counter (null = still loading).
+  const [subStatus, setSubStatus] = useState<{ name: string; ok: boolean | null }[]>([]);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -123,8 +126,11 @@ export default function RedditWidget({
         all.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
         return all;
       };
+      const mark = (i: number, ok: boolean) =>
+        setSubStatus(prev => prev.map((s, j) => (j === i ? { ...s, ok } : s)));
+      setSubStatus(cfg.subreddits.map(s => ({ name: s.name, ok: null })));
       const results = await Promise.all(
-        cfg.subreddits.map(async sub => {
+        cfg.subreddits.map(async (sub, i) => {
           try {
             const params = new URLSearchParams({ subreddit: sub.name, period: sub.period, limit: String(sub.limit) });
             if (force) params.set("refresh", "1");
@@ -134,9 +140,11 @@ export default function RedditWidget({
             received.set(`${sub.name}|${sub.period}`, items);
             const now = combined();
             if (now.length) setPosts(now);
+            mark(i, true);
             return items;
           } catch {
             // One bad feed must not blank the others.
+            mark(i, false);
             return null;
           }
         })
@@ -211,7 +219,32 @@ export default function RedditWidget({
             <span className="opacity-50"><Flame size={14} /></span>
             <span className="text-xs font-medium opacity-60">Reddit</span>
           </div>
-          <span className="flex items-center gap-2">
+          <span className="relative flex items-center gap-2">
+            {/* How many subreddits made it; tap for the per-feed breakdown. */}
+            {subStatus.length > 0 && (loading || subStatus.some(s => s.ok === false)) && (
+              <button
+                onClick={() => setStatusOpen(o => !o)}
+                title="Which subreddits loaded"
+                className={`text-[10px] tabular-nums font-medium ${subStatus.some(s => s.ok === false) ? "text-red-500/80" : `${c.label} opacity-50`} hover:opacity-100 transition-opacity`}
+              >
+                {subStatus.filter(s => s.ok).length}/{subStatus.length}
+              </button>
+            )}
+            {statusOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setStatusOpen(false)} />
+                <div className={`absolute right-0 top-5 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2 flex flex-col gap-1`}>
+                  {subStatus.map(s => (
+                    <span key={s.name} className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className={`truncate ${c.text} opacity-80`}>r/{s.name}</span>
+                      <span className={`shrink-0 ${s.ok === true ? "text-emerald-600 dark:text-emerald-400" : s.ok === false ? "text-red-500" : `${c.label} opacity-50`}`}>
+                        {s.ok === true ? "loaded" : s.ok === false ? "failed" : "loading"}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
             <RefreshButton c={c} busy={loading} onClick={() => fetchPosts(config, cacheKeyFor(config), true)} />
             <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
           </span>

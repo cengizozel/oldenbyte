@@ -204,7 +204,7 @@ export default function KiwixWidget({
           <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
             <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
               <span className="opacity-50 shrink-0"><Library size={14} /></span>
-              {config.sourceTitle && <span className="text-xs font-medium opacity-60 truncate">{config.sourceTitle}</span>}
+              <span className="text-xs font-medium opacity-60 truncate">{config.sourceTitle || "Kiwix"}</span>
             </div>
             <div className="flex items-center gap-2.5 shrink-0">
               {(selected || searched || query || results.length > 0) && (
