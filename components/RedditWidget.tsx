@@ -83,6 +83,9 @@ export default function RedditWidget({
   // Per-subreddit load state for the header counter (null = still loading).
   const [subStatus, setSubStatus] = useState<{ name: string; ok: boolean | null }[]>([]);
   const [statusOpen, setStatusOpen] = useState(false);
+  // Last good posts per subreddit, kept across scans: a rescan that fails for
+  // a feed keeps showing what it had instead of dropping it.
+  const receivedRef = useRef<Map<string, Post[]>>(new Map());
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -120,31 +123,40 @@ export default function RedditWidget({
       // queues the uncached ones against Reddit's rate limit — those can take
       // a while, so each subreddit PAINTS AS IT ARRIVES instead of the whole
       // widget waiting for the slowest one.
-      const received = new Map<string, Post[]>();
+      const keyOf = (s: SubEntry) => `${s.name}|${s.period}|${s.limit}`;
+      const received = receivedRef.current;
+      const valid = new Set(cfg.subreddits.map(keyOf));
+      for (const k of [...received.keys()]) if (!valid.has(k)) received.delete(k);
       const combined = () => {
         const all = [...received.values()].flat();
         all.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
         return all;
       };
-      const mark = (i: number, ok: boolean) =>
-        setSubStatus(prev => prev.map((s, j) => (j === i ? { ...s, ok } : s)));
+      const mark = (name: string, ok: boolean) =>
+        setSubStatus(prev => prev.map(s => (s.name === name ? { ...s, ok } : s)));
       setSubStatus(cfg.subreddits.map(s => ({ name: s.name, ok: null })));
+      // Feeds we have nothing for yet go first, so a rescan spends the rate
+      // budget on the missing ones before re-fetching what already shows.
+      const order = [...cfg.subreddits].sort(
+        (a, b) => Number(received.has(keyOf(a))) - Number(received.has(keyOf(b)))
+      );
       const results = await Promise.all(
-        cfg.subreddits.map(async (sub, i) => {
+        order.map(async sub => {
           try {
             const params = new URLSearchParams({ subreddit: sub.name, period: sub.period, limit: String(sub.limit) });
             if (force) params.set("refresh", "1");
             const res = await fetch(`/api/reddit?${params}`);
             if (!res.ok) throw new Error();
             const items: Post[] = await res.json();
-            received.set(`${sub.name}|${sub.period}`, items);
+            received.set(keyOf(sub), items);
             const now = combined();
             if (now.length) setPosts(now);
-            mark(i, true);
+            mark(sub.name, true);
             return items;
           } catch {
-            // One bad feed must not blank the others.
-            mark(i, false);
+            // One bad feed must not blank the others; a feed that loaded on an
+            // earlier scan keeps its old posts.
+            mark(sub.name, false);
             return null;
           }
         })
@@ -190,13 +202,11 @@ export default function RedditWidget({
   async function handleSave() {
     setError("");
     if (!draft.subreddits.length) { setError("Add at least one subreddit."); return; }
-    const cacheKey = cacheKeyFor(draft);
-    const ok = await fetchPosts(draft, cacheKey);
-    if (ok) {
-      setConfig(draft);
-      await storage.setItem(storageKey, JSON.stringify(draft));
-      setSettingsOpen(false);
-    }
+    // Flip back right away; the front paints feeds as they arrive.
+    setConfig(draft);
+    await storage.setItem(storageKey, JSON.stringify(draft));
+    setSettingsOpen(false);
+    void fetchPosts(draft, cacheKeyFor(draft));
   }
 
   async function handleReset() {
@@ -274,12 +284,6 @@ export default function RedditWidget({
                           )}
                         </span>
                         <div className="flex items-start gap-1 group/title">
-                          {config.images && post.thumbnail && (
-                            <button onClick={() => setSelected(post)} className="shrink-0 mr-1.5 hover:opacity-80 transition-opacity">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={post.thumbnail} alt="" loading="lazy" className="w-14 h-14 object-cover rounded-lg bg-black/10" />
-                            </button>
-                          )}
                           <button
                             onClick={() => setSelected(post)}
                             className={`flex-1 min-w-0 break-words text-left text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
@@ -295,6 +299,12 @@ export default function RedditWidget({
                           >
                             <ExternalLink size={11} />
                           </a>
+                          {config.images && post.thumbnail && (
+                            <button onClick={() => setSelected(post)} className="shrink-0 ml-1.5 hover:opacity-80 transition-opacity">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={post.thumbnail} alt="" loading="lazy" className="w-14 h-14 object-cover rounded-lg bg-black/10" />
+                            </button>
+                          )}
                         </div>
                       </li>
                     );
