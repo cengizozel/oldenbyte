@@ -201,7 +201,7 @@ export default function YoutubeWidget({
             {/* Video list */}
             <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
               <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={onScroll}>
-                {loading ? (
+                {loading && !videos.length ? (
                   <LoadingState c={c} />
                 ) : videos.length ? (
                   <ul className="flex flex-col">

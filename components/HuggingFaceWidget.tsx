@@ -105,7 +105,7 @@ export default function HuggingFaceWidget({
                 className="absolute inset-0 overflow-y-auto pr-3"
                 onScroll={listFade.onScroll}
               >
-                {loading || !papers.length ? (
+                {!papers.length ? (
                   <LoadingState c={c} />
                 ) : (
                   <ul className="flex flex-col">

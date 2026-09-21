@@ -256,7 +256,7 @@ export default function ArxivWidget({
                 className="absolute inset-0 overflow-y-auto pr-3"
                 onScroll={listFade.onScroll}
               >
-                {loading ? (
+                {loading && !cache?.papers.length ? (
                   <LoadingState c={c} />
                 ) : cache?.papers.length ? (
                   <ul className="flex flex-col">
