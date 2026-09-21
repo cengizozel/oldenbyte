@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen, Folder, FolderPlus, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen, Folder, FolderPlus, FileText, ZoomIn, ZoomOut } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -42,13 +42,17 @@ function PdfViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [fitMode, setFitMode] = useState<"height" | "width">("height");
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const ro = new ResizeObserver(([e]) => setSize({
-      width: Math.floor(e.contentRect.width),
-      height: Math.floor(e.contentRect.height),
-    }));
+    const ro = new ResizeObserver(([e]) => {
+      const width = Math.floor(e.contentRect.width);
+      const height = Math.floor(e.contentRect.height);
+      // Keep the last real size while hidden (dashboard switched away):
+      // collapsing to 0 would unmount the Document and force a full reload.
+      if (width > 0 && height > 0) setSize({ width, height });
+    });
     ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, []);
@@ -68,30 +72,41 @@ function PdfViewer({
     <div className="flex flex-col flex-1 min-h-0 gap-2">
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-auto cursor-pointer"
-        onClick={() => setFitMode(m => m === "height" ? "width" : "height")}
-        title={fitMode === "height" ? "Click for fit to width" : "Click for fit to height"}
+        className={`flex-1 min-h-0 overflow-auto ${zoom === 1 ? "cursor-pointer" : ""}`}
+        onClick={() => { if (zoom === 1) setFitMode(m => m === "height" ? "width" : "height"); }}
+        title={zoom !== 1 ? undefined : fitMode === "height" ? "Click for fit to width" : "Click for fit to height"}
       >
-        <div className="min-h-full flex items-center justify-center">
+        {/* w-max/h-max keep a zoomed page fully scrollable: a plain centered
+            flex child would clip its overflowing left/top edges. */}
+        <div className="min-w-full min-h-full w-max h-max flex items-center justify-center">
           {size.width > 0 && size.height > 0 && (
             <Document
               file={src}
               onLoadSuccess={({ numPages }) => setNumPages(numPages)}
               loading={<Loader size={16} className="animate-spin opacity-40" />}
             >
-              <Page
-                pageNumber={page}
-                height={fitMode === "height" ? size.height : undefined}
-                width={fitMode === "width" ? size.width : undefined}
-                renderAnnotationLayer={false}
-                renderTextLayer={false}
-              />
+              {/* Render the neighbouring pages hidden so page turns are
+                  instant instead of waiting on a fresh canvas render. */}
+              {[page - 1, page, page + 1]
+                .filter(p => p >= 1 && (numPages === 0 ? p === page : p <= numPages))
+                .map(p => (
+                  <div key={p} className={p === page ? "" : "hidden"}>
+                    <Page
+                      pageNumber={p}
+                      height={fitMode === "height" ? size.height : undefined}
+                      width={fitMode === "width" ? size.width : undefined}
+                      scale={zoom}
+                      renderAnnotationLayer={false}
+                      renderTextLayer={false}
+                    />
+                  </div>
+                ))}
             </Document>
           )}
         </div>
       </div>
       <div className="flex flex-col gap-1.5 shrink-0">
-        <div className="flex items-center justify-center gap-4">
+        <div className="relative flex items-center justify-center gap-4">
           <button
             onClick={() => onPageChange(Math.max(1, page - 1))}
             disabled={page <= 1}
@@ -109,6 +124,29 @@ function PdfViewer({
           >
             <ChevronRight size={fullscreen ? 20 : 16} />
           </button>
+          <span className="absolute right-0 flex items-center gap-1.5">
+            <button
+              onClick={() => setZoom(z => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}
+              className="text-neutral-400 hover:text-neutral-700"
+              title="Zoom out"
+            >
+              <ZoomOut size={fullscreen ? 16 : 13} />
+            </button>
+            <button
+              onClick={() => setZoom(1)}
+              className={`text-neutral-400 hover:text-neutral-700 tabular-nums ${fullscreen ? "text-xs" : "text-[10px]"}`}
+              title="Reset zoom"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              onClick={() => setZoom(z => Math.min(4, Math.round((z + 0.25) * 100) / 100))}
+              className="text-neutral-400 hover:text-neutral-700"
+              title="Zoom in"
+            >
+              <ZoomIn size={fullscreen ? 16 : 13} />
+            </button>
+          </span>
         </div>
         {numPages > 0 && (
           <div className="w-full h-0.5 bg-neutral-200 rounded-full overflow-hidden">
