@@ -408,6 +408,10 @@ export default function ReaderWidget({
   }
 
   async function makeFolder() {
+    if (isDemoMode()) {
+      setError("Folders are not available in demo mode.");
+      return;
+    }
     const name = newFolder.trim();
     if (!name) return;
     setError("");
