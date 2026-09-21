@@ -70,7 +70,11 @@ export async function GET(request: NextRequest) {
     const contentType = target.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/epub+zip";
     // Cast: a Uint8Array is a valid response body at runtime; the mismatch is
     // only the @types/node ArrayBufferLike vs DOM ArrayBuffer generic.
-    return new NextResponse(data as unknown as BodyInit, { headers: { "Content-Type": contentType } });
+    // private: book files may be cached by the reader's browser (fullscreen
+    // opens a second viewer of the same file) but never by shared caches.
+    return new NextResponse(data as unknown as BodyInit, {
+      headers: { "Content-Type": contentType, "Cache-Control": "private, max-age=3600" },
+    });
   }
 
   return NextResponse.json({ error: "Unknown op" }, { status: 400 });

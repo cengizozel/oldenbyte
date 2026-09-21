@@ -67,7 +67,10 @@ function PdfViewer({
   const [numPages, setNumPages] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const [fitMode, setFitMode] = useState<"height" | "width">("height");
+  // "page" fits the whole page inside the container (nothing cropped);
+  // "width" fills the width and scrolls vertically.
+  const [fitMode, setFitMode] = useState<"page" | "width">("page");
+  const [pageAspect, setPageAspect] = useState(0); // page width / height
   const [zoom, setZoom] = useState(1);
   const [toc, setToc] = useState<(TocEntry & { page: number })[]>([]);
   const [tocOpen, setTocOpen] = useState(false);
@@ -123,14 +126,18 @@ function PdfViewer({
     return () => window.removeEventListener("keydown", handler);
   }, [fullscreen, page, numPages, onPageChange]);
 
+  // Whole-page fit: whichever dimension the page would overflow first is the
+  // one pinned to the container, so nothing gets cropped.
+  const widthLimited = fitMode === "width" || (pageAspect > 0 && size.height * pageAspect > size.width);
+
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-2">
-      <div className="relative flex-1 min-h-0 flex flex-col">
+    <div className="flex flex-col flex-1 min-h-0 min-w-0 gap-2">
+      <div className="relative flex-1 min-h-0 min-w-0 flex flex-col">
       <div
         ref={containerRef}
-        className={`flex-1 min-h-0 overflow-auto ${zoom === 1 ? "cursor-pointer" : ""}`}
-        onClick={() => { if (zoom === 1) setFitMode(m => m === "height" ? "width" : "height"); }}
-        title={zoom !== 1 ? undefined : fitMode === "height" ? "Click for fit to width" : "Click for fit to height"}
+        className={`flex-1 min-h-0 min-w-0 max-w-full overflow-auto ${zoom === 1 ? "cursor-pointer" : ""}`}
+        onClick={() => { if (zoom === 1) setFitMode(m => m === "page" ? "width" : "page"); }}
+        title={zoom !== 1 ? undefined : fitMode === "page" ? "Click for fit to width" : "Click to fit whole page"}
       >
         {/* w-max/h-max keep a zoomed page fully scrollable: a plain centered
             flex child would clip its overflowing left/top edges. */}
@@ -149,9 +156,10 @@ function PdfViewer({
                   <div key={p} className={p === page ? "" : "hidden"}>
                     <Page
                       pageNumber={p}
-                      height={fitMode === "height" ? size.height : undefined}
-                      width={fitMode === "width" ? size.width : undefined}
+                      height={widthLimited ? undefined : size.height}
+                      width={widthLimited ? size.width : undefined}
                       scale={zoom}
+                      onLoadSuccess={pg => setPageAspect(pg.originalWidth / pg.originalHeight)}
                       renderAnnotationLayer={false}
                       renderTextLayer={false}
                     />
@@ -382,6 +390,15 @@ function EpubViewer({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [fullscreen]);
+
+  // Follow position changes made elsewhere (the widget instance keeps running
+  // while the fullscreen overlay reads the same book).
+  useEffect(() => {
+    if (renditionRef.current && cfi && cfi !== lastCfiRef.current) {
+      lastCfiRef.current = cfi;
+      renditionRef.current.display(cfi);
+    }
+  }, [cfi]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-2">
@@ -718,27 +735,23 @@ export default function ReaderWidget({
             </div>
 
             {config ? (
-              fullscreen ? (
-                <div className="flex-1 min-h-0 flex items-center justify-center">
-                  <p className={`text-xs opacity-30 ${c.text}`}>reading in full view</p>
-                </div>
-              ) : (
-                <div className="flex flex-col flex-1 min-h-0">
-                  {config.fileType === "pdf" ? (
-                    <PdfViewer
-                      src={srcFor(config)}
-                      page={parseInt(position) || 1}
-                      onPageChange={p => savePosition(String(p))}
-                    />
-                  ) : (
-                    <EpubViewer
-                      src={srcFor(config)}
-                      cfi={position}
-                      onLocationChange={savePosition}
-                    />
-                  )}
-                </div>
-              )
+              // Stays mounted while the fullscreen overlay is open, so closing
+              // the overlay never shows an empty widget waiting on a reload.
+              <div className="flex flex-col flex-1 min-h-0 min-w-0">
+                {config.fileType === "pdf" ? (
+                  <PdfViewer
+                    src={srcFor(config)}
+                    page={parseInt(position) || 1}
+                    onPageChange={p => savePosition(String(p))}
+                  />
+                ) : (
+                  <EpubViewer
+                    src={srcFor(config)}
+                    cfi={position}
+                    onLocationChange={savePosition}
+                  />
+                )}
+              </div>
             ) : (
               uploadZone()
             )}

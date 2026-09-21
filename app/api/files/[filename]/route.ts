@@ -32,6 +32,6 @@ export async function GET(
   // Cast: a Uint8Array is a valid response body at runtime; the mismatch is only
   // the @types/node ArrayBufferLike vs DOM ArrayBuffer generic.
   return new NextResponse(data as unknown as BodyInit, {
-    headers: { "Content-Type": contentType },
+    headers: { "Content-Type": contentType, "Cache-Control": "private, max-age=3600" },
   });
 }
