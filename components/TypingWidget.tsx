@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Keyboard, RotateCcw, Target, Maximize2, Minimize2, Volume2, VolumeX, Music } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import { TYPING_WORDS } from "@/lib/typingWords";
+import { SIMPLE_WORDS } from "@/lib/simpleWords";
 import * as storage from "@/lib/storage";
 
 // A Monkeytype-style typing trainer. Input is word-based: you type a word and
@@ -20,6 +21,7 @@ import * as storage from "@/lib/storage";
 
 type Mode = "words" | "time" | "drill" | "metro";
 type DrillId = "custom" | "home" | "rhythm" | "weak";
+type WordPool = "simple" | "varied";
 type Config = {
   mode: Mode;
   length: number;
@@ -27,6 +29,7 @@ type Config = {
   custom: string;
   customScramble: boolean; // custom drill: random strings of the letters
   customWords: boolean;    // custom drill: real words containing the letters
+  pool: WordPool;          // words/time/metro vocabulary: classic 200 or top 1000
   countdown: number; // get-ready seconds before a run (0 = off)
   bpm: number;
   sound: boolean;
@@ -40,7 +43,7 @@ type Stats = {
   keyMiss: Record<string, number>;
 };
 
-const DEFAULT_CONFIG: Config = { mode: "words", length: 25, drill: "custom", custom: "zxc", customScramble: true, customWords: false, countdown: 3, bpm: 100, sound: true, dynamic: false, endless: false };
+const DEFAULT_CONFIG: Config = { mode: "words", length: 25, drill: "custom", custom: "zxc", customScramble: true, customWords: false, pool: "varied", countdown: 3, bpm: 100, sound: true, dynamic: false, endless: false };
 
 const BPM_MIN = 40;
 const BPM_MAX = 300;
@@ -57,12 +60,13 @@ const TIME_LENGTHS = [15, 30, 60];
 const METRO_LENGTHS = [15, 25, 40];
 const COUNTDOWNS = [0, 3, 5];
 
-// Word pools from the bundled frequency-ranked list (lib/typingWords.ts).
-// words/time modes draw from the 1000 most common for a Monkeytype-like feel;
-// letter-matching drills search the full ~10k so any letter combo finds real
-// words, ranked by commonness.
+// Word pools. "simple" is the classic 200 most common words (the Monkeytype
+// default feel); "varied" is the top 1000 of the bundled frequency-ranked
+// list (lib/typingWords.ts). Letter-matching drills search the full ~10k so
+// any letter combo finds real words, ranked by commonness.
 const WORDS = TYPING_WORDS.slice(0, 1000);
 const MATCH_WORDS = TYPING_WORDS;
+const POOLS: Record<WordPool, string[]> = { simple: SIMPLE_WORDS, varied: WORDS };
 
 // Approximate QWERTY adjacency (horizontal + nearest staggered keys). Used to
 // classify a wrong keystroke as a "neighbour slip".
@@ -80,9 +84,10 @@ function shuffle<T>(a: T[]): T[] {
   }
   return r;
 }
-function pickWords(n: number): string {
+function pickWords(n: number, pool: WordPool = "varied"): string {
+  const src = POOLS[pool] ?? WORDS;
   const out: string[] = [];
-  while (out.length < n) out.push(...shuffle(WORDS));
+  while (out.length < n) out.push(...shuffle(src));
   return out.slice(0, n).join(" ");
 }
 
@@ -129,9 +134,9 @@ function buildCustom(cfg: Config): string {
 
 // Build the text to type for the current config.
 function buildTarget(cfg: Config, stats: Stats): string {
-  if (cfg.mode === "words") return pickWords(cfg.length);
-  if (cfg.mode === "metro") return pickWords(cfg.length);
-  if (cfg.mode === "time") return pickWords(80); // generous buffer; extended on demand
+  if (cfg.mode === "words") return pickWords(cfg.length, cfg.pool);
+  if (cfg.mode === "metro") return pickWords(cfg.length, cfg.pool);
+  if (cfg.mode === "time") return pickWords(80, cfg.pool); // generous buffer; extended on demand
   // drills
   if (cfg.drill === "custom") return buildCustom(cfg);
   if (cfg.drill === "home") {
@@ -494,7 +499,7 @@ export default function TypingWidget({
     if (!autoRefills(configRef.current) && typedWordsRef.current.length >= wordsRef.current.length) { finish(); return; }
     // time / endless: keep a buffer of words ahead of the typist
     if (autoRefills(configRef.current) && typedWordsRef.current.length >= wordsRef.current.length - 8) {
-      setWords([...wordsRef.current, ...pickWords(24).split(" ")]);
+      setWords([...wordsRef.current, ...pickWords(24, configRef.current.pool).split(" ")]);
     }
   }
 
@@ -640,6 +645,17 @@ export default function TypingWidget({
           {lengthOptions.length > 0 && <span className={`opacity-20 ${c.label}`}>|</span>}
           {lengthOptions.map(n => (
             <button key={n} onClick={() => applyConfig({ ...config, length: n })} className={chip(config.length === n)}>{n}</button>
+          ))}
+          {config.mode !== "drill" && <span className={`opacity-20 ${c.label}`}>|</span>}
+          {config.mode !== "drill" && (["simple", "varied"] as WordPool[]).map(p => (
+            <button
+              key={p}
+              onClick={() => applyConfig({ ...config, pool: p })}
+              className={chip(config.pool === p)}
+              title={p === "simple" ? "The classic 200 most common words" : "The 1000 most common words"}
+            >
+              {p}
+            </button>
           ))}
           {config.mode === "drill" && <span className={`opacity-20 ${c.label}`}>|</span>}
           {config.mode === "drill" && DRILLS.map(d => (
