@@ -10,7 +10,10 @@ import { maybeSeedFirstRun } from "@/lib/seed";
 export default function Home() {
   const [editing, setEditing] = useState(false);
   const [dashboards, setDashboards] = useState<DashboardsState | null>(null);
-  const editControls = useRef<{ cancel: () => void } | null>(null);
+  // Dashboards stay mounted once visited (hidden when inactive) so switching
+  // between them keeps widget state instead of reloading everything.
+  const [visited, setVisited] = useState<string[]>([]);
+  const editControls = useRef<Record<string, { cancel: () => void }>>({});
 
   useEffect(() => {
     // A true first run gets the seeded demo dashboards; everyone else loads
@@ -19,6 +22,15 @@ export default function Home() {
       .then(seeded => (seeded ? setDashboards(seeded) : getDashboards().then(setDashboards)))
       .catch(() => getDashboards().then(setDashboards));
   }, []);
+
+  useEffect(() => {
+    if (!dashboards) return;
+    const ids = new Set(dashboards.list.map(d => d.id));
+    setVisited(prev => {
+      const kept = prev.filter(id => ids.has(id));
+      return kept.includes(dashboards.activeId) ? kept : [...kept, dashboards.activeId];
+    });
+  }, [dashboards]);
 
   function handleDashboardsChange(next: DashboardsState) {
     setDashboards(next);
@@ -30,20 +42,24 @@ export default function Home() {
       <TopBar
         editing={editing}
         onToggleEdit={() => setEditing(e => !e)}
-        onCancelEdit={() => { editControls.current?.cancel(); setEditing(false); }}
+        onCancelEdit={() => { if (dashboards) editControls.current[dashboards.activeId]?.cancel(); setEditing(false); }}
         dashboards={dashboards}
         onDashboardsChange={handleDashboardsChange}
       />
-      {dashboards && (
-        <WidgetGrid
-          key={dashboards.activeId}
-          dashboardId={dashboards.activeId}
-          widgets={widgets}
-          editing={editing}
-          onToggleEdit={() => setEditing(e => !e)}
-          onRegisterEditControls={c => { editControls.current = c; }}
-        />
-      )}
+      {dashboards && visited.map(id => {
+        const active = id === dashboards.activeId;
+        return (
+          <div key={id} className={active ? "flex flex-col gap-4 md:gap-5 flex-1 min-h-0" : "hidden"}>
+            <WidgetGrid
+              dashboardId={id}
+              widgets={widgets}
+              editing={editing && active}
+              onToggleEdit={() => setEditing(e => !e)}
+              onRegisterEditControls={c => { editControls.current[id] = c; }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
