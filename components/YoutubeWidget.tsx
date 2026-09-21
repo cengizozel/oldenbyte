@@ -113,7 +113,13 @@ export default function YoutubeWidget({
       for (let i = 0; i < maxLen; i++) {
         for (const r of results) { if (r[i]) interleaved.push(r[i]); }
       }
-      interleaved.sort((a, b) => new Date(b.published).getTime() - new Date(a.published).getTime());
+      // A missing date means a live stream or premiere: the channel's newest
+      // item, so it sorts to the top rather than poisoning the sort with NaN.
+      const ts = (p: string) => {
+        const t = new Date(p).getTime();
+        return Number.isFinite(t) ? t : Number.MAX_SAFE_INTEGER;
+      };
+      interleaved.sort((a, b) => ts(b.published) - ts(a.published));
       if (!interleaved.length) throw new Error();
       setVideos(interleaved);
       await storage.setItem(cacheKey, JSON.stringify(interleaved));

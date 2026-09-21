@@ -28,10 +28,13 @@ function extractCdata(str: string): string {
 
 type Video = { title: string; link: string; published: string; isMembersOnly: boolean; isShort: boolean };
 
-// Convert relative YouTube time ("2 days ago") to approximate ISO string
+// Convert relative YouTube time ("2 days ago") to approximate ISO string.
+// No parseable time (live streams and premieres carry "watching now" or a
+// schedule instead) returns "" — an unknown date must stay unknown, not
+// become "now" (which rendered as a stuck "0m ago" plus a false NEW badge).
 function relToIso(rel: string): string {
   const m = rel.match(/(\d+)\s+(second|minute|hour|day|week|month|year)/i);
-  if (!m) return new Date().toISOString();
+  if (!m) return "";
   const n = parseInt(m[1]);
   const ms: Record<string, number> = {
     second: 1e3, minute: 6e4, hour: 36e5,
