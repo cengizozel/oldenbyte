@@ -12,11 +12,24 @@ import { SettingsInput } from "@/components/ui/Field";
 import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean };
-type YoutubeConfig  = { channels: YoutubeChannel[] };
+type YtView         = "list" | "thumbs" | "gallery";
+type YoutubeConfig  = { channels: YoutubeChannel[]; view: YtView };
 type Video          = { title: string; link: string; published: string; channelId: string; channelName: string };
 type VideoDetails   = { title: string; author: string; description: string; lengthSeconds: number; viewCount: number };
 
-const DEFAULT: YoutubeConfig = { channels: [] };
+const DEFAULT: YoutubeConfig = { channels: [], view: "list" };
+const VIEWS: { id: YtView; label: string }[] = [
+  { id: "list", label: "List" },
+  { id: "thumbs", label: "Thumbnails" },
+  { id: "gallery", label: "Gallery" },
+];
+
+// YouTube serves a predictable thumbnail per video id, so no extra fetch is
+// needed: mqdefault is 320x180, plenty for widget-sized cards.
+function thumbUrl(link: string): string {
+  const m = /[?&]v=([\w-]+)/.exec(link) ?? /\/(?:shorts|embed|live)\/([\w-]+)/.exec(link);
+  return m ? `https://i.ytimg.com/vi/${m[1]}/mqdefault.jpg` : "";
+}
 
 export default function YoutubeWidget({
   widget,
@@ -71,7 +84,7 @@ export default function YoutubeWidget({
     storage.getItem(storageKey).then(async saved => {
       if (!saved) return;
       try {
-        const parsed: YoutubeConfig = JSON.parse(saved);
+        const parsed: YoutubeConfig = { ...DEFAULT, ...JSON.parse(saved) };
         // migrate old format: channels had no per-channel limit (used top-level limit)
         const oldLimit = (parsed as unknown as { limit?: number }).limit ?? 5;
         parsed.channels = parsed.channels.map(ch =>
@@ -204,11 +217,63 @@ export default function YoutubeWidget({
                 {loading && !videos.length ? (
                   <LoadingState c={c} />
                 ) : videos.length ? (
+                  config.view === "gallery" ? (
+                    <div className="grid gap-x-2.5 gap-y-3 py-1" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+                      {videos.map((v, i) => {
+                        const sc = tagColor(v.channelName);
+                        const thumb = thumbUrl(v.link);
+                        return (
+                          <div key={i} className="flex flex-col gap-1">
+                            <button onClick={() => openVideo(v)} className="relative block w-full aspect-video rounded-lg overflow-hidden bg-black/10 hover:opacity-80 transition-opacity">
+                              {thumb && (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={thumb} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                              )}
+                            </button>
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              <span className={`inline-block min-w-0 truncate text-[9px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>
+                                {v.channelName}
+                              </span>
+                              {v.published && (
+                                <span className={`shrink-0 text-[9px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
+                              )}
+                            </span>
+                            <div className="flex items-start gap-1 group/title">
+                              <button
+                                onClick={() => openVideo(v)}
+                                className={`flex-1 min-w-0 break-words text-left text-xs leading-snug line-clamp-2 ${c.text} hover:opacity-70 transition-opacity`}
+                              >
+                                {v.title}
+                              </button>
+                              <a
+                                href={v.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                              >
+                                <ExternalLink size={11} />
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
                   <ul className="flex flex-col">
                     {videos.map((v, i) => {
                       const sc = tagColor(v.channelName);
+                      const thumb = config.view === "thumbs" ? thumbUrl(v.link) : "";
                       return (
                         <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                          <div className="flex gap-2.5">
+                            {thumb && (
+                              <button onClick={() => openVideo(v)} className="shrink-0 self-center hover:opacity-80 transition-opacity">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={thumb} alt="" loading="lazy" className="w-24 aspect-video object-cover rounded-lg bg-black/10" />
+                              </button>
+                            )}
+                            <div className="flex-1 min-w-0">
                           <span className="flex items-center gap-1.5 mb-1 min-w-0">
                             <span className={`inline-block min-w-0 truncate text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                               {v.channelName}
@@ -237,10 +302,13 @@ export default function YoutubeWidget({
                               <ExternalLink size={11} />
                             </a>
                           </div>
+                            </div>
+                          </div>
                         </li>
                       );
                     })}
                   </ul>
+                  )
                 ) : (
                   <EmptyState c={c} action="add YouTube channels" />
                 )}
@@ -296,6 +364,15 @@ export default function YoutubeWidget({
       back={
         <>
           <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
+            <div className="flex items-center gap-2">
+              <span className={`text-xs opacity-60 ${c.label}`}>View</span>
+              {VIEWS.map(v => (
+                <button key={v.id} onClick={() => setDraft(d => ({ ...d, view: v.id }))}
+                  className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${draft.view === v.id ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}>
+                  {v.label}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-1">
               <SettingsInput
                 type="text"
