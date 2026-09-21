@@ -43,15 +43,18 @@ function relToIso(rel: string): string {
   return new Date(Date.now() - n * (ms[m[2].toLowerCase()] ?? 0)).toISOString();
 }
 
-async function fetchViaRss(channelId: string, limit: number): Promise<{ name: string; videos: Video[] }> {
+// `feedQuery` is "channel_id=UC…" for a channel's full uploads, or
+// "playlist_id=UULF…" for its auto-generated long-form playlist (same uploads
+// WITHOUT Shorts — the UC->UULF prefix swap, a trick learned from Glance).
+async function fetchViaRss(feedQuery: string, limit: number): Promise<{ name: string; videos: Video[] }> {
   const res = await fetch(
-    `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`,
+    `https://www.youtube.com/feeds/videos.xml?${feedQuery}`,
     { headers: { "User-Agent": UA } }
   );
   if (!res.ok) throw new Error(`RSS ${res.status}`);
 
   const xml = await res.text();
-  const name = xml.match(/<author>\s*<name>([^<]+)<\/name>/)?.[1]?.trim() ?? channelId;
+  const name = xml.match(/<author>\s*<name>([^<]+)<\/name>/)?.[1]?.trim() ?? (feedQuery.split("=")[1] ?? "");
 
   const videos: Video[] = [];
   const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
@@ -286,11 +289,8 @@ export async function GET(request: NextRequest) {
   const filterMembers = request.nextUrl.searchParams.get("filterMembers") === "true";
   const includeShorts = request.nextUrl.searchParams.get("includeShorts") === "true";
   const limit = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "5"), 15);
-  // The RSS feed includes Shorts and exposes no members-only flag; only the
-  // channel-page scraper can filter either, so route through it (over-fetching
-  // to compensate for filtered-out items) whenever filtering is requested.
-  const useChannelPage = filterMembers || !includeShorts;
-  const fetchLimit = useChannelPage ? Math.min(limit * 4, 30) : limit;
+  // Over-fetch on the scraper paths to compensate for filtered-out items.
+  const fetchLimit = Math.min(limit * 4, 30);
 
   if (!channel && !channelId) {
     return NextResponse.json({ error: "Missing channel or channelId" }, { status: 400 });
@@ -312,23 +312,47 @@ export async function GET(request: NextRequest) {
     let name: string;
     let videos: Video[];
 
-    if (useChannelPage) {
-      // Channel page exposes members-only badges and excludes Shorts; RSS does neither
-      const result = await fetchViaChannelPage(resolvedId, fetchLimit);
-      name = result.name;
-      videos = result.videos
-        .filter(v => !filterMembers || !v.isMembersOnly)
+    // The channel's auto-generated "UULF" playlist = its uploads without
+    // Shorts, served as a normal RSS feed with exact publish times.
+    const uploadsPlaylist = resolvedId.startsWith("UC") ? "UULF" + resolvedId.slice(2) : "";
+    const rssQuery = !includeShorts && uploadsPlaylist
+      ? `playlist_id=${uploadsPlaylist}`
+      : `channel_id=${resolvedId}`;
+
+    if (filterMembers) {
+      // Only the channel page exposes members-only badges, so scrape for the
+      // list — but borrow exact publish times from the RSS feed by video id:
+      // the page only shows relative text ("2 days ago"), and none at all for
+      // live/premiere cards.
+      const [page, rss] = await Promise.allSettled([
+        fetchViaChannelPage(resolvedId, fetchLimit),
+        fetchViaRss(rssQuery, 15),
+      ]);
+      if (page.status === "rejected") throw page.reason;
+      const exact = new Map<string, string>();
+      if (rss.status === "fulfilled") {
+        for (const v of rss.value.videos) {
+          const id = extractVideoId(v.link);
+          if (id && v.published) exact.set(id, v.published);
+        }
+      }
+      name = page.value.name;
+      videos = page.value.videos
+        .map(v => ({ ...v, published: exact.get(extractVideoId(v.link)) ?? v.published }))
+        .filter(v => !v.isMembersOnly)
         .filter(v => includeShorts || !v.isShort)
         .slice(0, limit);
     } else {
       try {
-        const result = await fetchViaRss(resolvedId, fetchLimit);
+        const result = await fetchViaRss(rssQuery, limit);
         name = result.name;
         videos = result.videos;
       } catch {
         const result = await fetchViaChannelPage(resolvedId, fetchLimit);
         name = result.name;
-        videos = result.videos;
+        videos = result.videos
+          .filter(v => includeShorts || !v.isShort)
+          .slice(0, limit);
       }
     }
 
