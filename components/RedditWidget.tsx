@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus, ChevronLeft, ExternalLink, Flame } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -76,6 +76,10 @@ export default function RedditWidget({
   const [selected, setSelected]         = useState<Post | null>(null);
   const list   = useScrollFade<HTMLDivElement>([posts]);
   const detail = useScrollFade<HTMLDivElement>([selected]);
+  // Self-heal: when some subreddits fail (rate-limited upstream), retry them
+  // after a pause instead of waiting for the next page load. Bounded budget.
+  const retryRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; left: number }>({ timer: null, left: 3 });
+  useEffect(() => () => { if (retryRef.current.timer) clearTimeout(retryRef.current.timer); }, []);
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -109,8 +113,16 @@ export default function RedditWidget({
     setLoading(true);
     setError("");
     try {
-      // Fire them all at once: the server queues and paces the upstream
-      // fetches (Reddit's rate limit) and serves cached feeds instantly.
+      // Fire them all at once: the server serves cached feeds instantly and
+      // queues the uncached ones against Reddit's rate limit — those can take
+      // a while, so each subreddit PAINTS AS IT ARRIVES instead of the whole
+      // widget waiting for the slowest one.
+      const received = new Map<string, Post[]>();
+      const combined = () => {
+        const all = [...received.values()].flat();
+        all.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+        return all;
+      };
       const results = await Promise.all(
         cfg.subreddits.map(async sub => {
           try {
@@ -119,6 +131,9 @@ export default function RedditWidget({
             const res = await fetch(`/api/reddit?${params}`);
             if (!res.ok) throw new Error();
             const items: Post[] = await res.json();
+            received.set(`${sub.name}|${sub.period}`, items);
+            const now = combined();
+            if (now.length) setPosts(now);
             return items;
           } catch {
             // One bad feed must not blank the others.
@@ -126,13 +141,20 @@ export default function RedditWidget({
           }
         })
       );
-      const all: Post[] = results.filter((r): r is Post[] => r !== null).flat();
-      all.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+      const all = combined();
       if (!all.length) throw new Error();
-      setPosts(all);
-      // Cache only complete days: a partial result (some feeds rate-limited)
-      // must not become "the" posts for the rest of the day.
-      if (!results.some(r => r === null)) await storage.setItem(cacheKey, JSON.stringify(all));
+      if (results.some(r => r === null)) {
+        // Partial: never day-cache it, and quietly retry the missing feeds
+        // in a minute (the server keeps pacing against the rate limit).
+        if (retryRef.current.left > 0) {
+          retryRef.current.left--;
+          if (retryRef.current.timer) clearTimeout(retryRef.current.timer);
+          retryRef.current.timer = setTimeout(() => fetchPosts(cfg, cacheKey), 60000);
+        }
+      } else {
+        retryRef.current.left = 3;
+        await storage.setItem(cacheKey, JSON.stringify(all));
+      }
       return true;
     } catch {
       setError("Failed to load posts. Check the subreddit names.");
@@ -199,7 +221,7 @@ export default function RedditWidget({
           {/* Post list */}
           <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
             <div ref={list.ref} className="absolute inset-0 overflow-y-auto pr-3" onScroll={list.onScroll}>
-              {loading ? (
+              {loading && !posts.length ? (
                 <LoadingState c={c} />
               ) : posts.length ? (
                 <ul className="flex flex-col">
