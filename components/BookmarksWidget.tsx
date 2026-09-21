@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bookmark, Plus, Minus, GripVertical, LayoutGrid, LayoutList, AlignJustify, ExternalLink } from "lucide-react";
+import { Bookmark, Plus, Minus, GripVertical, LayoutGrid, Grid2x2, LayoutList, AlignJustify, ExternalLink } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { tagColor } from "@/lib/colors";
@@ -16,7 +16,7 @@ import { PencilButton, EmptyState, SaveCancelRow, ScrollFades } from "./ui/Widge
 // name rows, or a compact name-only list. Favicons load straight from the
 // bookmarked site (no third party), matching the project's self-hosted bent.
 
-type View = "icon" | "row" | "name";
+type View = "icon" | "grid" | "row" | "name";
 type Bookmark = { id: string; url: string; name: string; icon?: string };
 type Config = { bookmarks: Bookmark[]; view: View; iconSize?: number };
 
@@ -119,7 +119,8 @@ function Favicon({ bm, size }: { bm: Bookmark; size: number }) {
 function ViewToggle({ c, view, onChange }: { c: ColorClasses; view: View; onChange: (v: View) => void }) {
   const opts: { value: View; icon: typeof LayoutGrid; title: string }[] = [
     { value: "icon", icon: LayoutGrid, title: "Icons only" },
-    { value: "row", icon: LayoutList, title: "Icons and names" },
+    { value: "grid", icon: Grid2x2, title: "Icons with names" },
+    { value: "row", icon: LayoutList, title: "Icon and name rows" },
     { value: "name", icon: AlignJustify, title: "Names only" },
   ];
   return (
@@ -172,7 +173,7 @@ export default function BookmarksWidget({
           const list = (cfg.bookmarks ?? []).map(b => ({ ...b, id: b.id || newId() }));
           setBookmarks(list);
           setDraft(list);
-          if (cfg.view === "icon" || cfg.view === "row" || cfg.view === "name") setView(cfg.view);
+          if (cfg.view === "icon" || cfg.view === "grid" || cfg.view === "row" || cfg.view === "name") setView(cfg.view);
           if (typeof cfg.iconSize === "number") setIconSize(clampIcon(cfg.iconSize));
         } catch {}
       }
@@ -233,7 +234,7 @@ export default function BookmarksWidget({
           <span className="text-xs font-medium opacity-60 truncate">{widget.title}</span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {view === "icon" && bookmarks.length > 0 && (
+          {(view === "icon" || view === "grid") && bookmarks.length > 0 && (
             <div className="flex items-center gap-0.5">
               <button
                 onClick={() => changeIconSize(-ICON_STEP)}
@@ -275,6 +276,24 @@ export default function BookmarksWidget({
                     className="flex items-center justify-center p-1 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   >
                     <Favicon bm={bm} size={iconSize} />
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {view === "grid" && (
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(iconSize + 16, 64)}px, 1fr))` }}>
+                {bookmarks.map(bm => (
+                  <a
+                    key={bm.id}
+                    href={bm.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`${displayName(bm)} · ${bm.url}`}
+                    className="flex flex-col items-center gap-1 px-1 py-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                  >
+                    <Favicon bm={bm} size={iconSize} />
+                    <span className={`w-full text-center truncate text-[10px] leading-tight ${c.text} opacity-70`}>{displayName(bm)}</span>
                   </a>
                 ))}
               </div>
