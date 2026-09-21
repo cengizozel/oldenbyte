@@ -1,19 +1,23 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Layers, Search, Loader, ExternalLink, Home } from "lucide-react";
+import { Layers, Search, Loader, ExternalLink, Home, ChevronLeft, ChevronRight } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
+import Markdown from "@/components/Markdown";
 import { SettingsInput, SettingsSelect } from "@/components/ui/Field";
 import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type AnytypeObject = { id: string; name: string; snippet: string; spaceId: string; type: string };
 type Space = { id: string; name: string };
-type AnytypeConfig = { baseUrl: string; apiKey: string; spaceId: string; spaceName: string; limit: number };
+type AnytypeType = { id: string; key: string; name: string };
+type HomeView = "recent" | "types";
+type ReaderObject = { name: string; markdown: string; type: string; modified: string };
+type AnytypeConfig = { baseUrl: string; apiKey: string; spaceId: string; spaceName: string; limit: number; home: HomeView };
 
-const DEFAULT: AnytypeConfig = { baseUrl: "http://127.0.0.1:31009", apiKey: "", spaceId: "", spaceName: "", limit: 25 };
+const DEFAULT: AnytypeConfig = { baseUrl: "http://127.0.0.1:31009", apiKey: "", spaceId: "", spaceName: "", limit: 25, home: "recent" };
 
 // Deep-link that opens an object in the Anytype desktop app.
 function deepLink(o: AnytypeObject): string {
@@ -38,6 +42,14 @@ export default function AnytypeWidget({
   const [searched, setSearched] = useState(false);
   const searchAbort = useRef<AbortController | null>(null);
 
+  // Type browsing (home = "types") and the in-widget reader.
+  const [types, setTypes] = useState<AnytypeType[]>([]);
+  const [loadingTypes, setLoadingTypes] = useState(false);
+  const [activeType, setActiveType] = useState<AnytypeType | null>(null);
+  const [reader, setReader] = useState<AnytypeObject | null>(null);
+  const [readerObj, setReaderObj] = useState<ReaderObject | null>(null);
+  const [readerLoading, setReaderLoading] = useState(false);
+
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<AnytypeConfig>(DEFAULT);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -51,7 +63,7 @@ export default function AnytypeWidget({
 
   const configured = Boolean(config.baseUrl && config.apiKey && config.spaceId);
 
-  const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([objects, searching, error]);
+  const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([objects, searching, error, types, activeType, reader, readerObj]);
 
   useEffect(() => {
     storage.getItem(storageKey).then((saved) => {
@@ -64,8 +76,9 @@ export default function AnytypeWidget({
     });
   }, [storageKey]);
 
-  // Run a search (empty query = recent objects, sorted by last-modified).
-  const search = useCallback(async (q: string, cfg: AnytypeConfig, markSearched: boolean) => {
+  // Run a search (empty query = recent objects, sorted by last-modified;
+  // typeKey narrows to one object type).
+  const search = useCallback(async (q: string, cfg: AnytypeConfig, markSearched: boolean, typeKey = "") => {
     searchAbort.current?.abort();
     const ctrl = new AbortController();
     searchAbort.current = ctrl;
@@ -73,7 +86,7 @@ export default function AnytypeWidget({
     setError("");
     if (markSearched) setSearched(true);
     try {
-      const url = `/api/anytype?op=search&baseUrl=${encodeURIComponent(cfg.baseUrl)}&apiKey=${encodeURIComponent(cfg.apiKey)}&spaceId=${encodeURIComponent(cfg.spaceId)}&q=${encodeURIComponent(q)}&limit=${cfg.limit}`;
+      const url = `/api/anytype?op=search&baseUrl=${encodeURIComponent(cfg.baseUrl)}&apiKey=${encodeURIComponent(cfg.apiKey)}&spaceId=${encodeURIComponent(cfg.spaceId)}&q=${encodeURIComponent(q)}&limit=${cfg.limit}&type=${encodeURIComponent(typeKey)}`;
       const res = await fetch(url, { signal: ctrl.signal });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -87,15 +100,36 @@ export default function AnytypeWidget({
     }
   }, []);
 
-  // Load recent objects whenever a configured space is ready.
+  const loadTypes = useCallback(async (cfg: AnytypeConfig) => {
+    setLoadingTypes(true);
+    setError("");
+    try {
+      const url = `/api/anytype?op=types&baseUrl=${encodeURIComponent(cfg.baseUrl)}&apiKey=${encodeURIComponent(cfg.apiKey)}&spaceId=${encodeURIComponent(cfg.spaceId)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setTypes(data.types ?? []);
+    } catch (e) {
+      setError(String((e as Error).message ?? e));
+      setTypes([]);
+    } finally {
+      setLoadingTypes(false);
+    }
+  }, []);
+
+  // Load the default home view whenever a configured space is ready.
   useEffect(() => {
     if (!configured) return;
-    search("", config, false);
+    if (config.home === "types") loadTypes(config);
+    else search("", config, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.apiKey, config.spaceId, configured]);
+  }, [config.apiKey, config.spaceId, config.home, configured]);
 
   function runSearch() {
     if (!configured) return;
+    setReader(null);
+    setReaderObj(null);
+    setActiveType(null);
     setSearched(true);
     search(query.trim(), config, true);
   }
@@ -105,7 +139,36 @@ export default function AnytypeWidget({
     setQuery("");
     setSearched(false);
     setError("");
-    if (configured) search("", config, false);
+    setReader(null);
+    setReaderObj(null);
+    setActiveType(null);
+    if (!configured) return;
+    if (config.home === "types") loadTypes(config);
+    else search("", config, false);
+  }
+
+  function openType(t: AnytypeType) {
+    setActiveType(t);
+    setObjects([]);
+    search("", config, false, t.key);
+  }
+
+  async function openReader(o: AnytypeObject) {
+    setReader(o);
+    setReaderObj(null);
+    setReaderLoading(true);
+    setError("");
+    try {
+      const url = `/api/anytype?op=object&baseUrl=${encodeURIComponent(config.baseUrl)}&apiKey=${encodeURIComponent(config.apiKey)}&spaceId=${encodeURIComponent(o.spaceId || config.spaceId)}&id=${encodeURIComponent(o.id)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setReaderObj(data.object);
+    } catch (e) {
+      setError(String((e as Error).message ?? e));
+    } finally {
+      setReaderLoading(false);
+    }
   }
 
   // ── Pairing ──────────────────────────────────────────────────────────────
@@ -188,7 +251,10 @@ export default function AnytypeWidget({
     if (!draft.baseUrl.startsWith("http")) { setError("Enter the Anytype API URL (http://…)."); return; }
     if (!draft.apiKey) { setError("Pair with Anytype first."); return; }
     if (!draft.spaceId) { setError("Pick a space."); return; }
-    if (draft.spaceId !== config.spaceId) { setObjects([]); setQuery(""); setSearched(false); }
+    if (draft.spaceId !== config.spaceId || draft.home !== config.home) {
+      setObjects([]); setTypes([]); setQuery(""); setSearched(false);
+      setActiveType(null); setReader(null); setReaderObj(null);
+    }
     setConfig(draft);
     await storage.setItem(storageKey, JSON.stringify(draft));
     setSettingsOpen(false);
@@ -200,6 +266,10 @@ export default function AnytypeWidget({
     setDraft(DEFAULT);
     setSpaces([]);
     setObjects([]);
+    setTypes([]);
+    setActiveType(null);
+    setReader(null);
+    setReaderObj(null);
     setQuery("");
     setSearched(false);
     setPairing("idle");
@@ -219,8 +289,8 @@ export default function AnytypeWidget({
               <span className="text-xs font-medium opacity-60 truncate">{config.spaceName || "Anytype"}</span>
             </div>
             <div className="flex items-center gap-2.5 shrink-0">
-              {(searched || query) && (
-                <button onClick={goHome} title="Back to recent" className={`opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
+              {(searched || query || activeType || reader) && (
+                <button onClick={goHome} title="Back to start" className={`opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
                   <Home size={14} />
                 </button>
               )}
@@ -243,37 +313,88 @@ export default function AnytypeWidget({
               </div>
               <div className="flex-1 min-h-0 relative">
                 <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={onScroll}>
-                  {searching ? (
+                  {reader ? (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <button onClick={() => { setReader(null); setReaderObj(null); }} title="Back" className={`opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
+                          <ChevronLeft size={14} />
+                        </button>
+                        <span className={`flex-1 min-w-0 text-sm font-medium truncate ${c.text}`}>{readerObj?.name ?? reader.name}</span>
+                        <a href={deepLink(reader)} title="Open in Anytype" className={`shrink-0 opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
+                      {readerLoading ? (
+                        <LoadingState c={c} />
+                      ) : error ? (
+                        <p className="text-red-400 text-xs break-words">{error}</p>
+                      ) : readerObj?.markdown ? (
+                        <Markdown text={readerObj.markdown} className={`text-[13px] ${c.text}`} />
+                      ) : (
+                        <EmptyState c={c}>{reader.snippet || "no content"}</EmptyState>
+                      )}
+                    </div>
+                  ) : searching || loadingTypes ? (
                     <LoadingState c={c} />
                   ) : error ? (
                     <p className="text-red-400 text-xs break-words">{error}</p>
-                  ) : objects.length ? (
-                    <ul className="flex flex-col">
-                      {objects.map((o, i) => (
-                        <li key={o.id} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                          <div className="flex items-start gap-1 group/title">
-                            <a
-                              href={deepLink(o)}
-                              className={`flex-1 min-w-0 text-left text-sm leading-snug font-medium break-words ${c.text} hover:opacity-70 transition-opacity`}
-                              title="Open in Anytype"
+                  ) : !searched && !activeType && config.home === "types" ? (
+                    types.length ? (
+                      <ul className="flex flex-col">
+                        {types.map((t, i) => (
+                          <li key={t.id} className={`${i > 0 ? "border-t border-black/10" : ""}`}>
+                            <button
+                              onClick={() => openType(t)}
+                              className={`w-full flex items-center gap-1 py-2.5 text-left text-sm font-medium ${c.text} hover:opacity-70 transition-opacity`}
                             >
-                              {o.name}
-                            </a>
-                            <a
-                              href={deepLink(o)}
-                              className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
-                              title="Open in Anytype"
-                            >
-                              <ExternalLink size={11} />
-                            </a>
-                          </div>
-                          {o.snippet && <p className={`text-xs mt-0.5 opacity-50 ${c.text} line-clamp-2 break-words`}>{o.snippet}</p>}
-                          {o.type && <span className={`text-[10px] opacity-40 ${c.label}`}>{o.type}</span>}
-                        </li>
-                      ))}
-                    </ul>
+                              <span className="flex-1 min-w-0 truncate">{t.name}</span>
+                              <ChevronRight size={12} className="shrink-0 opacity-40" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <EmptyState c={c}>no types</EmptyState>
+                    )
                   ) : (
-                    <EmptyState c={c}>{searched ? "no objects found" : "no recent objects"}</EmptyState>
+                    <>
+                      {activeType && (
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <button onClick={goHome} title="Back to types" className={`opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
+                            <ChevronLeft size={14} />
+                          </button>
+                          <span className={`text-xs font-medium opacity-60 ${c.label}`}>{activeType.name}</span>
+                        </div>
+                      )}
+                      {objects.length ? (
+                        <ul className="flex flex-col">
+                          {objects.map((o, i) => (
+                            <li key={o.id} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                              <div className="flex items-start gap-1 group/title">
+                                <button
+                                  onClick={() => openReader(o)}
+                                  className={`flex-1 min-w-0 text-left text-sm leading-snug font-medium break-words ${c.text} hover:opacity-70 transition-opacity`}
+                                  title="Read here"
+                                >
+                                  {o.name}
+                                </button>
+                                <a
+                                  href={deepLink(o)}
+                                  className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                                  title="Open in Anytype"
+                                >
+                                  <ExternalLink size={11} />
+                                </a>
+                              </div>
+                              {o.snippet && <p className={`text-xs mt-0.5 opacity-50 ${c.text} line-clamp-2 break-words`}>{o.snippet}</p>}
+                              {o.type && !activeType && <span className={`text-[10px] opacity-40 ${c.label}`}>{o.type}</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <EmptyState c={c}>{searched ? "no objects found" : "no objects"}</EmptyState>
+                      )}
+                    </>
                   )}
                 </div>
                 <ScrollFades c={c} top={topFade} bottom={bottomFade} />
@@ -352,6 +473,16 @@ export default function AnytypeWidget({
               {pairBusy ? <span className="flex items-center gap-1.5"><Loader size={12} className="animate-spin" /> contacting Anytype…</span> : "Pair with Anytype"}
             </button>
           )}
+
+          <div className="flex items-center gap-2">
+            <span className={`text-xs opacity-60 ${c.label}`}>Home</span>
+            {([["recent", "Recent"], ["types", "Types"]] as [HomeView, string][]).map(([v, label]) => (
+              <button key={v} onClick={() => setDraft((d) => ({ ...d, home: v }))}
+                className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${draft.home === v ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}>
+                {label}
+              </button>
+            ))}
+          </div>
 
           <div className="flex items-center gap-2">
             <span className={`text-xs opacity-60 ${c.label}`}>Results</span>

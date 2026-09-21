@@ -55,16 +55,21 @@ function extractMeta(properties: any[]): { created: string; modified: string; fi
 }
 
 // One raw search request. Anytype matches the query as a contiguous phrase, so
-// multi-word queries only hit when those words appear adjacent.
+// multi-word queries only hit when those words appear adjacent. An optional
+// type key narrows results to objects of that type.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function rawSearch(baseUrl: string, apiKey: string, spaceId: string, query: string, limit: number, signal?: AbortSignal): Promise<any[]> {
+async function rawSearch(baseUrl: string, apiKey: string, spaceId: string, query: string, limit: number, signal?: AbortSignal, typeKey?: string): Promise<any[]> {
   const url = spaceId
     ? `${root(baseUrl)}/v1/spaces/${encodeURIComponent(spaceId)}/search?limit=${limit}`
     : `${root(baseUrl)}/v1/search?limit=${limit}`;
   const res = await fetch(url, {
     method: "POST",
     headers: headers(apiKey),
-    body: JSON.stringify({ query, sort: { property_key: "last_modified_date", direction: "desc" } }),
+    body: JSON.stringify({
+      query,
+      ...(typeKey ? { types: [typeKey] } : {}),
+      sort: { property_key: "last_modified_date", direction: "desc" },
+    }),
     signal,
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -92,19 +97,39 @@ function toHit(o: any): AnytypeHit {
 // finds nothing is retried as an AND of its terms — search each word and keep the
 // objects that match every one — so "2026 journal" still finds "Journal (2026)".
 export async function anytypeSearch(
-  baseUrl: string, apiKey: string, spaceId: string, query: string, limit: number, signal?: AbortSignal,
+  baseUrl: string, apiKey: string, spaceId: string, query: string, limit: number, signal?: AbortSignal, typeKey?: string,
 ): Promise<AnytypeHit[]> {
-  const direct = await rawSearch(baseUrl, apiKey, spaceId, query, limit, signal);
+  const direct = await rawSearch(baseUrl, apiKey, spaceId, query, limit, signal, typeKey);
   const terms = query.trim().split(/\s+/).filter(Boolean);
   if (direct.length > 0 || terms.length < 2) return direct.map(toHit);
 
   const perTerm = await Promise.all(
-    terms.map((t) => rawSearch(baseUrl, apiKey, spaceId, t, Math.max(limit, 50), signal)),
+    terms.map((t) => rawSearch(baseUrl, apiKey, spaceId, t, Math.max(limit, 50), signal, typeKey)),
   );
   const idSets = perTerm.map((arr) => new Set(arr.map((o) => o.id)));
   // Keep objects present in every term's results, ordered by the first term's ranking.
   const merged = perTerm[0].filter((o) => idSets.every((s) => s.has(o.id)));
   return merged.slice(0, limit).map(toHit);
+}
+
+export type AnytypeType = { id: string; key: string; name: string };
+
+// The object types defined in a space (Page, Note, Task, …), for browsing by type.
+export async function anytypeTypes(
+  baseUrl: string, apiKey: string, spaceId: string, signal?: AbortSignal,
+): Promise<AnytypeType[]> {
+  const res = await fetch(
+    `${root(baseUrl)}/v1/spaces/${encodeURIComponent(spaceId)}/types?limit=100`,
+    { headers: headers(apiKey), signal },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return (data.data ?? [])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((t: any) => !t.archived)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((t: any) => ({ id: t.id, key: t.key, name: t.name || t.key }))
+    .sort((a: AnytypeType, b: AnytypeType) => a.name.localeCompare(b.name));
 }
 
 // Read an object's full body as markdown (the ?format=md ObjectWithBody view).

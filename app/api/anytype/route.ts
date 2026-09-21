@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
-import { anytypeSearch, ANYTYPE_VERSION } from "@/lib/anytype";
+import { anytypeSearch, anytypeTypes, anytypeReadObject, ANYTYPE_VERSION } from "@/lib/anytype";
 
 // Proxy to the Anytype local API (embedded in the Anytype desktop app, default
 // http://127.0.0.1:31009). Server-side, like /api/kiwix and /api/model, to dodge
@@ -33,7 +33,7 @@ async function errMsg(res: Response): Promise<string> {
   }
 }
 
-// GET reads: ?op=spaces | ?op=search&q=&spaceId=&limit=
+// GET reads: ?op=spaces | ?op=search&q=&spaceId=&limit=[&type=] | ?op=types&spaceId= | ?op=object&spaceId=&id=
 export async function GET(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
@@ -57,10 +57,24 @@ export async function GET(request: NextRequest) {
     if (op === "search") {
       const q = sp.get("q") ?? "";
       const spaceId = sp.get("spaceId") ?? "";
+      const type = sp.get("type") ?? "";
       const limit = Math.min(100, Math.max(1, Number(sp.get("limit") ?? 25)));
       // Empty query + recency sort gives a "recent objects" list.
-      const objects = await anytypeSearch(baseUrl, apiKey, spaceId, q, limit, request.signal);
+      const objects = await anytypeSearch(baseUrl, apiKey, spaceId, q, limit, request.signal, type || undefined);
       return NextResponse.json({ objects });
+    }
+    if (op === "types") {
+      const spaceId = sp.get("spaceId") ?? "";
+      if (!spaceId) return NextResponse.json({ error: "Missing spaceId" }, { status: 400 });
+      const types = await anytypeTypes(baseUrl, apiKey, spaceId, request.signal);
+      return NextResponse.json({ types });
+    }
+    if (op === "object") {
+      const spaceId = sp.get("spaceId") ?? "";
+      const id = sp.get("id") ?? "";
+      if (!spaceId || !id) return NextResponse.json({ error: "Missing spaceId or id" }, { status: 400 });
+      const object = await anytypeReadObject(baseUrl, apiKey, spaceId, id, request.signal);
+      return NextResponse.json({ object });
     }
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });
   } catch (err) {
