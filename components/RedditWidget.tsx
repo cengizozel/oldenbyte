@@ -109,11 +109,10 @@ export default function RedditWidget({
     setLoading(true);
     setError("");
     try {
+      // Fire them all at once: the server queues and paces the upstream
+      // fetches (Reddit's rate limit) and serves cached feeds instantly.
       const results = await Promise.all(
-        cfg.subreddits.map(async (sub, i) => {
-          // Stagger the volley: Reddit rate-limits unauthenticated RSS hard,
-          // and N feeds fired at once trip it.
-          if (i) await new Promise(r => setTimeout(r, i * 400));
+        cfg.subreddits.map(async sub => {
           try {
             const params = new URLSearchParams({ subreddit: sub.name, period: sub.period, limit: String(sub.limit) });
             const res = await fetch(`/api/reddit?${params}`);
@@ -122,15 +121,17 @@ export default function RedditWidget({
             return items;
           } catch {
             // One bad feed must not blank the others.
-            return [] as Post[];
+            return null;
           }
         })
       );
-      const all: Post[] = results.flat();
+      const all: Post[] = results.filter((r): r is Post[] => r !== null).flat();
       all.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
       if (!all.length) throw new Error();
       setPosts(all);
-      await storage.setItem(cacheKey, JSON.stringify(all));
+      // Cache only complete days: a partial result (some feeds rate-limited)
+      // must not become "the" posts for the rest of the day.
+      if (!results.some(r => r === null)) await storage.setItem(cacheKey, JSON.stringify(all));
       return true;
     } catch {
       setError("Failed to load posts. Check the subreddit names.");
