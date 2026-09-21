@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { GripVertical, Download, Upload, Search, Undo2, Redo2, Trash2 } from "lucide-react";
+import { GripVertical, Download, Upload, Search, Undo2, Redo2, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import type { Widget } from "@/lib/widgets";
 import { colorMap, WIDGET_CATEGORIES } from "@/lib/widgets";
 
@@ -43,6 +43,15 @@ export default function WidgetShelf({
   const dragging = useRef(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const [query, setQuery] = useState("");
+  // Collapsed = a small draggable pill, so the panel stops covering the grid
+  // while arranging widgets. Remembered per device.
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem("shelf-collapsed") === "1"; } catch { return false; }
+  });
+  function toggleCollapsed(next: boolean) {
+    setCollapsed(next);
+    try { localStorage.setItem("shelf-collapsed", next ? "1" : "0"); } catch {}
+  }
 
   function startDrag(clientX: number, clientY: number) {
     const el = panelRef.current;
@@ -89,12 +98,12 @@ export default function WidgetShelf({
   return (
     <div
       ref={panelRef}
-      className={`fixed z-50 w-72 flex flex-col bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-2xl shadow-lg select-none ${pos === null ? "bottom-6 left-1/2 -translate-x-1/2" : ""}`}
+      className={`fixed z-50 ${collapsed ? "" : "w-72"} flex flex-col bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-2xl shadow-lg select-none ${pos === null ? "bottom-6 left-1/2 -translate-x-1/2" : ""}`}
       style={pos !== null ? { left: pos.x, top: pos.y } : undefined}
     >
-      {/* Drag handle + search */}
+      {/* Drag handle + search (or the collapsed pill) */}
       <div
-        className="flex items-center gap-2 px-3 pt-2.5 pb-2 cursor-grab active:cursor-grabbing"
+        className={`flex items-center gap-2 px-3 cursor-grab active:cursor-grabbing ${collapsed ? "py-2" : "pt-2.5 pb-2"}`}
         onMouseDown={e => {
           if ((e.target as HTMLElement).closest("input,button")) return;
           e.preventDefault();
@@ -106,17 +115,38 @@ export default function WidgetShelf({
         }}
       >
         <GripVertical size={14} className="text-[var(--text-muted)] shrink-0" />
-        <div className="flex items-center gap-1.5 flex-1 min-w-0 bg-[var(--surface)] border border-[var(--surface-border)] rounded-lg px-2 py-1">
-          <Search size={12} className="text-[var(--text-muted)] shrink-0" />
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search widgets"
-            className="w-full bg-transparent text-xs outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
-          />
-        </div>
+        {collapsed ? (
+          <button
+            onClick={() => toggleCollapsed(false)}
+            className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors pr-0.5"
+            title="Expand the widget picker"
+          >
+            Widgets <ChevronUp size={13} />
+          </button>
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 bg-[var(--surface)] border border-[var(--surface-border)] rounded-lg px-2 py-1">
+              <Search size={12} className="text-[var(--text-muted)] shrink-0" />
+              <input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search widgets"
+                className="w-full bg-transparent text-xs outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
+              />
+            </div>
+            <button
+              onClick={() => toggleCollapsed(true)}
+              className="p-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors shrink-0"
+              title="Collapse to a pill"
+            >
+              <ChevronDown size={14} />
+            </button>
+          </>
+        )}
       </div>
 
+      {collapsed ? null : (
+      <>
       {/* Catalog */}
       <div className="flex-1 max-h-[50vh] overflow-y-auto px-3 pb-2 flex flex-col gap-2.5">
         {groups.map(group => (
@@ -203,6 +233,8 @@ export default function WidgetShelf({
           <Trash2 size={13} />
         </button>
       </div>
+      </>
+      )}
     </div>
   );
 }

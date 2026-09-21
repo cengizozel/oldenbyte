@@ -314,12 +314,15 @@ export default function KiwixWidget({
       }
       back={
         <>
-          <SettingsInput
-            type="url"
-            value={draft.baseUrl}
-            onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value }))}
-            placeholder="http://192.168.1.10:8080"
-          />
+          <div>
+            <p className={`text-xs mb-1.5 opacity-50 ${c.label}`}>Kiwix</p>
+            <SettingsInput
+              type="url"
+              value={draft.baseUrl}
+              onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value }))}
+              placeholder="http://192.168.1.10:8080"
+            />
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => loadSources(draft.baseUrl, draft.source)}

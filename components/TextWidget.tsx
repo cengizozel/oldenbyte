@@ -10,7 +10,15 @@ import { PencilButton, EmptyState, SaveCancelRow } from "@/components/ui/WidgetC
 
 type FontFamily = "sans" | "serif" | "mono";
 type SourceConfig = { type: "text" | "url"; value: string };
-type TextWidgetConfig = { source: SourceConfig; font: FontFamily };
+// "auto" fits the text to the card (default); the rest are fixed sizes.
+type TextSize = "auto" | "sm" | "md" | "lg" | "xl";
+type TextWidgetConfig = { source: SourceConfig; font: FontFamily; size?: TextSize };
+
+const SIZE_PX: Record<Exclude<TextSize, "auto">, number> = { sm: 20, md: 32, lg: 48, xl: 72 };
+const SIZES: { id: TextSize; label: string }[] = [
+  { id: "auto", label: "Auto" }, { id: "sm", label: "S" }, { id: "md", label: "M" },
+  { id: "lg", label: "L" }, { id: "xl", label: "XL" },
+];
 
 const FONT_CLASS: Record<FontFamily, string> = {
   sans: "font-sans",
@@ -28,6 +36,7 @@ const FONT_PREVIEW_CLASS: Record<FontFamily, string> = {
 const DEFAULT: TextWidgetConfig = {
   source: { type: "text", value: "" },
   font: "sans",
+  size: "auto",
 };
 
 export default function TextWidget({
@@ -91,6 +100,9 @@ export default function TextWidget({
   // Binary search for largest font size that fits the container.
   // Deferred to rAF so the browser finishes layout before we measure.
   const fitText = useCallback(() => {
+    // Fixed size chosen: no fitting, just apply it.
+    const size = config.size ?? "auto";
+    if (size !== "auto") { setFontSize(SIZE_PX[size]); return; }
     requestAnimationFrame(() => {
       const container = containerRef.current;
       const el = textRef.current;
@@ -109,7 +121,9 @@ export default function TextWidget({
       while (lo < hi - 1) {
         const mid = Math.floor((lo + hi) / 2);
         el.style.fontSize = `${mid}px`;
-        if (el.scrollHeight <= maxH) {
+        // Width matters too: the longest word must fit on one line, so big
+        // words shrink the font instead of being split mid-word.
+        if (el.scrollHeight <= maxH && el.scrollWidth <= maxW + 1) {
           lo = mid;
         } else {
           hi = mid;
@@ -123,7 +137,7 @@ export default function TextWidget({
       el.style.visibility = "";
       setFontSize(lo);
     });
-  }, [display, config.font]);
+  }, [display, config.font, config.size]);
 
   useEffect(() => { fitText(); }, [fitText]);
   useEffect(() => { if (!settingsOpen) fitText(); }, [settingsOpen, fitText]);
@@ -179,7 +193,7 @@ export default function TextWidget({
               <div
                 ref={textRef}
                 style={{ fontSize: `${fontSize}px` }}
-                className={`${FONT_CLASS[config.font]} ${c.text} text-center leading-tight break-words w-full`}
+                className={`${FONT_CLASS[config.font]} ${c.text} text-center leading-tight w-full ${(config.size ?? "auto") === "auto" ? "" : "break-words"}`}
               >
                 {display}
               </div>
@@ -244,6 +258,26 @@ export default function TextWidget({
                       {f.charAt(0).toUpperCase() + f.slice(1)}
                     </span>
                   </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Size picker */}
+            <div>
+              <p className={`text-xs mb-1.5 opacity-50 ${c.label}`}>Size</p>
+              <div className="flex gap-1">
+                {SIZES.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => setDraft(d => ({ ...d, size: s.id }))}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      (draft.size ?? "auto") === s.id
+                        ? "bg-white text-neutral-700 shadow-sm"
+                        : "text-neutral-400 hover:text-neutral-600"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
                 ))}
               </div>
             </div>

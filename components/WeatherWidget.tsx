@@ -152,7 +152,7 @@ export default function WeatherWidget({
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
           <span className="opacity-50 shrink-0"><CurrentIcon size={14} /></span>
-          {config.name && <span className="text-xs font-medium opacity-60 truncate">{config.name}</span>}
+          <span className="text-xs font-medium opacity-60 truncate">{config.name || "Weather"}</span>
         </div>
         <PencilButton c={c} onClick={() => { setDraft(config); setQuery(""); setResults([]); setSearchError(""); setSettingsOpen(true); }} />
       </div>
