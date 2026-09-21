@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen, Folder, FolderPlus, FileText, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen, Folder, FolderPlus, FileText, ZoomIn, ZoomOut, List } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -25,6 +25,32 @@ function srcFor(config: ReaderConfig): string {
     : `/api/files/${config.filename}`;
 }
 
+// ── Table of contents ──────────────────────────────────────────────────────
+
+type TocEntry = { label: string; depth: number };
+
+// Overlay list shared by both viewers: covers the reading area, picking an
+// entry jumps and closes.
+function TocOverlay({ items, onPick }: { items: TocEntry[]; onPick: (i: number) => void }) {
+  return (
+    <div className="absolute inset-0 z-10 overflow-y-auto rounded-lg bg-[var(--surface)]">
+      <ul className="flex flex-col py-1">
+        {items.map((it, i) => (
+          <li key={i}>
+            <button
+              onClick={() => onPick(i)}
+              style={{ paddingLeft: 8 + it.depth * 14 }}
+              className="w-full text-left text-xs leading-snug py-1.5 pr-2 text-[var(--text-primary)] opacity-75 hover:opacity-100"
+            >
+              {it.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // ── PDF Viewer ─────────────────────────────────────────────────────────────
 
 function PdfViewer({
@@ -43,6 +69,35 @@ function PdfViewer({
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [fitMode, setFitMode] = useState<"height" | "width">("height");
   const [zoom, setZoom] = useState(1);
+  const [toc, setToc] = useState<(TocEntry & { page: number })[]>([]);
+  const [tocOpen, setTocOpen] = useState(false);
+
+  // The PDF outline (bookmarks), each entry resolved to its page number.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function loadOutline(pdf: any) {
+    try {
+      const outline = await pdf.getOutline();
+      if (!outline?.length) { setToc([]); return; }
+      const items: (TocEntry & { page: number })[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      async function walk(nodes: any[], depth: number) {
+        for (const n of nodes) {
+          let dest = n.dest;
+          if (typeof dest === "string") dest = await pdf.getDestination(dest);
+          let pageNum = 0;
+          if (Array.isArray(dest) && dest[0]) {
+            try { pageNum = (await pdf.getPageIndex(dest[0])) + 1; } catch {}
+          }
+          if (n.title && pageNum > 0) items.push({ label: n.title, depth, page: pageNum });
+          if (n.items?.length) await walk(n.items, depth + 1);
+        }
+      }
+      await walk(outline, 0);
+      setToc(items);
+    } catch {
+      setToc([]);
+    }
+  }
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -70,6 +125,7 @@ function PdfViewer({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-2">
+      <div className="relative flex-1 min-h-0 flex flex-col">
       <div
         ref={containerRef}
         className={`flex-1 min-h-0 overflow-auto ${zoom === 1 ? "cursor-pointer" : ""}`}
@@ -82,7 +138,7 @@ function PdfViewer({
           {size.width > 0 && size.height > 0 && (
             <Document
               file={src}
-              onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+              onLoadSuccess={pdf => { setNumPages(pdf.numPages); loadOutline(pdf); }}
               loading={<Loader size={16} className="animate-spin opacity-40" />}
             >
               {/* Render the neighbouring pages hidden so page turns are
@@ -105,8 +161,21 @@ function PdfViewer({
           )}
         </div>
       </div>
+      {tocOpen && toc.length > 0 && (
+        <TocOverlay items={toc} onPick={i => { onPageChange(toc[i].page); setTocOpen(false); }} />
+      )}
+      </div>
       <div className="flex flex-col gap-1.5 shrink-0">
         <div className="relative flex items-center justify-center gap-4">
+          {toc.length > 0 && (
+            <button
+              onClick={() => setTocOpen(o => !o)}
+              className={`absolute left-0 ${tocOpen ? "text-neutral-700" : "text-neutral-400"} hover:text-neutral-700`}
+              title="Table of contents"
+            >
+              <List size={fullscreen ? 16 : 13} />
+            </button>
+          )}
           <button
             onClick={() => onPageChange(Math.max(1, page - 1))}
             disabled={page <= 1}
@@ -184,6 +253,8 @@ function EpubViewer({
   const dimsRef = useRef<{ w: number; h: number } | null>(null);
   const [dimsReady, setDimsReady] = useState(false);
   const [percentage, setPercentage] = useState<number | null>(null);
+  const [toc, setToc] = useState<(TocEntry & { href: string })[]>([]);
+  const [tocOpen, setTocOpen] = useState(false);
 
   const applyEpubTheme = useCallback(() => {
     if (!renditionRef.current || !wrapperRef.current) return;
@@ -245,6 +316,20 @@ function EpubViewer({
       rendition.display(cfi || undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      book.loaded.navigation.then((nav: any) => {
+        if (!active) return;
+        const items: (TocEntry & { href: string })[] = [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (function walk(nodes: any[], depth: number) {
+          for (const n of nodes ?? []) {
+            if (n.label?.trim() && n.href) items.push({ label: n.label.trim(), depth, href: n.href });
+            if (n.subitems?.length) walk(n.subitems, depth + 1);
+          }
+        })(nav?.toc ?? [], 0);
+        setToc(items);
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       rendition.on("relocated", (location: any) => {
         lastCfiRef.current = location.start.cfi;
         onLocationChange(location.start.cfi);
@@ -303,9 +388,24 @@ function EpubViewer({
       {/* wrapperRef measures available space; viewerRef is the epubjs mount target */}
       <div ref={wrapperRef} className="flex-1 min-h-0 relative overflow-hidden rounded-xl">
         <div ref={viewerRef} className="absolute inset-0" />
+        {tocOpen && toc.length > 0 && (
+          <TocOverlay
+            items={toc}
+            onPick={i => { renditionRef.current?.display(toc[i].href); setTocOpen(false); }}
+          />
+        )}
       </div>
       <div className="flex flex-col gap-1.5 shrink-0">
-        <div className="flex items-center justify-center gap-4">
+        <div className="relative flex items-center justify-center gap-4">
+          {toc.length > 0 && (
+            <button
+              onClick={() => setTocOpen(o => !o)}
+              className={`absolute left-0 ${tocOpen ? "text-neutral-700" : "text-neutral-400"} hover:text-neutral-700`}
+              title="Table of contents"
+            >
+              <List size={fullscreen ? 16 : 13} />
+            </button>
+          )}
           <button
             onClick={e => { e.stopPropagation(); renditionRef.current?.prev(); }}
             className="text-neutral-400 hover:text-neutral-700"
