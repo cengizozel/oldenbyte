@@ -324,16 +324,16 @@ function FullscreenOverlay({
       className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative bg-white rounded-2xl shadow-2xl flex flex-col"
+      <div className="relative bg-[var(--surface)] rounded-2xl shadow-2xl flex flex-col"
         style={{ width: "min(90vw, 800px)", height: "min(92vh, 1000px)" }}
       >
         {/* Overlay header */}
-        <div className="flex items-center justify-between px-5 py-3 shrink-0 border-b border-neutral-100">
+        <div className="flex items-center justify-between px-5 py-3 shrink-0 border-b border-[var(--surface-border)]">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-neutral-700 truncate">{config.displayName}</p>
-            <span className="text-xs text-neutral-400 uppercase tracking-widest">{config.fileType}</span>
+            <p className="text-sm font-medium text-[var(--text-primary)] truncate">{config.displayName}</p>
+            <span className="text-xs text-[var(--text-secondary)] opacity-70 uppercase tracking-widest">{config.fileType}</span>
           </div>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 ml-4">
+          <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-4">
             <X size={18} />
           </button>
         </div>
