@@ -13,8 +13,8 @@ import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, Sav
 
 type Period = "day" | "week" | "month" | "year" | "all";
 type SubEntry = { name: string; limit: number; period: Period };
-type RedditConfig = { subreddits: SubEntry[] };
-type Post = { title: string; link: string; subreddit: string; pubDate: string; content: string; score: number };
+type RedditConfig = { subreddits: SubEntry[]; images?: boolean };
+type Post = { title: string; link: string; subreddit: string; pubDate: string; content: string; score: number; thumbnail?: string; image?: string };
 
 function sanitizeRedditHtml(raw: string | undefined): string {
   if (!raw) return "";
@@ -274,6 +274,12 @@ export default function RedditWidget({
                           )}
                         </span>
                         <div className="flex items-start gap-1 group/title">
+                          {config.images && post.thumbnail && (
+                            <button onClick={() => setSelected(post)} className="shrink-0 mr-1.5 hover:opacity-80 transition-opacity">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={post.thumbnail} alt="" loading="lazy" className="w-14 h-14 object-cover rounded-lg bg-black/10" />
+                            </button>
+                          )}
                           <button
                             onClick={() => setSelected(post)}
                             className={`flex-1 min-w-0 break-words text-left text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
@@ -315,6 +321,12 @@ export default function RedditWidget({
                   </a>
                 </div>
                 <div ref={detail.ref} className="flex-1 min-h-0 overflow-y-auto pr-3" onScroll={detail.onScroll}>
+                  {config.images && (selected.image || selected.thumbnail) && (
+                    <a href={selected.image || selected.link} target="_blank" rel="noopener noreferrer" className="block mb-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={selected.image || selected.thumbnail} alt="" loading="lazy" className="w-full max-h-64 object-contain rounded-xl bg-black/5" />
+                    </a>
+                  )}
                   {sanitizeRedditHtml(selected.content) ? (
                     <div
                       className={`text-sm leading-relaxed break-words ${c.text} opacity-80
@@ -363,6 +375,17 @@ export default function RedditWidget({
               <Plus size={14} />
             </button>
           </div>
+
+          {/* Post images (thumbnails in the list, full image in the detail view) */}
+          <label className={`flex items-center gap-2 text-xs cursor-pointer select-none ${c.label}`}>
+            <input
+              type="checkbox"
+              checked={!!draft.images}
+              onChange={e => setDraft(d => ({ ...d, images: e.target.checked }))}
+              className="w-3.5 h-3.5 rounded accent-current"
+            />
+            <span className="opacity-70">Show post images</span>
+          </label>
 
           {/* Selected subreddits with per-sub limit and period */}
           {draft.subreddits.length > 0 && (

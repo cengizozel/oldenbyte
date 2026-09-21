@@ -14,7 +14,7 @@ import { feedTtlMs } from "@/lib/feedCache";
 // good result instead of nothing (stale-while-revalidate).
 const UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0";
 
-type Post = { title: string; link: string; pubDate: string; score: number; subreddit: string; content: string };
+type Post = { title: string; link: string; pubDate: string; score: number; subreddit: string; content: string; thumbnail: string; image: string };
 
 const STALE_MS = 24 * 60 * 60 * 1000; // still better than an empty feed
 const SPACING_MS = 15 * 1000;         // gap between upstream fetches
@@ -67,6 +67,12 @@ async function fetchSubreddit(subreddit: string, period: string, limit: number):
       // Atom content is HTML-escaped; one decode returns the markup the
       // widget's sanitizer expects (same shape as the old selftext_html).
       const content = decodeEntities(tag(entry, "content"));
+      // Image posts carry a small media:thumbnail plus a [link] to the full
+      // image inside the content HTML.
+      const thumbnail = decodeEntities(entry.match(/<media:thumbnail[^>]*url="([^"]+)"/)?.[1] ?? "");
+      const image =
+        content.match(/href="(https:\/\/(?:i\.redd\.it|preview\.redd\.it|i\.imgur\.com)\/[^"]+)"/)?.[1] ??
+        content.match(/<img[^>]*src="(https:\/\/[^"]+)"/)?.[1] ?? "";
       return {
         title: decodeEntities(tag(entry, "title")),
         link: decodeEntities(link),
@@ -74,6 +80,8 @@ async function fetchSubreddit(subreddit: string, period: string, limit: number):
         score: 0,
         subreddit,
         content,
+        thumbnail,
+        image,
       };
     })
     .filter(p => p.title && p.link);
