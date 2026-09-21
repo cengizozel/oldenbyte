@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen, Folder, FolderPlus, FileText } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -15,17 +15,25 @@ import { isDemoMode } from "@/lib/demo";
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 type FileType = "pdf" | "epub";
-type ReaderConfig = { filename: string; fileType: FileType; displayName: string };
+// filename: legacy uuid upload served by /api/files; path: a file in the
+// user's library folder served by /api/library.
+type ReaderConfig = { filename?: string; path?: string; fileType: FileType; displayName: string };
+
+function srcFor(config: ReaderConfig): string {
+  return config.path
+    ? `/api/library?op=file&path=${encodeURIComponent(config.path)}`
+    : `/api/files/${config.filename}`;
+}
 
 // ── PDF Viewer ─────────────────────────────────────────────────────────────
 
 function PdfViewer({
-  filename,
+  src,
   page,
   onPageChange,
   fullscreen = false,
 }: {
-  filename: string;
+  src: string;
   page: number;
   onPageChange: (p: number) => void;
   fullscreen?: boolean;
@@ -67,7 +75,7 @@ function PdfViewer({
         <div className="min-h-full flex items-center justify-center">
           {size.width > 0 && size.height > 0 && (
             <Document
-              file={`/api/files/${filename}`}
+              file={src}
               onLoadSuccess={({ numPages }) => setNumPages(numPages)}
               loading={<Loader size={16} className="animate-spin opacity-40" />}
             >
@@ -118,12 +126,12 @@ function PdfViewer({
 // ── EPUB Viewer ────────────────────────────────────────────────────────────
 
 function EpubViewer({
-  filename,
+  src,
   cfi,
   onLocationChange,
   fullscreen = false,
 }: {
-  filename: string;
+  src: string;
   cfi: string;
   onLocationChange: (cfi: string) => void;
   fullscreen?: boolean;
@@ -187,7 +195,7 @@ function EpubViewer({
     import("epubjs").then(({ default: Epub }) => {
       if (!active || !viewerRef.current || !dimsRef.current) return;
 
-      const book = Epub(`/api/files/${filename}`);
+      const book = Epub(src);
       bookRef.current = book;
       const rendition = book.renderTo(viewerRef.current, {
         width: dimsRef.current.w,
@@ -209,7 +217,7 @@ function EpubViewer({
       // Generate locations for accurate percentage — cached in localStorage
       book.ready.then(() => {
         if (!active) return;
-        const cacheKey = `epub-locs-v1-${filename}`;
+        const cacheKey = `epub-locs-v1-${src}`;
         const cached = localStorage.getItem(cacheKey);
 
         function refreshPct() {
@@ -239,7 +247,7 @@ function EpubViewer({
       lastCfiRef.current = "";
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filename, dimsReady, applyEpubTheme]);
+  }, [src, dimsReady, applyEpubTheme]);
 
   // Keyboard nav in fullscreen
   useEffect(() => {
@@ -334,14 +342,14 @@ function FullscreenOverlay({
         <div className="flex flex-1 min-h-0 p-4">
           {config.fileType === "pdf" ? (
             <PdfViewer
-              filename={config.filename}
+              src={srcFor(config)}
               page={parseInt(position) || 1}
               onPageChange={p => onPageChange(String(p))}
               fullscreen
             />
           ) : (
             <EpubViewer
-              filename={config.filename}
+              src={srcFor(config)}
               cfi={position}
               onLocationChange={onPageChange}
               fullscreen
@@ -374,6 +382,63 @@ export default function ReaderWidget({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const libFileRef = useRef<HTMLInputElement>(null);
+
+  // Library browser (settings face): the user's server-side folder of books.
+  const [dir, setDir] = useState("");
+  const [entries, setEntries] = useState<{ dirs: string[]; files: { name: string; size: number }[] } | null>(null);
+  const [libLoading, setLibLoading] = useState(false);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [newFolder, setNewFolder] = useState("");
+
+  async function loadDir(d: string) {
+    setLibLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/library?op=list&path=${encodeURIComponent(d)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setDir(d);
+      setEntries(data);
+    } catch (e) {
+      setError(String((e as Error).message ?? e));
+    } finally {
+      setLibLoading(false);
+    }
+  }
+
+  async function makeFolder() {
+    const name = newFolder.trim();
+    if (!name) return;
+    setError("");
+    try {
+      const res = await fetch("/api/library", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "mkdir", path: dir, name }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setNewFolder("");
+      setNewFolderOpen(false);
+      loadDir(dir);
+    } catch (e) {
+      setError(String((e as Error).message ?? e));
+    }
+  }
+
+  async function selectFile(name: string) {
+    const ext = name.split(".").pop()?.toLowerCase() as FileType;
+    const newConfig: ReaderConfig = {
+      path: dir ? `${dir}/${name}` : name,
+      fileType: ext,
+      displayName: name.replace(/\.[^.]+$/, ""),
+    };
+    setConfig(newConfig);
+    setPosition(ext === "pdf" ? "1" : "");
+    await storage.setItem(configKey, JSON.stringify(newConfig));
+    await storage.removeItem(positionKey);
+    setSettingsOpen(false);
+  }
 
   useEffect(() => {
     Promise.all([
@@ -402,15 +467,18 @@ export default function ReaderWidget({
     setUploading(true);
     setError("");
     try {
+      // dir goes first so the server knows the target folder before the file
+      // stream starts.
       const formData = new FormData();
+      formData.append("dir", dir);
       formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const res = await fetch("/api/library", { method: "POST", body: formData });
       if (!res.ok) throw new Error();
-      const { filename } = await res.json();
+      const { name, path } = await res.json();
       const newConfig: ReaderConfig = {
-        filename,
+        path,
         fileType: ext as FileType,
-        displayName: file.name.replace(/\.[^.]+$/, ""),
+        displayName: name.replace(/\.[^.]+$/, ""),
       };
       setConfig(newConfig);
       setPosition(ext === "pdf" ? "1" : "");
@@ -503,7 +571,7 @@ export default function ReaderWidget({
                     <Maximize2 size={14} />
                   </button>
                 )}
-                <PencilButton c={c} onClick={() => { setSettingsOpen(true); setError(""); }} title="Settings" />
+                <PencilButton c={c} onClick={() => { setSettingsOpen(true); setError(""); loadDir(dir); }} title="Settings" />
               </div>
             </div>
 
@@ -516,13 +584,13 @@ export default function ReaderWidget({
                 <div className="flex flex-col flex-1 min-h-0">
                   {config.fileType === "pdf" ? (
                     <PdfViewer
-                      filename={config.filename}
+                      src={srcFor(config)}
                       page={parseInt(position) || 1}
                       onPageChange={p => savePosition(String(p))}
                     />
                   ) : (
                     <EpubViewer
-                      filename={config.filename}
+                      src={srcFor(config)}
                       cfi={position}
                       onLocationChange={savePosition}
                     />
@@ -536,8 +604,113 @@ export default function ReaderWidget({
         }
         back={
           <>
-            {uploadZone(true)}
-            <div className="flex items-center justify-between mt-auto">
+            <div className="flex flex-col gap-2 flex-1 min-h-0">
+              {/* Current folder + actions */}
+              <div className={`flex items-center gap-1.5 shrink-0 text-xs ${c.label}`}>
+                {dir && (
+                  <button
+                    onClick={() => loadDir(dir.split("/").slice(0, -1).join("/"))}
+                    className="opacity-60 hover:opacity-100 shrink-0"
+                    title="Up one folder"
+                  >
+                    <ChevronLeft size={13} />
+                  </button>
+                )}
+                <span className="flex-1 min-w-0 truncate opacity-60 font-medium">{dir || "Library"}</span>
+                <button
+                  onClick={() => setNewFolderOpen(o => !o)}
+                  className="opacity-60 hover:opacity-100 shrink-0"
+                  title="New folder"
+                >
+                  <FolderPlus size={13} />
+                </button>
+                <button
+                  onClick={() => libFileRef.current?.click()}
+                  className="opacity-60 hover:opacity-100 shrink-0"
+                  title="Upload into this folder"
+                >
+                  {uploading ? <Loader size={13} className="animate-spin" /> : <Upload size={13} />}
+                </button>
+              </div>
+
+              {newFolderOpen && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <input
+                    autoFocus
+                    value={newFolder}
+                    onChange={e => setNewFolder(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && makeFolder()}
+                    placeholder="folder name"
+                    className={`flex-1 min-w-0 text-xs rounded-lg px-2 py-1 outline-none bg-black/5 dark:bg-white/10 ${c.text} placeholder:opacity-40`}
+                  />
+                  <button
+                    onClick={makeFolder}
+                    className="text-xs px-2 py-1 rounded-lg bg-white border border-neutral-200 text-neutral-600 hover:text-neutral-800 shrink-0"
+                  >
+                    Create
+                  </button>
+                </div>
+              )}
+
+              {/* Folder listing */}
+              <div
+                className="flex-1 min-h-0 overflow-y-auto pr-2"
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files[0];
+                  if (file) handleFile(file);
+                }}
+              >
+                {libLoading ? (
+                  <LoadingState c={c} />
+                ) : entries && (entries.dirs.length || entries.files.length) ? (
+                  <ul className="flex flex-col">
+                    {entries.dirs.map(d => (
+                      <li key={`d-${d}`}>
+                        <button
+                          onClick={() => loadDir(dir ? `${dir}/${d}` : d)}
+                          className={`w-full flex items-center gap-1.5 py-1.5 text-left text-xs ${c.text} hover:opacity-70 transition-opacity`}
+                        >
+                          <Folder size={12} className="shrink-0 opacity-40" />
+                          <span className="flex-1 min-w-0 truncate font-medium">{d}</span>
+                          <ChevronRight size={11} className="shrink-0 opacity-30" />
+                        </button>
+                      </li>
+                    ))}
+                    {entries.files.map(f => (
+                      <li key={`f-${f.name}`}>
+                        <button
+                          onClick={() => selectFile(f.name)}
+                          className={`w-full flex items-center gap-1.5 py-1.5 text-left text-xs ${c.text} hover:opacity-70 transition-opacity`}
+                        >
+                          <FileText size={12} className="shrink-0 opacity-40" />
+                          <span className="flex-1 min-w-0 truncate">{f.name}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={`text-xs opacity-40 pt-2 ${c.text}`}>Empty folder. Upload a PDF or EPUB here, or drop one in.</p>
+                )}
+              </div>
+
+              {error && <p className="text-red-400 text-xs shrink-0">{error}</p>}
+            </div>
+
+            <input
+              ref={libFileRef}
+              type="file"
+              accept=".pdf,.epub"
+              className="hidden"
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+                e.target.value = "";
+              }}
+            />
+
+            <div className="flex items-center justify-between mt-2 shrink-0">
               <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Remove file">
                 <RotateCcw size={13} />
               </button>
