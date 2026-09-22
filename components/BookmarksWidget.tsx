@@ -162,9 +162,13 @@ export default function BookmarksWidget({
   const [draft, setDraft] = useState<Bookmark[]>([]);
   const [urlInput, setUrlInput] = useState("");
   // Drag reorder with live preview: rows shift out of the way while dragging
-  // (smartphone app-arranging style); the move commits on drop.
+  // (smartphone app-arranging style); the move commits on drop. The target
+  // slot comes from the pointer position against the list's UNTRANSFORMED
+  // geometry: reading it off the row under the cursor would jitter, because
+  // the rows move away as the preview updates.
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   function shiftFor(i: number): number {
@@ -174,6 +178,14 @@ export default function BookmarksWidget({
     if (dragIdx < overIdx && i > dragIdx && i <= overIdx) return -h;
     if (dragIdx > overIdx && i >= overIdx && i < dragIdx) return h;
     return 0;
+  }
+
+  function slotFromPointer(clientY: number): number | null {
+    const list = listRef.current;
+    const h = dragIdx !== null ? (rowRefs.current[dragIdx]?.offsetHeight ?? 0) + 8 : 0;
+    if (!list || !h) return null;
+    const y = clientY - list.getBoundingClientRect().top;
+    return Math.max(0, Math.min(draft.length - 1, Math.floor(y / h)));
   }
 
   const { ref, onScroll, topFade, bottomFade } = useScrollFade<HTMLDivElement>([bookmarks, view]);
@@ -228,7 +240,7 @@ export default function BookmarksWidget({
   function addDraft() {
     const url = normalizeUrl(urlInput);
     if (!url) return;
-    setDraft(d => [...d, { id: newId(), url, name: domainOf(url) }]);
+    setDraft(d => [{ id: newId(), url, name: domainOf(url) }, ...d]);
     setUrlInput("");
   }
 
@@ -389,17 +401,25 @@ export default function BookmarksWidget({
         )}
 
         {draft.length > 0 && (
-          <div className="flex flex-col gap-2">
+          <div
+            ref={listRef}
+            className="flex flex-col gap-2"
+            onDragOver={e => {
+              if (dragIdx === null) return;
+              e.preventDefault();
+              const slot = slotFromPointer(e.clientY);
+              if (slot !== null && slot !== overIdx) setOverIdx(slot);
+            }}
+            onDrop={() => {
+              if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
+              setDragIdx(null);
+              setOverIdx(null);
+            }}
+          >
             {draft.map((bm, i) => (
               <div
                 key={bm.id}
                 ref={el => { rowRefs.current[i] = el; }}
-                onDragOver={e => { if (dragIdx !== null) { e.preventDefault(); setOverIdx(i); } }}
-                onDrop={() => {
-                  if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
-                  setDragIdx(null);
-                  setOverIdx(null);
-                }}
                 style={{ transform: shiftFor(i) ? `translateY(${shiftFor(i)}px)` : undefined }}
                 className={`flex flex-col gap-1.5 px-2 py-2 rounded-lg bg-black/5 dark:bg-white/10 transition-[transform,opacity] duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
               >

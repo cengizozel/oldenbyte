@@ -163,7 +163,9 @@ export default function YoutubeWidget({
       if (!res.ok || data.error) throw new Error(data.error ?? "Failed to resolve channel");
       const ch: YoutubeChannel = { channelId: data.channelId, name: data.name, limit: 5 };
       if (draft.channels.find(c => c.channelId === ch.channelId)) { setChInput(""); return; }
-      setDraft(d => ({ ...d, channels: [...d.channels, ch] }));
+      // Newest first, so the fresh channel is right there to configure
+      // instead of at the bottom of a long list.
+      setDraft(d => ({ ...d, channels: [ch, ...d.channels] }));
       setChInput("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not find channel.");

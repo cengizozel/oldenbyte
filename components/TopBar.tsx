@@ -710,9 +710,13 @@ function DashboardSwitcher({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   // Drag reorder with live preview: rows shift out of the way (smartphone
-  // app-arranging style) while dragging; the move commits on drop.
+  // app-arranging style) while dragging; the move commits on drop. The target
+  // slot comes from the pointer position against the list's UNTRANSFORMED
+  // geometry: reading it off the row under the cursor would jitter, because
+  // the rows move away as the preview updates.
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -723,6 +727,14 @@ function DashboardSwitcher({
     if (dragIdx < overIdx && i > dragIdx && i <= overIdx) return -h;
     if (dragIdx > overIdx && i >= overIdx && i < dragIdx) return h;
     return 0;
+  }
+
+  function slotFromPointer(clientY: number): number | null {
+    const list = listRef.current;
+    const h = dragIdx !== null ? rowRefs.current[dragIdx]?.offsetHeight ?? 0 : 0;
+    if (!list || !h) return null;
+    const y = clientY - list.getBoundingClientRect().top;
+    return Math.max(0, Math.min(dashboards.list.length - 1, Math.floor(y / h)));
   }
 
   useEffect(() => {
@@ -786,16 +798,24 @@ function DashboardSwitcher({
       </button>
       {open && (
         <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 w-48 bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-xl shadow-lg p-1">
+          <div
+            ref={listRef}
+            onDragOver={e => {
+              if (dragIdx === null) return;
+              e.preventDefault();
+              const slot = slotFromPointer(e.clientY);
+              if (slot !== null && slot !== overIdx) setOverIdx(slot);
+            }}
+            onDrop={() => {
+              if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
+              setDragIdx(null);
+              setOverIdx(null);
+            }}
+          >
           {dashboards.list.map((d, i) => (
             <div
               key={d.id}
               ref={el => { rowRefs.current[i] = el; }}
-              onDragOver={e => { if (dragIdx !== null) { e.preventDefault(); setOverIdx(i); } }}
-              onDrop={() => {
-                if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
-                setDragIdx(null);
-                setOverIdx(null);
-              }}
               style={{ transform: shiftFor(i) ? `translateY(${shiftFor(i)}px)` : undefined }}
               className={`group/dash flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-transform duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
             >
@@ -850,6 +870,7 @@ function DashboardSwitcher({
               )}
             </div>
           ))}
+          </div>
           <div className="border-t border-[var(--surface-border)] mt-1 pt-1">
             {creating ? (
               <div className="flex items-center gap-1 px-2">

@@ -198,7 +198,7 @@ export default function RedditWidget({
   function addSub() {
     const name = subInput.trim().replace(/^r\//i, "").toLowerCase();
     if (!name || draft.subreddits.find(s => s.name === name)) { setSubInput(""); return; }
-    setDraft(d => ({ ...d, subreddits: [...d.subreddits, { name, limit: 5, period: "week" as Period }] }));
+    setDraft(d => ({ ...d, subreddits: [{ name, limit: 5, period: "week" as Period }, ...d.subreddits] }));
     setSubInput("");
   }
 
