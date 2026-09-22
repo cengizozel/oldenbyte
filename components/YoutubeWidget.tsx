@@ -25,10 +25,16 @@ const VIEWS: { id: YtView; label: string }[] = [
 ];
 
 // YouTube serves a predictable thumbnail per video id, so no extra fetch is
-// needed: mqdefault is 320x180, plenty for widget-sized cards.
-function thumbUrl(link: string): string {
+// needed: mqdefault is 320x180, plenty for widget-sized cards; hqdefault
+// (480x360) for the detail view.
+function thumbUrl(link: string, big = false): string {
   const m = /[?&]v=([\w-]+)/.exec(link) ?? /\/(?:shorts|embed|live)\/([\w-]+)/.exec(link);
-  return m ? `https://i.ytimg.com/vi/${m[1]}/mqdefault.jpg` : "";
+  return m ? `https://i.ytimg.com/vi/${m[1]}/${big ? "hqdefault" : "mqdefault"}.jpg` : "";
+}
+
+// Pulse the placeholder square until the image paints.
+function unpulse(e: React.SyntheticEvent<HTMLImageElement>) {
+  e.currentTarget.classList.remove("animate-pulse");
 }
 
 export default function YoutubeWidget({
@@ -227,7 +233,7 @@ export default function YoutubeWidget({
                             <button onClick={() => openVideo(v)} className="relative block w-full aspect-video rounded-lg overflow-hidden bg-black/10 hover:opacity-80 transition-opacity">
                               {thumb && (
                                 /* eslint-disable-next-line @next/next/no-img-element */
-                                <img src={thumb} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                                <img src={thumb} alt="" loading="lazy" onLoad={unpulse} className="absolute inset-0 w-full h-full object-cover bg-black/10 dark:bg-white/10 animate-pulse" />
                               )}
                             </button>
                             <span className="flex items-center gap-1.5 min-w-0">
@@ -270,7 +276,7 @@ export default function YoutubeWidget({
                             {thumb && (
                               <button onClick={() => openVideo(v)} className="shrink-0 self-center hover:opacity-80 transition-opacity">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={thumb} alt="" loading="lazy" className="w-24 aspect-video object-cover rounded-lg bg-black/10" />
+                                <img src={thumb} alt="" loading="lazy" onLoad={unpulse} className="w-24 aspect-video object-cover rounded-lg bg-black/10 dark:bg-white/10 animate-pulse" />
                               </button>
                             )}
                             <div className="flex-1 min-w-0">
@@ -330,6 +336,12 @@ export default function YoutubeWidget({
                     </a>
                   </div>
                   <div className="flex-1 min-h-0 overflow-y-auto pr-3">
+                    {thumbUrl(selected.link, true) && (
+                      <a href={selected.link} target="_blank" rel="noopener noreferrer" className="block mb-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={thumbUrl(selected.link, true)} alt="" onLoad={unpulse} className="w-full aspect-video object-cover rounded-xl bg-black/10 dark:bg-white/10 animate-pulse" />
+                      </a>
+                    )}
                     {loadingDetails ? (
                       <LoadingState c={c} />
                     ) : detailsError ? (

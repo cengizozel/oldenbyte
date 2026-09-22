@@ -268,7 +268,9 @@ export default function BookmarksWidget({
         <EmptyState c={c}>all bookmarks hidden</EmptyState>
       ) : (
         <div className="flex-1 min-h-0 relative">
-          <div ref={ref} onScroll={onScroll} className="absolute inset-0 overflow-y-auto pr-3">
+          {/* Icon views pad both sides so the grid sits centered; the right
+              padding alone (scrollbar clearance) reads as off-center. */}
+          <div ref={ref} onScroll={onScroll} className={`absolute inset-0 overflow-y-auto ${view === "icon" || view === "grid" ? "px-3" : "pr-3"}`}>
             {view === "icon" && (
               <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${iconSize + 12}px, 1fr))` }}>
                 {shown.map(bm => (

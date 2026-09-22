@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen, Folder, FolderPlus, FileText, ZoomIn, ZoomOut, List } from "lucide-react";
+import { ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen, Folder, FolderPlus, FileText, ZoomIn, ZoomOut, List, ExternalLink } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -67,11 +67,28 @@ function PdfViewer({
   const [numPages, setNumPages] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  // "page" fits the whole page inside the container (nothing cropped);
-  // "width" fills the width and scrolls vertically.
-  const [fitMode, setFitMode] = useState<"page" | "width">("page");
+  // "width" fills the width and scrolls vertically (default: most readable);
+  // "page" fits the whole page inside the container (nothing cropped).
+  const [fitMode, setFitMode] = useState<"page" | "width">("width");
   const [pageAspect, setPageAspect] = useState(0); // page width / height
   const [zoom, setZoom] = useState(1);
+  // Drag-to-pan bookkeeping; a real drag also swallows the fit-toggle click.
+  const dragRef = useRef<{ x: number; y: number; left: number; top: number; moved: boolean } | null>(null);
+
+  // Ctrl+wheel (and trackpad pinch, which browsers report the same way) zooms.
+  // Plain scrolling keeps panning. Native listener: React's onWheel is passive,
+  // so preventDefault (needed to stop browser page zoom) would be ignored.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setZoom(z => Math.min(4, Math.max(0.5, Math.round(z * (e.deltaY < 0 ? 1.1 : 0.9) * 100) / 100)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
   const [toc, setToc] = useState<(TocEntry & { page: number })[]>([]);
   const [tocOpen, setTocOpen] = useState(false);
 
@@ -135,9 +152,30 @@ function PdfViewer({
       <div className="relative flex-1 min-h-0 min-w-0 flex flex-col">
       <div
         ref={containerRef}
-        className={`flex-1 min-h-0 min-w-0 max-w-full overflow-auto ${zoom === 1 ? "cursor-pointer" : ""}`}
-        onClick={() => { if (zoom === 1) setFitMode(m => m === "page" ? "width" : "page"); }}
-        title={zoom !== 1 ? undefined : fitMode === "page" ? "Click for fit to width" : "Click to fit whole page"}
+        className={`flex-1 min-h-0 min-w-0 max-w-full overflow-auto ${zoom === 1 ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
+        onClick={() => {
+          if (dragRef.current?.moved) return; // a pan, not a click
+          if (zoom === 1) setFitMode(m => m === "page" ? "width" : "page");
+        }}
+        onPointerDown={e => {
+          if (e.button !== 0) return;
+          const el = containerRef.current;
+          if (!el) return;
+          el.setPointerCapture(e.pointerId);
+          dragRef.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop, moved: false };
+        }}
+        onPointerMove={e => {
+          const d = dragRef.current;
+          const el = containerRef.current;
+          if (!d || !el) return;
+          const dx = e.clientX - d.x;
+          const dy = e.clientY - d.y;
+          if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
+          el.scrollLeft = d.left - dx;
+          el.scrollTop = d.top - dy;
+        }}
+        onPointerUp={() => { setTimeout(() => { dragRef.current = null; }, 0); }}
+        title={zoom !== 1 ? "Drag to pan, ctrl+scroll to zoom" : fitMode === "page" ? "Click for fit to width" : "Click to fit whole page"}
       >
         {/* w-max/h-max keep a zoomed page fully scrollable: a plain centered
             flex child would clip its overflowing left/top edges. */}
@@ -223,6 +261,15 @@ function PdfViewer({
             >
               <ZoomIn size={fullscreen ? 16 : 13} />
             </button>
+            <a
+              href={src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-400 hover:text-neutral-700"
+              title="Open in new tab"
+            >
+              <ExternalLink size={fullscreen ? 15 : 12} />
+            </a>
           </span>
         </div>
         {numPages > 0 && (

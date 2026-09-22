@@ -302,7 +302,13 @@ export default function RedditWidget({
                           {config.images && post.thumbnail && (
                             <button onClick={() => setSelected(post)} className="shrink-0 ml-1.5 hover:opacity-80 transition-opacity">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={post.thumbnail} alt="" loading="lazy" className="w-14 h-14 object-cover rounded-lg bg-black/10" />
+                              <img
+                                src={post.thumbnail}
+                                alt=""
+                                loading="lazy"
+                                onLoad={e => e.currentTarget.classList.remove("animate-pulse")}
+                                className="w-14 h-14 object-cover rounded-lg bg-black/10 dark:bg-white/10 animate-pulse"
+                              />
                             </button>
                           )}
                         </div>
@@ -331,7 +337,9 @@ export default function RedditWidget({
                   </a>
                 </div>
                 <div ref={detail.ref} className="flex-1 min-h-0 overflow-y-auto pr-3" onScroll={detail.onScroll}>
-                  {config.images && (selected.image || selected.thumbnail) && (
+                  {/* The detail view always shows the post image when there is
+                      one; the settings toggle only governs list thumbnails. */}
+                  {(selected.image || selected.thumbnail) && (
                     <a href={selected.image || selected.link} target="_blank" rel="noopener noreferrer" className="block mb-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={selected.image || selected.thumbnail} alt="" loading="lazy" className="w-full max-h-64 object-contain rounded-xl bg-black/5" />

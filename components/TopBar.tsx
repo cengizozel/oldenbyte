@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, Plus, Pencil, Search, LogOut, Shield } from "lucide-react";
+import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, Plus, Pencil, Search, LogOut, Shield, GripVertical } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { isDark, toggleTheme, THEME_EVENT } from "@/lib/theme";
 import { layoutKey, instancesKey, type DashboardsState } from "@/lib/dashboards";
@@ -707,6 +707,9 @@ function DashboardSwitcher({
   const [open, setOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -722,15 +725,26 @@ function DashboardSwitcher({
 
   function addDashboard() {
     const id = `dash-${Date.now()}`;
+    const name = newName.trim() || `Dashboard ${dashboards.list.length + 1}`;
     // Seed empty layout so the new dashboard starts blank instead of falling
     // back to the default starter widgets.
     storage.setItem(layoutKey(id), "[]");
     storage.setItem(instancesKey(id), "{}");
     onChange({
-      list: [...dashboards.list, { id, name: `Dashboard ${dashboards.list.length + 1}` }],
+      list: [...dashboards.list, { id, name }],
       activeId: id,
     });
+    setCreating(false);
+    setNewName("");
     setOpen(false);
+  }
+
+  function reorder(from: number, to: number) {
+    if (from === to) return;
+    const list = [...dashboards.list];
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    onChange({ ...dashboards, list });
   }
 
   function removeDashboard(id: string) {
@@ -759,8 +773,22 @@ function DashboardSwitcher({
       </button>
       {open && (
         <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 w-48 bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-xl shadow-lg p-1">
-          {dashboards.list.map(d => (
-            <div key={d.id} className="group/dash flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5">
+          {dashboards.list.map((d, i) => (
+            <div
+              key={d.id}
+              onDragOver={e => { if (dragIdx !== null) e.preventDefault(); }}
+              onDrop={() => { if (dragIdx !== null) reorder(dragIdx, i); setDragIdx(null); }}
+              className={`group/dash flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 ${dragIdx === i ? "opacity-40" : ""}`}
+            >
+              <span
+                draggable
+                onDragStart={() => setDragIdx(i)}
+                onDragEnd={() => setDragIdx(null)}
+                title="Drag to reorder"
+                className="shrink-0 pl-1 cursor-grab active:cursor-grabbing text-[var(--text-secondary)] opacity-0 group-hover/dash:opacity-40 hover:!opacity-80"
+              >
+                <GripVertical size={11} />
+              </span>
               {renamingId === d.id ? (
                 <input
                   value={draft}
@@ -804,13 +832,37 @@ function DashboardSwitcher({
             </div>
           ))}
           <div className="border-t border-[var(--surface-border)] mt-1 pt-1">
-            <button
-              onClick={addDashboard}
-              className="w-full flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              <Plus size={11} />
-              New dashboard
-            </button>
+            {creating ? (
+              <div className="flex items-center gap-1 px-2">
+                <input
+                  value={newName}
+                  autoFocus
+                  placeholder={`Dashboard ${dashboards.list.length + 1}`}
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") addDashboard();
+                    if (e.key === "Escape") { setCreating(false); setNewName(""); }
+                  }}
+                  onBlur={() => { if (newName.trim()) addDashboard(); else { setCreating(false); setNewName(""); } }}
+                  className="flex-1 min-w-0 text-xs py-1.5 bg-transparent outline-none text-[var(--text-primary)] placeholder:opacity-40"
+                />
+                <button
+                  onMouseDown={e => { e.preventDefault(); addDashboard(); }}
+                  className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0"
+                  title="Create"
+                >
+                  <Check size={12} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setCreating(true)}
+                className="w-full flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                <Plus size={11} />
+                New dashboard
+              </button>
+            )}
           </div>
         </div>
       )}
