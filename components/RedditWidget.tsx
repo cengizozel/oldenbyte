@@ -104,7 +104,16 @@ export default function RedditWidget({
         if (!parsed.subreddits.length) return;
         const cacheKey = cacheKeyFor(parsed);
         const cached = await storage.getItem(cacheKey);
-        if (cached) setPosts(JSON.parse(cached));
+        if (cached) {
+          const posts: Post[] = JSON.parse(cached);
+          setPosts(posts);
+          // Seed the per-feed map so the counter starts from what the day
+          // cache already shows instead of 0/N.
+          for (const sub of parsed.subreddits) {
+            const mine = posts.filter(p => p.subreddit === sub.name);
+            if (mine.length) receivedRef.current.set(`${sub.name}|${sub.period}|${sub.limit}`, mine);
+          }
+        }
         fetchPosts(parsed, cacheKey);
       } catch {}
     });
@@ -134,7 +143,9 @@ export default function RedditWidget({
       };
       const mark = (name: string, ok: boolean) =>
         setSubStatus(prev => prev.map(s => (s.name === name ? { ...s, ok } : s)));
-      setSubStatus(cfg.subreddits.map(s => ({ name: s.name, ok: null })));
+      // The counter reflects which feeds HAVE posts: a rescan starts from the
+      // feeds already showing (5/8 stays 5/8) and only the missing ones load.
+      setSubStatus(cfg.subreddits.map(s => ({ name: s.name, ok: received.has(keyOf(s)) ? true : null })));
       // Feeds we have nothing for yet go first, so a rescan spends the rate
       // budget on the missing ones before re-fetching what already shows.
       const order = [...cfg.subreddits].sort(
@@ -155,8 +166,8 @@ export default function RedditWidget({
             return items;
           } catch {
             // One bad feed must not blank the others; a feed that loaded on an
-            // earlier scan keeps its old posts.
-            mark(sub.name, false);
+            // earlier scan keeps its old posts and stays counted as loaded.
+            mark(sub.name, received.has(keyOf(sub)));
             return null;
           }
         })
