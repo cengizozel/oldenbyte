@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -227,6 +227,15 @@ export const widgets: Widget[] = [
     color: "sky",
     title: "Anytype",
     description: "Browse and search your Anytype spaces.",
+    digestable: false,
+  },
+  {
+    id: "tv",
+    type: "tv",
+    category: "feeds",
+    color: "rose",
+    title: "TV",
+    description: "Watch IPTV/HLS channels, e.g. an ErsatzTV playlist.",
     digestable: false,
   },
 ];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bookmark, Plus, Minus, GripVertical, LayoutGrid, Grid2x2, LayoutList, AlignJustify, ExternalLink, Eye, EyeOff } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -161,7 +161,20 @@ export default function BookmarksWidget({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<Bookmark[]>([]);
   const [urlInput, setUrlInput] = useState("");
+  // Drag reorder with live preview: rows shift out of the way while dragging
+  // (smartphone app-arranging style); the move commits on drop.
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  function shiftFor(i: number): number {
+    if (dragIdx === null || overIdx === null || dragIdx === overIdx) return 0;
+    const h = (rowRefs.current[dragIdx]?.offsetHeight ?? 0) + 8; // gap-2
+    if (i === dragIdx) return (overIdx - dragIdx) * h;
+    if (dragIdx < overIdx && i > dragIdx && i <= overIdx) return -h;
+    if (dragIdx > overIdx && i >= overIdx && i < dragIdx) return h;
+    return 0;
+  }
 
   const { ref, onScroll, topFade, bottomFade } = useScrollFade<HTMLDivElement>([bookmarks, view]);
 
@@ -380,15 +393,21 @@ export default function BookmarksWidget({
             {draft.map((bm, i) => (
               <div
                 key={bm.id}
-                onDragOver={e => { if (dragIdx !== null) e.preventDefault(); }}
-                onDrop={() => { if (dragIdx !== null) reorder(dragIdx, i); setDragIdx(null); }}
-                className={`flex flex-col gap-1.5 px-2 py-2 rounded-lg bg-black/5 dark:bg-white/10 transition-opacity ${dragIdx === i ? "opacity-40" : ""}`}
+                ref={el => { rowRefs.current[i] = el; }}
+                onDragOver={e => { if (dragIdx !== null) { e.preventDefault(); setOverIdx(i); } }}
+                onDrop={() => {
+                  if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
+                  setDragIdx(null);
+                  setOverIdx(null);
+                }}
+                style={{ transform: shiftFor(i) ? `translateY(${shiftFor(i)}px)` : undefined }}
+                className={`flex flex-col gap-1.5 px-2 py-2 rounded-lg bg-black/5 dark:bg-white/10 transition-[transform,opacity] duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
               >
                 <div className="flex items-center gap-2">
                   <span
                     draggable
                     onDragStart={() => setDragIdx(i)}
-                    onDragEnd={() => setDragIdx(null)}
+                    onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
                     title="Drag to reorder"
                     className={`shrink-0 cursor-grab active:cursor-grabbing ${c.label} opacity-30 hover:opacity-70`}
                   >

@@ -37,6 +37,7 @@ import BankWidget from "./BankWidget";
 import type { BankWidgetDef } from "@/lib/widgetBank";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 const ChessWidget = dynamic(() => import("./ChessWidget"), { ssr: false });
+const TvWidget = dynamic(() => import("./TvWidget"), { ssr: false });
 
 const COLS = 4;
 const GAP = 16;
@@ -86,6 +87,7 @@ function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, 
   if (widget.type === "bookmarks") return <BookmarksWidget widget={widget} className={cls} />;
   if (widget.type === "typing")   return <TypingWidget    widget={widget} className={cls} />;
   if (widget.type === "chess")    return <ChessWidget     widget={widget} className={cls} />;
+  if (widget.type === "tv")       return <TvWidget        widget={widget} className={cls} />;
   if (widget.type === "chat")     return <ChatWidget      widget={widget} className={cls} />;
   if (widget.type === "kiwix")    return <KiwixWidget     widget={widget} className={cls} />;
   if (widget.type === "anytype")  return <AnytypeWidget   widget={widget} className={cls} />;
@@ -387,6 +389,7 @@ export default function WidgetGrid({
     chat:     { w: 1, h: 4 },
     kiwix:    { w: 1, h: 4 },
     anytype:  { w: 1, h: 4 },
+    tv:       { w: 2, h: 3 },
   };
 
   function findNextPosition(

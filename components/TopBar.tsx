@@ -709,8 +709,21 @@ function DashboardSwitcher({
   const [draft, setDraft] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  // Drag reorder with live preview: rows shift out of the way (smartphone
+  // app-arranging style) while dragging; the move commits on drop.
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  function shiftFor(i: number): number {
+    if (dragIdx === null || overIdx === null || dragIdx === overIdx) return 0;
+    const h = rowRefs.current[dragIdx]?.offsetHeight ?? 0;
+    if (i === dragIdx) return (overIdx - dragIdx) * h;
+    if (dragIdx < overIdx && i > dragIdx && i <= overIdx) return -h;
+    if (dragIdx > overIdx && i >= overIdx && i < dragIdx) return h;
+    return 0;
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -776,14 +789,20 @@ function DashboardSwitcher({
           {dashboards.list.map((d, i) => (
             <div
               key={d.id}
-              onDragOver={e => { if (dragIdx !== null) e.preventDefault(); }}
-              onDrop={() => { if (dragIdx !== null) reorder(dragIdx, i); setDragIdx(null); }}
-              className={`group/dash flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 ${dragIdx === i ? "opacity-40" : ""}`}
+              ref={el => { rowRefs.current[i] = el; }}
+              onDragOver={e => { if (dragIdx !== null) { e.preventDefault(); setOverIdx(i); } }}
+              onDrop={() => {
+                if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
+                setDragIdx(null);
+                setOverIdx(null);
+              }}
+              style={{ transform: shiftFor(i) ? `translateY(${shiftFor(i)}px)` : undefined }}
+              className={`group/dash flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-transform duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
             >
               <span
                 draggable
                 onDragStart={() => setDragIdx(i)}
-                onDragEnd={() => setDragIdx(null)}
+                onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
                 title="Drag to reorder"
                 className="shrink-0 pl-1 cursor-grab active:cursor-grabbing text-[var(--text-secondary)] opacity-0 group-hover/dash:opacity-40 hover:!opacity-80"
               >
