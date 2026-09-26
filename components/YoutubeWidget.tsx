@@ -42,6 +42,21 @@ function thumbUrl(link: string, big = false): string {
 
 const taActive = (ta?: TaConfig): ta is TaConfig => !!(ta && ta.open === "ta" && ta.url && ta.token);
 
+// One TubeArchivist connection shared by every YouTube widget: set it up in
+// any of them and all of them use it.
+const TA_KEY = "youtube-tubearchivist";
+
+// Two independent 32-bit FNV-1a passes: short, stable, collision-safe enough
+// for a per-widget cache key.
+function hashSig(s: string): string {
+  let a = 0x811c9dc5, b = 0x01000193 ^ s.length;
+  for (let i = 0; i < s.length; i++) {
+    a = Math.imul(a ^ s.charCodeAt(i), 0x01000193);
+    b = Math.imul(b ^ s.charCodeAt(s.length - 1 - i), 0x01000193);
+  }
+  return (a >>> 0).toString(36) + (b >>> 0).toString(36);
+}
+
 // Pulse the placeholder square until the image paints.
 function unpulse(e: React.SyntheticEvent<HTMLImageElement>) {
   e.currentTarget.classList.remove("animate-pulse");
@@ -147,8 +162,13 @@ export default function YoutubeWidget({
   }
 
   useEffect(() => {
-    storage.getItem(storageKey).then(async saved => {
-      if (!saved) return;
+    Promise.all([storage.getItem(storageKey), storage.getItem(TA_KEY)]).then(async ([saved, sharedRaw]) => {
+      let shared: TaConfig | undefined;
+      try { if (sharedRaw) shared = JSON.parse(sharedRaw); } catch {}
+      if (!saved) {
+        if (shared) { setConfig(c => ({ ...c, ta: shared })); setDraft(d => ({ ...d, ta: shared })); }
+        return;
+      }
       try {
         const parsed: YoutubeConfig = { ...DEFAULT, ...JSON.parse(saved) };
         // migrate old format: channels had no per-channel limit (used top-level limit)
@@ -156,6 +176,13 @@ export default function YoutubeWidget({
         parsed.channels = parsed.channels.map(ch =>
           ch.limit == null ? { ...ch, limit: oldLimit } : ch
         );
+        // A connection saved on this widget before it became shared seeds the
+        // shared one.
+        if (!shared && parsed.ta?.url && parsed.ta.token) {
+          shared = parsed.ta;
+          storage.setItem(TA_KEY, JSON.stringify(shared));
+        }
+        parsed.ta = shared;
         setConfig(parsed);
         setDraft(parsed);
         if (!parsed.channels.length) return;
@@ -169,7 +196,11 @@ export default function YoutubeWidget({
   }, [storageKey]);
 
   function cacheKeyFor(cfg: YoutubeConfig) {
-    return `${storageKey}-${today}-${cfg.channels.map(ch => `${ch.channelId}:${ch.limit}:${ch.filterMembers ? 1 : 0}:${ch.includeShorts ? 1 : 0}`).join(",")}`;
+    // Hashed: the settings API caps keys at 256 chars, and the raw signature
+    // (every channel id) outgrows that past a handful of channels, which made
+    // the day cache fail silently.
+    const sig = cfg.channels.map(ch => `${ch.channelId}:${ch.limit}:${ch.filterMembers ? 1 : 0}:${ch.includeShorts ? 1 : 0}`).join(",");
+    return `${storageKey}-${today}-${hashSig(sig)}`;
   }
 
   async function fetchVideos(cfg: YoutubeConfig, cacheKey: string, force = false): Promise<boolean> {
@@ -250,7 +281,12 @@ export default function YoutubeWidget({
     if (ok) {
       setSelected(null);
       setConfig(next);
-      await storage.setItem(storageKey, JSON.stringify(next));
+      // The connection lives in the shared slot, not in this widget's config.
+      const { ta: _shared, ...own } = next;
+      void _shared;
+      await storage.setItem(storageKey, JSON.stringify(own));
+      if (ta) await storage.setItem(TA_KEY, JSON.stringify(ta));
+      else await storage.removeItem(TA_KEY);
       setSettingsOpen(false);
     }
   }
@@ -310,7 +346,7 @@ export default function YoutubeWidget({
                                 <span className={`shrink-0 text-[9px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
                               )}
                               {onTa(v) && (
-                                <span className={`shrink-0 text-[8px] font-semibold tracking-widest opacity-50 ${c.label}`} title="Opens on TubeArchivist">TA</span>
+                                <span className={`shrink-0 text-[8px] font-semibold tracking-widest px-1 py-0.5 rounded bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
                               )}
                             </span>
                             <div className="flex items-start gap-1 group/title">
@@ -360,7 +396,7 @@ export default function YoutubeWidget({
                               <span className={`shrink-0 text-[10px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
                             )}
                             {onTa(v) && (
-                              <span className={`shrink-0 text-[9px] font-semibold tracking-widest opacity-50 ${c.label}`} title="Opens on TubeArchivist">TA</span>
+                              <span className={`shrink-0 text-[9px] font-semibold tracking-widest px-1 py-0.5 rounded bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
                             )}
                           </span>
                           <div className="flex items-start gap-1 group/title">
@@ -448,6 +484,58 @@ export default function YoutubeWidget({
       back={
         <>
           <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
+            {/* TubeArchivist link-out */}
+            <div className="flex flex-col gap-2 pb-3 border-b border-black/10 dark:border-white/10">
+              <span className={`text-xs opacity-60 ${c.label}`}>TubeArchivist (shared by all YouTube widgets)</span>
+              <SettingsInput
+                type="url"
+                value={draft.ta?.url ?? ""}
+                onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { url: e.target.value, token: d.ta?.token ?? "", open: d.ta?.open ?? "youtube" } })); }}
+                placeholder="http://server:8000"
+              />
+              <div className="flex gap-1">
+                <SettingsInput
+                  type="password"
+                  autoComplete="off"
+                  value={draft.ta?.token ?? ""}
+                  onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { url: d.ta?.url ?? "", token: e.target.value, open: d.ta?.open ?? "youtube" } })); }}
+                  placeholder="API token"
+                  className="flex-1 min-w-0"
+                />
+                <button
+                  onClick={testTa}
+                  disabled={taStatus.state === "testing"}
+                  className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
+                >
+                  {taStatus.state === "testing" ? <Loader size={14} className="animate-spin" /> : "Test"}
+                </button>
+              </div>
+              {taStatus.msg && (
+                <p className={`text-xs ${taStatus.state === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-red-400"}`}>{taStatus.msg}</p>
+              )}
+              {(taStatus.state === "ok" || !!config.ta) && (
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs opacity-60 ${c.label}`}>Open on</span>
+                  {([["youtube", "YouTube"], ["ta", "TubeArchivist"]] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      onClick={() => setDraft(d => ({ ...d, ta: { url: d.ta?.url ?? "", token: d.ta?.token ?? "", open: id } }))}
+                      className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(draft.ta?.open ?? "youtube") === id ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {draft.ta?.open === "ta" && (
+                <p className={`text-[10px] opacity-60 ${c.text}`}>
+                  {taActive(config.ta) && videos.length
+                    ? `${videos.filter(v => archived.has(videoId(v.link))).length} of ${videos.length} videos here are in your archive and open there (marked TA). The rest open on YouTube.`
+                    : "Archived videos open on TubeArchivist (marked TA). The rest open on YouTube."}
+                </p>
+              )}
+            </div>
+
             <div className="flex items-center gap-2">
               <span className={`text-xs opacity-60 ${c.label}`}>View</span>
               {VIEWS.map(v => (
@@ -523,54 +611,6 @@ export default function YoutubeWidget({
                 })}
               </div>
             )}
-            {/* TubeArchivist link-out */}
-            <div className="flex flex-col gap-2 pt-2 border-t border-black/10 dark:border-white/10">
-              <span className={`text-xs opacity-60 ${c.label}`}>TubeArchivist</span>
-              <SettingsInput
-                type="url"
-                value={draft.ta?.url ?? ""}
-                onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { url: e.target.value, token: d.ta?.token ?? "", open: d.ta?.open ?? "youtube" } })); }}
-                placeholder="http://server:8000"
-              />
-              <div className="flex gap-1">
-                <SettingsInput
-                  type="password"
-                  autoComplete="off"
-                  value={draft.ta?.token ?? ""}
-                  onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { url: d.ta?.url ?? "", token: e.target.value, open: d.ta?.open ?? "youtube" } })); }}
-                  placeholder="API token"
-                  className="flex-1 min-w-0"
-                />
-                <button
-                  onClick={testTa}
-                  disabled={taStatus.state === "testing"}
-                  className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
-                >
-                  {taStatus.state === "testing" ? <Loader size={14} className="animate-spin" /> : "Test"}
-                </button>
-              </div>
-              {taStatus.msg && (
-                <p className={`text-xs ${taStatus.state === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-red-400"}`}>{taStatus.msg}</p>
-              )}
-              {(taStatus.state === "ok" || draft.ta?.open === "ta") && (
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs opacity-60 ${c.label}`}>Open on</span>
-                  {([["youtube", "YouTube"], ["ta", "TubeArchivist"]] as const).map(([id, label]) => (
-                    <button
-                      key={id}
-                      onClick={() => setDraft(d => ({ ...d, ta: { url: d.ta?.url ?? "", token: d.ta?.token ?? "", open: id } }))}
-                      className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(draft.ta?.open ?? "youtube") === id ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {draft.ta?.open === "ta" && (
-                <p className={`text-[10px] opacity-50 ${c.text}`}>Archived videos open on TubeArchivist and show a TA mark; the rest still open on YouTube.</p>
-              )}
-            </div>
-
             {error && <p className="text-red-400 text-xs">{error}</p>}
           </div>
           <SaveCancelRow
