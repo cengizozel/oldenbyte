@@ -13,7 +13,10 @@ import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, Sav
 
 type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean };
 type YtView         = "list" | "thumbs" | "gallery";
-type YoutubeConfig  = { channels: YoutubeChannel[]; view: YtView };
+// TubeArchivist link-out: `open` picks where video links go; archived videos
+// open there, anything not in the archive still falls back to YouTube.
+type TaConfig       = { url: string; token: string; open: "youtube" | "ta" };
+type YoutubeConfig  = { channels: YoutubeChannel[]; view: YtView; ta?: TaConfig };
 type Video          = { title: string; link: string; published: string; channelId: string; channelName: string };
 type VideoDetails   = { title: string; author: string; description: string; lengthSeconds: number; viewCount: number };
 
@@ -24,13 +27,20 @@ const VIEWS: { id: YtView; label: string }[] = [
   { id: "gallery", label: "Gallery" },
 ];
 
+function videoId(link: string): string {
+  const m = /[?&]v=([\w-]+)/.exec(link) ?? /\/(?:shorts|embed|live)\/([\w-]+)/.exec(link);
+  return m ? m[1] : "";
+}
+
 // YouTube serves a predictable thumbnail per video id, so no extra fetch is
 // needed: mqdefault is 320x180, plenty for widget-sized cards; hqdefault
 // (480x360) for the detail view.
 function thumbUrl(link: string, big = false): string {
-  const m = /[?&]v=([\w-]+)/.exec(link) ?? /\/(?:shorts|embed|live)\/([\w-]+)/.exec(link);
-  return m ? `https://i.ytimg.com/vi/${m[1]}/${big ? "hqdefault" : "mqdefault"}.jpg` : "";
+  const id = videoId(link);
+  return id ? `https://i.ytimg.com/vi/${id}/${big ? "hqdefault" : "mqdefault"}.jpg` : "";
 }
+
+const taActive = (ta?: TaConfig): ta is TaConfig => !!(ta && ta.open === "ta" && ta.url && ta.token);
 
 // Pulse the placeholder square until the image paints.
 function unpulse(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -57,6 +67,56 @@ export default function YoutubeWidget({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft]               = useState<YoutubeConfig>(DEFAULT);
   const [chInput, setChInput]           = useState("");
+
+  // TubeArchivist: which feed videos exist in the archive, and the settings
+  // face's connection test.
+  const [archived, setArchived]         = useState<Set<string>>(new Set());
+  const [taStatus, setTaStatus]         = useState<{ state: "idle" | "testing" | "ok" | "error"; msg: string }>({ state: "idle", msg: "" });
+
+  function hrefFor(v: Video): string {
+    const id = videoId(v.link);
+    if (taActive(config.ta) && id && archived.has(id)) return `${config.ta.url.trim().replace(/\/+$/, "")}/video/${id}`;
+    return v.link;
+  }
+  const onTa = (v: Video) => taActive(config.ta) && archived.has(videoId(v.link));
+
+  useEffect(() => {
+    const ta = config.ta;
+    if (!taActive(ta) || !videos.length) { setArchived(new Set()); return; }
+    const ids = [...new Set(videos.map(v => videoId(v.link)).filter(Boolean))];
+    const ctrl = new AbortController();
+    fetch("/api/tubearchivist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "check", url: ta.url, token: ta.token, ids }),
+      signal: ctrl.signal,
+    })
+      .then(r => r.json())
+      .then(d => setArchived(new Set(d.archived ?? [])))
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [videos, config.ta]);
+
+  async function testTa() {
+    const ta = draft.ta;
+    if (!ta?.url || !/^https?:\/\//.test(ta.url.trim()) || !ta.token?.trim()) {
+      setTaStatus({ state: "error", msg: "Enter the TubeArchivist URL and API token." });
+      return;
+    }
+    setTaStatus({ state: "testing", msg: "" });
+    try {
+      const res = await fetch("/api/tubearchivist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "ping", url: ta.url.trim(), token: ta.token.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "No response from TubeArchivist");
+      setTaStatus({ state: "ok", msg: data.version ? `Connected, TubeArchivist ${data.version}` : "Connected" });
+    } catch (e) {
+      setTaStatus({ state: "error", msg: String((e as Error).message ?? e) });
+    }
+  }
 
   // Inline video detail (slides over the list, like the arXiv widget).
   const [selected, setSelected]         = useState<Video | null>(null);
@@ -181,12 +241,16 @@ export default function YoutubeWidget({
   async function handleSave() {
     setError("");
     if (!draft.channels.length) { setError("Add at least one channel."); return; }
-    const cacheKey = cacheKeyFor(draft);
-    const ok = await fetchVideos(draft, cacheKey);
+    const ta = draft.ta && draft.ta.url.trim() && draft.ta.token.trim()
+      ? { url: draft.ta.url.trim(), token: draft.ta.token.trim(), open: draft.ta.open }
+      : undefined;
+    const next: YoutubeConfig = { ...draft, ta };
+    const cacheKey = cacheKeyFor(next);
+    const ok = await fetchVideos(next, cacheKey);
     if (ok) {
       setSelected(null);
-      setConfig(draft);
-      await storage.setItem(storageKey, JSON.stringify(draft));
+      setConfig(next);
+      await storage.setItem(storageKey, JSON.stringify(next));
       setSettingsOpen(false);
     }
   }
@@ -214,7 +278,7 @@ export default function YoutubeWidget({
             {!selected && (
               <span className="flex items-center gap-2">
                 <RefreshButton c={c} busy={loading} onClick={() => fetchVideos(config, cacheKeyFor(config), true)} />
-                <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
+                <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); setTaStatus({ state: "idle", msg: "" }); }} />
               </span>
             )}
           </div>
@@ -245,6 +309,9 @@ export default function YoutubeWidget({
                               {v.published && (
                                 <span className={`shrink-0 text-[9px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
                               )}
+                              {onTa(v) && (
+                                <span className={`shrink-0 text-[8px] font-semibold tracking-widest opacity-50 ${c.label}`} title="Opens on TubeArchivist">TA</span>
+                              )}
                             </span>
                             <div className="flex items-start gap-1 group/title">
                               <button
@@ -254,7 +321,7 @@ export default function YoutubeWidget({
                                 {v.title}
                               </button>
                               <a
-                                href={v.link}
+                                href={hrefFor(v)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={e => e.stopPropagation()}
@@ -292,6 +359,9 @@ export default function YoutubeWidget({
                             {v.published && (
                               <span className={`shrink-0 text-[10px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
                             )}
+                            {onTa(v) && (
+                              <span className={`shrink-0 text-[9px] font-semibold tracking-widest opacity-50 ${c.label}`} title="Opens on TubeArchivist">TA</span>
+                            )}
                           </span>
                           <div className="flex items-start gap-1 group/title">
                             <button
@@ -301,7 +371,7 @@ export default function YoutubeWidget({
                               {v.title}
                             </button>
                             <a
-                              href={v.link}
+                              href={hrefFor(v)}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={e => e.stopPropagation()}
@@ -333,13 +403,13 @@ export default function YoutubeWidget({
                       <ChevronLeft size={14} />
                     </button>
                     <span className="flex-1 text-xs font-medium truncate opacity-80">{selected.title}</span>
-                    <a href={selected.link} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80" title="Watch on YouTube">
+                    <a href={hrefFor(selected)} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80" title={onTa(selected) ? "Watch on TubeArchivist" : "Watch on YouTube"}>
                       <ExternalLink size={11} />
                     </a>
                   </div>
                   <div className="flex-1 min-h-0 overflow-y-auto pr-3">
                     {thumbUrl(selected.link, true) && (
-                      <a href={selected.link} target="_blank" rel="noopener noreferrer" className="block mb-2">
+                      <a href={hrefFor(selected)} target="_blank" rel="noopener noreferrer" className="block mb-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={thumbUrl(selected.link, true)} alt="" onLoad={unpulse} className="w-full aspect-video object-cover rounded-xl bg-black/10 dark:bg-white/10 animate-pulse" />
                       </a>
@@ -453,6 +523,54 @@ export default function YoutubeWidget({
                 })}
               </div>
             )}
+            {/* TubeArchivist link-out */}
+            <div className="flex flex-col gap-2 pt-2 border-t border-black/10 dark:border-white/10">
+              <span className={`text-xs opacity-60 ${c.label}`}>TubeArchivist</span>
+              <SettingsInput
+                type="url"
+                value={draft.ta?.url ?? ""}
+                onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { url: e.target.value, token: d.ta?.token ?? "", open: d.ta?.open ?? "youtube" } })); }}
+                placeholder="http://server:8000"
+              />
+              <div className="flex gap-1">
+                <SettingsInput
+                  type="password"
+                  autoComplete="off"
+                  value={draft.ta?.token ?? ""}
+                  onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { url: d.ta?.url ?? "", token: e.target.value, open: d.ta?.open ?? "youtube" } })); }}
+                  placeholder="API token"
+                  className="flex-1 min-w-0"
+                />
+                <button
+                  onClick={testTa}
+                  disabled={taStatus.state === "testing"}
+                  className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
+                >
+                  {taStatus.state === "testing" ? <Loader size={14} className="animate-spin" /> : "Test"}
+                </button>
+              </div>
+              {taStatus.msg && (
+                <p className={`text-xs ${taStatus.state === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-red-400"}`}>{taStatus.msg}</p>
+              )}
+              {(taStatus.state === "ok" || draft.ta?.open === "ta") && (
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs opacity-60 ${c.label}`}>Open on</span>
+                  {([["youtube", "YouTube"], ["ta", "TubeArchivist"]] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      onClick={() => setDraft(d => ({ ...d, ta: { url: d.ta?.url ?? "", token: d.ta?.token ?? "", open: id } }))}
+                      className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(draft.ta?.open ?? "youtube") === id ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {draft.ta?.open === "ta" && (
+                <p className={`text-[10px] opacity-50 ${c.text}`}>Archived videos open on TubeArchivist and show a TA mark; the rest still open on YouTube.</p>
+              )}
+            </div>
+
             {error && <p className="text-red-400 text-xs">{error}</p>}
           </div>
           <SaveCancelRow
