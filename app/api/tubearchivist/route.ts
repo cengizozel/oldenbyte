@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { requireUser } from "@/lib/http";
-import { cachedFeed } from "@/lib/feedCache";
 
 // TubeArchivist bridge for the YouTube widget. Server-side, like /api/kiwix
 // and /api/anytype: the archive usually lives on the LAN over plain http.
 // POST so the API token rides in the body, never in a URL or access log.
 //
 // {op:"ping", url, token}        -> {ok, version}
-// {op:"check", url, token, ids}  -> {archived: string[]}  (subset of ids)
+// {op:"check", url, token, ids, force?} -> {archived: string[]} (subset of ids)
 
 const MAX_IDS = 100;
 const CONCURRENCY = 6;
+
+// Per-video archive status. The two answers age differently on purpose: an
+// archived video stays archived, but "not archived" goes stale the moment the
+// download finishes, so it is only trusted briefly. `force` (the widget's
+// refresh button) skips the cache entirely.
+const HIT_MS = 60 * 60 * 1000;
+const MISS_MS = 2 * 60 * 1000;
+const known = new Map<string, { at: number; has: boolean }>();
 
 function root(url: string): string {
   return url.trim().replace(/\/+$/, "");
@@ -29,7 +36,7 @@ export async function POST(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
 
-  const { op, url, token, ids } = await request.json().catch(() => ({}));
+  const { op, url, token, ids, force } = await request.json().catch(() => ({}));
   if (typeof url !== "string" || !/^https?:\/\//.test(url)) {
     return NextResponse.json({ error: "Missing or invalid TubeArchivist URL" }, { status: 400 });
   }
@@ -58,12 +65,21 @@ export async function POST(request: NextRequest) {
       async function worker() {
         while (next < list.length) {
           const id = list[next++];
-          const has = await cachedFeed(`ta|${scope}|${id}`, async () => {
-            const res = await taFetch(url, token, `/api/video/${id}/`);
-            if (res.status === 404) return false;
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return true;
-          }).catch(() => false);
+          const key = `ta|${scope}|${id}`;
+          const hit = known.get(key);
+          let has = hit?.has ?? false;
+          if (force === true || !hit || Date.now() - hit.at >= (hit.has ? HIT_MS : MISS_MS)) {
+            try {
+              const res = await taFetch(url, token, `/api/video/${id}/`);
+              if (res.status === 404) has = false;
+              else if (res.ok) has = true;
+              else throw new Error(`HTTP ${res.status}`);
+              if (known.size > 5000) known.clear();
+              known.set(key, { at: Date.now(), has });
+            } catch {
+              // TubeArchivist unreachable: keep the last known answer.
+            }
+          }
           if (has) archived.push(id);
         }
       }

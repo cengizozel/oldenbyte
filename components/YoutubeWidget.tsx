@@ -86,6 +86,9 @@ export default function YoutubeWidget({
   // TubeArchivist: which feed videos exist in the archive, and the settings
   // face's connection test.
   const [archived, setArchived]         = useState<Set<string>>(new Set());
+  // Set by the refresh button so the next archive check skips the server's
+  // short "not archived" memory.
+  const forceTaRef                      = useRef(false);
   const [taStatus, setTaStatus]         = useState<{ state: "idle" | "testing" | "ok" | "error"; msg: string }>({ state: "idle", msg: "" });
 
   function hrefFor(v: Video): string {
@@ -103,11 +106,11 @@ export default function YoutubeWidget({
     fetch("/api/tubearchivist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ op: "check", url: ta.url, token: ta.token, ids }),
+      body: JSON.stringify({ op: "check", url: ta.url, token: ta.token, ids, force: forceTaRef.current }),
       signal: ctrl.signal,
     })
       .then(r => r.json())
-      .then(d => setArchived(new Set(d.archived ?? [])))
+      .then(d => { forceTaRef.current = false; setArchived(new Set(d.archived ?? [])); })
       .catch(() => {});
     return () => ctrl.abort();
   }, [videos, config.ta]);
@@ -204,6 +207,7 @@ export default function YoutubeWidget({
   }
 
   async function fetchVideos(cfg: YoutubeConfig, cacheKey: string, force = false): Promise<boolean> {
+    if (force) forceTaRef.current = true;
     setLoading(true);
     setError("");
     try {
