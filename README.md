@@ -66,7 +66,6 @@ The app runs at `http://localhost:3000`. A local SQLite database is created auto
 **1. Create a `.env` file** next to `docker-compose.yml`:
 
 ```
-DASHBOARD_PASSWORD=your-password
 SESSION_SECRET=<random hex string>
 ```
 

@@ -8,7 +8,6 @@ The recommended deployment method is Docker Compose. The image is published to G
 
 **1. Create a `.env` file:**
 ```env
-DASHBOARD_PASSWORD=your-password
 SESSION_SECRET=<output of: openssl rand -hex 32>
 ```
 
@@ -40,7 +39,6 @@ services:
     environment:
       - DATABASE_URL=file:/app/data/db.sqlite
       - UPLOADS_DIR=/app/data/uploads
-      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD}
       - SESSION_SECRET=${SESSION_SECRET}
     volumes:
       - ./data:/app/data
@@ -88,4 +86,4 @@ npm run dev
 
 The app runs at `http://localhost:3000`. A local SQLite database is created at `prisma/dev.db` on first run (the `DATABASE_URL` default in `lib/prisma.ts`).
 
-No `.env` file is required for local development - `DASHBOARD_PASSWORD` and `SESSION_SECRET` are optional and fall back to insecure defaults.
+No `.env` file is required for local development: `SESSION_SECRET` is optional and falls back to an insecure default. The first visit to the login page creates the admin account.
