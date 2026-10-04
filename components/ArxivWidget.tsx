@@ -198,10 +198,17 @@ export default function ArxivWidget({
   async function fetchPapers(cfg: ArxivConfig, force = false) {
     setLoading(true);
     try {
-      const url = `https://rss.arxiv.org/rss/${cfg.category}`;
-      const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=25${force ? "&refresh=1" : ""}`);
-      if (!res.ok) throw new Error();
-      const papers: Paper[] = await res.json();
+      const load = async (url: string): Promise<Paper[]> => {
+        const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=25${force ? "&refresh=1" : ""}`);
+        if (!res.ok) throw new Error();
+        return res.json();
+      };
+      // The RSS feed only carries the latest announcement and is empty on
+      // weekends and holidays; the search API always has the newest submissions.
+      let papers = await load(`https://rss.arxiv.org/rss/${cfg.category}`);
+      if (!papers.length) {
+        papers = await load(`https://export.arxiv.org/api/query?search_query=cat:${cfg.category}&sortBy=submittedDate&sortOrder=descending&max_results=25`);
+      }
       if (!papers.length) throw new Error();
       const newCache: Cache = { papers };
       setCache(newCache);
