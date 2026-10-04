@@ -44,6 +44,17 @@ function domainOf(url: string): string {
   }
 }
 
+// https links keep their port (several services can share one host, e.g.
+// tailscale serve); plain http is upgraded to https on the bare host so the
+// favicon is never mixed content.
+function faviconOrigin(url: string, domain: string): string {
+  try {
+    const u = new URL(url);
+    if (u.protocol === "https:") return u.origin;
+  } catch {}
+  return `https://${domain}`;
+}
+
 function displayName(bm: Bookmark): string {
   return (bm.name || "").trim() || domainOf(bm.url) || bm.url;
 }
@@ -63,7 +74,7 @@ function Favicon({ bm, size }: { bm: Bookmark; size: number }) {
   const domain = domainOf(bm.url);
   const custom = bm.icon?.trim();
   const isEmoji = !!custom && !/^https?:\/\//i.test(custom);
-  const src = isEmoji ? "" : (custom || (domain ? `https://${domain}/favicon.ico` : ""));
+  const src = isEmoji ? "" : (custom || (domain ? `${faviconOrigin(bm.url, domain)}/favicon.ico` : ""));
   const radius = Math.round(size * 0.28);
 
   const [failed, setFailed] = useState(false);
