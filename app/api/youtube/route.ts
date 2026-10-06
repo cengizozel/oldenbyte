@@ -44,6 +44,41 @@ function relToIso(rel: string): string {
   return new Date(Date.now() - n * (ms[m[2].toLowerCase()] ?? 0)).toISOString();
 }
 
+// The UULF playlist occasionally carries a Short anyway (YouTube misfiles some
+// uploads). Ground truth: /shorts/<id> serves a real Short directly but
+// redirects a regular video to /watch. A video's kind never changes, so each
+// answer is remembered; a failed check keeps the video.
+const shortKind = new Map<string, boolean>();
+
+async function isShortVideo(id: string): Promise<boolean> {
+  const known = shortKind.get(id);
+  if (known !== undefined) return known;
+  try {
+    const res = await fetch(`https://www.youtube.com/shorts/${id}`, {
+      method: "HEAD",
+      redirect: "manual",
+      headers: { "User-Agent": UA },
+      signal: AbortSignal.timeout(5000),
+    });
+    const redirected = res.status >= 300 && res.status < 400;
+    if (res.status !== 200 && !redirected) return false; // unexpected answer: keep, recheck later
+    const short = res.status === 200;
+    if (shortKind.size > 5000) shortKind.clear();
+    shortKind.set(id, short);
+    return short;
+  } catch {
+    return false;
+  }
+}
+
+async function dropShorts(videos: Video[]): Promise<Video[]> {
+  const flags = await Promise.all(videos.map(v => {
+    const id = extractVideoId(v.link);
+    return id ? isShortVideo(id) : Promise.resolve(false);
+  }));
+  return videos.filter((_, i) => !flags[i]);
+}
+
 // `feedQuery` is "channel_id=UC…" for a channel's full uploads, or
 // "playlist_id=UULF…" for its auto-generated long-form playlist (same uploads
 // WITHOUT Shorts — the UC->UULF prefix swap, a trick learned from Glance).
@@ -349,9 +384,10 @@ export async function GET(request: NextRequest) {
         .slice(0, limit);
     } else {
       try {
-        const result = await fetchViaRss(rssQuery, limit);
+        // A few extra entries cover any Short the check below removes.
+        const result = await fetchViaRss(rssQuery, includeShorts ? limit : limit + 3);
         name = result.name;
-        videos = result.videos;
+        videos = (includeShorts ? result.videos : await dropShorts(result.videos)).slice(0, limit);
       } catch {
         const result = await fetchViaChannelPage(resolvedId, fetchLimit);
         name = result.name;
