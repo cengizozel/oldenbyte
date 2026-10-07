@@ -33,13 +33,14 @@ type Video = { title: string; link: string; published: string; isMembersOnly: bo
 // No parseable time (live streams and premieres carry "watching now" or a
 // schedule instead) returns "" — an unknown date must stay unknown, not
 // become "now" (which rendered as a stuck "0m ago" plus a false NEW badge).
+// Both the long form ("2 days ago") and the compact one YouTube switched to
+// ("2d ago", "3mo ago") are accepted; "mo" is checked before "m" (minutes).
 function relToIso(rel: string): string {
-  const m = rel.match(/(\d+)\s+(second|minute|hour|day|week|month|year)/i);
+  const m = rel.match(/(\d+)\s*(mo|[smhdwy])[a-z]*\s+ago/i);
   if (!m) return "";
   const n = parseInt(m[1]);
   const ms: Record<string, number> = {
-    second: 1e3, minute: 6e4, hour: 36e5,
-    day: 864e5, week: 6048e5, month: 2592e6, year: 31536e6,
+    s: 1e3, m: 6e4, h: 36e5, d: 864e5, w: 6048e5, mo: 2592e6, y: 31536e6,
   };
   return new Date(Date.now() - n * (ms[m[2].toLowerCase()] ?? 0)).toISOString();
 }
@@ -384,8 +385,12 @@ export async function GET(request: NextRequest) {
         .slice(0, limit);
     } else {
       try {
-        // A few extra entries cover any Short the check below removes.
-        const result = await fetchViaRss(rssQuery, includeShorts ? limit : limit + 3);
+        // A few extra entries cover any Short the check below removes. YouTube's
+        // feeds fail now and then for a moment, so one retry comes before the
+        // (less precise) channel page fallback.
+        const want = includeShorts ? limit : limit + 3;
+        const result = await fetchViaRss(rssQuery, want)
+          .catch(() => new Promise(r => setTimeout(r, 1500)).then(() => fetchViaRss(rssQuery, want)));
         name = result.name;
         videos = (includeShorts ? result.videos : await dropShorts(result.videos)).slice(0, limit);
       } catch {
