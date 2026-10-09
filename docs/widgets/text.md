@@ -19,8 +19,8 @@ The fetched value is displayed and re-fetched on every page load (no caching).
 
 ## Font Options
 
-| Value | CSS |
+| Value | Font |
 |---|---|
-| `sans` | `font-family: Arial, Helvetica, sans-serif` |
-| `serif` | `font-family: var(--font-playfair)` (Playfair Display) |
-| `mono` | `font-family: var(--font-dm-mono)` (DM Mono) |
+| `sans` | Tailwind `font-sans` (the system sans-serif font) |
+| `serif` | Tailwind `font-serif` (the system serif font) |
+| `mono` | Tailwind `font-mono` (the system monospace font) |

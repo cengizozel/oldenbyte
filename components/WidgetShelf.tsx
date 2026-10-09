@@ -151,7 +151,7 @@ export default function WidgetShelf({
       <div className="flex-1 max-h-[50vh] overflow-y-auto px-3 pb-2 flex flex-col gap-2.5">
         {groups.map(group => (
           <div key={group.id}>
-            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] font-[family-name:var(--font-dm-mono)] mb-1.5">
+            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] font-[family-name:var(--font-ui-mono)] mb-1.5">
               {group.label}
             </div>
             <div className="grid grid-cols-2 gap-1.5">

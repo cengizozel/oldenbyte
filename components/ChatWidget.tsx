@@ -1833,7 +1833,7 @@ export default function ChatWidget({
                   {/* click-away backdrop */}
                   <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                   <div className={`absolute right-0 top-6 z-50 w-60 rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
-                    <p className={`px-2.5 pt-1.5 pb-1 text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-40 ${c.label}`}>Data access</p>
+                    <p className={`px-2.5 pt-1.5 pb-1 text-[9px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-40 ${c.label}`}>Data access</p>
                     {/* One row per data-bearing widget on the dashboard; no master
                         switch. A calendar widget's row also grants its tools. */}
                     {roster.length === 0 && (
@@ -1859,7 +1859,7 @@ export default function ChatWidget({
                         </button>
                       );
                     })}
-                    <p className={`px-2.5 pt-2 pb-1 text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-40 border-t ${c.border} mt-1 ${c.label}`}>Connections</p>
+                    <p className={`px-2.5 pt-2 pb-1 text-[9px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-40 border-t ${c.border} mt-1 ${c.label}`}>Connections</p>
                     {([
                       { icon: Library, label: "Kiwix library", caption: "all books", on: config.useKiwix, ready: !!config.kiwixUrl, toggle: toggleKiwix, hint: "set up in settings" },
                       { icon: Layers, label: "Anytype", caption: config.anytypeSpaceName || "", on: config.useAnytype, ready: !!(config.anytypeApiKey && config.anytypeSpaceId), toggle: toggleAnytype, hint: "pair in settings" },
@@ -2070,7 +2070,7 @@ export default function ChatWidget({
         <div className="flex flex-col gap-3 flex-1 min-h-0 p-4">
           <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
 
-            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 ${c.label}`}>Model</p>
+            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-50 ${c.label}`}>Model</p>
 
             <div>
               <p className={`text-xs mb-1 opacity-50 ${c.label}`}>API URL</p>
@@ -2129,7 +2129,7 @@ export default function ChatWidget({
               {modelsError && <p className="text-red-400 text-[11px] mt-1">{modelsError}</p>}
             </div>
 
-            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 mt-1 ${c.label}`}>Behavior</p>
+            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-50 mt-1 ${c.label}`}>Behavior</p>
 
             <div>
               <p className={`text-xs mb-1 opacity-50 ${c.label}`}>System prompt <span className="opacity-60">(optional)</span></p>
@@ -2220,7 +2220,7 @@ export default function ChatWidget({
               </div>)}
             </div>
 
-            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-50 mt-1 ${c.label}`}>Data sources</p>
+            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-50 mt-1 ${c.label}`}>Data sources</p>
 
             <p className={`text-[10px] -mt-1 opacity-45 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
 
@@ -2427,13 +2427,13 @@ export default function ChatWidget({
                       if (e.key === "Escape") setEditingTitle(false);
                     }}
                     placeholder={titleFrom(messages)}
-                    className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest text-center font-[family-name:var(--font-dm-mono)] bg-transparent border border-[var(--surface-border)] outline-none w-44 ${c.label}`}
+                    className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest text-center font-[family-name:var(--font-ui-mono)] bg-transparent border border-[var(--surface-border)] outline-none w-44 ${c.label}`}
                   />
                 ) : (
                   <button
                     onClick={() => { setTitleDraft(activeConv?.renamed ? activeConv.title : ""); setEditingTitle(true); }}
                     title="Rename this chat"
-                    className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-35 hover:opacity-70 transition-opacity ${c.label}`}
+                    className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-35 hover:opacity-70 transition-opacity ${c.label}`}
                   >
                     {chatTitle}
                   </button>
@@ -2473,7 +2473,7 @@ export default function ChatWidget({
                   <Fragment key={i}>
                   {daySep && (
                     <div className="self-center my-1">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest font-[family-name:var(--font-dm-mono)] opacity-40 ${c.label} bg-black/5 dark:bg-white/10`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-40 ${c.label} bg-black/5 dark:bg-white/10`}>
                         {daySep}
                       </span>
                     </div>

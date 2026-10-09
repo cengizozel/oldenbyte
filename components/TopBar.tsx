@@ -318,7 +318,7 @@ function DateDisplay({ timezone }: { timezone: string }) {
       >
         {format === "analog"
           ? <AnalogClock time={shown} size={48} />
-          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center font-[family-name:var(--font-dm-mono)]" suppressHydrationWarning>{fmt(shown, format)}</span>
+          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center font-[family-name:var(--font-ui-mono)]" suppressHydrationWarning>{fmt(shown, format)}</span>
         }
       </button>
 
@@ -790,7 +790,7 @@ function DashboardSwitcher({
     <div ref={wrapRef} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-[family-name:var(--font-dm-mono)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+        className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-[family-name:var(--font-ui-mono)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
         title="Switch dashboard"
       >
         {active.name}
@@ -981,7 +981,7 @@ export default function TopBar({
           {demo && (
             <button
               onClick={exitDemoMode}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] uppercase tracking-wider font-[family-name:var(--font-dm-mono)] text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] uppercase tracking-wider font-[family-name:var(--font-ui-mono)] text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
               title="Exit demo mode"
             >
               demo
