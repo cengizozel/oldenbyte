@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Keyboard, RotateCcw, Target, Maximize2, Minimize2, Volume2, VolumeX, Music } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
@@ -9,10 +9,13 @@ import { SIMPLE_WORDS } from "@/lib/simpleWords";
 import * as storage from "@/lib/storage";
 
 // A Monkeytype-style typing trainer. Input is word-based: you type a word and
-// SPACE commits it and jumps to the next one (partial/wrong words are scored as
-// typed, extra letters spill in red) — never a rigid character-by-character
-// stream. On top of that it tracks which keys you miss and how you slip
-// (neighbour reach vs transposition) and can drill exactly those.
+// SPACE commits it and jumps to the next one (letters you skip count as missed,
+// extra letters spill in dark red); backspace only reaches back into the
+// previous word when that word has a mistake. Only three lines of text show at
+// a time: once the caret passes the first line it stays on the second and
+// finished lines scroll up out of view. On top of that it tracks which keys you
+// miss and how you slip (neighbour reach vs transposition) and can drill
+// exactly those.
 //
 // Extras: a controllable get-ready countdown, a custom-letters drill ("zxc" ->
 // random combos of just those keys), a metronome mode that asks you to strike a
@@ -92,7 +95,7 @@ function pickWords(n: number, pool: WordPool = "varied"): string {
 }
 
 // The top real words for a set of trouble letters: words containing ALL the
-// letters rank first, then the closest approximations — more of the letters
+// letters rank first, then the closest approximations: more of the letters
 // present wins, ties broken by how much of the word is made of them, then by
 // commonness (MATCH_WORDS is frequency-ordered). Words with NONE of the
 // letters never qualify; the list just comes back shorter.
@@ -123,7 +126,7 @@ function buildCustom(cfg: Config): string {
     if (useWords && (!useScramble || Math.random() < 0.5)) {
       out.push(pool[Math.floor(Math.random() * pool.length)]);
     } else {
-      const len = 2 + Math.floor(Math.random() * 3); // 2–4 chars
+      const len = 2 + Math.floor(Math.random() * 3); // 2 to 4 chars
       let w = "";
       for (let j = 0; j < len; j++) w += letters[Math.floor(Math.random() * letters.length)];
       out.push(w);
@@ -153,7 +156,7 @@ function buildTarget(cfg: Config, stats: Stats): string {
       .sort((a, b) => b.miss / b.total - a.miss / a.total)
       .slice(0, 5)
       .map(x => x.k);
-    if (!weak.length) return buildCustom(cfg); // nothing learned yet — fall back to your own keys
+    if (!weak.length) return buildCustom(cfg); // nothing learned yet, fall back to your own keys
     const seqs: string[] = [];
     for (const k of weak) {
       seqs.push(`f${k}f`, `j${k}j`, `${k}${k}${k}`);
@@ -170,7 +173,7 @@ function optionsFor(m: Mode): number[] {
   return m === "time" ? TIME_LENGTHS : m === "metro" ? METRO_LENGTHS : m === "words" ? WORD_LENGTHS : [];
 }
 
-// Runs that never end on their own — they refill words and end only on the
+// Runs that never end on their own: they refill words and end only on the
 // clock (time) or when you stop (endless metronome).
 function autoRefills(cfg: Config): boolean {
   return cfg.mode === "time" || (cfg.mode === "metro" && cfg.endless);
@@ -195,12 +198,89 @@ function freshRun(): RunStat {
   return { start: 0, keystrokes: 0, errors: 0, neighbor: 0, transposition: 0, keyHit: {}, keyMiss: {}, beatErr: 0, beatCount: 0, onBeat: 0, peakBpm: 0, goodStreak: 0, badStreak: 0 };
 }
 
+type Chars = { correct: number; incorrect: number; extra: number; missed: number };
+
 type Result = {
-  wpm: number; raw: number; acc: number; seconds: number; correct: number;
+  wpm: number; raw: number; acc: number; seconds: number;
+  chars: Chars;
+  pb: boolean;  // beat the stored best
+  test: string; // short description of the run ("words 25 varied")
   neighbor: number; transposition: number;
   weak: { k: string; miss: number; total: number }[];
   metro?: { bpm: number; onBeatPct: number; avgErr: number; peak?: number };
 };
+
+// Character tally of the run so far. Committed words count every letter as
+// correct / incorrect / extra, and letters skipped with space as missed; the
+// word being typed counts what's there but nothing as missed yet. `wpmChars`
+// only credits fully correct words (plus the space after them) and the
+// still-correct prefix of the current word; `rawChars` credits everything typed.
+function tally(target: string[], typed: string[], cur: string): Chars & { wpmChars: number; rawChars: number } {
+  const t = { correct: 0, incorrect: 0, extra: 0, missed: 0, wpmChars: 0, rawChars: 0 };
+  const count = (g: string, w: string) => {
+    for (let j = 0; j < w.length; j++) {
+      if (j >= g.length) t.extra++;
+      else if (w[j] === g[j]) t.correct++;
+      else t.incorrect++;
+    }
+    t.rawChars += w.length;
+  };
+  typed.forEach((w, i) => {
+    const g = target[i] ?? "";
+    count(g, w);
+    if (w.length < g.length) t.missed += g.length - w.length;
+    t.rawChars++; // the space that committed it
+    if (w === g) t.wpmChars += g.length + 1;
+  });
+  if (cur) {
+    const g = target[typed.length] ?? "";
+    count(g, cur);
+    if (g.startsWith(cur)) t.wpmChars += cur.length;
+  }
+  return t;
+}
+
+const perMinute = (chars: number, seconds: number) => Math.round((chars / 5) / (Math.max(seconds, 0.5) / 60));
+
+// Extra letters past the end of a word are capped so a stuck key can't push
+// the line layout around indefinitely.
+const MAX_EXTRA = 20;
+
+// One word of the test. Memoised on primitive props so a keystroke only
+// re-renders the word being typed, not the whole text. Letters not reached yet
+// are dimmed, correct ones bright, wrong ones red, extras dark red; a word left
+// behind with a mistake in it gets a red underline.
+const Word = memo(function Word({ wi, word, typed, done, text }: {
+  wi: number;
+  word: string;
+  typed?: string;
+  done: boolean;
+  text: string;
+}) {
+  const len = Math.max(word.length, typed?.length ?? 0);
+  const flagged = done && typed !== word;
+  const nodes: React.ReactNode[] = [];
+  for (let j = 0; j < len; j++) {
+    const tch = typed?.[j];
+    let cls: string;
+    let display = word[j];
+    if (j < word.length) {
+      if (tch === undefined) cls = `${text} opacity-40`;
+      else if (tch === word[j]) cls = text;
+      else cls = "text-red-500 dark:text-red-400";
+    } else {
+      display = tch ?? "";
+      cls = "text-red-800 dark:text-red-400/55";
+    }
+    if (flagged) cls += " underline decoration-red-500/60 decoration-2 underline-offset-[0.3em]";
+    nodes.push(<span key={j} className={cls}>{display}</span>);
+  }
+  return (
+    <span data-wi={wi} className="inline-flex whitespace-pre">
+      {nodes.length ? nodes : <span>&nbsp;</span>}
+    </span>
+  );
+});
 
 export default function TypingWidget({
   widget,
@@ -228,6 +308,8 @@ export default function TypingWidget({
   const [counting, setCounting] = useState<number | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [caret, setCaret] = useState<{ x: number; y: number; h: number; show: boolean }>({ x: 0, y: 0, h: 0, show: false });
+  const [shift, setShift] = useState(0);    // px the text is scrolled up so finished lines leave the window
+  const [calm, setCalmState] = useState(false); // typing without touching the mouse: fade the chrome
 
   const wordsRef = useRef<string[]>([]);
   const typedWordsRef = useRef<string[]>([]);
@@ -237,6 +319,8 @@ export default function TypingWidget({
   const configRef = useRef<Config>(DEFAULT_CONFIG);
   const fieldRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const topWordRef = useRef(0); // first word of the top visible line; you can't backspace above it
+  const calmRef = useRef(false);
   const finishedRef = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
   const bpmRef = useRef(DEFAULT_CONFIG.bpm);                 // live tempo during a run
@@ -248,6 +332,7 @@ export default function TypingWidget({
   const setWords = (w: string[]) => { wordsRef.current = w; setWordsState(w); };
   const setTypedWords = (w: string[]) => { typedWordsRef.current = w; setTypedWordsState(w); };
   const setCur = (s: string) => { curRef.current = s; setCurState(s); };
+  const setCalm = (v: boolean) => { if (calmRef.current !== v) { calmRef.current = v; setCalmState(v); } };
 
   useEffect(() => setMounted(true), []);
 
@@ -274,6 +359,9 @@ export default function TypingWidget({
     setCur("");
     runRef.current = freshRun();
     finishedRef.current = false;
+    topWordRef.current = 0;
+    setShift(0);
+    setCalm(false);
     setStarted(false);
     setFinished(false);
     setResult(null);
@@ -314,22 +402,26 @@ export default function TypingWidget({
     setStarted(true);
   }
 
+  // Live wpm for the counter above the text, read on its own tick.
+  const liveWpm = useCallback(() => {
+    const start = runRef.current.start;
+    if (!start) return 0;
+    const t = tally(wordsRef.current, typedWordsRef.current, curRef.current);
+    return perMinute(t.wpmChars, Math.max(1, (Date.now() - start) / 1000));
+  }, []);
+
   // ── Finish + scoring ─────────────────────────────────────────────────────
   const finish = useCallback(() => {
     if (finishedRef.current) return; // idempotent
     finishedRef.current = true;
     const run = runRef.current;
     const cfg = configRef.current;
-    const seconds = run.start ? Math.max(0.5, (Date.now() - run.start) / 1000) : 0.5;
+    let seconds = run.start ? Math.max(0.5, (Date.now() - run.start) / 1000) : 0.5;
+    if (cfg.mode === "time") seconds = Math.min(seconds, cfg.length); // timer jitter
 
-    const typedList = curRef.current.length ? [...typedWordsRef.current, curRef.current] : [...typedWordsRef.current];
-    let correct = 0;
-    for (let i = 0; i < typedList.length; i++) {
-      const t = typedList[i], g = wordsRef.current[i] || "";
-      for (let j = 0; j < t.length; j++) if (t[j] === g[j]) correct++;
-    }
-    const wpm = Math.round((correct / 5) / (seconds / 60));
-    const raw = Math.round((run.keystrokes / 5) / (seconds / 60));
+    const t = tally(wordsRef.current, typedWordsRef.current, curRef.current);
+    const wpm = perMinute(t.wpmChars, seconds);
+    const raw = perMinute(t.rawChars, seconds);
     const acc = run.keystrokes ? Math.round(((run.keystrokes - run.errors) / run.keystrokes) * 100) : 100;
     const weak = Object.keys(run.keyMiss)
       .map(k => ({ k, miss: run.keyMiss[k], total: run.keyMiss[k] + (run.keyHit[k] || 0) }))
@@ -343,9 +435,19 @@ export default function TypingWidget({
           peak: cfg.dynamic ? Math.round(run.peakBpm) : undefined,
         }
       : undefined;
+    const test =
+      cfg.mode === "drill" ? `drill ${cfg.drill}`
+      : cfg.mode === "metro" ? `metro ${cfg.endless ? "endless" : cfg.length} ${cfg.pool}`
+      : `${cfg.mode} ${cfg.length} ${cfg.pool}`;
 
-    setResult({ wpm, raw, acc, seconds: Math.round(seconds), correct, neighbor: run.neighbor, transposition: run.transposition, weak, metro });
+    setResult({
+      wpm, raw, acc, seconds: Math.round(seconds),
+      chars: { correct: t.correct, incorrect: t.incorrect, extra: t.extra, missed: t.missed },
+      pb: wpm > 0 && wpm > statsRef.current.best,
+      test, neighbor: run.neighbor, transposition: run.transposition, weak, metro,
+    });
     setFinished(true);
+    setCalm(false);
 
     const merged: Stats = {
       best: Math.max(statsRef.current.best, wpm),
@@ -387,45 +489,61 @@ export default function TypingWidget({
   function onKeyDown(e: React.KeyboardEvent) {
     if (!loaded) return;
     const k = e.key;
-    if (k === "Escape" && expanded) { setExpanded(false); return; }
-    if (counting !== null) { if (k === "Escape") reset(configRef.current); return; }
+    const inRun = runRef.current.start > 0 || counting !== null || finishedRef.current;
 
-    if (finished) {
-      if (k === "Enter" || k === "Tab") { e.preventDefault(); reset(configRef.current); }
+    // Escape and Tab restart from anywhere (mid-run, count-in, results). An
+    // idle Escape closes the fullscreen overlay instead.
+    if (k === "Escape") {
+      e.preventDefault();
+      if (inRun) reset(configRef.current);
+      else if (expanded) setExpanded(false);
       return;
     }
     if (k === "Tab") { e.preventDefault(); reset(configRef.current); return; }
+    if (counting !== null) return;
+
+    if (finished) {
+      if (k === "Enter") { e.preventDefault(); reset(configRef.current); }
+      return;
+    }
     // endless run: Enter stops it and shows results
     if (k === "Enter" && runRef.current.start && autoRefills(configRef.current) && configRef.current.mode === "metro") {
       e.preventDefault(); finish(); return;
     }
 
     // Not started yet: with a get-ready countdown, the first key (space or any
-    // printable key) kicks off the count-in rather than typing.
-    if (!runRef.current.start) {
-      if (configRef.current.countdown > 0) {
-        if (k === " " || k === "Enter" || k.length === 1) { e.preventDefault(); arm(); }
-        return;
-      }
-      // countdown off: first real key starts the clock (handled below)
+    // printable key) kicks off the count-in rather than typing. Enter is left
+    // out so the Tab, Enter restart habit never arms a fresh run by accident.
+    if (!runRef.current.start && configRef.current.countdown > 0) {
+      if (k === " " || (k.length === 1 && !e.ctrlKey && !e.metaKey)) { e.preventDefault(); arm(); }
+      return;
     }
 
     if (k === "Backspace") {
       e.preventDefault();
-      if (curRef.current) setCur(curRef.current.slice(0, -1));
-      else if (typedWordsRef.current.length) {
-        const prev = typedWordsRef.current[typedWordsRef.current.length - 1];
-        setTypedWords(typedWordsRef.current.slice(0, -1));
-        setCur(prev);
-      }
+      handleBackspace(e.ctrlKey || e.altKey || e.metaKey);
       return;
     }
 
     if (k === " ") { e.preventDefault(); handleSpace(); return; }
     if (k.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
 
+    e.preventDefault();
     if (!runRef.current.start) { ensureAudio(); startTyping(); }
     handleChar(k);
+  }
+
+  // Backspace edits the current word; on an empty word it steps back into the
+  // previous one, but only if that word has a mistake and its line is still on
+  // screen. With a modifier held it clears the whole word.
+  function handleBackspace(wholeWord: boolean) {
+    if (curRef.current) { setCur(wholeWord ? "" : curRef.current.slice(0, -1)); return; }
+    const pi = typedWordsRef.current.length - 1;
+    if (pi < 0 || pi < topWordRef.current) return;
+    const prev = typedWordsRef.current[pi];
+    if (prev === wordsRef.current[pi]) return; // correct words are locked in
+    setTypedWords(typedWordsRef.current.slice(0, -1));
+    setCur(wholeWord ? "" : prev);
   }
 
   function handleChar(ch: string) {
@@ -434,7 +552,9 @@ export default function TypingWidget({
     const wi = typedWordsRef.current.length;
     const targetWord = wordsRef.current[wi] || "";
     const pos = curRef.current.length;
+    if (pos >= targetWord.length + MAX_EXTRA) return;
     const expected = targetWord[pos];
+    setCalm(true);
 
     run.keystrokes++;
     const correct = ch === expected;
@@ -482,24 +602,28 @@ export default function TypingWidget({
 
     setCur(curRef.current + ch);
 
-    // finish when the final word is fully typed — unless this run auto-refills
-    // (time mode, or an endless metronome run) and only ends when you stop.
-    if (!autoRefills(cfg) && wi === wordsRef.current.length - 1 && curRef.current.length >= targetWord.length) {
+    // finish the moment the final word is typed correctly (a wrong last word
+    // needs a space) unless this run auto-refills (time mode, or an endless
+    // metronome run) and only ends when you stop.
+    if (!autoRefills(cfg) && wi === wordsRef.current.length - 1 && curRef.current === targetWord) {
       finish();
     }
   }
 
+  // Space commits the word as typed, whatever state it's in; letters left
+  // untyped count as missed. Leading or repeated spaces do nothing.
   function handleSpace() {
     const run = runRef.current;
-    if (!run.start || curRef.current.length === 0) return; // ignore leading / repeat spaces
+    if (!run.start || curRef.current.length === 0) return;
+    setCalm(true);
     run.keystrokes++; // the space counts as a (correct) advance keystroke
     setTypedWords([...typedWordsRef.current, curRef.current]);
     setCur("");
 
     if (!autoRefills(configRef.current) && typedWordsRef.current.length >= wordsRef.current.length) { finish(); return; }
     // time / endless: keep a buffer of words ahead of the typist
-    if (autoRefills(configRef.current) && typedWordsRef.current.length >= wordsRef.current.length - 8) {
-      setWords([...wordsRef.current, ...pickWords(24, configRef.current.pool).split(" ")]);
+    if (autoRefills(configRef.current) && typedWordsRef.current.length >= wordsRef.current.length - 30) {
+      setWords([...wordsRef.current, ...pickWords(40, configRef.current.pool).split(" ")]);
     }
   }
 
@@ -512,38 +636,61 @@ export default function TypingWidget({
     return () => clearTimeout(id);
   }, [started, finished, config.mode, config.length, finish]);
 
-  // Measure where the caret should sit — the left edge of the character it
-  // precedes, or the right edge of the last one at a word's end — and let CSS
-  // glide it there. Reads refs so the callback stays stable across renders.
-  const measureCaret = useCallback(() => {
+  // ── Line window + caret ──────────────────────────────────────────────────
+  // Groups the rendered words into lines by their offsetTop (so it holds at
+  // any card width or font size), keeps the caret's line at most the second
+  // visible one by scrolling finished lines up, then measures where the caret
+  // goes: the left edge of the letter it precedes, or the right edge of the
+  // last one at a word's end. CSS transitions do the gliding. Reads refs so the
+  // callback stays stable across renders.
+  const measure = useCallback(() => {
     const wrap = wrapRef.current;
-    if (!wrap || finishedRef.current) { setCaret(c => ({ ...c, show: false })); return; }
-    const activeWi = typedWordsRef.current.length;
-    const word = wordsRef.current[activeWi];
-    const wordEl = wrap.querySelector('[data-w-active="1"]') as HTMLElement | null;
-    if (word === undefined || !wordEl) { setCaret(c => ({ ...c, show: false })); return; }
-    const caretPos = curRef.current.length;
-    const len = Math.max(word.length, caretPos);
-    let x: number, y: number, h: number;
-    if (len === 0) {
-      x = wordEl.offsetLeft; y = wordEl.offsetTop; h = wordEl.offsetHeight;
-    } else {
-      const idx = caretPos < len ? caretPos : len - 1;
-      const el = wordEl.children[idx] as HTMLElement | undefined;
-      if (!el) { setCaret(c => ({ ...c, show: false })); return; }
-      h = el.offsetHeight; y = el.offsetTop;
-      x = caretPos < len ? el.offsetLeft : el.offsetLeft + el.offsetWidth;
+    if (!wrap || finishedRef.current) { setCaret(p => ({ ...p, show: false })); return; }
+    const els = wrap.querySelectorAll<HTMLElement>("[data-wi]");
+    if (!els.length) { setCaret(p => ({ ...p, show: false })); return; }
+
+    const tops: number[] = [];
+    const firstOfLine: number[] = [];
+    const lineOf: number[] = [];
+    els.forEach((el, i) => {
+      const top = el.offsetTop;
+      if (!tops.length || top > tops[tops.length - 1] + 1) { tops.push(top); firstOfLine.push(i); }
+      lineOf.push(tops.length - 1);
+    });
+
+    const active = Math.min(typedWordsRef.current.length, els.length - 1);
+    const activeLine = lineOf[active];
+    // The window only ever moves down while typing; a resize that rewraps the
+    // text can pull it back so the caret is never above the window.
+    let top = lineOf[Math.min(topWordRef.current, els.length - 1)];
+    if (activeLine - top >= 2) top = activeLine - 1;
+    else if (activeLine < top) top = activeLine;
+    topWordRef.current = firstOfLine[top];
+    setShift(tops[top] - tops[0]);
+
+    const wordEl = els[active];
+    const word = wordsRef.current[active] ?? "";
+    const pos = curRef.current.length;
+    const len = Math.max(word.length, pos);
+    let x = wordEl.offsetLeft;
+    if (len > 0) {
+      const el = wordEl.children[pos < len ? pos : len - 1] as HTMLElement | undefined;
+      if (el) x = pos < len ? el.offsetLeft : el.offsetLeft + el.offsetWidth;
     }
+    const h = Math.round((parseFloat(getComputedStyle(wrap).fontSize) || 16) * 1.2);
+    const y = wordEl.offsetTop + (wordEl.offsetHeight - h) / 2;
     setCaret({ x, y, h, show: true });
-    if (runRef.current.start) wordEl.scrollIntoView({ block: "nearest" });
   }, []);
 
-  useLayoutEffect(() => { measureCaret(); }, [typedWords, cur, words, expanded, finished, loaded, measureCaret]);
+  useLayoutEffect(() => { measure(); }, [typedWords, cur, words, expanded, finished, loaded, measure]);
+  // Card resizes (grid drag, window, fullscreen) rewrap the text: re-measure.
   useEffect(() => {
-    const onResize = () => measureCaret();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [measureCaret]);
+    const wrap = wrapRef.current;
+    if (!wrap || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [expanded, finished, loaded, measure]);
 
   // Focus the field when the overlay opens.
   useEffect(() => {
@@ -551,6 +698,7 @@ export default function TypingWidget({
   }, [expanded]);
 
   const focusField = () => fieldRef.current?.focus();
+  const restart = () => { reset(configRef.current); focusField(); };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const chipBase = "px-2 py-0.5 rounded-md text-[11px] transition-colors";
@@ -563,65 +711,60 @@ export default function TypingWidget({
     { id: "rhythm", label: "rhythm" }, { id: "weak", label: "my weak keys" },
   ];
 
+  const idle = !started && counting === null && !finished;
+  const running = started && !finished;
+  // Focus mode: while you type, the chrome fades out; moving the mouse brings it back.
+  const quiet = running && calm;
+  const fade = `transition-opacity duration-300 ${quiet ? "opacity-0 pointer-events-none" : ""}`;
+  const onMouseMove = () => setCalm(false);
+
+  // Exactly three lines tall: the window height is 3 x line-height in em, so it
+  // follows the font size of either layout.
   function renderWords(big: boolean) {
     const activeWi = typedWords.length;
-    const fontCls = big ? "text-2xl leading-[2.6rem]" : "text-[15px] leading-8";
+    const fontCls = big ? "text-[30px]" : "text-[19px]";
     return (
-      <div ref={wrapRef} className={`relative font-mono ${fontCls} tracking-wide flex flex-wrap gap-x-[0.55ch] gap-y-1 select-none transition-opacity ${focused ? "" : "opacity-50 blur-[1.5px]"}`}>
-        {/* single caret that glides between characters — nudged 2px left into
-            the inter-character gap and kept translucent so it never obscures
-            the glyph it precedes */}
-        <span
-          aria-hidden
-          className={`absolute left-0 top-0 w-[2px] rounded-full bg-current ${c.text} pointer-events-none will-change-transform transition-[transform,height] duration-75 ease-out ${started ? "" : "animate-pulse"}`}
-          style={{ transform: `translate(${caret.x - 2}px, ${caret.y}px)`, height: caret.h || undefined, opacity: caret.show ? (focused ? 0.6 : 0.3) : 0 }}
-        />
-        {words.map((w, wi) => {
-          const typedW = wi < typedWords.length ? typedWords[wi] : wi === activeWi ? cur : undefined;
-          const isActive = wi === activeWi && !finished;
-          const len = Math.max(w.length, typedW?.length ?? 0);
-          const nodes: React.ReactNode[] = [];
-          for (let j = 0; j < len; j++) {
-            const gch = w[j];
-            const tch = typedW?.[j];
-            let cls: string;
-            let display: string | undefined = gch;
-            if (j < w.length) {
-              if (tch === undefined) cls = `opacity-30 ${c.text}`;
-              else if (tch === gch) cls = `opacity-100 ${c.text}`;
-              else cls = "opacity-100 text-red-500 dark:text-red-400 underline decoration-red-500/50";
-            } else {
-              display = tch; // extra letters spilled past the word
-              cls = "opacity-90 text-red-500/80 dark:text-red-400/80";
-            }
-            nodes.push(<span key={j} className={cls}>{display}</span>);
-          }
-          return (
-            <span key={wi} data-w-active={isActive ? "1" : undefined} className="inline-flex whitespace-pre">
-              {nodes.length ? nodes : <span>&nbsp;</span>}
-            </span>
-          );
-        })}
+      <div className={`relative font-mono ${fontCls} leading-[1.6] h-[4.8em] overflow-hidden select-none transition-[filter,opacity] duration-200 ${focused ? "" : "opacity-40 blur-[3px]"}`}>
+        <div
+          ref={wrapRef}
+          className="relative flex flex-wrap gap-x-[0.6em] pl-[3px] transition-transform duration-200 ease-out will-change-transform"
+          style={{ transform: `translateY(${-shift}px)` }}
+        >
+          {/* single caret that glides between letters, nudged into the gap
+              before the letter it precedes; blinks until the run starts */}
+          <span
+            aria-hidden
+            className={`absolute left-0 top-0 w-[2px] rounded-full bg-current ${c.text} pointer-events-none will-change-transform transition-[transform,opacity] duration-100 ease-out ${started ? "" : "animate-pulse"}`}
+            style={{ transform: `translate(${caret.x - 2}px, ${caret.y}px)`, height: caret.h || undefined, opacity: caret.show && !finished ? (focused ? 0.9 : 0) : 0 }}
+          />
+          {words.map((w, wi) => (
+            <Word
+              key={wi}
+              wi={wi}
+              word={w}
+              typed={wi < activeWi ? typedWords[wi] : wi === activeWi ? cur : undefined}
+              done={wi < activeWi}
+              text={c.text}
+            />
+          ))}
+        </div>
       </div>
     );
   }
-
-  const idle = !started && counting === null && !finished;
-  const totalWords = words.length;
 
   function card(big: boolean) {
     return (
       <>
         {/* Header */}
         <div className="flex items-center justify-between mb-2 shrink-0 gap-2">
-          <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
+          <div className={`flex items-center gap-1.5 min-w-0 ${c.label} ${fade}`}>
             <span className="opacity-50"><Keyboard size={14} /></span>
             <span className="text-xs font-medium opacity-60 truncate">{widget.title}</span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className={`flex items-center gap-2 shrink-0 ${fade}`}>
             {stats.best > 0 && <span className={`text-[10px] tabular-nums opacity-50 ${c.text}`}>best {stats.best}</span>}
             <button
-              onClick={() => { reset(configRef.current); focusField(); }}
+              onClick={restart}
               title="Restart (Tab)"
               className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 hover:!opacity-100 ${c.icon}`}
             >
@@ -629,7 +772,7 @@ export default function TypingWidget({
             </button>
             <button
               onClick={() => setExpanded(v => !v)}
-              title={big ? "Close (Esc)" : "Expand"}
+              title={big ? "Close" : "Expand"}
               className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 hover:!opacity-100 ${c.icon}`}
             >
               {big ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
@@ -638,7 +781,7 @@ export default function TypingWidget({
         </div>
 
         {/* Config bar */}
-        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-3 shrink-0">
+        <div className={`flex items-center flex-wrap gap-x-2 gap-y-1 mb-3 shrink-0 ${fade}`}>
           {(["words", "time", "drill", "metro"] as Mode[]).map(m => (
             <button key={m} onClick={() => setMode(m)} className={chip(config.mode === m)}>{m}</button>
           ))}
@@ -694,7 +837,7 @@ export default function TypingWidget({
               <span className={`text-[11px] tabular-nums w-16 text-center ${c.text}`}>{config.bpm} bpm{config.dynamic ? " start" : ""}</span>
               <button onClick={() => applyConfig({ ...config, bpm: Math.min(BPM_MAX, config.bpm + 5) })} className={`${chipBase} ${c.label} opacity-60 hover:opacity-100`}>+</button>
               <button onClick={() => applyConfig({ ...config, dynamic: !config.dynamic })} className={chip(config.dynamic)} title="Tempo speeds up on hits, slows on misses">dynamic</button>
-              <button onClick={() => applyConfig({ ...config, endless: !config.endless })} className={chip(config.endless)} title="Never ends on its own — press Enter to stop">endless</button>
+              <button onClick={() => applyConfig({ ...config, endless: !config.endless })} className={chip(config.endless)} title="Never ends on its own, press Enter to stop">endless</button>
               <button
                 onClick={() => applyConfig({ ...config, sound: !config.sound })}
                 title={config.sound ? "Mute" : "Unmute"}
@@ -723,85 +866,86 @@ export default function TypingWidget({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onClick={() => { if (idle) startClick(); else focusField(); }}
-          className="flex-1 min-h-0 outline-none relative cursor-text overflow-y-auto"
+          className={`flex-1 min-h-0 outline-none relative cursor-text flex flex-col ${finished ? "overflow-y-auto" : "justify-center overflow-hidden"}`}
         >
           {!loaded ? null : finished && result ? (
             <div className="tw-rise h-full">
-              <Results c={c} r={result} onRestart={() => { reset(configRef.current); focusField(); }} onPracticeWeak={() => applyConfig({ ...config, mode: "drill", drill: "weak" })} />
+              <Results c={c} r={result} onRestart={restart} onPracticeWeak={() => applyConfig({ ...config, mode: "drill", drill: "weak" })} />
             </div>
           ) : (
-            <div className="relative">
-              {renderWords(big)}
+            <>
+              {/* live counter: time left or words done, plus wpm (and the
+                  metronome pulse) while a run is going */}
+              <div className={`h-7 shrink-0 flex items-center gap-3 tabular-nums ${big ? "text-lg" : "text-sm"} ${c.text}`}>
+                {running && runRef.current.start > 0 && (
+                  <LiveStats
+                    endsAt={config.mode === "time" ? runRef.current.start + config.length * 1000 : undefined}
+                    progress={`${typedWords.length}${autoRefills(config) ? "" : `/${words.length}`}`}
+                    wpm={liveWpm}
+                  />
+                )}
+                {config.mode === "metro" && running && runRef.current.start > 0 && (
+                  <div className="ml-auto flex items-center gap-2">
+                    {config.dynamic && liveBpm !== null && (
+                      <span
+                        key={liveBpm}
+                        className={`tw-pop text-[11px] tabular-nums font-medium ${levelDir === "up" ? "text-emerald-600 dark:text-emerald-400" : levelDir === "down" ? "text-red-500 dark:text-red-400" : c.text} `}
+                        style={{ animationDuration: "0.3s" }}
+                      >
+                        {levelDir === "up" ? "▲ " : levelDir === "down" ? "▼ " : ""}{liveBpm} bpm
+                      </span>
+                    )}
+                    <Metronome key={runRef.current.start} startAt={runRef.current.start} bpmRef={bpmRef} beatRef={beatRef} soundRef={soundRef} audioRef={audioRef} c={c} />
+                  </div>
+                )}
+              </div>
 
-              {/* metronome pulse (top-right of the text) */}
-              {config.mode === "metro" && started && runRef.current.start && (
-                <div className="absolute top-0 right-0 flex items-center gap-2">
-                  {config.dynamic && liveBpm !== null && (
-                    <span
-                      key={liveBpm}
-                      className={`tw-pop text-[11px] tabular-nums font-medium ${levelDir === "up" ? "text-emerald-600 dark:text-emerald-400" : levelDir === "down" ? "text-red-500 dark:text-red-400" : c.text} `}
-                      style={{ animationDuration: "0.3s" }}
-                    >
-                      {levelDir === "up" ? "▲ " : levelDir === "down" ? "▼ " : ""}{liveBpm} bpm
+              <div className="relative shrink-0">
+                {renderWords(big)}
+
+                {/* get-ready countdown overlay */}
+                {counting !== null && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span key={counting} className={`tw-pop font-semibold tabular-nums ${big ? "text-8xl" : "text-5xl"} ${c.text} drop-shadow`}>
+                      {counting}
                     </span>
-                  )}
-                  <Metronome key={runRef.current.start} startAt={runRef.current.start} bpmRef={bpmRef} beatRef={beatRef} soundRef={soundRef} audioRef={audioRef} c={c} />
-                </div>
-              )}
+                  </div>
+                )}
 
-              {/* get-ready countdown overlay */}
-              {counting !== null && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span key={counting} className={`tw-pop font-semibold tabular-nums ${big ? "text-8xl" : "text-6xl"} ${c.text} drop-shadow`}>
-                    {counting}
-                  </span>
-                </div>
-              )}
+                {/* focus hint over the blurred text whenever the field isn't
+                    focused. pointer-events-none: a focusable overlay would
+                    steal the first click's focus and unmount mid-click, eating
+                    the click; let it fall through to the field itself. */}
+                {!focused && counting === null && (
+                  <div className={`absolute inset-0 flex items-center justify-center text-xs ${c.label} opacity-80 pointer-events-none`}>
+                    {running ? "click here to continue" : config.countdown > 0 ? "click, then press space to start" : "click here, then type"}
+                  </div>
+                )}
+              </div>
 
-              {/* idle hint */}
-              {/* pointer-events-none: a focusable overlay would steal the first
-                  click's focus and unmount mid-click, eating the click — let it
-                  fall through to the field itself. */}
-              {idle && !focused && (
-                <div
-                  className={`absolute inset-0 flex items-center justify-center text-xs ${c.label} opacity-80 pointer-events-none`}
-                >
-                  {config.countdown > 0 ? "click, then press space to start" : "click here, then type"}
-                </div>
-              )}
-              {idle && focused && config.countdown > 0 && (
-                <div className={`absolute inset-x-0 bottom-0 flex items-center justify-center text-[11px] ${c.label} opacity-60 pointer-events-none`}>
-                  press space to start
-                </div>
-              )}
-            </div>
+              {/* footer: start hint, metronome cue, or the endless stop button */}
+              <div className={`h-7 shrink-0 mt-1 flex items-center gap-3 text-[11px] ${c.label}`}>
+                {idle && focused && config.countdown > 0 && <span className="opacity-60">press space to start</span>}
+                {running && config.mode === "metro" && !autoRefills(config) && <span className="opacity-50">strike a key on each beat</span>}
+                {running && config.mode === "metro" && autoRefills(config) && (
+                  <button
+                    onClick={() => finish()}
+                    className={`px-2 py-0.5 rounded-md bg-black/10 dark:bg-white/15 ${c.text} opacity-80 hover:opacity-100 transition-opacity`}
+                  >
+                    stop (enter)
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
-
-        {/* Live footer */}
-        {!finished && started && (
-          <div className={`shrink-0 mt-2 flex items-center gap-3 text-[11px] tabular-nums opacity-60 ${c.text}`}>
-            {config.mode === "time" && runRef.current.start
-              ? <Countdown endsAt={runRef.current.start + config.length * 1000} />
-              : <span>{typedWords.length}{autoRefills(config) ? "" : `/${totalWords}`} words</span>}
-            {config.mode === "metro" && !autoRefills(config) && <span className="opacity-70">strike a key on each beat</span>}
-            {config.mode === "metro" && autoRefills(config) && (
-              <button
-                onClick={() => finish()}
-                className={`ml-auto px-2 py-0.5 rounded-md bg-black/10 dark:bg-white/15 ${c.text} opacity-80 hover:opacity-100 transition-opacity`}
-              >
-                stop (enter)
-              </button>
-            )}
-          </div>
-        )}
       </>
     );
   }
 
   return (
     <>
-      <div className={`rounded-2xl border h-full relative group flex flex-col p-5 ${c.bg} ${c.border} ${c.glow} ${className}`}>
+      <div onMouseMove={onMouseMove} className={`rounded-2xl border h-full relative group flex flex-col p-5 ${c.bg} ${c.border} ${c.glow} ${className}`}>
         {expanded ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
             <Keyboard size={22} className={`${c.label} opacity-40`} />
@@ -817,6 +961,7 @@ export default function TypingWidget({
         <div
           className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
           onMouseDown={e => { if (e.target === e.currentTarget) setExpanded(false); }}
+          onMouseMove={onMouseMove}
         >
           <div className={`tw-overlay-in group w-[80vw] h-[80vh] max-w-[1200px] rounded-2xl border shadow-2xl relative flex flex-col p-6 ${c.bg} ${c.border}`}>
             {card(true)}
@@ -828,7 +973,7 @@ export default function TypingWidget({
   );
 }
 
-// One sine tone with a fixed, identical envelope — the building block for every
+// One sine tone with a fixed, identical envelope, the building block for every
 // cue so loudness never varies. `when` is an AudioContext timestamp so tones can
 // be scheduled precisely ahead of time.
 function tone(ctx: AudioContext, freq: [number, number] | number, when: number, dur: number, peak: number) {
@@ -930,15 +1075,22 @@ function Metronome({
   );
 }
 
-// Self-ticking countdown for time mode — its own interval re-renders only this
-// element, never the parent's character spans.
-function Countdown({ endsAt }: { endsAt: number }) {
+// Live counter above the text: seconds left (time mode) or words done, plus
+// wpm. Ticks on its own interval so only this element re-renders, never the
+// parent's words.
+function LiveStats({ endsAt, progress, wpm }: { endsAt?: number; progress: string; wpm: () => number }) {
   const [, tick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => tick(n => n + 1), 250);
     return () => clearInterval(id);
   }, []);
-  return <span>{Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))}s left</span>;
+  const left = endsAt !== undefined ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000)) : null;
+  return (
+    <>
+      <span className="font-semibold">{left !== null ? left : progress}</span>
+      <span className="opacity-50">{wpm()} wpm</span>
+    </>
+  );
 }
 
 function Results({
@@ -949,34 +1101,43 @@ function Results({
   onRestart: () => void;
   onPracticeWeak: () => void;
 }) {
+  const big = (value: React.ReactNode, label: string, cls = c.text) => (
+    <div>
+      <div className={`text-[10px] uppercase tracking-widest opacity-40 mb-1 ${c.label}`}>{label}</div>
+      <div className={`text-4xl font-semibold tabular-nums leading-none ${cls}`}>{value}</div>
+    </div>
+  );
+  const small = (value: React.ReactNode, label: string, title?: string) => (
+    <div title={title}>
+      <div className={`text-[10px] uppercase tracking-widest opacity-40 ${c.label}`}>{label}</div>
+      <div className={`text-sm tabular-nums ${c.text}`}>{value}</div>
+    </div>
+  );
+  const ch = r.chars;
   return (
-    <div className="h-full flex flex-col gap-3">
-      <div className="flex items-end gap-5 flex-wrap">
-        <div>
-          <div className={`text-3xl font-semibold tabular-nums leading-none ${c.text}`}>{r.wpm}</div>
-          <div className={`text-[10px] uppercase tracking-widest opacity-40 mt-1 ${c.label}`}>wpm</div>
-        </div>
-        <div>
-          <div className={`text-3xl font-semibold tabular-nums leading-none ${r.acc >= 97 ? "text-emerald-600 dark:text-emerald-400" : r.acc >= 90 ? c.text : "text-red-500 dark:text-red-400"}`}>{r.acc}%</div>
-          <div className={`text-[10px] uppercase tracking-widest opacity-40 mt-1 ${c.label}`}>accuracy</div>
-        </div>
-        {r.metro && (
-          <div>
-            <div className={`text-3xl font-semibold tabular-nums leading-none ${r.metro.onBeatPct >= 80 ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>{r.metro.onBeatPct}%</div>
-            <div className={`text-[10px] uppercase tracking-widest opacity-40 mt-1 ${c.label}`}>on beat</div>
-          </div>
+    <div className="h-full flex flex-col gap-4">
+      <div className="flex items-end gap-6 flex-wrap">
+        {big(r.wpm, r.pb ? "wpm, new best" : "wpm")}
+        {big(`${r.acc}%`, "accuracy", r.acc >= 97 ? "text-emerald-600 dark:text-emerald-400" : r.acc >= 90 ? c.text : "text-red-500 dark:text-red-400")}
+        {r.metro && big(`${r.metro.onBeatPct}%`, "on beat", r.metro.onBeatPct >= 80 ? "text-emerald-600 dark:text-emerald-400" : c.text)}
+        {r.metro?.peak !== undefined && big(r.metro.peak, "peak bpm")}
+      </div>
+
+      <div className="flex items-start gap-x-6 gap-y-2 flex-wrap">
+        {small(r.raw, "raw")}
+        {small(
+          <>
+            <span>{ch.correct}</span><span className="opacity-40">/</span>
+            <span className={ch.incorrect ? "text-red-500 dark:text-red-400" : ""}>{ch.incorrect}</span><span className="opacity-40">/</span>
+            <span className={ch.extra ? "text-red-800 dark:text-red-400/55" : ""}>{ch.extra}</span><span className="opacity-40">/</span>
+            <span className={ch.missed ? "opacity-50" : ""}>{ch.missed}</span>
+          </>,
+          "characters",
+          "correct / incorrect / extra / missed",
         )}
-        {r.metro?.peak !== undefined && (
-          <div>
-            <div className={`text-3xl font-semibold tabular-nums leading-none ${c.text}`}>{r.metro.peak}</div>
-            <div className={`text-[10px] uppercase tracking-widest opacity-40 mt-1 ${c.label}`}>peak bpm</div>
-          </div>
-        )}
-        <div className={`text-[11px] tabular-nums opacity-55 leading-5 ${c.text}`}>
-          <div>raw {r.raw}</div>
-          <div>{r.seconds}s</div>
-          {r.metro && <div>±{r.metro.avgErr}ms {r.metro.peak !== undefined ? `from ${r.metro.bpm}bpm` : `@ ${r.metro.bpm}bpm`}</div>}
-        </div>
+        {small(`${r.seconds}s`, "time")}
+        {r.metro && small(`±${r.metro.avgErr}ms`, r.metro.peak !== undefined ? `from ${r.metro.bpm}bpm` : `at ${r.metro.bpm}bpm`, "average distance from the beat")}
+        {small(r.test, "test")}
       </div>
 
       <div className={`text-[11px] leading-relaxed opacity-70 ${c.text}`}>
@@ -998,14 +1159,15 @@ function Results({
       )}
 
       <div className="flex items-center gap-2 mt-auto">
-        <button onClick={onRestart} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}>
-          <RotateCcw size={12} /> again
+        <button onClick={onRestart} title="Next test (Tab, Enter or Esc)" className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}>
+          <RotateCcw size={12} /> next test
         </button>
         {r.weak.length > 0 && (
           <button onClick={onPracticeWeak} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs ${c.label} opacity-70 hover:opacity-100 transition-opacity`}>
             <Target size={12} /> practice these
           </button>
         )}
+        <span className={`ml-auto text-[10px] opacity-40 ${c.label}`}>tab or enter to restart</span>
       </div>
     </div>
   );
