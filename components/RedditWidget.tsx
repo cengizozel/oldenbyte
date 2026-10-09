@@ -310,11 +310,13 @@ export default function RedditWidget({
                           >
                             <ExternalLink size={11} />
                           </a>
-                          {config.images && post.thumbnail && (
+                          {/* Some image posts come without a feed thumbnail; the
+                              full image stands in for it then. */}
+                          {config.images && (post.thumbnail || post.image) && (
                             <button onClick={() => setSelected(post)} className="shrink-0 ml-1.5 hover:opacity-80 transition-opacity">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={post.thumbnail}
+                                src={post.thumbnail || post.image}
                                 alt=""
                                 loading="lazy"
                                 onLoad={e => e.currentTarget.classList.remove("animate-pulse")}
@@ -353,7 +355,14 @@ export default function RedditWidget({
                   {(selected.image || selected.thumbnail) && (
                     <a href={selected.image || selected.link} target="_blank" rel="noopener noreferrer" className="block mb-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={selected.image || selected.thumbnail} alt="" loading="lazy" className="w-full max-h-64 object-contain rounded-xl bg-black/5" />
+                      <img
+                        src={selected.image || selected.thumbnail}
+                        alt=""
+                        loading="lazy"
+                        // A full image that fails (expired preview link) falls back to the thumbnail.
+                        onError={e => { if (selected.thumbnail && e.currentTarget.src !== selected.thumbnail) e.currentTarget.src = selected.thumbnail; }}
+                        className="w-full max-h-80 object-contain rounded-xl bg-black/5"
+                      />
                     </a>
                   )}
                   {sanitizeRedditHtml(selected.content) ? (

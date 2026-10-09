@@ -70,9 +70,11 @@ async function fetchSubreddit(subreddit: string, period: string, limit: number):
       // Image posts carry a small media:thumbnail plus a [link] to the full
       // image inside the content HTML.
       const thumbnail = decodeEntities(entry.match(/<media:thumbnail[^>]*url="([^"]+)"/)?.[1] ?? "");
-      const image =
+      // Attribute values inside the content are still entity-encoded ("&amp;"),
+      // and a URL left that way 403s, so decode it like the thumbnail.
+      const image = decodeEntities(
         content.match(/href="(https:\/\/(?:i\.redd\.it|preview\.redd\.it|i\.imgur\.com)\/[^"]+)"/)?.[1] ??
-        content.match(/<img[^>]*src="(https:\/\/[^"]+)"/)?.[1] ?? "";
+        content.match(/<img[^>]*src="(https:\/\/[^"]+)"/)?.[1] ?? "");
       return {
         title: decodeEntities(tag(entry, "title")),
         link: decodeEntities(link),
