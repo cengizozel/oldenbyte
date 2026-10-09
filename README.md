@@ -41,7 +41,7 @@ Widgets can also be defined as single JSON files in `widget-bank/`: declare a UR
 
 ## Top bar
 
-The left and right text fields are editable and can display either a static string or a live value fetched from any URL that returns plain text (for example a weather or IP address endpoint). The center shows a configurable date or clock with the action buttons (dashboard switcher, digest, layout edit, settings) grouped below it. The switcher creates, renames, and deletes dashboards; the settings panel holds the dark mode toggle. Dark mode preference is persisted to the database, and pressing **Shift+D** toggles it from anywhere (except while typing in a field).
+The left and right text fields are editable and can display either a static string or a live value fetched from any URL that returns plain text (for example a weather or IP address endpoint). The center shows a configurable date or clock with the action buttons (dashboard switcher, digest, layout edit, settings) grouped below it. On phones the two text fields share the first row and the date with its buttons sits on a row below. The switcher creates, renames, and deletes dashboards. The settings panel holds dark mode, the timezone, **Preload dashboards** (mount every dashboard in the background at page load so switching is instant; otherwise each mounts on first visit and then stays), and demo mode. Dark mode preference is persisted to the database, and pressing **Shift+D** toggles it from anywhere (except while typing in a field).
 
 ## Stack
 
