@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @variant dark (&:where(.dark, .dark *));
 
+/* The UI's accent face (labels, the date, the digest): Shantell Sans, a
+   marker-style hand. Digits stay fixed-width so times and counts line up.
+   The font is loaded in app/layout.tsx. */
+@utility font-ui {
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Color system ─────────────────────────────────────────────────────────── */
 
 :root {

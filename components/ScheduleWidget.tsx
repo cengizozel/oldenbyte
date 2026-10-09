@@ -596,7 +596,7 @@ export default function ScheduleWidget({
         {/* Entry editor */}
         {editor && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 overflow-y-auto ${c.bg}`}>
-            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-50 ${c.label}`}>
+            <p className={`text-[11px] font-ui opacity-50 ${c.label}`}>
               {editor.id ? "Edit entry" : "New entry"}
             </p>
             <SettingsInput
@@ -707,7 +707,7 @@ export default function ScheduleWidget({
         {/* Grid-hours settings */}
         {settingsOpen && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
-            <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-50 ${c.label}`}>Grid hours</p>
+            <p className={`text-[11px] font-ui opacity-50 ${c.label}`}>Grid hours</p>
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Day starts</p>
@@ -746,7 +746,7 @@ export default function ScheduleWidget({
         {exportOpen && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
             <div className="flex items-center justify-between">
-              <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-50 ${c.label}`}>Export</p>
+              <p className={`text-[11px] font-ui opacity-50 ${c.label}`}>Export</p>
               <button
                 onClick={copyExport}
                 className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}
@@ -773,7 +773,7 @@ export default function ScheduleWidget({
           const groupDays = src.days.map(d => DAYS_SHORT[d]).join(", ");
           return (
             <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
-              <p className={`text-[10px] uppercase tracking-widest font-[family-name:var(--font-ui-mono)] opacity-50 ${c.label}`}>Split from group</p>
+              <p className={`text-[11px] font-ui opacity-50 ${c.label}`}>Split from group</p>
               <p className={`text-xs leading-relaxed ${c.text} opacity-80`}>
                 "{src.title}" repeats on {groupDays}. Moving this block pulls {DAYS[splitAsk.fromDay]} out of that group:
                 it becomes its own entry at {DAYS[splitAsk.toDay]} {fmt(splitAsk.toStartMin % 1440)}, and the others stay put.

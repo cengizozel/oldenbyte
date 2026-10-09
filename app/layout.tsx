@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Playfair_Display, IBM_Plex_Mono } from "next/font/google";
+import { Playfair_Display, Shantell_Sans } from "next/font/google";
 import Script from "next/script";
 import ThemeHotkey from "@/components/ThemeHotkey";
 import "./globals.css";
@@ -10,10 +10,10 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
-const uiMono = IBM_Plex_Mono({
+// Accent face for labels and the date (the font-ui utility in globals.css).
+const uiFont = Shantell_Sans({
   subsets: ["latin"],
-  weight: ["300", "400", "500"],
-  variable: "--font-ui-mono",
+  variable: "--font-ui",
   display: "swap",
 });
 
@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${playfair.variable} ${uiMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${playfair.variable} ${uiFont.variable}`} suppressHydrationWarning>
       <body>
         {/* Apply the saved theme before paint to avoid a flash of the wrong mode. */}
         <Script id="theme-init" strategy="beforeInteractive">
