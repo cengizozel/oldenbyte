@@ -12,6 +12,15 @@ import { anytypeSearch, anytypeTypes, anytypeReadObject, ANYTYPE_VERSION } from 
 // Reads (spaces, search) carry that token. Search/object reads live in lib/anytype
 // so the chat route can reuse them directly.
 
+// The API only exists while the Anytype desktop app is open, so an
+// unreachable host almost always means the app (or its computer) is off.
+function anytypeError(err: unknown, baseUrl: unknown): string {
+  const msg = String(err instanceof Error ? err.message : err);
+  return msg === "fetch failed" && typeof baseUrl === "string"
+    ? `Can't reach Anytype at ${root(baseUrl)}. Is the Anytype app running on that computer?`
+    : msg;
+}
+
 function root(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, "");
 }
@@ -78,7 +87,7 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });
   } catch (err) {
-    return NextResponse.json({ error: String(err instanceof Error ? err.message : err) }, { status: 502 });
+    return NextResponse.json({ error: anytypeError(err, baseUrl) }, { status: 502 });
   }
 }
 
@@ -153,6 +162,6 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });
   } catch (err) {
-    return NextResponse.json({ error: String(err instanceof Error ? err.message : err) }, { status: 502 });
+    return NextResponse.json({ error: anytypeError(err, baseUrl) }, { status: 502 });
   }
 }
