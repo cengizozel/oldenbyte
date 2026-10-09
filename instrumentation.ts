@@ -10,6 +10,13 @@ export async function register() {
     );
   }
 
+  // Node gives each address family 250 ms to connect before trying the next.
+  // A far-away host with both IPv4 and IPv6 (Hacker News, seen from a server
+  // without working IPv6) needs longer than that over IPv4, so every attempt
+  // failed. 2 s lets the slow-but-working address finish.
+  const net = await import("node:net");
+  net.setDefaultAutoSelectFamilyAttemptTimeout(2000);
+
   const { prisma } = await import("./lib/prisma");
 
   await prisma.$executeRawUnsafe(`
