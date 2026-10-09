@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, Plus, Pencil, Search, LogOut, Shield, GripVertical } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { isDark, toggleTheme, THEME_EVENT } from "@/lib/theme";
-import { layoutKey, instancesKey, type DashboardsState } from "@/lib/dashboards";
+import { layoutKey, instancesKey, PRELOAD_KEY, PRELOAD_EVENT, type DashboardsState } from "@/lib/dashboards";
 import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
 import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, TZ_AUTO } from "@/lib/timezone";
 
@@ -101,9 +101,9 @@ function EditableField({
   }
 
   return (
-    <div className="relative" ref={popoverRef}>
+    <div className="relative min-w-0 max-w-full" ref={popoverRef}>
       <span
-        className={`${className} cursor-pointer`}
+        className={`${className} cursor-pointer block truncate whitespace-nowrap pb-[0.2em]`}
         onClick={() => { setDraft(config); setOpen(o => !o); setError(""); }}
       >
         {display}
@@ -285,7 +285,19 @@ function DateDisplay({ timezone }: { timezone: string }) {
   useEffect(() => {
     const ms = NEEDS_SECONDS.includes(format) ? 1000 : 60_000;
     const id = setInterval(() => setNow(new Date()), ms);
-    return () => clearInterval(id);
+    // Browsers pause timers in background tabs and while the device sleeps, so
+    // a tab left open overnight kept showing the day it was opened. Re-read the
+    // clock whenever the page comes back.
+    const wake = () => { if (document.visibilityState === "visible") setNow(new Date()); };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("focus", wake);
+    window.addEventListener("pageshow", wake);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("pageshow", wake);
+    };
   }, [format]);
 
   useEffect(() => {
@@ -598,6 +610,8 @@ function SettingsPanel({
   onToggleDemo,
   timezone,
   onChangeTimezone,
+  preload,
+  onTogglePreload,
 }: {
   open: boolean;
   onClose: () => void;
@@ -607,6 +621,8 @@ function SettingsPanel({
   onToggleDemo: () => void;
   timezone: string;
   onChangeTimezone: (tz: string) => void;
+  preload: boolean;
+  onTogglePreload: () => void;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -657,6 +673,23 @@ function SettingsPanel({
               <span className="text-sm text-[var(--text-secondary)] shrink-0">Timezone</span>
               <TimezoneSelect value={timezone} onChange={onChangeTimezone} />
             </div>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Performance</span>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[var(--text-secondary)]">Preload dashboards</span>
+              <button
+                onClick={onTogglePreload}
+                title={preload ? "Load dashboards on first visit" : "Load every dashboard at startup"}
+                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${preload ? "bg-[var(--text-muted)]" : "bg-[var(--surface-border-focus)]"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${preload ? "translate-x-4" : "translate-x-0"}`} />
+              </button>
+            </div>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed -mt-1">
+              Load every dashboard in the background when the page opens, so switching between them is instant. Uses more data and memory at startup.
+            </p>
           </section>
 
           <section className="flex flex-col gap-3">
@@ -929,6 +962,18 @@ export default function TopBar({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [demo, setDemo] = useState(false);
   const [timezone, setTz] = useState("");
+  const [preload, setPreload] = useState(false);
+
+  useEffect(() => {
+    storage.getItem(PRELOAD_KEY).then(v => setPreload(v === "1"));
+  }, []);
+
+  function togglePreload() {
+    const next = !preload;
+    setPreload(next);
+    storage.setItem(PRELOAD_KEY, next ? "1" : "0");
+    window.dispatchEvent(new CustomEvent(PRELOAD_EVENT, { detail: next }));
+  }
 
   // Demo state comes from sessionStorage, so it can only be read client-side.
   useEffect(() => {
@@ -964,15 +1009,18 @@ export default function TopBar({
 
   return (
     <>
-    <div className="grid grid-cols-3 items-center min-h-14 md:min-h-16">
-      <div className="flex items-center">
+    {/* Phones: the two text fields share the first row and the date with its
+        controls gets a full-width row below; three columns are too narrow
+        there and wrapped the date and the right-hand text. */}
+    <div className="grid grid-cols-2 md:grid-cols-3 items-center gap-y-2 md:gap-y-0 min-h-14 md:min-h-16">
+      <div className="flex items-center min-w-0">
         <EditableField
           storageKey="topbar-phrase"
           defaultValue="oldenbyte"
           className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none font-[family-name:var(--font-playfair)]"
         />
       </div>
-      <div className="flex flex-col items-center justify-center gap-1.5">
+      <div className="col-span-2 md:col-span-1 order-last md:order-none flex flex-col items-center justify-center gap-1.5">
         <DateDisplay timezone={timezone} />
         <div className="flex items-center gap-3">
           {dashboards && onDashboardsChange && (
@@ -1024,7 +1072,7 @@ export default function TopBar({
           </button>
         </div>
       </div>
-      <div className="flex justify-end items-center group/right">
+      <div className="flex justify-end items-center min-w-0 group/right">
         <EditableField
           storageKey="topbar-mood"
           defaultValue="feeling quiet"
@@ -1042,6 +1090,8 @@ export default function TopBar({
       onToggleDemo={() => (demo ? exitDemoMode() : enterDemoMode())}
       timezone={timezone}
       onChangeTimezone={tz => { setTz(tz); setTimezone(tz); }}
+      preload={preload}
+      onTogglePreload={togglePreload}
     />
     </>
   );

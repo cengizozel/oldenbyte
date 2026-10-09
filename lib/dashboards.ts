@@ -43,3 +43,9 @@ export async function getActiveDataKeys(): Promise<{ layout: string; instances: 
   const d = await getDashboards();
   return { layout: layoutKey(d.activeId), instances: instancesKey(d.activeId) };
 }
+
+// Settings > Performance: when on ("1"), every dashboard mounts at page load
+// instead of on first visit, so switching is instant. The page listens for
+// PRELOAD_EVENT (detail: boolean) to apply a change without a reload.
+export const PRELOAD_KEY = "preload-dashboards";
+export const PRELOAD_EVENT = "preloadchange";

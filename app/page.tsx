@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import TopBar from "@/components/TopBar";
 import WidgetGrid from "@/components/WidgetGrid";
 import { widgets } from "@/lib/widgets";
-import { getDashboards, saveDashboards, type DashboardsState } from "@/lib/dashboards";
+import { getDashboards, saveDashboards, PRELOAD_KEY, PRELOAD_EVENT, type DashboardsState } from "@/lib/dashboards";
 import { maybeSeedFirstRun } from "@/lib/seed";
+import * as storage from "@/lib/storage";
+
+const localDay = () => new Date().toDateString();
 
 export default function Home() {
   const [editing, setEditing] = useState(false);
@@ -14,6 +17,26 @@ export default function Home() {
   // between them keeps widget state instead of reloading everything.
   const [visited, setVisited] = useState<string[]>([]);
   const editControls = useRef<Record<string, { cancel: () => void }>>({});
+  // Settings > Performance: mount every dashboard at load, not just on first visit.
+  const [preload, setPreload] = useState(false);
+
+  useEffect(() => {
+    storage.getItem(PRELOAD_KEY).then(v => setPreload(v === "1"));
+    const onChange = (e: Event) => setPreload(!!(e as CustomEvent).detail);
+    window.addEventListener(PRELOAD_EVENT, onChange);
+    return () => window.removeEventListener(PRELOAD_EVENT, onChange);
+  }, []);
+
+  // Widgets fetch their day's data once, so a tab left open overnight shows
+  // yesterday everywhere. Coming back to the tab on a new day reloads it.
+  useEffect(() => {
+    const loadedOn = localDay();
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && localDay() !== loadedOn) location.reload();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   useEffect(() => {
     // A true first run gets the seeded demo dashboards; everyone else loads
@@ -30,7 +53,14 @@ export default function Home() {
       const kept = prev.filter(id => ids.has(id));
       return kept.includes(dashboards.activeId) ? kept : [...kept, dashboards.activeId];
     });
-  }, [dashboards]);
+    if (!preload) return;
+    // The active dashboard renders first; the rest mount a moment later so
+    // their fetches do not compete with what is on screen.
+    const t = setTimeout(() => {
+      setVisited(prev => [...prev, ...dashboards.list.map(d => d.id).filter(id => !prev.includes(id))]);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [dashboards, preload]);
 
   function handleDashboardsChange(next: DashboardsState) {
     setDashboards(next);
