@@ -210,33 +210,43 @@ type Result = {
   metro?: { bpm: number; onBeatPct: number; avgErr: number; peak?: number };
 };
 
-// Character tally of the run so far. Committed words count every letter as
-// correct / incorrect / extra, and letters skipped with space as missed; the
-// word being typed counts what's there but nothing as missed yet. `wpmChars`
-// only credits fully correct words (plus the space after them) and the
-// still-correct prefix of the current word; `rawChars` credits everything typed.
-function tally(target: string[], typed: string[], cur: string): Chars & { wpmChars: number; rawChars: number } {
+// Character tally of the run so far, counted the way monkeytype counts.
+// Every word is compared together with the space that separates it from the
+// next one (the test's final word has none):
+// - a matching letter is correct; the matching space is correct only when the
+//   whole word is, otherwise that space counts as extra
+// - a typed letter past the end of the target, or typed where the active
+//   word's space belongs, is extra; any other mismatch is incorrect (so
+//   letters skipped with an early space make that space incorrect)
+// - target letters never typed are missed, except in a run that credits the
+//   unfinished last word (timed runs), where the active word misses nothing
+// `wpmChars` credits fully correct words with their space, plus the still
+// correct prefix of the active word in credited runs; `rawChars` is
+// everything typed: correct + incorrect + extra.
+function tally(target: string[], typed: string[], cur: string, fixedEnd: boolean, creditPartial: boolean): Chars & { wpmChars: number; rawChars: number } {
   const t = { correct: 0, incorrect: 0, extra: 0, missed: 0, wpmChars: 0, rawChars: 0 };
-  const count = (g: string, w: string) => {
-    for (let j = 0; j < w.length; j++) {
-      if (j >= g.length) t.extra++;
-      else if (w[j] === g[j]) t.correct++;
-      else t.incorrect++;
+  const compare = (input: string, goal: string, partial: boolean) => {
+    const whole = input === goal;
+    const prefix = goal.startsWith(input);
+    for (let i = 0; i < Math.max(input.length, goal.length); i++) {
+      const got = input[i], want = goal[i];
+      if (got === want) {
+        if (want === " " && !whole) t.extra++;
+        else t.correct++;
+        if (whole || (partial && prefix)) t.wpmChars++;
+      } else if (got === undefined) {
+        if (!partial) t.missed++;
+      } else if (want === undefined || (want === " " && !input.includes(" "))) {
+        t.extra++;
+      } else {
+        t.incorrect++;
+      }
     }
-    t.rawChars += w.length;
   };
-  typed.forEach((w, i) => {
-    const g = target[i] ?? "";
-    count(g, w);
-    if (w.length < g.length) t.missed += g.length - w.length;
-    t.rawChars++; // the space that committed it
-    if (w === g) t.wpmChars += g.length + 1;
-  });
-  if (cur) {
-    const g = target[typed.length] ?? "";
-    count(g, cur);
-    if (g.startsWith(cur)) t.wpmChars += cur.length;
-  }
+  const goalAt = (i: number) => (target[i] ?? "") + (fixedEnd && i === target.length - 1 ? "" : " ");
+  typed.forEach((w, i) => compare(w + " ", goalAt(i), false));
+  if (cur) compare(cur, goalAt(typed.length), creditPartial);
+  t.rawChars = t.correct + t.incorrect + t.extra;
   return t;
 }
 
@@ -406,7 +416,7 @@ export default function TypingWidget({
   const liveWpm = useCallback(() => {
     const start = runRef.current.start;
     if (!start) return 0;
-    const t = tally(wordsRef.current, typedWordsRef.current, curRef.current);
+    const t = tally(wordsRef.current, typedWordsRef.current, curRef.current, !autoRefills(configRef.current), autoRefills(configRef.current));
     return perMinute(t.wpmChars, Math.max(1, (Date.now() - start) / 1000));
   }, []);
 
@@ -419,7 +429,7 @@ export default function TypingWidget({
     let seconds = run.start ? Math.max(0.5, (Date.now() - run.start) / 1000) : 0.5;
     if (cfg.mode === "time") seconds = Math.min(seconds, cfg.length); // timer jitter
 
-    const t = tally(wordsRef.current, typedWordsRef.current, curRef.current);
+    const t = tally(wordsRef.current, typedWordsRef.current, curRef.current, !autoRefills(configRef.current), autoRefills(configRef.current));
     const wpm = perMinute(t.wpmChars, seconds);
     const raw = perMinute(t.rawChars, seconds);
     const acc = run.keystrokes ? Math.round(((run.keystrokes - run.errors) / run.keystrokes) * 100) : 100;
@@ -616,7 +626,14 @@ export default function TypingWidget({
     const run = runRef.current;
     if (!run.start || curRef.current.length === 0) return;
     setCalm(true);
-    run.keystrokes++; // the space counts as a (correct) advance keystroke
+    // Like monkeytype, the space is only a correct keystroke where a space
+    // belongs: right after the word's last letter, and not after a fixed
+    // test's final word (which ends without one).
+    const wi = typedWordsRef.current.length;
+    const word = wordsRef.current[wi] ?? "";
+    const finalWord = !autoRefills(configRef.current) && wi === wordsRef.current.length - 1;
+    run.keystrokes++;
+    if (finalWord || curRef.current.length !== word.length) run.errors++;
     setTypedWords([...typedWordsRef.current, curRef.current]);
     setCur("");
 
