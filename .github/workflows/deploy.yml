@@ -22,6 +22,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      # The Prisma client (and its types) is generated code, not committed.
+      - name: Generate Prisma client
+        run: npx prisma generate
+
       - name: Typecheck
         run: npm run typecheck
 
