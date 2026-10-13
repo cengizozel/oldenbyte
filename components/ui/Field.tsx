@@ -14,6 +14,16 @@ export const FIELD_CLASS =
   "focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] " +
   "placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]";
 
+// Keyboard focus ring for icon buttons and switches: shown only for keyboard
+// focus (focus-visible), in the muted text tone so it reads in both modes.
+// A 24px hit area around a small icon button without changing how it looks or
+// sits: the padding enlarges the click/tap target and the matching negative
+// margin cancels it out in the layout.
+export const HIT_AREA = "p-[5px] -m-[5px] rounded-md";
+
+export const FOCUS_RING =
+  "outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-muted)] rounded-md";
+
 export function SettingsInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${FIELD_CLASS} ${className}`} />;
 }

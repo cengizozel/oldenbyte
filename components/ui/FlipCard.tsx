@@ -43,6 +43,9 @@ export default function FlipCard({
             WebkitBackfaceVisibility: "hidden",
             pointerEvents: flipped ? "none" : "auto",
           }}
+          // The hidden face stays in the DOM for the flip animation; inert keeps
+          // it out of the tab order and the accessibility tree.
+          inert={flipped}
         >
           {front}
         </div>
@@ -54,6 +57,7 @@ export default function FlipCard({
             transform: "rotateY(180deg)",
             pointerEvents: flipped ? "auto" : "none",
           }}
+          inert={!flipped}
         >
           {back}
         </div>

@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type RefObject } from "react";
 import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, Plus, Pencil, Search, LogOut, Shield, GripVertical } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { isDark, toggleTheme, THEME_EVENT } from "@/lib/theme";
 import { layoutKey, instancesKey, PRELOAD_KEY, PRELOAD_EVENT, type DashboardsState } from "@/lib/dashboards";
 import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
 import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, TZ_AUTO } from "@/lib/timezone";
+import Toggle from "@/components/ui/Toggle";
+import { FOCUS_RING } from "@/components/ui/Field";
 
 // ── EditableField ─────────────────────────────────────────────────────────
 
@@ -50,7 +52,7 @@ function EditableField({
         }
       } catch {}
     });
-  }, [storageKey]);
+  }, [storageKey, defaultValue]);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -103,8 +105,16 @@ function EditableField({
   return (
     <div className="relative min-w-0 max-w-full" ref={popoverRef}>
       <span
-        className={`${className} cursor-pointer block truncate whitespace-nowrap pb-[0.2em]`}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        className={`${className} cursor-pointer block truncate whitespace-nowrap pb-[0.2em] ${FOCUS_RING}`}
         onClick={() => { setDraft(config); setOpen(o => !o); setError(""); }}
+        onKeyDown={e => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          setDraft(config); setOpen(o => !o); setError("");
+        }}
       >
         {display}
       </span>
@@ -522,7 +532,7 @@ function AccountSection({ open }: { open: boolean }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Account</span>
+      <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Account</span>
 
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-[var(--text-secondary)] truncate" title={me.username}>{me.username}</span>
@@ -612,9 +622,12 @@ function SettingsPanel({
   onChangeTimezone,
   preload,
   onTogglePreload,
+  returnFocusRef,
 }: {
   open: boolean;
   onClose: () => void;
+  // Gets focus back when the drawer closes (the settings button).
+  returnFocusRef?: RefObject<HTMLElement | null>;
   dark: boolean;
   onToggleDark: () => void;
   demo: boolean;
@@ -631,18 +644,37 @@ function SettingsPanel({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Focus moves into the drawer when it opens and back to the settings button
+  // when it closes (not on first mount, when it starts closed).
+  const panelRef = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open) panelRef.current?.focus({ preventScroll: true });
+    else if (wasOpen.current) returnFocusRef?.current?.focus({ preventScroll: true });
+    wasOpen.current = open;
+  }, [open, returnFocusRef]);
+
   return (
     <>
       <div
         className={`fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px] transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={onClose}
+        aria-hidden
       />
+      {/* Closed: slid off screen and inert, so it is neither tabbable nor read. */}
       <div
-        className={`fixed top-0 right-0 h-full w-72 z-50 bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${open ? "translate-x-0" : "translate-x-full"}`}
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        aria-hidden={!open}
+        inert={!open}
+        tabIndex={-1}
+        className={`fixed top-0 right-0 h-full w-72 z-50 bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl flex flex-col outline-none transition-transform duration-300 ease-in-out ${open ? "translate-x-0" : "translate-x-full"}`}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[var(--surface-border)]">
           <span className="text-sm font-medium text-[var(--text-primary)]">Settings</span>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+          <button onClick={onClose} aria-label="Close settings" title="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors ${FOCUS_RING}`}>
             <X size={14} />
           </button>
         </div>
@@ -651,24 +683,18 @@ function SettingsPanel({
           <AccountSection open={open} />
 
           <section className="flex flex-col gap-3">
-            <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Appearance</span>
+            <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Appearance</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">
                 Dark mode
-                <kbd className="ml-2 px-1.5 py-0.5 rounded border border-[var(--surface-border)] text-[10px] text-[var(--text-muted)] align-middle">⇧D</kbd>
+                <kbd className="ml-2 px-1.5 py-0.5 rounded border border-[var(--surface-border)] text-[12px] text-[var(--text-muted)] align-middle">⇧D</kbd>
               </span>
-              <button
-                onClick={onToggleDark}
-                title="Toggle dark mode (Shift+D)"
-                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${dark ? "bg-[var(--text-muted)]" : "bg-[var(--surface-border-focus)]"}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${dark ? "translate-x-4" : "translate-x-0"}`} />
-              </button>
+              <Toggle checked={dark} onChange={onToggleDark} label="Dark mode" title="Toggle dark mode (Shift+D)" />
             </div>
           </section>
 
           <section className="flex flex-col gap-2">
-            <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Time</span>
+            <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Time</span>
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-[var(--text-secondary)] shrink-0">Timezone</span>
               <TimezoneSelect value={timezone} onChange={onChangeTimezone} />
@@ -676,16 +702,15 @@ function SettingsPanel({
           </section>
 
           <section className="flex flex-col gap-3">
-            <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Performance</span>
+            <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Performance</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">Preload dashboards</span>
-              <button
-                onClick={onTogglePreload}
+              <Toggle
+                checked={preload}
+                onChange={onTogglePreload}
+                label="Preload dashboards"
                 title={preload ? "Load dashboards on first visit" : "Load every dashboard at startup"}
-                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${preload ? "bg-[var(--text-muted)]" : "bg-[var(--surface-border-focus)]"}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${preload ? "translate-x-4" : "translate-x-0"}`} />
-              </button>
+              />
             </div>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed -mt-1">
               Load every dashboard in the background when the page opens, so switching between them is instant. Uses more data and memory at startup.
@@ -693,16 +718,10 @@ function SettingsPanel({
           </section>
 
           <section className="flex flex-col gap-3">
-            <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Preview</span>
+            <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Preview</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">Demo mode</span>
-              <button
-                onClick={onToggleDemo}
-                title={demo ? "Exit demo mode" : "Enter demo mode"}
-                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${demo ? "bg-[var(--text-muted)]" : "bg-[var(--surface-border-focus)]"}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${demo ? "translate-x-4" : "translate-x-0"}`} />
-              </button>
+              <Toggle checked={demo} onChange={onToggleDemo} label="Demo mode" title={demo ? "Exit demo mode" : "Enter demo mode"} />
             </div>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed -mt-1">
               Preview the first-run dashboards with sample data. Your own data is untouched and nothing you change in demo mode is saved.
@@ -711,7 +730,7 @@ function SettingsPanel({
         </div>
 
         <div className="shrink-0 px-5 py-3 border-t border-[var(--surface-border)]">
-          <p className="text-[10px] text-[var(--text-muted)]">
+          <p className="text-[12px] text-[var(--text-muted)]">
             oldenbyte © 2026{" "}
             <a
               href="https://github.com/cengizozel/oldenbyte"
@@ -887,16 +906,18 @@ function DashboardSwitcher({
               )}
               <button
                 onClick={() => { setRenamingId(d.id); setDraft(d.name); }}
-                className="opacity-0 group-hover/dash:opacity-60 hover:!opacity-100 text-[var(--text-secondary)] shrink-0"
+                className={`opacity-0 group-hover/dash:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0`}
                 title="Rename"
+                aria-label={`Rename ${d.name}`}
               >
                 <Pencil size={11} />
               </button>
               {dashboards.list.length > 1 && (
                 <button
                   onClick={() => removeDashboard(d.id)}
-                  className="opacity-0 group-hover/dash:opacity-60 hover:!opacity-100 text-[var(--text-secondary)] shrink-0 mr-1.5"
+                  className={`opacity-0 group-hover/dash:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0 mr-1.5`}
                   title="Delete dashboard"
+                  aria-label={`Delete ${d.name}`}
                 >
                   <X size={11} />
                 </button>
@@ -963,6 +984,7 @@ export default function TopBar({
   const [demo, setDemo] = useState(false);
   const [timezone, setTz] = useState("");
   const [preload, setPreload] = useState(false);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     storage.getItem(PRELOAD_KEY).then(v => setPreload(v === "1"));
@@ -997,7 +1019,7 @@ export default function TopBar({
     });
   }, []);
 
-  // Theme can be toggled from here or the global Shift+D hotkey — sync the switch
+  // Theme can be toggled from here or the global Shift+D hotkey; sync the switch
   // UI from the shared `themechange` event.
   useEffect(() => {
     const onChange = (e: Event) => setDark(!!(e as CustomEvent).detail);
@@ -1029,7 +1051,7 @@ export default function TopBar({
           {demo && (
             <button
               onClick={exitDemoMode}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-ui text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[12px] font-ui text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
               title="Exit demo mode"
             >
               demo
@@ -1039,7 +1061,7 @@ export default function TopBar({
           {editing && onCancelEdit && (
             <button
               onClick={onCancelEdit}
-              className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)] p-[5px] -m-[5px] rounded-md"
               title="Cancel layout changes"
             >
               <X size={14} />
@@ -1047,7 +1069,7 @@ export default function TopBar({
           )}
           <button
             onClick={onToggleEdit}
-            className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)] p-[5px] -m-[5px] rounded-md"
             title={editing ? "Done editing" : "Edit layout"}
           >
             {editing ? <Check size={14} /> : <LayoutGrid size={14} />}
@@ -1057,16 +1079,20 @@ export default function TopBar({
           {!demo && (
             <a
               href="/digest"
-              className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)] p-[5px] -m-[5px] rounded-md"
               title="Morning digest"
             >
               <Newspaper size={14} />
             </a>
           )}
           <button
+            ref={settingsButtonRef}
             onClick={() => setSettingsOpen(o => !o)}
-            className="transition-colors text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            className="transition-colors text-[var(--text-muted)] hover:text-[var(--text-secondary)] p-[5px] -m-[5px] rounded-md"
             title="Settings"
+            aria-label="Settings"
+            aria-expanded={settingsOpen}
+            aria-haspopup="dialog"
           >
             <Settings size={14} />
           </button>
@@ -1092,6 +1118,7 @@ export default function TopBar({
       onChangeTimezone={tz => { setTz(tz); setTimezone(tz); }}
       preload={preload}
       onTogglePreload={togglePreload}
+      returnFocusRef={settingsButtonRef}
     />
     </>
   );

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { GripVertical, Download, Upload, Search, Undo2, Redo2, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import type { Widget } from "@/lib/widgets";
 import { colorMap, WIDGET_CATEGORIES } from "@/lib/widgets";
+import { FOCUS_RING } from "@/components/ui/Field";
 
 // Edit-mode widget picker. A draggable floating panel with search and
 // category groups, so the catalog stays usable as widget count grows.
@@ -131,6 +132,7 @@ export default function WidgetShelf({
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search widgets"
+                aria-label="Search widgets"
                 className="w-full bg-transparent text-xs outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
               />
             </div>
@@ -138,6 +140,7 @@ export default function WidgetShelf({
               onClick={() => toggleCollapsed(true)}
               className="p-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors shrink-0"
               title="Collapse to a pill"
+              aria-label="Collapse the widget picker"
             >
               <ChevronDown size={14} />
             </button>
@@ -151,7 +154,7 @@ export default function WidgetShelf({
       <div className="flex-1 max-h-[50vh] overflow-y-auto px-3 pb-2 flex flex-col gap-2.5">
         {groups.map(group => (
           <div key={group.id}>
-            <div className="text-[11px] text-[var(--text-muted)] font-ui mb-1.5">
+            <div className="text-[12px] text-[var(--text-muted)] font-ui mb-1.5">
               {group.label}
             </div>
             <div className="grid grid-cols-2 gap-1.5">
@@ -165,7 +168,16 @@ export default function WidgetShelf({
                     onDragStart={() => onTemplateDragStart(template)}
                     onDragEnd={onTemplateDragEnd}
                     onClick={() => onAdd(template)}
-                    className={`px-2.5 py-2 rounded-xl border cursor-grab select-none min-w-0 ${c.bg} ${c.border}`}
+                    // Keyboard users add with Enter or Space (dragging is mouse only).
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Add ${template.title}`}
+                    onKeyDown={e => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault();
+                      onAdd(template);
+                    }}
+                    className={`px-2.5 py-2 rounded-xl border cursor-grab select-none min-w-0 ${FOCUS_RING} !rounded-xl ${c.bg} ${c.border}`}
                   >
                     <span className={`block truncate text-xs font-semibold ${c.label}`}>{template.title}</span>
                   </div>

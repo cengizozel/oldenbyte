@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ComponentType } from "react";
+import { createPortal } from "react-dom";
 import * as storage from "@/lib/storage";
 import { Layers } from "lucide-react";
 import GridLayout from "react-grid-layout";
 import type { Layout as LayoutItem } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
-import type { Widget } from "@/lib/widgets";
-import { colorMap, widgets as widgetDefs } from "@/lib/widgets";
+import type { Widget, WidgetType, WidgetSize } from "@/lib/widgets";
+import { colorMap, widgets as widgetDefs, defaultSizeFor, instanceOf } from "@/lib/widgets";
+import { WidgetActiveContext, usePageVisible } from "@/lib/activeDashboard";
 import { layoutKey, instancesKey } from "@/lib/dashboards";
 import { isDemoMode } from "@/lib/demo";
 import WidgetCard from "./WidgetCard";
@@ -66,47 +68,89 @@ const initialInstances: Record<string, Widget> = {
   "chat-default":  { id: "chat-default",  type: "chat",     color: "sky",    title: "Chat",     description: "Chat with a local or OpenAI-compatible model." },
 };
 
+// Type to component. Kept here rather than on the registry in lib/widgets.ts:
+// that module is imported by the widgets themselves and by server code, so
+// pointing it at components would create import cycles and pull client code
+// into server bundles. The Record type makes a missing entry a type error.
+type WidgetProps = { widget: Widget; className?: string };
+const WIDGET_COMPONENTS: Record<Exclude<WidgetType, "custom" | "empty">, ComponentType<WidgetProps>> = {
+  notebook: NotebookWidget,
+  text: TextWidget,
+  rss: RssWidget,
+  reddit: RedditWidget,
+  youtube: YoutubeWidget,
+  ebook: ReaderWidget,
+  f1: F1Widget,
+  weather: WeatherWidget,
+  calendar: CalendarWidget,
+  schedule: ScheduleWidget,
+  arxiv: ArxivWidget,
+  hf: HuggingFaceWidget,
+  tracker: TrackerWidget,
+  rhythm: RhythmWidget,
+  upkeep: UpkeepWidget,
+  bookmarks: BookmarksWidget,
+  typing: TypingWidget,
+  chess: ChessWidget,
+  tv: TvWidget,
+  chat: ChatWidget,
+  kiwix: KiwixWidget,
+  anytype: AnytypeWidget,
+};
+
 function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, BankWidgetDef> = {}) {
   const cls = `h-full ${extraClass}`;
-  if (widget.type === "custom")   return <BankWidget widget={widget} def={widget.bankId ? bankDefs[widget.bankId] : undefined} className={cls} />;
-  if (widget.type === "notebook") return <NotebookWidget widget={widget} className={cls} />;
-  if (widget.type === "text")     return <TextWidget     widget={widget} className={cls} />;
-  if (widget.type === "rss")      return <RssWidget      widget={widget} className={cls} />;
-  if (widget.type === "reddit")   return <RedditWidget   widget={widget} className={cls} />;
-  if (widget.type === "youtube")  return <YoutubeWidget  widget={widget} className={cls} />;
-  if (widget.type === "ebook")    return <ReaderWidget   widget={widget} className={cls} />;
-  if (widget.type === "f1")       return <F1Widget       widget={widget} className={cls} />;
-  if (widget.type === "weather")  return <WeatherWidget  widget={widget} className={cls} />;
-  if (widget.type === "calendar") return <CalendarWidget widget={widget} className={cls} />;
-  if (widget.type === "schedule") return <ScheduleWidget widget={widget} className={cls} />;
-  if (widget.type === "arxiv")    return <ArxivWidget    widget={widget} className={cls} />;
-  if (widget.type === "hf")       return <HuggingFaceWidget widget={widget} className={cls} />;
-  if (widget.type === "tracker")  return <TrackerWidget   widget={widget} className={cls} />;
-  if (widget.type === "rhythm")   return <RhythmWidget    widget={widget} className={cls} />;
-  if (widget.type === "upkeep")   return <UpkeepWidget    widget={widget} className={cls} />;
-  if (widget.type === "bookmarks") return <BookmarksWidget widget={widget} className={cls} />;
-  if (widget.type === "typing")   return <TypingWidget    widget={widget} className={cls} />;
-  if (widget.type === "chess")    return <ChessWidget     widget={widget} className={cls} />;
-  if (widget.type === "tv")       return <TvWidget        widget={widget} className={cls} />;
-  if (widget.type === "chat")     return <ChatWidget      widget={widget} className={cls} />;
-  if (widget.type === "kiwix")    return <KiwixWidget     widget={widget} className={cls} />;
-  if (widget.type === "anytype")  return <AnytypeWidget   widget={widget} className={cls} />;
+  if (widget.type === "custom") return <BankWidget widget={widget} def={widget.bankId ? bankDefs[widget.bankId] : undefined} className={cls} />;
+  const Component = widget.type === "empty" ? undefined : WIDGET_COMPONENTS[widget.type];
+  if (Component) return <Component widget={widget} className={cls} />;
   return <WidgetCard widget={widget} className={cls} />;
+}
+
+// Each widget renders exactly once, through a portal into its own persistent
+// DOM node, from a fixed spot in the tree (see the end of WidgetGrid). The
+// edit grid and the three view layouts only render WidgetSlot placeholders that
+// adopt that node. So toggling edit mode or crossing a breakpoint moves DOM
+// instead of remounting widgets: chat streams, readers and feeds keep going.
+// moveBefore() (where supported) moves nodes without resetting iframes or
+// scroll positions; appendChild is the fallback.
+function moveNode(parent: Element, node: Element) {
+  if (node.parentNode === parent) return;
+  const p = parent as Element & { moveBefore?: (node: Node, child: Node | null) => void };
+  if (typeof p.moveBefore === "function" && parent.isConnected && node.isConnected) {
+    try { p.moveBefore(node, null); return; } catch {}
+  }
+  parent.appendChild(node);
+}
+
+function WidgetSlot({ node, park }: { node: HTMLDivElement; park: (node: HTMLDivElement) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Layout effect so the node is in place before paint. On unmount the node is
+  // parked (still in the document) until the next layout's slot adopts it,
+  // which happens in the same commit when the layout variant changes.
+  useLayoutEffect(() => {
+    const host = ref.current;
+    if (!host) return;
+    moveNode(host, node);
+    return () => { if (node.parentNode === host) park(node); };
+  }, [node, park]);
+  return <div ref={ref} className="h-full" />;
 }
 
 export default function WidgetGrid({
   widgets,
   editing = false,
-  onToggleEdit,
   onRegisterEditControls,
   dashboardId = "default",
+  active = true,
 }: {
   widgets: Widget[];
   editing?: boolean;
-  onToggleEdit?: () => void;
   // Lets the TopBar cancel an edit session (revert to the pre-edit layout).
   onRegisterEditControls?: (controls: { cancel: () => void }) => void;
   dashboardId?: string;
+  // Whether this dashboard is the one on screen (page.tsx keeps hidden ones
+  // mounted). Feeds useWidgetActive() together with tab visibility.
+  active?: boolean;
 }) {
   const LAYOUT_KEY = layoutKey(dashboardId);
   const INSTANCES_KEY = instancesKey(dashboardId);
@@ -150,7 +194,25 @@ export default function WidgetGrid({
       .catch(() => {});
   }, []);
 
-  const renderW = (w: Widget, extraClass = "") => renderWidget(w, extraClass, bankDefs);
+  const pageVisible = usePageVisible();
+
+  // Persistent per-widget DOM nodes the portals render into (see WidgetSlot).
+  // Created on first use, dropped once the widget leaves the dashboard.
+  const nodesRef = useRef(new Map<string, HTMLDivElement>());
+  const parkingRef = useRef<HTMLDivElement>(null);
+  const getNode = (id: string) => {
+    let node = nodesRef.current.get(id);
+    if (!node) {
+      node = document.createElement("div");
+      node.style.height = "100%";
+      nodesRef.current.set(id, node);
+    }
+    return node;
+  };
+  const park = useCallback((node: HTMLDivElement) => {
+    if (parkingRef.current) moveNode(parkingRef.current, node);
+  }, []);
+  const slot = (id: string) => <WidgetSlot node={getNode(id)} park={park} />;
   const [gridReady, setGridReady] = useState(false);
   const [groupingSource, setGroupingSource] = useState<string | null>(null);
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
@@ -232,7 +294,7 @@ export default function WidgetGrid({
   }, [onRegisterEditControls]);
 
   // Load persisted layout from DB after hydration. Only mark loaded (which
-  // enables the persist effects below) once the reads SUCCEED — a failed read
+  // enables the persist effects below) once the reads SUCCEED: a failed read
   // must not let the in-memory default get written over real, momentarily
   // unreachable data (e.g. during a deploy restart). It retries on next mount.
   useEffect(() => {
@@ -264,7 +326,9 @@ export default function WidgetGrid({
       } catch {}
       setLoaded(true);
     });
-  }, []);
+    // The keys derive from dashboardId, fixed for this grid's lifetime (each
+    // dashboard mounts its own grid), so this runs once.
+  }, [LAYOUT_KEY, INSTANCES_KEY]);
 
   const [droppingId, setDroppingId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -286,13 +350,13 @@ export default function WidgetGrid({
     if (!loaded) return;
     if (!layoutHydrated.current) { layoutHydrated.current = true; return; }
     storage.setItem(LAYOUT_KEY, JSON.stringify(layout));
-  }, [layout, loaded]);
+  }, [layout, loaded, LAYOUT_KEY]);
 
   useEffect(() => {
     if (!loaded) return;
     if (!instancesHydrated.current) { instancesHydrated.current = true; return; }
     storage.setItem(INSTANCES_KEY, JSON.stringify(instances));
-  }, [instances, loaded]);
+  }, [instances, loaded, INSTANCES_KEY]);
 
   // Cancel grouping mode when edit mode is turned off
   useEffect(() => {
@@ -367,30 +431,12 @@ export default function WidgetGrid({
     });
   }
 
-  const DEFAULT_SIZE: Partial<Record<string, { w: number; h: number }>> = {
-    notebook: { w: 2, h: 2 },
-    ebook:    { w: 2, h: 3 },
-    text:     { w: 2, h: 1 },
-    rss:      { w: 2, h: 3 },
-    reddit:   { w: 1, h: 3 },
-    youtube:  { w: 1, h: 3 },
-    f1:       { w: 1, h: 2 },
-    weather:  { w: 1, h: 3 },
-    calendar: { w: 1, h: 3 },
-    arxiv:    { w: 2, h: 3 },
-    hf:       { w: 2, h: 3 },
-    tracker:  { w: 1, h: 3 },
-    rhythm:   { w: 1, h: 3 },
-    upkeep:   { w: 1, h: 3 },
-    bookmarks: { w: 1, h: 3 },
-    typing:   { w: 2, h: 3 },
-    schedule: { w: 2, h: 4 },
-    chess:    { w: 2, h: 4 },
-    chat:     { w: 1, h: 4 },
-    kiwix:    { w: 1, h: 4 },
-    anytype:  { w: 1, h: 4 },
-    tv:       { w: 2, h: 3 },
-  };
+  // Starting size for a new or ungrouped instance: bank defs carry their own,
+  // built-in types read it from the registry in lib/widgets.ts.
+  function sizeFor(w: Widget | undefined): WidgetSize {
+    if (w?.type === "custom") return (w.bankId ? bankDefs[w.bankId]?.defaultSize : undefined) ?? { w: 1, h: 3 };
+    return defaultSizeFor(w?.type ?? "empty");
+  }
 
   function findNextPosition(
     currentLayout: TabLayoutItem[],
@@ -447,9 +493,7 @@ export default function WidgetGrid({
   function addWidget(template: Widget, instanceId?: string) {
     pushHistory();
     const id = instanceId ?? `${template.id}-${Date.now()}`;
-    const { w: dw, h: dh } = template.type === "custom"
-      ? (template.bankId ? bankDefs[template.bankId]?.defaultSize : undefined) ?? { w: 1, h: 3 }
-      : DEFAULT_SIZE[template.type] ?? { w: 2, h: 2 };
+    const { w: dw, h: dh } = sizeFor(template);
     const { x, y, w, h } = findNextPosition(layout, dw, dh);
 
     const layoutIds = new Set(layout.map(l => l.i));
@@ -461,7 +505,7 @@ export default function WidgetGrid({
       ? template.title
       : `${template.title} ${sameType.length + 1}`;
 
-    setInstances(prev => ({ ...prev, [id]: { ...template, id, title } }));
+    setInstances(prev => ({ ...prev, [id]: instanceOf(template, id, title) }));
     setLayout(l => [...l, {
       i: id, x, y, w, h,
       minW: 1, minH: 1, maxW: 4, maxH: 6,
@@ -508,8 +552,7 @@ export default function WidgetGrid({
           ? { ...item, tabs: (item.tabs ?? []).filter(t => t !== tabId) }
           : item
       );
-      const widget = instances[tabId];
-      const { w: dw, h: dh } = DEFAULT_SIZE[widget?.type ?? ""] ?? { w: 2, h: 2 };
+      const { w: dw, h: dh } = sizeFor(instances[tabId]);
       const pos = findNextPosition(updated, dw, dh);
       return [...updated, { i: tabId, x: pos.x, y: pos.y, w: pos.w, h: pos.h, minW: 1, minH: 1, maxW: 4, maxH: 6 }];
     });
@@ -523,9 +566,8 @@ export default function WidgetGrid({
   function renderWithTabs(item: TabLayoutItem, isEditMode: boolean) {
     const hasTabs = (item.tabs?.length ?? 0) > 0;
     if (!hasTabs) {
-      const widget = instances[item.i];
-      if (!widget) return null;
-      return renderW(widget);
+      if (!instances[item.i]) return null;
+      return slot(item.i);
     }
     const activeId = activeTabs[item.i] ?? item.i;
     const activeWidget = instances[activeId];
@@ -542,7 +584,7 @@ export default function WidgetGrid({
                 key={tabId}
                 onMouseDown={e => e.stopPropagation()}
                 onClick={() => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all border ${
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-all border ${
                   isActive
                     ? `${c.bg} ${c.border} opacity-100`
                     : "bg-transparent border-transparent opacity-40 hover:opacity-70"
@@ -566,7 +608,7 @@ export default function WidgetGrid({
             if (!w) return null;
             return (
               <div key={tabId} className="absolute inset-0" style={{ display: tabId === activeId ? "block" : "none" }}>
-                {renderW(w, "!rounded-none !border-0 !shadow-none")}
+                {slot(tabId)}
               </div>
             );
           })}
@@ -575,9 +617,38 @@ export default function WidgetGrid({
     );
   }
 
+  // Every widget placed on the dashboard (cells and their tabs), with the
+  // classes it renders with. Tab members drop their own card chrome because the
+  // tab container draws it. This list, not the layout variant, decides what is
+  // mounted, so a widget only unmounts when it leaves the dashboard.
+  const mounted: { id: string; extraClass: string }[] = [];
+  if (loaded) {
+    const seen = new Set<string>();
+    for (const item of layout) {
+      const tabbed = (item.tabs?.length ?? 0) > 0;
+      for (const id of [item.i, ...(item.tabs ?? [])]) {
+        if (seen.has(id) || !instances[id]) continue;
+        seen.add(id);
+        mounted.push({ id, extraClass: tabbed ? "!rounded-none !border-0 !shadow-none" : "" });
+      }
+    }
+  }
+  const mountedKey = mounted.map(m => m.id).join("|");
+
+  // Drop the DOM nodes of widgets that left the dashboard (their portals have
+  // unmounted by now). Undoing a removal mounts the widget fresh.
+  useEffect(() => {
+    const keep = new Set(mountedKey ? mountedKey.split("|") : []);
+    for (const [id, node] of nodesRef.current) {
+      if (keep.has(id)) continue;
+      node.remove();
+      nodesRef.current.delete(id);
+    }
+  }, [mountedKey]);
+
   return (
-    <>
-    {/* Fixed shelf — outside the flex column so it never shifts children indices */}
+    <WidgetActiveContext.Provider value={active && pageVisible}>
+    {/* Fixed shelf: outside the flex column so it never shifts children indices */}
     {editing && (
       <WidgetShelf
         templates={widgets}
@@ -590,7 +661,7 @@ export default function WidgetGrid({
         onWipe={wipe}
         onTemplateDragStart={template => {
           const id = `${template.id}-${Date.now()}`;
-          setInstances(prev => ({ ...prev, [id]: { ...template, id } }));
+          setInstances(prev => ({ ...prev, [id]: instanceOf(template, id) }));
           setDroppingId(id);
         }}
         onTemplateDragEnd={() => setDroppingId(null)}
@@ -687,7 +758,7 @@ export default function WidgetGrid({
                                     key={tabId}
                                     onMouseDown={e => e.stopPropagation()}
                                     onClick={() => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
-                                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all border ${
+                                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-all border ${
                                       isActive
                                         ? `${c.bg} ${c.border} opacity-100`
                                         : "bg-transparent border-transparent opacity-40 hover:opacity-70"
@@ -713,22 +784,19 @@ export default function WidgetGrid({
                       {(() => {
                         const activeId = activeTabs[item.i] ?? item.i;
                         const hasTabs = (item.tabs?.length ?? 0) > 0;
-                        if (!hasTabs) {
-                          const w = instances[item.i];
-                          return w ? renderW(w) : null;
-                        }
+                        if (!hasTabs) return instances[item.i] ? slot(item.i) : null;
                         return [item.i, ...(item.tabs ?? [])].map(tabId => {
                           const w = instances[tabId];
                           if (!w) return null;
                           return (
                             <div key={tabId} className="absolute inset-0" style={{ display: tabId === activeId ? "block" : "none" }}>
-                              {renderW(w, "!rounded-none !border-0 !shadow-none")}
+                              {slot(tabId)}
                             </div>
                           );
                         });
                       })()}
                     </div>
-                    {/* Border overlay — highlighted when this is the grouping source */}
+                    {/* Border overlay, highlighted when this is the grouping source */}
                     <div className={`absolute inset-0 z-10 rounded-2xl border-2 cursor-grab transition-colors ${
                       isGroupingSource
                         ? "border-blue-400 bg-blue-400/10"
@@ -751,6 +819,9 @@ export default function WidgetGrid({
                     <button
                       onMouseDown={e => e.stopPropagation()}
                       onClick={() => handleGroupStart(i)}
+                      aria-label={isGroupingSource ? "Cancel grouping" : "Group with another widget as tabs"}
+                      aria-pressed={isGroupingSource}
+                      title={isGroupingSource ? "Cancel grouping" : "Group as tabs"}
                       className={`absolute top-2 right-8 z-20 w-5 h-5 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
                         isGroupingSource
                           ? "bg-blue-100 border-blue-300 text-blue-600"
@@ -763,6 +834,8 @@ export default function WidgetGrid({
                     <button
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={() => removeWidget(i)}
+                      aria-label={`Remove ${widget.title}`}
+                      title="Remove widget"
                       className="absolute top-2 right-2 z-20 w-5 h-5 flex items-center justify-center rounded-full bg-white border border-neutral-200 text-neutral-400 hover:text-neutral-600 text-sm leading-none shadow-sm"
                     >
                       ×
@@ -846,6 +919,13 @@ export default function WidgetGrid({
       </div>
 
     </div>
-    </>
+
+    {/* Stable portal host: rendered after the layouts so their slots adopt the
+        nodes before widget layout effects run. Also parks nodes between
+        slots. Never moves in the tree, so widgets never remount. */}
+    <div ref={parkingRef} aria-hidden className="fixed w-0 h-0 overflow-hidden invisible pointer-events-none">
+      {mounted.map(({ id, extraClass }) => createPortal(renderWidget(instances[id], extraClass, bankDefs), getNode(id), id))}
+    </div>
+    </WidgetActiveContext.Provider>
   );
 }

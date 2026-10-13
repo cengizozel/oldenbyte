@@ -3,18 +3,21 @@
 import type { ReactNode } from "react";
 import { Pencil, Check, X, RotateCcw, Loader, RefreshCw } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
+import { FOCUS_RING, HIT_AREA } from "./Field";
 
 // Small shared pieces of widget chrome: the hover pencil, scroll fades, the
 // loading spinner, empty-state copy, and the settings save/cancel row.
 
-// Settings entry point. Hidden until the card is hovered (always visible on
-// touch devices), matching the pattern every widget previously inlined.
+// Settings entry point. Hidden until the card is hovered or the button gets
+// keyboard focus (always visible on touch devices), matching the pattern every
+// widget previously inlined.
 export function PencilButton({ c, onClick, title }: { c: ColorClasses; onClick: () => void; title?: string }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
+      aria-label={title ?? "Settings"}
+      className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
     >
       <Pencil size={14} />
     </button>
@@ -29,7 +32,8 @@ export function RefreshButton({ c, onClick, busy }: { c: ColorClasses; onClick: 
       onClick={onClick}
       disabled={busy}
       title="Refresh now"
-      className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 disabled:opacity-40 ${c.icon}`}
+      aria-label="Refresh now"
+      className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 disabled:opacity-40 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
     >
       <RefreshCw size={13} className={busy ? "animate-spin" : undefined} />
     </button>
@@ -61,7 +65,7 @@ export function LoadingState({ c }: { c: ColorClasses }) {
 export function EmptyState({ c, action, children }: { c: ColorClasses; action?: string; children?: ReactNode }) {
   return (
     <div className="flex-1 h-full min-h-0 flex items-center justify-center text-center px-4">
-      <p className={`text-xs opacity-45 ${c.text}`}>
+      <p className={`text-xs opacity-60 ${c.text}`}>
         {children ?? `hover and click the pencil to ${action}`}
       </p>
     </div>

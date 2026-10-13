@@ -249,7 +249,7 @@ function PdfViewer({
             </button>
             <button
               onClick={() => setZoom(1)}
-              className={`text-neutral-400 hover:text-neutral-700 tabular-nums ${fullscreen ? "text-xs" : "text-[10px]"}`}
+              className={`text-neutral-400 hover:text-neutral-700 tabular-nums ${fullscreen ? "text-xs" : "text-[12px]"}`}
               title="Reset zoom"
             >
               {Math.round(zoom * 100)}%
@@ -741,7 +741,7 @@ export default function ReaderWidget({
             {compact ? "Upload new file" : "Upload PDF or EPUB"}
           </button>
           {!compact && (
-            <p className={`text-xs opacity-40 ${c.text}`}>or drag and drop</p>
+            <p className={`text-xs opacity-60 ${c.text}`}>or drag and drop</p>
           )}
         </>
       )}
@@ -902,7 +902,7 @@ export default function ReaderWidget({
                     ))}
                   </ul>
                 ) : (
-                  <p className={`text-xs opacity-40 pt-2 ${c.text}`}>Empty folder. Upload a PDF or EPUB here, or drop one in.</p>
+                  <p className={`text-xs opacity-60 pt-2 ${c.text}`}>Empty folder. Upload a PDF or EPUB here, or drop one in.</p>
                 )}
               </div>
 

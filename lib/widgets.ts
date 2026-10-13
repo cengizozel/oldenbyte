@@ -22,7 +22,12 @@ export type Widget = {
   category?: WidgetCategory;
   // For type "custom": which widget-bank definition renders this instance.
   bankId?: string;
+  // Registry only: grid cells a new instance starts with. Stripped by
+  // instanceOf() so it is never persisted on placed instances.
+  defaultSize?: WidgetSize;
 };
+
+export type WidgetSize = { w: number; h: number };
 
 export type ColorClasses = {
   bg: string;
@@ -36,7 +41,7 @@ export type ColorClasses = {
 
 export const colorMap: Record<WidgetColor, ColorClasses> = {
   // `icon` is the color for small action icons (pencil, history, settings…),
-  // using each palette's `text` tone — the higher-contrast-against-bg shade in
+  // using each palette's `text` tone, the higher-contrast-against-bg shade in
   // both modes. (Firefox doesn't repaint these icons' SVG `currentColor` on a
   // theme toggle while they sit at opacity:0; applyTheme() in TopBar nudges them
   // to re-render so the color updates live.)
@@ -52,6 +57,7 @@ export const widgets: Widget[] = [
   {
     id: "notebook",
     type: "notebook",
+    defaultSize: { w: 2, h: 2 },
     category: "tools",
     color: "amber",
     title: "Notepad",
@@ -61,6 +67,7 @@ export const widgets: Widget[] = [
   {
     id: "ebook",
     type: "ebook",
+    defaultSize: { w: 2, h: 3 },
     category: "tools",
     color: "sky",
     title: "Reader",
@@ -70,6 +77,7 @@ export const widgets: Widget[] = [
   {
     id: "text",
     type: "text",
+    defaultSize: { w: 2, h: 1 },
     category: "tools",
     color: "rose",
     title: "Text",
@@ -78,6 +86,7 @@ export const widgets: Widget[] = [
   {
     id: "rss",
     type: "rss",
+    defaultSize: { w: 2, h: 3 },
     category: "feeds",
     color: "teal",
     title: "Feed",
@@ -86,6 +95,7 @@ export const widgets: Widget[] = [
   {
     id: "reddit",
     type: "reddit",
+    defaultSize: { w: 1, h: 3 },
     category: "feeds",
     color: "orange",
     title: "Reddit",
@@ -94,6 +104,7 @@ export const widgets: Widget[] = [
   {
     id: "youtube",
     type: "youtube",
+    defaultSize: { w: 1, h: 3 },
     category: "feeds",
     color: "rose",
     title: "YouTube",
@@ -102,6 +113,7 @@ export const widgets: Widget[] = [
   {
     id: "weather",
     type: "weather",
+    defaultSize: { w: 1, h: 3 },
     category: "feeds",
     color: "sky",
     title: "Weather",
@@ -110,6 +122,7 @@ export const widgets: Widget[] = [
   {
     id: "f1",
     type: "f1",
+    defaultSize: { w: 1, h: 2 },
     category: "feeds",
     color: "rose",
     title: "F1",
@@ -118,6 +131,7 @@ export const widgets: Widget[] = [
   {
     id: "arxiv",
     type: "arxiv",
+    defaultSize: { w: 2, h: 3 },
     category: "feeds",
     color: "sky",
     title: "arXiv",
@@ -126,6 +140,7 @@ export const widgets: Widget[] = [
   {
     id: "hf",
     type: "hf",
+    defaultSize: { w: 2, h: 3 },
     category: "feeds",
     color: "orange",
     title: "HF Daily",
@@ -134,6 +149,7 @@ export const widgets: Widget[] = [
   {
     id: "calendar",
     type: "calendar",
+    defaultSize: { w: 1, h: 3 },
     category: "tools",
     color: "amber",
     title: "Calendar",
@@ -142,6 +158,7 @@ export const widgets: Widget[] = [
   {
     id: "tracker",
     type: "tracker",
+    defaultSize: { w: 1, h: 3 },
     category: "tools",
     color: "teal",
     title: "Tracker",
@@ -151,6 +168,7 @@ export const widgets: Widget[] = [
   {
     id: "schedule",
     type: "schedule",
+    defaultSize: { w: 2, h: 4 },
     category: "tools",
     color: "sky",
     title: "Schedule",
@@ -160,6 +178,7 @@ export const widgets: Widget[] = [
   {
     id: "rhythm",
     type: "rhythm",
+    defaultSize: { w: 1, h: 3 },
     category: "tools",
     color: "rose",
     title: "Rhythm",
@@ -169,6 +188,7 @@ export const widgets: Widget[] = [
   {
     id: "upkeep",
     type: "upkeep",
+    defaultSize: { w: 1, h: 3 },
     category: "tools",
     color: "orange",
     title: "Upkeep",
@@ -178,6 +198,7 @@ export const widgets: Widget[] = [
   {
     id: "bookmarks",
     type: "bookmarks",
+    defaultSize: { w: 1, h: 3 },
     category: "tools",
     color: "sky",
     title: "Bookmarks",
@@ -187,6 +208,7 @@ export const widgets: Widget[] = [
   {
     id: "typing",
     type: "typing",
+    defaultSize: { w: 2, h: 3 },
     category: "tools",
     color: "amber",
     title: "Typing",
@@ -196,6 +218,7 @@ export const widgets: Widget[] = [
   {
     id: "chess",
     type: "chess",
+    defaultSize: { w: 2, h: 4 },
     category: "tools",
     color: "neutral",
     title: "Chess",
@@ -205,6 +228,7 @@ export const widgets: Widget[] = [
   {
     id: "chat",
     type: "chat",
+    defaultSize: { w: 1, h: 4 },
     category: "ai",
     color: "sky",
     title: "Chat",
@@ -214,6 +238,7 @@ export const widgets: Widget[] = [
   {
     id: "kiwix",
     type: "kiwix",
+    defaultSize: { w: 1, h: 4 },
     category: "knowledge",
     color: "teal",
     title: "Kiwix",
@@ -223,6 +248,7 @@ export const widgets: Widget[] = [
   {
     id: "anytype",
     type: "anytype",
+    defaultSize: { w: 1, h: 4 },
     category: "knowledge",
     color: "sky",
     title: "Anytype",
@@ -232,6 +258,7 @@ export const widgets: Widget[] = [
   {
     id: "tv",
     type: "tv",
+    defaultSize: { w: 2, h: 3 },
     category: "feeds",
     color: "rose",
     title: "TV",
@@ -239,3 +266,18 @@ export const widgets: Widget[] = [
     digestable: false,
   },
 ];
+
+const FALLBACK_SIZE: WidgetSize = { w: 2, h: 2 };
+
+// Default grid size for a built-in widget type, from its registry entry.
+export function defaultSizeFor(type: WidgetType): WidgetSize {
+  return widgets.find(w => w.type === type)?.defaultSize ?? FALLBACK_SIZE;
+}
+
+// A placed instance built from a registry template: registry-only fields are
+// dropped so they do not end up in the saved dashboard.
+export function instanceOf(template: Widget, id: string, title = template.title): Widget {
+  const inst: Widget = { ...template, id, title };
+  delete inst.defaultSize;
+  return inst;
+}

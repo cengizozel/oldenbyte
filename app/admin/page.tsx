@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Loader, ArrowLeft, KeyRound, Trash2, Copy, Check, ShieldCheck, AlertTriangle,
 } from "lucide-react";
@@ -204,9 +205,9 @@ export default function AdminPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-[var(--page-bg)]">
         <p className="text-sm text-[var(--text-secondary)]">Not authorized.</p>
-        <a href="/" className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+        <Link href="/" className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
           <ArrowLeft size={14} /> Back to dashboard
-        </a>
+        </Link>
       </main>
     );
   }
@@ -218,9 +219,9 @@ export default function AdminPage() {
           <h1 className="text-xl font-medium text-[var(--text-primary)] font-[family-name:var(--font-playfair)]">
             User management
           </h1>
-          <a href="/" className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+          <Link href="/" className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
             <ArrowLeft size={14} /> Dashboard
-          </a>
+          </Link>
         </div>
 
         {error && (
@@ -231,7 +232,7 @@ export default function AdminPage() {
 
         {/* Users */}
         <section className={cardClass}>
-          <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Users</span>
+          <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Users</span>
           {!users ? (
             <div className="flex items-center gap-2 mt-3 text-sm text-[var(--text-muted)]">
               <Loader size={13} className="animate-spin" /> Loading…
@@ -246,7 +247,7 @@ export default function AdminPage() {
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm text-[var(--text-primary)] truncate">{u.username}</span>
                       <span
-                        className={`shrink-0 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-md ${
+                        className={`shrink-0 inline-flex items-center gap-1 text-[12px] uppercase tracking-wide px-1.5 py-0.5 rounded-md ${
                           u.role === "admin"
                             ? "bg-[var(--w-sky-bg)] border border-[var(--w-sky-border)] text-[var(--w-sky-label)]"
                             : "bg-[var(--w-neutral-bg)] border border-[var(--w-neutral-border)] text-[var(--w-neutral-label)]"
@@ -256,7 +257,7 @@ export default function AdminPage() {
                         {u.role}
                       </span>
                       {u.id === me.id && (
-                        <span className="shrink-0 text-[10px] text-[var(--text-muted)]">you</span>
+                        <span className="shrink-0 text-[12px] text-[var(--text-muted)]">you</span>
                       )}
                     </div>
                     <span className="shrink-0 text-xs text-[var(--text-muted)]">{fmtDate(u.createdAt)}</span>
@@ -308,7 +309,7 @@ export default function AdminPage() {
 
         {/* Registration */}
         <section className={cardClass}>
-          <span className="text-[11px] uppercase tracking-widest text-[var(--text-muted)]">Registration</span>
+          <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Registration</span>
           {!config ? (
             <div className="flex items-center gap-2 mt-3 text-sm text-[var(--text-muted)]">
               <Loader size={13} className="animate-spin" /> Loading…

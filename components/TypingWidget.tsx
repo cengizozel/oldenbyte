@@ -378,7 +378,6 @@ export default function TypingWidget({
     setCounting(null);
     setLiveBpm(null);
     setLevelDir(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function applyConfig(next: Config) {
@@ -480,7 +479,6 @@ export default function TypingWidget({
       else setCounting(counting - 1);
     }, 720);
     return () => clearTimeout(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [counting]);
 
   function arm() {
@@ -718,7 +716,7 @@ export default function TypingWidget({
   const restart = () => { reset(configRef.current); focusField(); };
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  const chipBase = "px-2 py-0.5 rounded-md text-[11px] transition-colors";
+  const chipBase = "px-2 py-0.5 rounded-md text-[12px] transition-colors";
   const chip = (active: boolean) =>
     `${chipBase} ${active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-50 hover:opacity-90`}`;
 
@@ -779,7 +777,7 @@ export default function TypingWidget({
             <span className="text-xs font-medium opacity-60 truncate">{widget.title}</span>
           </div>
           <div className={`flex items-center gap-2 shrink-0 ${fade}`}>
-            {stats.best > 0 && <span className={`text-[10px] tabular-nums opacity-50 ${c.text}`}>best {stats.best}</span>}
+            {stats.best > 0 && <span className={`text-[12px] tabular-nums opacity-50 ${c.text}`}>best {stats.best}</span>}
             <button
               onClick={restart}
               title="Restart (Tab)"
@@ -828,7 +826,7 @@ export default function TypingWidget({
                 onChange={e => applyConfig({ ...config, custom: e.target.value })}
                 placeholder="letters e.g. zxc"
                 spellCheck={false}
-                className={`w-28 px-2 py-0.5 rounded-md text-[11px] font-mono bg-black/5 dark:bg-white/10 outline-none ${c.text} placeholder:opacity-40`}
+                className={`w-28 px-2 py-0.5 rounded-md text-[12px] font-mono bg-black/5 dark:bg-white/10 outline-none ${c.text} placeholder:opacity-40`}
               />
               <button
                 onClick={() => { if (config.customWords) applyConfig({ ...config, customScramble: !config.customScramble }); }}
@@ -851,7 +849,7 @@ export default function TypingWidget({
             <span className="flex items-center gap-1">
               <Music size={12} className={`${c.label} opacity-60`} />
               <button onClick={() => applyConfig({ ...config, bpm: Math.max(BPM_MIN, config.bpm - 5) })} className={`${chipBase} ${c.label} opacity-60 hover:opacity-100`}>−</button>
-              <span className={`text-[11px] tabular-nums w-16 text-center ${c.text}`}>{config.bpm} bpm{config.dynamic ? " start" : ""}</span>
+              <span className={`text-[12px] tabular-nums w-16 text-center ${c.text}`}>{config.bpm} bpm{config.dynamic ? " start" : ""}</span>
               <button onClick={() => applyConfig({ ...config, bpm: Math.min(BPM_MAX, config.bpm + 5) })} className={`${chipBase} ${c.label} opacity-60 hover:opacity-100`}>+</button>
               <button onClick={() => applyConfig({ ...config, dynamic: !config.dynamic })} className={chip(config.dynamic)} title="Tempo speeds up on hits, slows on misses">dynamic</button>
               <button onClick={() => applyConfig({ ...config, endless: !config.endless })} className={chip(config.endless)} title="Never ends on its own, press Enter to stop">endless</button>
@@ -866,7 +864,7 @@ export default function TypingWidget({
           )}
           {/* get-ready countdown */}
           <span className="flex items-center gap-1 ml-auto">
-            <span className={`text-[10px] uppercase tracking-wider opacity-40 ${c.label}`}>ready</span>
+            <span className={`text-[12px] uppercase tracking-wider opacity-60 ${c.label}`}>ready</span>
             {COUNTDOWNS.map(n => (
               <button key={n} onClick={() => applyConfig({ ...config, countdown: n })} className={chip(config.countdown === n)}>
                 {n === 0 ? "off" : `${n}s`}
@@ -906,7 +904,7 @@ export default function TypingWidget({
                     {config.dynamic && liveBpm !== null && (
                       <span
                         key={liveBpm}
-                        className={`tw-pop text-[11px] tabular-nums font-medium ${levelDir === "up" ? "text-emerald-600 dark:text-emerald-400" : levelDir === "down" ? "text-red-500 dark:text-red-400" : c.text} `}
+                        className={`tw-pop text-[12px] tabular-nums font-medium ${levelDir === "up" ? "text-emerald-600 dark:text-emerald-400" : levelDir === "down" ? "text-red-500 dark:text-red-400" : c.text} `}
                         style={{ animationDuration: "0.3s" }}
                       >
                         {levelDir === "up" ? "▲ " : levelDir === "down" ? "▼ " : ""}{liveBpm} bpm
@@ -941,7 +939,7 @@ export default function TypingWidget({
               </div>
 
               {/* footer: start hint, metronome cue, or the endless stop button */}
-              <div className={`h-7 shrink-0 mt-1 flex items-center gap-3 text-[11px] ${c.label}`}>
+              <div className={`h-7 shrink-0 mt-1 flex items-center gap-3 text-[12px] ${c.label}`}>
                 {idle && focused && config.countdown > 0 && <span className="opacity-60">press space to start</span>}
                 {running && config.mode === "metro" && !autoRefills(config) && <span className="opacity-50">strike a key on each beat</span>}
                 {running && config.mode === "metro" && autoRefills(config) && (
@@ -1120,13 +1118,13 @@ function Results({
 }) {
   const big = (value: React.ReactNode, label: string, cls = c.text) => (
     <div>
-      <div className={`text-[10px] uppercase tracking-widest opacity-40 mb-1 ${c.label}`}>{label}</div>
+      <div className={`text-[12px] uppercase tracking-widest opacity-60 mb-1 ${c.label}`}>{label}</div>
       <div className={`text-4xl font-semibold tabular-nums leading-none ${cls}`}>{value}</div>
     </div>
   );
   const small = (value: React.ReactNode, label: string, title?: string) => (
     <div title={title}>
-      <div className={`text-[10px] uppercase tracking-widest opacity-40 ${c.label}`}>{label}</div>
+      <div className={`text-[12px] uppercase tracking-widest opacity-60 ${c.label}`}>{label}</div>
       <div className={`text-sm tabular-nums ${c.text}`}>{value}</div>
     </div>
   );
@@ -1157,7 +1155,7 @@ function Results({
         {small(r.test, "test")}
       </div>
 
-      <div className={`text-[11px] leading-relaxed opacity-70 ${c.text}`}>
+      <div className={`text-[12px] leading-relaxed opacity-70 ${c.text}`}>
         {r.neighbor > 0 && <span>{r.neighbor} neighbour slip{r.neighbor > 1 ? "s" : ""}</span>}
         {r.neighbor > 0 && r.transposition > 0 && <span> · </span>}
         {r.transposition > 0 && <span>{r.transposition} transposition{r.transposition > 1 ? "s" : ""}</span>}
@@ -1166,9 +1164,9 @@ function Results({
 
       {r.weak.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={`text-[10px] uppercase tracking-widest opacity-40 ${c.label}`}>missed</span>
+          <span className={`text-[12px] uppercase tracking-widest opacity-60 ${c.label}`}>missed</span>
           {r.weak.map(w => (
-            <span key={w.k} className="px-1.5 py-0.5 rounded-md text-[11px] font-mono bg-red-500/10 text-red-500 dark:text-red-400" title={`${w.miss}/${w.total} wrong`}>
+            <span key={w.k} className="px-1.5 py-0.5 rounded-md text-[12px] font-mono bg-red-500/10 text-red-500 dark:text-red-400" title={`${w.miss}/${w.total} wrong`}>
               {w.k === " " ? "space" : w.k}<span className="opacity-50"> {w.miss}</span>
             </span>
           ))}
@@ -1184,7 +1182,7 @@ function Results({
             <Target size={12} /> practice these
           </button>
         )}
-        <span className={`ml-auto text-[10px] opacity-40 ${c.label}`}>tab or enter to restart</span>
+        <span className={`ml-auto text-[12px] opacity-60 ${c.label}`}>tab or enter to restart</span>
       </div>
     </div>
   );

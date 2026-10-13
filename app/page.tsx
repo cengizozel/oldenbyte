@@ -14,7 +14,8 @@ export default function Home() {
   const [editing, setEditing] = useState(false);
   const [dashboards, setDashboards] = useState<DashboardsState | null>(null);
   // Dashboards stay mounted once visited (hidden when inactive) so switching
-  // between them keeps widget state instead of reloading everything.
+  // between them keeps widget state instead of reloading everything. Widgets
+  // can read useWidgetActive() (lib/activeDashboard) to idle while hidden.
   const [visited, setVisited] = useState<string[]>([]);
   const editControls = useRef<Record<string, { cancel: () => void }>>({});
   // Settings > Performance: mount every dashboard at load, not just on first visit.
@@ -82,9 +83,9 @@ export default function Home() {
           <div key={id} className={active ? "flex flex-col gap-4 md:gap-5 flex-1 min-h-0" : "hidden"}>
             <WidgetGrid
               dashboardId={id}
+              active={active}
               widgets={widgets}
               editing={editing && active}
-              onToggleEdit={() => setEditing(e => !e)}
               onRegisterEditControls={c => { editControls.current[id] = c; }}
             />
           </div>
