@@ -6,16 +6,16 @@ Displays the latest papers from a chosen research field fetched from arXiv RSS f
 
 | Key | Value |
 |---|---|
-| `arxiv-widget-{id}` | JSON: `{ group: number; category: string }` |
-| `arxiv-widget-{id}-{YYYY-MM-DD}` | Daily cache of fetched papers |
+| `arxiv-widget-{id}` | JSON: `{ category: string }` (default `cs.AI`) |
+| `arxiv-widget-{id}-{YYYY-MM-DD}` | Daily cache: `{ papers: Paper[] }` |
 
-The cache is keyed by date so it is reused for the rest of the day and refreshed on the next.
+On load the widget paints today's cache entry, if there is one, and then always refetches and overwrites it. A failed fetch leaves the cached list in place. Changing the category clears the day's cache and fetches the new one. The refresh button adds `refresh=1` to bypass the server feed cache.
 
 ## Settings
 
 Two-level selection:
 
-1. **Field** - a broad research area (e.g. "Computer Science", "Physics"). Defined in `CATEGORY_GROUPS`, each with a label and an array of subcategories.
+1. **Field** - a broad research area (e.g. "Computer Science", "Physics"). Defined in `CATEGORY_GROUPS`, each with a label and an array of subcategories. The field is derived from the saved category, so only the category is stored.
 2. **Topic** - a specific arXiv category within that field (e.g. `cs.AI`, `physics.optics`).
 
 Available groups:
@@ -33,28 +33,34 @@ Available groups:
 
 ## Feed Fetching
 
-Papers are fetched via the existing `GET /api/rss?url=…` route using arXiv's RSS endpoint:
+Papers are fetched via the existing `GET /api/rss?url=…&limit=25` route (and so through the server feed cache) using arXiv's RSS endpoint:
 
 ```
 https://rss.arxiv.org/rss/{category}
 ```
 
-The route auto-detects RSS 2.0 vs Atom by checking for `<entry>` tags. arXiv uses RSS 2.0, so items are parsed from `<item>` elements.
+The RSS feed only carries the latest announcement, so it is empty on weekends and holidays. When it returns no items, the widget falls back to the arXiv search API, which always has the newest submissions:
+
+```
+https://export.arxiv.org/api/query?search_query=cat:{category}&sortBy=submittedDate&sortOrder=descending&max_results=25
+```
+
+The route auto-detects RSS 2.0 vs Atom by checking for `<entry>` tags: the RSS feed is parsed from `<item>` elements, the search API's Atom response from `<entry>` elements.
 
 ## Content Parsing
 
 arXiv RSS `<description>` fields contain HTML-encoded text with "Authors:" and "Abstract:" sections. `parseContent()`:
 
 1. Strips all HTML tags
-2. Extracts the authors line (text after "Authors:" up to the next label or end)
+2. Extracts the authors line (text after "Authors:" up to "Abstract:" or the end)
 3. Extracts the abstract (text after "Abstract:")
-4. Removes the HTML-encoded link suffix arXiv appends to descriptions
+4. When there is no "Authors:" label (the search API's plain `<summary>`), uses the whole text as the abstract
 
 ## List and Detail Views
 
 The list and detail panels use the same absolute-position slide pattern as Reddit and HF Daily: both panels sit side-by-side in an `overflow-hidden` container and slide in/out via CSS `translate-x` transitions.
 
-- **List** - 25 paper titles, each with an external link icon on hover
+- **List** - up to 25 paper titles, each with an external link icon on hover
 - **Detail** - authors, publication date, and abstract; scroll fades on both panels
 
 ## Scroll Fades

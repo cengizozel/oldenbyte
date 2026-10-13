@@ -2,27 +2,25 @@
 
 ## Overview
 
-The dashboard has per-user accounts stored in the database. Passwords are hashed with scrypt, and a successful login creates a session row plus an HMAC-signed cookie that references it. Every request is verified in middleware before reaching any page or API route.
+The dashboard has per-user accounts stored in the database. Passwords are hashed with scrypt, and a successful login creates a session row plus an HMAC-signed cookie that references it. Every request is checked in middleware before reaching any page or API route, and every API handler then confirms the session against the database.
 
 ## Accounts
 
-- **First run:** with no users in the database, the login page switches to "Create admin account" and posts to `POST /api/setup`. That endpoint only works while the user table is empty.
-- **Roles:** `admin` or `user`. Admins manage accounts at `/admin` (`/api/admin/users`): create users, reset passwords, delete accounts.
-- **Registration:** `POST /api/register` creates an account only when registration is open and a valid invite code is supplied; otherwise it returns 403.
-- **Forced password change:** accounts created by an admin, or whose password an admin reset, carry `mustChangePassword`. The UI prompts for a new password on next login (`/api/account/password`).
+- **First run:** with no users in the database (`GET /api/auth/state` reports `needsSetup`), the login page switches to "Create admin account" and posts to `POST /api/setup`. That endpoint only works while the user table is empty. The new admin also claims any settings and uploads left from the single-user era.
+- **Roles:** `admin` or `user`. Admins manage accounts at `/admin` (`/api/admin/users`): list accounts, reset passwords, delete accounts. The same page sets the registration toggle, the invite code and the feed cache TTL (`/api/admin/config`). Admin accounts may also point integrations (Kiwix, CalDAV, Anytype, TubeArchivist, TV, LLM servers) at LAN or tailnet addresses; other accounts are limited to public addresses (see [architecture.md](architecture.md#outbound-fetches-and-ssrf)).
+- **Registration:** there is no admin "create user" action; new accounts come from `POST /api/register`, which creates a regular account only when registration is enabled and a valid invite code is supplied (otherwise 403). With no invite code set, registration is closed.
+- **Forced password change:** an admin password reset sets a temporary password and `mustChangePassword`. Until the user picks a new one (`/api/account/password`, also in the settings panel's Account section), every API route except `/api/me` and `/api/account/password` answers `403 password_change_required`.
 
 ## Flow
 
-```
-1. User submits username and password -> POST /api/auth
-2. Server looks up the user and verifies the password hash (scrypt, constant-time compare)
-3. On match: inserts a Session row, sets an httpOnly session cookie
-4. Middleware verifies the cookie on every request
-5. Invalid, missing or expired session -> redirect to /login (API routes: 401)
-6. DELETE /api/auth logs out: deletes the session row and clears the cookie
-```
+1. The user submits username and password to `POST /api/auth`.
+2. The server looks up the user and verifies the password hash (scrypt, constant-time compare).
+3. On match it inserts a Session row and sets an httpOnly session cookie.
+4. The middleware checks the cookie signature on every request; route handlers look the session up in the database.
+5. An invalid, missing or expired session redirects to `/login` (API routes: 401).
+6. `DELETE /api/auth` logs out: it deletes the session row and clears the cookie. Changing your password, an admin reset, or deleting the account ends all of that account's sessions.
 
-Login is rate limited per client IP and per username.
+Login is rate limited per client IP plus username and per username alone; registration, setup and password changes are rate limited too (`lib/ratelimit.ts`, in memory).
 
 ## Session Token
 
@@ -32,7 +30,7 @@ The cookie value is `<sid>.<exp>.<sig>`:
 - `exp` is the expiry timestamp.
 - `sig` is an `HMAC-SHA256` of `sid.exp` using `SESSION_SECRET`.
 
-Verification recomputes the HMAC with constant-time comparison, then confirms the session row exists and has not expired. Sessions last 30 days from login and are not extended by activity. Expired rows are pruned periodically. The Web Crypto API (`crypto.subtle`) is used directly, with no third-party session library.
+Verification recomputes the HMAC with constant-time comparison, then confirms the session row exists and has not expired. Sessions last 30 days from login and are not extended by activity. Expired rows are pruned at startup and every 6 hours (`lib/maintenance.ts`). The Web Crypto API (`crypto.subtle`) is used directly, with no third-party session library.
 
 ## Cookie Properties
 
@@ -51,11 +49,16 @@ Because the cookie is `secure` in production, a login over plain `http://` (for 
 
 ## Middleware
 
-`proxy.ts` is the Next.js 16 middleware (the renamed `middleware` convention). It runs on every request except the public paths `/login`, `/api/auth`, `/api/setup` and `/api/register`. The matcher excludes Next.js static assets, images and the favicon:
+`proxy.ts` is the Next.js 16 middleware (the renamed `middleware` convention). It lets the public paths `/login`, `/api/auth` (including `/api/auth/state`), `/api/setup` and `/api/register` through. The matcher always runs it for API routes, and for pages it excludes Next.js static assets, images, the favicon and `.png` files (so the login screen's images load):
 
 ```ts
-matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.png$).*)"]
+matcher: [
+  "/api/:path*",
+  "/((?!api|_next/static|_next/image|favicon.ico|.*\\.png$).*)",
+]
 ```
+
+The middleware only checks the cookie signature (it runs on the edge runtime). The authoritative check, including revoked sessions and roles, happens in each route handler through `requireUser` / `requireAdmin` (`lib/http.ts`, `lib/session.ts`).
 
 A request is allowed through if it carries a valid session cookie **or** a valid bearer token (see below). Otherwise API routes return `401 {"error":"Unauthorized"}` and page requests redirect to `/login`.
 

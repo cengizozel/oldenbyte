@@ -1,18 +1,20 @@
 # API Reference
 
-All routes are under `/api`. Every route except `/api/auth` is protected by the middleware (`proxy.ts`): send a valid session cookie, or — for scripts — an `Authorization: Bearer <API_KEY>` header (see [auth.md](./auth.md)). Unauthenticated API calls return `401 {"error":"Unauthorized"}`.
+All routes are under `/api`. The middleware (`proxy.ts`) lets `/api/auth` (and `/api/auth/state`), `/api/setup` and `/api/register` through without a session; every other route needs a valid session cookie or, for scripts, an `Authorization: Bearer <API_KEY>` header (see [auth.md](./auth.md)). Unauthenticated API calls return `401 {"error":"Unauthorized"}`. Each handler then checks the session against the database (`requireUser` / `requireAdmin` in `lib/http.ts`) and scopes all data to the signed-in user. An account with `mustChangePassword` set gets `403 {"error":"password_change_required"}` from every route except `/api/me` and `/api/account/password`.
+
+Routes that fetch a URL the client supplies (Kiwix, CalDAV, Anytype, TubeArchivist, TV, chat, model, digest) let admin accounts reach LAN and tailnet addresses; for every other account the URL must resolve to a public address. `/api/proxy` and `/api/rss` are public-only for everyone. See [architecture.md](./architecture.md#outbound-fetches-and-ssrf).
 
 ---
 
 ## Config (dashboard as JSON)
 
-The whole dashboard — every dashboard's layout, widget instances, and per-widget content, plus global settings like theme and timezone — lives in the key/value store. `/api/config` exposes it as a single hand-authorable JSON document. Unlike `/api/settings/export`, values are JSON-decoded (so `widget-layout` is a real array, not an escaped string) and re-encoded on the way back in.
+The whole dashboard (every dashboard's layout, widget instances, and per-widget content, plus global settings like theme and timezone) lives in the key/value store. `/api/config` exposes it as a single hand-authorable JSON document. Unlike `/api/settings/export`, values are JSON-decoded (so `widget-layout` is a real array, not an escaped string) and re-encoded on the way back in.
 
 ### `GET /api/config`
-Returns all non-cache config as `{ key: value, ... }` with each value parsed from JSON where possible.
+Returns all of the user's non-cache config as `{ key: value, ... }`. Values that are JSON objects or arrays are parsed; scalars stay verbatim strings, so the round trip is lossless. Cache keys are those matched by `isCacheKey` in `lib/settingKeys.ts` (see [storage.md](./storage.md#cache-keys)).
 
 ### `PUT /api/config` (also `POST`)
-Writes config from a JSON object. Non-string values are JSON-stringified before storage; cache keys in the body are ignored.
+Writes config from a JSON object. Non-string values are JSON-stringified before storage; cache keys in the body are ignored. Bodies over 25 MB get `413`. A bearer `API_KEY` request acts as the first admin account, so scripts edit the admin's dashboards.
 
 - `?mode=merge` (default): upserts the provided keys, leaving everything else untouched.
 - `?mode=replace`: in addition, deletes existing config keys **not** present in the body, so the dashboard ends up matching the document exactly (cache keys are never deleted). Send the *complete* config; an empty body is refused (`400`) rather than wiping everything.
@@ -45,6 +47,7 @@ Creates or updates a key-value pair.
 ```json
 { "key": "...", "value": "..." }
 ```
+`key` must be 1 to 256 characters and `value` a string of at most 1,000,000 characters; anything else returns `400` with `{ "error": "Invalid key" }` or `{ "error": "Invalid value" }`. Success returns `{ "ok": true }`.
 
 ### `DELETE /api/settings?key=<key>`
 Deletes a key.
@@ -54,10 +57,10 @@ Deletes a key.
 ## Settings: Export / Import
 
 ### `GET /api/settings/export`
-Returns all non-cache settings as a flat JSON object `{ key: value, ... }`. Cache keys (date-keyed feed data, epub location caches) are excluded.
+Returns all of the user's non-cache settings as a flat JSON object `{ key: value, ... }`, with values as stored strings. Cache keys (see [storage.md](./storage.md#cache-keys)) are excluded.
 
 ### `POST /api/settings/import`
-Bulk-upserts all key-value pairs from a JSON object. Intended for restoring a backup exported from `/api/settings/export`.
+Bulk-upserts the key-value pairs from a JSON object in one transaction. Intended for restoring a backup exported from `/api/settings/export`. Entries whose value is not a string, or whose key or value break the `/api/settings` limits, are skipped; at most 2000 entries are imported. Bodies over 25 MB get `413`. Returns `{ "ok": true, "count": <n> }`.
 
 ---
 
@@ -65,13 +68,52 @@ Bulk-upserts all key-value pairs from a JSON object. Intended for restoring a ba
 
 ### `POST /api/auth`
 ```json
-{ "password": "..." }
+{ "username": "...", "password": "..." }
 ```
-On success: sets an `httpOnly` session cookie and returns `{ "ok": true }`.  
-On failure: returns `401`.
+On success: sets an `httpOnly` session cookie and returns `{ "ok": true, "mustChangePassword": false }`.
+On failure: returns `401 {"error":"Invalid username or password"}`. Rate limited per client IP plus username and per username (`429` with `Retry-After`).
 
 ### `DELETE /api/auth`
-Clears the session cookie (logout).
+Deletes the session row and clears the cookie (logout).
+
+### `GET /api/auth/state`
+Public. Returns `{ "needsSetup": true, "registrationEnabled": false, "hasInvite": false }` so the login page can show the right form.
+
+### `POST /api/setup`
+Public, and only while there are no accounts (otherwise `403`). Creates the first account as admin from `{ "username", "password" }` (username 3 to 32 of `A-Z a-z 0-9 _ . -`, password 8 to 200 characters), claims any legacy single-user settings and uploads, and signs in.
+
+### `POST /api/register`
+Public. Creates a regular account from `{ "username", "password", "invite" }` when registration is enabled and the invite code matches; otherwise `403`. A taken username returns `400`. Rate limited per IP. Signs in on success.
+
+### `GET /api/me`
+Returns the signed-in account: `{ "id", "username", "role", "mustChangePassword" }`.
+
+### `POST /api/account/password`
+```json
+{ "currentPassword": "...", "newPassword": "..." }
+```
+Changes your own password (8 to 200 characters), clears `mustChangePassword`, ends every session of the account, and issues a fresh cookie. A wrong current password returns `400`. Rate limited.
+
+---
+
+## Admin
+
+All admin routes need an admin account (`403` otherwise).
+
+### `GET /api/admin/users`
+Returns `{ "users": [{ "id", "username", "role", "mustChangePassword", "createdAt" }] }`, oldest first.
+
+### `PATCH /api/admin/users/<id>`
+`{ "action": "resetPassword" }` sets a random temporary password, marks the account `mustChangePassword`, ends its sessions, and returns `{ "ok": true, "tempPassword": "..." }`.
+
+### `DELETE /api/admin/users/<id>`
+Deletes the account with its settings, sessions, uploads and library folder. You cannot delete yourself or the only admin (`400`).
+
+### `GET /api/admin/config`
+Returns `{ "registrationEnabled": false, "hasInvite": true, "feedCacheMinutes": 60 }`.
+
+### `PUT /api/admin/config`
+Accepts any of `registrationEnabled` (boolean), `inviteCode` (string, stored hashed), and `feedCacheMinutes` (number, clamped to 1 to 1440; the TTL of the server feed cache). Returns `{ "ok": true, ... }` with the current values.
 
 ---
 
@@ -104,8 +146,8 @@ provider. The base URL and API key are supplied by the client per-request and
 never stored server-side. `/chat/completions` and `/models` are appended to the
 provided `baseUrl`.
 
-### `GET /api/chat?baseUrl=<url>&apiKey=<key>`
-Lists available models from `{baseUrl}/models`. Accepts both OpenAI-style
+### `GET /api/chat?baseUrl=<url>`
+Lists available models from `{baseUrl}/models`. The API key, if any, goes in an `X-Api-Key` header, never the query string (URLs end up in proxy and access logs). Accepts both OpenAI-style
 (`{ data: [{ id }] }`) and Ollama-style (`{ models: [{ name }] }`) responses.
 
 ```json
@@ -120,8 +162,10 @@ Sends a chat completion request to `{baseUrl}/chat/completions`.
 ```
 
 Optional fields: `maxTokens` (`max_tokens`), `reasoningEffort` (`reasoning_effort`),
-`ttl` (LM Studio idle-unload seconds, ignored by other servers), and the `kiwix` /
-`anytype` / `dashboard` / `caldav` lookup objects below.
+`ttl` (LM Studio idle-unload seconds, ignored by other servers), `today` and
+`timezone` (the client's local date and IANA zone, for calendar anchoring), and the
+`kiwix` / `anytype` / `dashboard` / `caldav` lookup objects below. More than 1000
+messages in one request returns `413`.
 
 With `stream: true` (default), returns a `text/plain` stream of token deltas,
 read with a `ReadableStreamDefaultReader`. With `stream: false`, returns
@@ -155,8 +199,8 @@ tool calls, feeds results back, and repeats until the model answers. Tools offer
 - **Anytype:** `search_anytype(query)`, `read_anytype_object(id, find?, page?)`
   (long notes return in ~6k-char parts; `find` jumps to matching sections, `page`
   reads sequentially), and `summarize_anytype_object(id, focus?)`, a **map-reduce**
-  digest of a whole long note (chunk → summarize each chunk via a non-streaming
-  sub-call → return per-part summaries to synthesize).
+  digest of a whole long note (split into chunks, summarize each chunk via a
+  non-streaming sub-call, then return the per-part summaries to synthesize).
 - **Dashboard:** `read_widget(id, find?, page?)` reads one widget's content (same
   `find`/`page` windowing as long notes; forgiving fallbacks accept a title or type
   in place of an id), and `search_dashboard(query)` keyword-searches all widgets at
@@ -230,8 +274,11 @@ Reports the backend and what's loaded. Probes Ollama's `/api/ps` then LM Studio'
 
 `expiresAt` (unload time) is Ollama-only; LM Studio reports `loaded` with no countdown.
 
+### `GET /api/model?baseUrl=<url>&op=caps&model=<name>`
+Reports whether a model accepts images: `{ "vision": true }`, or `{ "vision": null }` when the backend does not say.
+
 ### `POST /api/model`
-Changes residency. Ollama: `keep_alive` via `/api/generate` (`"5m"` | `-1` pin | `0` unload). LM Studio: `action: "pin"` (manual load) or `"unload"` (`/api/v1/models/unload`); durations are applied as `ttl` on the chat request instead.
+Changes residency. Ollama: `keep_alive` via `/api/generate` (`"5m"`, `-1` to pin, `0` to unload). LM Studio: `action: "pin"` (manual load via `/api/v1/models/load`) or `"unload"` (`/api/v1/models/unload`); durations are applied as `ttl` on the chat request instead.
 
 ```json
 { "baseUrl": "…", "backend": "ollama", "model": "qwen3:8b", "keepAlive": "30m" }
@@ -243,21 +290,33 @@ Changes residency. Ollama: `keep_alive` via `/api/generate` (`"5m"` | `-1` pin |
 
 Server-side proxy to the [Anytype](https://anytype.io/) local API (in the desktop app, default `http://127.0.0.1:31009`, localhost-only). Search and object-read logic lives in [`lib/anytype.ts`](../lib/anytype.ts) so the Chat widget's agentic lookup can reuse it directly. Sends the required `Anytype-Version` header; auth is a Bearer token from pairing.
 
-### `POST /api/anytype` (auth)
-- `{ op: "challenge", baseUrl }` → `{ challengeId }` (and a 4-digit code appears in the desktop app).
-- `{ op: "key", baseUrl, challengeId, code }` → `{ apiKey }`.
+### `POST /api/anytype` (pairing)
+- `{ op: "challenge", baseUrl }` returns `{ challengeId }` (and a 4-digit code appears in the desktop app).
+- `{ op: "key", baseUrl, challengeId, code }` returns `{ apiKey }`.
 
-### `GET /api/anytype?op=spaces&baseUrl=<url>&apiKey=<key>`
-```json
-{ "spaces": [{ "id": "…", "name": "Main Space" }] }
+### `POST /api/anytype` (write bridge)
+Relays to the optional write bridge in `tools/anytype-bridge`; credentials ride each request.
+- `{ op: "bridge-health", bridgeUrl }` returns the bridge's `/health` answer.
+- `{ op: "bridge", bridgeUrl, bridgeToken, rpc: { op, ... } }` forwards `rpc` to the bridge's `/rpc`. Allowed `rpc.op` values: `list_types`, `style_profile`, `create_object`, `append_markdown`, `read_object`, `search`, `archive_object`.
+
+### `GET` reads
+Every read sends the API key in an `X-Api-Key` header, never in the URL:
+
+```bash
+curl -H "X-Api-Key: $ANYTYPE_KEY" "https://host/api/anytype?op=spaces&baseUrl=http://127.0.0.1:31009"
 ```
 
-### `GET /api/anytype?op=search&baseUrl=<url>&apiKey=<key>&spaceId=<id>&q=<query>&limit=<n>`
-Searches a space (empty `q` = recent, newest first). A multi-word query that returns nothing is retried as an AND of its terms.
+- `?op=spaces&baseUrl=<url>` returns `{ "spaces": [{ "id": "...", "name": "Main Space" }] }`.
+- `?op=search&baseUrl=<url>&spaceId=<id>&q=<query>&limit=<n>[&type=<type>]` searches a space (empty `q` = recent, newest first; `limit` 1 to 100, default 25). A multi-word query that returns nothing is retried as an AND of its terms.
 
 ```json
-{ "objects": [{ "id": "…", "name": "Journal (2026)", "snippet": "…", "type": "Page", "spaceId": "…", "created": "2026-…Z", "modified": "2026-…Z" }] }
+{ "objects": [{ "id": "...", "name": "Journal (2026)", "snippet": "...", "type": "Page", "spaceId": "...", "created": "2026-...Z", "modified": "2026-...Z" }] }
 ```
+
+- `?op=types&baseUrl=<url>&spaceId=<id>` returns `{ "types": [...] }`, the space's object types.
+- `?op=object&baseUrl=<url>&spaceId=<id>&id=<objectId>` returns `{ "object": ... }`, one object read as markdown plus metadata.
+
+An unreachable host is reported as a hint that the Anytype app is not running; upstream errors return `502`.
 
 ---
 
@@ -266,7 +325,7 @@ Searches a space (empty `q` = recent, newest first). A multi-word query that ret
 Server-side proxy to any CalDAV server (RFC 4791; tested against Radicale, written for Nextcloud compatibility) for the Calendar widget. Server-side for Basic auth and CORS; credentials ride each request and are never stored. The client logic lives in [`lib/caldav.ts`](../lib/caldav.ts) so the Chat widget's calendar tools can reuse it directly. All operations are `POST /api/caldav` with an `op` field plus `baseUrl`, `username`, `password`. Errors are surfaced as `{ "error": "..." }` with `400` (bad input) or `502` (upstream).
 
 ### `op: "calendars"`
-Discovers the account's event calendars (`current-user-principal` → `calendar-home-set` → `PROPFIND`). Collections that can't hold VEVENTs (task-only lists) are skipped; `readOnly` is derived from the reported privileges.
+Discovers the account's event calendars (`current-user-principal`, then `calendar-home-set`, then `PROPFIND`). Collections that can't hold VEVENTs (task-only lists) are skipped; `readOnly` is derived from the reported privileges.
 
 ```json
 { "calendars": [{ "name": "Personal", "url": "https://…/calendars/user/personal/", "readOnly": false }] }
@@ -274,7 +333,7 @@ Discovers the account's event calendars (`current-user-principal` → `calendar-
 
 ### `op: "events"`
 ```json
-{ "op": "events", "baseUrl": "…", "username": "…", "password": "…", "calendars": [{ "name": "Personal", "url": "…" }], "start": "2026-06-12", "end": "2026-06-26" }
+{ "op": "events", "baseUrl": "…", "username": "…", "password": "…", "calendars": [{ "name": "Personal", "url": "…" }], "start": "2026-06-12", "end": "2026-06-26", "timezone": "Europe/Istanbul" }
 ```
 Fetches events in `[start, end)` (dates as `YYYY-MM-DD`) across up to 20 calendars in parallel, merged and sorted by start. A calendar that fails doesn't sink the rest: its error is reported in `failures`.
 
@@ -282,7 +341,7 @@ Fetches events in `[start, end)` (dates as `YYYY-MM-DD`) across up to 20 calenda
 { "events": [{ "uid": "…", "href": "…", "calendar": "Personal", "title": "Dentist", "start": "2026-06-13T14:00", "end": "2026-06-13T15:00", "allDay": false, "location": "…", "recurring": true }], "failures": [] }
 ```
 
-`start`/`end` on an event are `YYYY-MM-DDTHH:mm` (or `YYYY-MM-DD` with `allDay: true`); UTC times are converted to the server's local time for display. Recurring events rely on the server's time-range expansion; servers that don't expand return the recurrence master once.
+An optional `timezone` (IANA name) sets the zone event times are converted to; without it the server's zone is used. `start`/`end` on an event are `YYYY-MM-DDTHH:mm` (or `YYYY-MM-DD` with `allDay: true`) in that zone. Recurring events are expanded locally by `lib/caldav.ts` (`DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY` rules), so they work on servers that do not expand them.
 
 ### `op: "create"`
 ```json
@@ -301,7 +360,7 @@ Deletes the event object at `href`. Returns `{ "ok": true }`.
 ## RSS
 
 ### `GET /api/rss?url=<feed-url>&limit=<n>`
-Fetches and parses an RSS or Atom feed. Returns up to `limit` items (max 20).
+Fetches and parses an RSS or Atom feed. Returns up to `limit` items (1 to 20, default 5). Used by the Feed and arXiv widgets.
 
 ```json
 [
@@ -309,23 +368,38 @@ Fetches and parses an RSS or Atom feed. Returns up to `limit` items (max 20).
 ]
 ```
 
-Handles CDATA sections, HTML entity decoding, and both RSS `<item>` and Atom `<entry>` formats.
+Handles CDATA sections, HTML entity decoding, and both RSS `<item>` and Atom `<entry>` formats. The feed URL must resolve to a public address (for every account, admins included), every redirect hop is re-checked, and the body is read up to 5 MB. Results go through the server feed cache (`lib/feedCache.ts`): served from memory within the admin TTL, refreshed in the background when stale. Add `refresh=1` to force an upstream fetch. Errors return `500`.
+
+---
+
+## Reddit
+
+### `GET /api/reddit?subreddit=<name>&period=<period>&limit=<n>`
+Top posts of one subreddit from Reddit's RSS feed (`/r/<name>/top.rss?t=<period>`). `subreddit` must match `[A-Za-z0-9_]{1,50}` (`400` otherwise), `period` defaults to `week`, `limit` is 1 to 25 (default 5).
+
+```json
+[{ "title": "...", "link": "...", "pubDate": "...", "score": 0, "subreddit": "programming", "content": "<html>", "thumbnail": "...", "image": "..." }]
+```
+
+RSS carries no vote counts, so `score` is always `0`. Reddit rate-limits unauthenticated requests hard, so every upstream fetch goes through one queue spaced 15 seconds apart, a `429` is retried at the back of the queue (up to 3 attempts), and results are cached in memory with the admin feed TTL. A stale entry (up to 24 hours) is served immediately while it refreshes. `refresh=1` skips the cache but still waits its turn in the queue. Failures return `502`, unless an entry from the last 24 hours exists.
 
 ---
 
 ## YouTube
 
-### `GET /api/youtube?channelId=<id>&limit=<n>`
-Fetches the latest videos for a known channel ID.
-
 ### `GET /api/youtube?channel=<handle-or-url>&limit=<n>`
-Resolves a YouTube handle, `@handle`, or channel URL to a channel ID first, then fetches videos.
+Resolves a YouTube handle, `@handle`, channel URL or raw `UC...` id to a channel id, then fetches videos. Full URLs must be on a YouTube host. The channel id is read from the page's canonical link, its `externalId` field, or any `/channel/UC...` link.
 
-**Resolution strategy:** Fetches the YouTube channel page and extracts the channel ID from the canonical `<link>` tag.
+### `GET /api/youtube?channelId=<id>&limit=<n>`
+Fetches the latest videos for a known channel id (`UC` + 22 characters).
 
-**Video fetching strategy:**
-1. Try YouTube's RSS feed (`/feeds/videos.xml?channel_id=…`)
-2. On failure, scrape the channel's `/videos` page and extract `ytInitialData`
+Optional parameters: `includeShorts=true` keeps Shorts, `filterMembers=true` drops members-only videos, `refresh=1` bypasses the feed cache. `limit` is 1 to 15 (default 5).
+
+**Video fetching:**
+1. Without `includeShorts`, the feed is the channel's `UULF...` playlist (its uploads without Shorts), fetched as RSS (`/feeds/videos.xml?playlist_id=UULF...`); with it, the channel feed (`?channel_id=UC...`). A failed feed is retried once after 1.5 seconds.
+2. Because the UULF playlist occasionally carries a Short anyway, each video is checked with a `HEAD` request to `/shorts/<id>`: a real Short answers `200`, a regular video redirects to `/watch`. Answers are remembered per video id.
+3. If RSS fails, the route scrapes the channel's `/videos` page (`ytInitialData`). Relative times there ("2 days ago") are converted to approximate timestamps.
+4. With `filterMembers`, the channel page is always scraped (only it shows members-only badges), and exact publish times are borrowed from the RSS feed by video id.
 
 Returns:
 ```json
@@ -333,17 +407,58 @@ Returns:
   "channelId": "UC...",
   "name": "Channel Name",
   "videos": [
-    { "title": "...", "link": "https://youtube.com/watch?v=...", "published": "<ISO 8601>" }
+    { "title": "...", "link": "https://www.youtube.com/watch?v=...", "published": "<ISO 8601 or empty>", "isMembersOnly": false, "isShort": false }
   ]
 }
 ```
+
+### `GET /api/youtube?video=<url-or-id>`
+Details for one video, from its watch page: `{ "title", "author", "description", "lengthSeconds", "viewCount" }` (description capped at 4000 characters).
+
+All modes go through the server feed cache. Errors return `500` (`502` for video details).
+
+---
+
+## TubeArchivist
+
+### `POST /api/tubearchivist`
+Bridge to a [TubeArchivist](https://www.tubearchivist.com/) server for the YouTube widget. POST so the API token rides in the body, never a URL. `url` (http or https) and `token` are required.
+
+- `{ op: "ping", url, token }` returns `{ "ok": true, "version": "..." }`. A rejected token is reported as an error.
+- `{ op: "check", url, token, ids, force? }` returns `{ "archived": ["<videoId>", ...] }`, the subset of up to 100 `ids` present in the archive. Answers are cached per server and token: "archived" for an hour, "not archived" for 2 minutes; `force: true` skips the cache. If TubeArchivist is unreachable, the last known answer is kept.
+
+Errors return `502`.
+
+---
+
+## HF Daily
+
+### `GET /api/hf?limit=<n>`
+Hugging Face daily papers (`https://huggingface.co/api/daily_papers`), sorted by upvotes, `limit` 1 to 50 (default 50). Goes through the server feed cache; `refresh=1` forces a fetch.
+
+```json
+[{ "id": "2606.01234", "title": "...", "abstract": "...", "authors": ["..."], "publishedAt": "...", "upvotes": 42, "link": "https://huggingface.co/papers/2606.01234" }]
+```
+
+---
+
+## TV
+
+### `GET /api/tv?op=<op>&url=<url>`
+Proxy for the TV widget. IPTV servers (for example ErsatzTV) usually serve plain http on the LAN while the dashboard is on https, so the browser cannot fetch the streams directly.
+
+- `op=channels&url=<.m3u>` parses an M3U channel list: `{ "channels": [{ "name", "url", "logo" }] }`.
+- `op=playlist&url=<.m3u8>` returns the HLS playlist with every URI rewritten back through this route (nested playlists as `op=playlist`, segments and keys as `op=seg`).
+- `op=seg&url=<segment-or-stream>` streams the bytes through. Only `video/*` and `audio/*` content types are passed on; anything else is sent as `application/octet-stream` with `Content-Disposition: attachment`, so an upstream page can never render on the dashboard's origin.
+
+Missing or non-http URLs return `400`; upstream errors return `502`.
 
 ---
 
 ## F1
 
 ### `GET /api/f1`
-Fetches current season data from the [Jolpica F1 API](https://api.jolpi.ca/ergast/) (Ergast-compatible). Cached for 1 hour via Next.js fetch revalidation.
+Fetches current season data from [f1api.dev](https://f1api.dev), falling back to the [Jolpica F1 API](https://api.jolpi.ca/ergast/) (Ergast-compatible) when the first returns nothing or fails. Upstream requests have a 7 second timeout and are cached for 1 hour via Next.js fetch revalidation. Both sources are mapped to the same shape. If both fail, the route returns `502`.
 
 Returns:
 ```json
@@ -418,18 +533,26 @@ Serves the community widget definitions: every JSON file in `widget-bank/` that 
 ## Proxy
 
 ### `GET /api/proxy?url=<url>`
-Fetches a URL server-side with `User-Agent: curl/7.68.0` and returns the response body as plain text. Used by the TopBar and Text widget for URL-based dynamic content (e.g. `wttr.in`), where the response differs based on User-Agent.
+Fetches a URL server-side with `User-Agent: curl/7.68.0` and returns the response body as plain text (trimmed, capped at 1 MB). Used by the TopBar, the Text widget and community bank widgets for URL-based content (e.g. `wttr.in`, where the response differs by User-Agent). The URL must resolve to a public address for every account, and each redirect hop is re-checked; otherwise `400 {"error":"Invalid or disallowed URL"}`.
 
 ---
 
 ## Files
 
 ### `POST /api/upload`
-Accepts a `multipart/form-data` request with a `file` field. Saves the file to `UPLOADS_DIR` with a UUID filename. Returns:
+Accepts a `multipart/form-data` request with one file. Saves it to the user's own folder `UPLOADS_DIR/<userId>/` with a UUID filename. Returns:
 ```json
 { "filename": "<uuid>.<ext>" }
 ```
-Accepted types: `.pdf`, `.epub`.
+Accepted types: `.pdf`, `.epub`, up to 50 MB. The Reader widget now uploads through `/api/library`; this route and `/api/files` remain for files uploaded before the library existed. Client errors return a JSON `error` with `400` (not multipart, no file part), `413` (too large) or `415` (unsupported type); anything else is a `500` with a generic message.
 
 ### `GET /api/files/<filename>`
-Serves an uploaded file from `UPLOADS_DIR`.
+Serves one of the user's uploaded files (`<uuid>.pdf` or `<uuid>.epub`) from `UPLOADS_DIR/<userId>/`. Any other name, or another user's file, returns `404`.
+
+### `/api/library`
+A per-user reader library: a real folder tree of PDFs and EPUBs under `LIBRARY_DIR/<userId>/` (default `data/library/<userId>/`). Files keep their names, so the folder can also be filled from outside (rsync, `docker cp`). Paths are relative to the user's root; any path that escapes it returns `400`.
+
+- `GET ?op=list&path=<dir>` returns `{ "dirs": ["..."], "files": [{ "name", "size" }] }` (hidden entries skipped). A user with no folder yet gets an empty list.
+- `GET ?op=file&path=<file>` returns the file with its content type.
+- `POST` JSON `{ "op": "mkdir", "path": "<parent>", "name": "<folder>" }` creates a subfolder.
+- `POST` multipart with a `file` and an optional `dir` field uploads into that folder (`.pdf` or `.epub`, up to 100 MB), returning `{ "name", "path" }`. Client errors return `400`, `413` or `415` like `/api/upload`.

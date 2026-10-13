@@ -38,10 +38,10 @@ It appears in the edit-mode picker under Community. Invalid files are skipped (t
 | `description` | yes | max 160 chars, shown as the picker tooltip |
 | `color` | no | one of `amber sky neutral rose teal orange` (default `neutral`) |
 | `defaultSize` | no | grid units, `{ "w": 1, "h": 3 }` default |
-| `digestable` | no | default `false`; set `true` to include in the morning digest |
+| `digestable` | no | default `false`. Reserved: the morning digest does not support community widgets yet, so `true` has no effect |
 | `config` | no | user settings, see below |
-| `fetch.url` | yes | https only, fetched server-side; `{config.key}` placeholders allowed |
-| `fetch.cacheMinutes` | no | client cache TTL, default 60 |
+| `fetch.url` | yes | https only, fetched server-side through `/api/proxy` (public hosts only, body capped at 1 MB); `{config.key}` placeholders allowed |
+| `fetch.cacheMinutes` | no | client cache TTL, default 60; the last response is kept under `bank-widget-<id>-cache` |
 | `items` | one of | shorthand for a mapped list |
 | `layout` | one of | full primitive layout |
 

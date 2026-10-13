@@ -14,7 +14,7 @@ Times how long you spend on each of a set of named activities. Only one activity
 Two keys with different lifetimes:
 
 - **`tracker-config-{id}`**: the activity list plus the "what's running" pointer (`activeId` + `since`, an epoch-ms timestamp). This persists across days, so a stopwatch left running keeps running into the next day.
-- **`tracker-days-{id}`**: every day's accumulated seconds per activity, keyed by local date. Past days are retained; the history overlay reads them. (An earlier version stored one key per day, `tracker-day-{id}-{date}`; on load that today-key is migrated into this consolidated store.)
+- **`tracker-days-{id}`**: every day's accumulated seconds per activity, keyed by local date. Past days are retained; the history overlay reads them. (An earlier version stored one key per day, `tracker-day-{id}-{date}`; on load that today-key is migrated into this consolidated store. Those dated keys are user data, so the cache cleanup never deletes them.)
 
 ## Day Boundary: Local Midnight
 
@@ -43,7 +43,7 @@ Transitions: clicking an idle activity commits the current one (if any) and star
 
 ## Settings
 
-The card flips to a settings panel where activities are added (text field + `Plus`), renamed inline, and removed (`×`). Edits are staged in a draft and applied on save. On save, removed activities are dropped from today's bucket and the running pointer (the stopwatch stops if the running activity was removed), but their past-day history is kept: per-day time is keyed by activity **id**, so renaming keeps history intact and a removed activity's past time still appears (labeled `(removed)`, neutral dot).
+The card flips to a settings panel where activities are added (text field + `Plus`), renamed inline, and removed (X button). Edits are staged in a draft and applied on save. On save, removed activities are dropped from today's bucket and the running pointer (the stopwatch stops if the running activity was removed), but their past-day history is kept: per-day time is keyed by activity **id**, so renaming keeps history intact and a removed activity's past time still appears (labeled `(removed)`, neutral dot).
 
 The settings footer's reset button zeroes today's bucket (keeping the activity list). If something is running, its `since` resets to now so it continues cleanly from zero.
 
@@ -62,4 +62,4 @@ A day's detail view shows its donut and a per-activity breakdown. Every current 
 
 ## Digest and Chat
 
-`digestable: false`: numeric time data is not useful for the narrative `/digest` briefing, so the Tracker is excluded from it. The Chat widget's dashboard lookup **does** include it: the most recent 7 days that have entries, per activity, as text.
+`digestable: false`: numeric time data is not useful for the narrative `/digest` briefing, so the Tracker is excluded from it. The Chat widget's dashboard lookup **does** include it: its `read_widget` tool reads, server-side through `lib/widgetData.ts`, the most recent 7 days that have entries, per activity, as text.

@@ -8,11 +8,16 @@ Responses stream token-by-token and conversations are saved.
 
 | Key | Value |
 |---|---|
-| `chat-widget-{id}` | JSON: `{ config, conversations: [{ id, title, messages, updatedAt, characterId }], activeId, characters: [{ id, name, emoji, persona, focus, memories }], activeCharacterId }` |
+| `chat-{id}-index` | JSON: `{ config, activeId, characters: [{ id, name, emoji, persona, focus, memories }], activeCharacterId, conversations: [{ id, title, autoTitle, count, updatedAt, renamed, characterId }] }`. The conversation list holds metadata only. |
+| `chat-{id}-conv-{convId}` | JSON: `{ messages }` for one conversation. Loaded when the conversation is opened. |
+
+Saving a conversation writes only its own key plus the index, so one long chat cannot push every other chat over the 1 MB value limit. Storage code lives in `lib/chat/storage.ts`.
+
+**Migration.** Older installs kept everything in one `chat-widget-{id}` key. On load, when no index exists, that key is read, each conversation is copied to its own key, then the index is written, and the old key is removed only after every write succeeded. If any write fails the old key stays the source of truth and the copy is retried on the next save. A value that does not parse is left untouched, and a failed read makes the widget read-only (with a Retry button) rather than saving defaults over data.
 
 `config` holds: `baseUrl, apiKey, model, system, useDashboard, dashboardWidgets, maxTokens, length, effort, useKiwix, kiwixUrl, kiwixSource, kiwixSourceTitle, useCalendar, useAnytype, anytypeUrl, anytypeApiKey, anytypeSpaceId, anytypeSpaceName, keepAlive`.
 
-The legacy single-conversation shape (`{ config, messages }`) is migrated to one conversation on load. Older configs without `characters` get a default **Assistant** character seeded on load (so existing chats are unaffected).
+The oldest single-conversation shape (`{ config, messages }`) is migrated the same way, into one conversation. Older configs without `characters` get a default **Assistant** character seeded on load (so existing chats are unaffected).
 
 - `baseUrl`: the API base, e.g. `http://localhost:11434/v1`. `/chat/completions` and `/models` are appended to it.
 - `apiKey`: sent as `Authorization: Bearer <key>` when set. The settings field is **currently hidden** (local-only mode), so this is always empty and no key is stored. Re-add the field in `ChatWidget.tsx` (and stop forcing `apiKey: ""` in `saveSettings`) to use hosted providers.
@@ -40,7 +45,7 @@ Hover the widget and click the pencil. The panel is grouped into three sections:
 ## Behaviour
 
 - **Streaming**: replies stream in real-time via `POST /api/chat` with `stream: true`. The **Stop** button aborts the in-flight request and keeps whatever streamed so far.
-- **Thinking**: reasoning models (qwen3, deepseek-r1, ...) stream their chain-of-thought in a separate `delta.reasoning` field (with empty `content`). The `/api/chat` route re-wraps it inline as `<think>...</think>`, and the client (`splitThinking`/`ThinkBlock` in `ChatWidget.tsx`) shows it as a collapsible "Thinking" block that auto-expands while the model is thinking, then collapses once the answer begins. Prior turns' thinking is stripped from the history sent upstream so it never crowds out the conversation.
+- **Thinking**: reasoning models (qwen3, deepseek-r1, ...) stream their chain-of-thought in a separate `delta.reasoning` field (with empty `content`). The `/api/chat` route re-wraps it inline as `<think>...</think>`, and the client (`splitThinking` in `lib/chat/format.ts`, `ThinkBlock` in `components/chat/MessageRow.tsx`) shows it as a collapsible "Thinking" block that auto-expands while the model is thinking, then collapses once the answer begins. Prior turns' thinking is stripped from the history sent upstream so it never crowds out the conversation.
 - **Markdown**: assistant replies are rendered as Markdown (headings, bold/italic, lists, inline code, fenced code blocks, blockquotes, links) by a small in-house renderer in `components/Markdown.tsx`, no external dependency. User messages stay plain text.
 - **Live status**: while waiting, a caption under the reply shows `thinking... {s}s` (switching to `loading model / thinking...` past 3s, since a cold model load shows up as latency before the first token), then `generating... {s}s`.
 - **Stats**: once a reply finishes, a footer reports `{tok/s} · {tokens} tokens · {total time} · {time to first token}`. Timings are measured client-side; the token count comes from a `\x1e`-delimited trailer the `/api/chat` route appends (it counts per-token deltas, exact for local servers that stream one token per chunk).

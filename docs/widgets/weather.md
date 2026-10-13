@@ -38,4 +38,4 @@ The route validates `lat`/`lon` ranges and normalizes the response to:
 
 ## Digest and Chat
 
-Weather is `digestable` (the default), so the `/digest` page reads the saved config, fetches a fresh forecast, and includes it as text. The Chat widget's dashboard lookup gathers the same entry. Both use `summarizeForecast()` in `lib/weather.ts`: a one-line "Now in {place}" summary (temperature, condition, feels-like, humidity, wind) plus the next 3 days, with precipitation chance when above 20%. The WMO code-to-label mapping lives in `lib/weather.ts` so the widget, the digest, and the chat context all use the same words.
+Weather is `digestable` (the default), so the `/digest` page reads the saved config, fetches a fresh forecast, and includes it as text. The Chat widget's `read_widget` tool reads it server-side through `lib/widgetData.ts`. Both use `summarizeForecast()` in `lib/weather.ts`: a one-line "Now in {place}" summary (temperature, condition, feels-like, humidity, wind) plus the next 3 days, with precipitation chance when above 20%. The WMO code-to-label mapping lives in `lib/weather.ts` so the widget, the digest, and the chat context all use the same words.

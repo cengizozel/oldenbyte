@@ -34,7 +34,7 @@ Each calendar's `current-user-privilege-set` is checked for a `write`/`write-con
 
 ## Events
 
-`POST /api/caldav` with `op: "events"` runs a `calendar-query` REPORT with a time range against each selected calendar (up to 20, in parallel; failures are reported per calendar without sinking the rest). The iCal payloads are parsed with a line-unfolding VEVENT reader: UTC times are converted to the server's local time for display, all-day events are detected via `VALUE=DATE`, and escaped characters are unescaped. Servers that match the time range but do not inline `calendar-data` get those objects fetched directly (batches of 8, capped at 100). Recurring events rely on the server's time-range handling; servers that do not expand recurrences return the master once.
+`POST /api/caldav` with `op: "events"` runs a `calendar-query` REPORT with a time range against each selected calendar (up to 20, in parallel; failures are reported per calendar without sinking the rest). The iCal payloads are parsed with a line-unfolding VEVENT reader. Times are timezone-aware: the widget sends the browser's IANA zone (`timezone`), and UTC values and TZID-stamped wall times are converted into it (the server's zone is used when none is sent); floating times and all-day dates (`VALUE=DATE`) are read in that zone. Escaped characters are unescaped. Servers that match the time range but do not inline `calendar-data` get those objects fetched directly (batches of 8, capped at 100). Recurring events are expanded locally (DAILY/WEEKLY/MONTHLY/YEARLY with INTERVAL, COUNT, UNTIL, BYDAY including monthly ordinals, EXDATE and RECURRENCE-ID overrides), so a server that returns only the recurrence master still yields the real occurrences in range.
 
 The other ops are `calendars` (discovery), `create`, and `delete`.
 
@@ -44,13 +44,12 @@ The front shows events for the next `days` days, grouped by local day with "Toda
 
 ## Chat Read/Write Tools
 
-When the Chat widget's calendar toggle is on, the chat reuses this widget's account rather than storing a second copy of the credentials: `getCalendarAccount()` in `lib/dashboardContext.ts` returns the first configured Calendar widget's config on the active dashboard, and the chat relays it with each request (the same pattern as its Anytype connection). The model gets two tools:
-
-- `list_calendar_events(start_date?, end_date?)`: events across the selected calendars, defaulting to the next 14 days.
-- `create_calendar_event(title, start, end?, calendar?, location?, description?)`: only writable calendars are eligible; the calendar name is matched loosely and falls back to the first writable one. Created events get a generated UID, a default duration of one hour for timed events (one day for all-day), and a `If-None-Match: *` header so an existing object is never overwritten.
-
-The chat's system prompt instructs the model to create events only on an explicit request and to confirm exactly what it created.
+When the Chat widget's calendar toggle is on, the chat reuses this widget's account rather than storing a second copy of the credentials: `getCalendarAccount()` in `lib/dashboardContext.ts` returns the first configured Calendar widget's config on the active dashboard, and the chat relays it with each request. The calendar tools (`list_calendar_events`, `create_calendar_event`, `delete_calendar_event`) live in `lib/assistant/providers/calendar.ts`; see [chat.md](chat.md) for how they behave. Only writable calendars are eligible for writes. Created events get a generated UID, a default duration of one hour for timed events (all-day events cover their day), a TZID in the user's zone, and an `If-None-Match: *` header so an existing object is never overwritten.
 
 ## Digest
 
-Calendar is `digestable` (the default): the `/digest` page fetches the configured window's events and includes them as one line per event. The chat's dashboard lookup gathers the same entry.
+Calendar is `digestable` (the default): the `/digest` page fetches the next two days of events (today and tomorrow, regardless of the widget's `days` setting) and includes them as one line per event. The chat's `read_widget` tool reads the calendar server-side through `lib/widgetData.ts`.
+
+## Network Access
+
+`/api/caldav` fetches through `userFetch` ([`lib/requestUser.ts`](../../lib/requestUser.ts)): admin accounts may reach a CalDAV server on the LAN or tailnet, every other account is limited to public addresses.

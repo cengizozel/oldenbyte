@@ -6,29 +6,31 @@ Browse and search your own [Anytype](https://anytype.io/) spaces from the dashbo
 
 | Key | Value |
 |---|---|
-| `anytype-widget-{id}` | JSON: `{ baseUrl, apiKey, spaceId, spaceName, limit }` |
+| `anytype-widget-{id}` | JSON: `{ baseUrl, apiKey, spaceId, spaceName, limit, home }` |
 
 - `baseUrl` - the Anytype local API root (default `http://127.0.0.1:31009`). The desktop app must be running and reachable from wherever the dashboard server runs.
 - `apiKey` - the Bearer token obtained by pairing (below).
 - `spaceId` / `spaceName` - the selected space.
 - `limit` - result count (10 / 25 / 50 / 100).
+- `home` - what the front view shows when no search is active: `"recent"` (default) or `"types"`.
 
 ## Pairing
 
 Anytype auth is a one-time challenge/response:
 
-1. Enter the API URL and click **Pair with Anytype** → `POST /api/anytype { op: "challenge" }` triggers a **4-digit code** to appear in the desktop app.
-2. Type the code and confirm → `POST /api/anytype { op: "key", challengeId, code }` exchanges it for an `api_key` (a Bearer token), stored in the config.
+1. Enter the API URL and click **Pair with Anytype**. `POST /api/anytype { op: "challenge" }` makes a **4-digit code** appear in the desktop app.
+2. Type the code and confirm. `POST /api/anytype { op: "key", challengeId, code }` exchanges it for an `api_key` (a Bearer token), stored in the config.
 3. Pick a space (`GET /api/anytype?op=spaces`).
 
 To revoke, remove the app authorization in Anytype's settings and re-pair.
 
 ## Behaviour
 
-- The front view shows **recent objects** (an empty search sorted by last-modified) and a search box. Searching calls `GET /api/anytype?op=search` within the selected space.
+- The front view shows either **recent objects** (an empty search sorted by last-modified) or, with `home: "types"`, the space's **object types** (`GET /api/anytype?op=types`); opening a type lists its objects. A search box sits on top. Searching calls `GET /api/anytype?op=search` within the selected space.
+- Every GET sends the API key in an `X-Api-Key` header, never in the query string, so it stays out of proxy and access logs.
 - **Multi-word search** that finds nothing is retried as an AND of its terms (so `2026 journal` finds `Journal (2026)`) - handled in [`lib/anytype.ts`](../../lib/anytype.ts).
-- Clicking an object (or its external-link icon) opens it in the desktop app via an `anytype://object?objectId=…&spaceId=…` deep link.
-- The **home** button returns to the recent list; the **pencil** opens the settings card (flip animation, like the Kiwix widget).
+- Clicking an object opens it in an in-widget reader (`GET /api/anytype?op=object`, rendered as markdown). The external-link icon (on hover, and in the reader header) opens it in the desktop app via an `anytype://object?objectId=…&spaceId=…` deep link.
+- The **home** button returns to the home view; the **pencil** opens the settings card (flip animation, like the Kiwix widget).
 
 ## Reachability
 
@@ -36,6 +38,6 @@ The Anytype API binds to `127.0.0.1`, so it's only reachable when the dashboard 
 
 ## Why a server-side proxy
 
-Requests go through [`/api/anytype`](../api.md#anytype) (which shares search/read logic with the Chat widget's Anytype lookup via `lib/anytype.ts`) rather than directly from the browser - same reason as the Kiwix and Chat widgets: it avoids CORS and HTTPS mixed-content blocking against a plain-http local server.
+Requests go through [`/api/anytype`](../api.md#anytype) (which shares search/read logic with the Chat widget's Anytype lookup via `lib/anytype.ts`) rather than directly from the browser, for the same reason as the Kiwix and Chat widgets: it avoids CORS and HTTPS mixed-content blocking against a plain-http local server. The route fetches through `userFetch` ([`lib/requestUser.ts`](../../lib/requestUser.ts)): admin accounts may reach LAN and tailnet addresses, every other account is limited to public addresses, so only an admin can point the widget at a private Anytype host.
 
 This widget is not `digestable`.
