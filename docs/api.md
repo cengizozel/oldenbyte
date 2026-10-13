@@ -6,6 +6,8 @@ Routes that fetch a URL the client supplies (Kiwix, CalDAV, Anytype, TubeArchivi
 
 ---
 
+
+Unreachable or failing upstream services (Kiwix, Anytype, CalDAV, LLM servers, feeds) answer `503`, never `502` or `504`: behind Cloudflare those two are replaced by Cloudflare's own HTML error page and the JSON error would be lost.
 ## Config (dashboard as JSON)
 
 The whole dashboard (every dashboard's layout, widget instances, and per-widget content, plus global settings like theme and timezone) lives in the key/value store. `/api/config` exposes it as a single hand-authorable JSON document. Unlike `/api/settings/export`, values are JSON-decoded (so `widget-layout` is a real array, not an escaped string) and re-encoded on the way back in.
@@ -170,7 +172,7 @@ messages in one request returns `413`.
 With `stream: true` (default), returns a `text/plain` stream of token deltas,
 read with a `ReadableStreamDefaultReader`. With `stream: false`, returns
 `{ "content": "..." }`. Upstream errors are surfaced as
-`{ "error": "..." }` with the upstream status code (or `502` if unreachable).
+`{ "error": "..." }` with the upstream status code (or `503` if unreachable).
 
 **Agentic lookup (Kiwix, Anytype, dashboard, calendar).** Pass any of these
 objects to hand the model tools so it can ground answers in a source it reads:
@@ -257,7 +259,7 @@ Fetches one article and returns a plain-text extract of its lead paragraphs (tag
 { "extract": "Isaac Newton was an English mathematician..." }
 ```
 
-Upstream errors (e.g. a ZIM that can't be read) are surfaced as `{ "error": "..." }` with a `502` status.
+Upstream errors (e.g. a ZIM that can't be read) are surfaced as `{ "error": "..." }` with a `503` status.
 
 ---
 
@@ -316,13 +318,13 @@ curl -H "X-Api-Key: $ANYTYPE_KEY" "https://host/api/anytype?op=spaces&baseUrl=ht
 - `?op=types&baseUrl=<url>&spaceId=<id>` returns `{ "types": [...] }`, the space's object types.
 - `?op=object&baseUrl=<url>&spaceId=<id>&id=<objectId>` returns `{ "object": ... }`, one object read as markdown plus metadata.
 
-An unreachable host is reported as a hint that the Anytype app is not running; upstream errors return `502`.
+An unreachable host is reported as a hint that the Anytype app is not running; upstream errors return `503`.
 
 ---
 
 ## CalDAV
 
-Server-side proxy to any CalDAV server (RFC 4791; tested against Radicale, written for Nextcloud compatibility) for the Calendar widget. Server-side for Basic auth and CORS; credentials ride each request and are never stored. The client logic lives in [`lib/caldav.ts`](../lib/caldav.ts) so the Chat widget's calendar tools can reuse it directly. All operations are `POST /api/caldav` with an `op` field plus `baseUrl`, `username`, `password`. Errors are surfaced as `{ "error": "..." }` with `400` (bad input) or `502` (upstream).
+Server-side proxy to any CalDAV server (RFC 4791; tested against Radicale, written for Nextcloud compatibility) for the Calendar widget. Server-side for Basic auth and CORS; credentials ride each request and are never stored. The client logic lives in [`lib/caldav.ts`](../lib/caldav.ts) so the Chat widget's calendar tools can reuse it directly. All operations are `POST /api/caldav` with an `op` field plus `baseUrl`, `username`, `password`. Errors are surfaced as `{ "error": "..." }` with `400` (bad input) or `503` (upstream).
 
 ### `op: "calendars"`
 Discovers the account's event calendars (`current-user-principal`, then `calendar-home-set`, then `PROPFIND`). Collections that can't hold VEVENTs (task-only lists) are skipped; `readOnly` is derived from the reported privileges.
@@ -381,7 +383,7 @@ Top posts of one subreddit from Reddit's RSS feed (`/r/<name>/top.rss?t=<period>
 [{ "title": "...", "link": "...", "pubDate": "...", "score": 0, "subreddit": "programming", "content": "<html>", "thumbnail": "...", "image": "..." }]
 ```
 
-RSS carries no vote counts, so `score` is always `0`. Reddit rate-limits unauthenticated requests hard, so every upstream fetch goes through one queue spaced 15 seconds apart, a `429` is retried at the back of the queue (up to 3 attempts), and results are cached in memory with the admin feed TTL. A stale entry (up to 24 hours) is served immediately while it refreshes. `refresh=1` skips the cache but still waits its turn in the queue. Failures return `502`, unless an entry from the last 24 hours exists.
+RSS carries no vote counts, so `score` is always `0`. Reddit rate-limits unauthenticated requests hard, so every upstream fetch goes through one queue spaced 15 seconds apart, a `429` is retried at the back of the queue (up to 3 attempts), and results are cached in memory with the admin feed TTL. A stale entry (up to 24 hours) is served immediately while it refreshes. `refresh=1` skips the cache but still waits its turn in the queue. Failures return `503`, unless an entry from the last 24 hours exists.
 
 ---
 
@@ -415,7 +417,7 @@ Returns:
 ### `GET /api/youtube?video=<url-or-id>`
 Details for one video, from its watch page: `{ "title", "author", "description", "lengthSeconds", "viewCount" }` (description capped at 4000 characters).
 
-All modes go through the server feed cache. Errors return `500` (`502` for video details).
+All modes go through the server feed cache. Errors return `500` (`503` for video details).
 
 ---
 
@@ -427,7 +429,7 @@ Bridge to a [TubeArchivist](https://www.tubearchivist.com/) server for the YouTu
 - `{ op: "ping", url, token }` returns `{ "ok": true, "version": "..." }`. A rejected token is reported as an error.
 - `{ op: "check", url, token, ids, force? }` returns `{ "archived": ["<videoId>", ...] }`, the subset of up to 100 `ids` present in the archive. Answers are cached per server and token: "archived" for an hour, "not archived" for 2 minutes; `force: true` skips the cache. If TubeArchivist is unreachable, the last known answer is kept.
 
-Errors return `502`.
+Errors return `503`.
 
 ---
 
@@ -451,14 +453,14 @@ Proxy for the TV widget. IPTV servers (for example ErsatzTV) usually serve plain
 - `op=playlist&url=<.m3u8>` returns the HLS playlist with every URI rewritten back through this route (nested playlists as `op=playlist`, segments and keys as `op=seg`).
 - `op=seg&url=<segment-or-stream>` streams the bytes through. Only `video/*` and `audio/*` content types are passed on; anything else is sent as `application/octet-stream` with `Content-Disposition: attachment`, so an upstream page can never render on the dashboard's origin.
 
-Missing or non-http URLs return `400`; upstream errors return `502`.
+Missing or non-http URLs return `400`; upstream errors return `503`.
 
 ---
 
 ## F1
 
 ### `GET /api/f1`
-Fetches current season data from [f1api.dev](https://f1api.dev), falling back to the [Jolpica F1 API](https://api.jolpi.ca/ergast/) (Ergast-compatible) when the first returns nothing or fails. Upstream requests have a 7 second timeout and are cached for 1 hour via Next.js fetch revalidation. Both sources are mapped to the same shape. If both fail, the route returns `502`.
+Fetches current season data from [f1api.dev](https://f1api.dev), falling back to the [Jolpica F1 API](https://api.jolpi.ca/ergast/) (Ergast-compatible) when the first returns nothing or fails. Upstream requests have a 7 second timeout and are cached for 1 hour via Next.js fetch revalidation. Both sources are mapped to the same shape. If both fail, the route returns `503`.
 
 Returns:
 ```json
@@ -501,7 +503,7 @@ Geocoding search; returns the top 5 matches. Cached for 24 hours via Next.js fet
 ```
 
 ### `GET /api/weather?lat=<lat>&lon=<lon>&unit=<c|f>`
-Current conditions plus a 6-day daily forecast for a coordinate. `unit` defaults to `c`. Cached for 30 minutes. Invalid coordinates return `400`; upstream failures return `502` with `{ "error": "..." }`.
+Current conditions plus a 6-day daily forecast for a coordinate. `unit` defaults to `c`. Cached for 30 minutes. Invalid coordinates return `400`; upstream failures return `503` with `{ "error": "..." }`.
 
 ```json
 {

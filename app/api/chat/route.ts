@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       .filter((m): m is string => Boolean(m));
     return NextResponse.json({ models });
   } catch (err) {
-    return NextResponse.json({ error: `Could not list models: ${String(err)}` }, { status: 502 });
+    return NextResponse.json({ error: `Could not list models: ${String(err)}` }, { status: 503 });
   }
 }
 
@@ -490,7 +490,7 @@ export async function POST(request: NextRequest) {
   try {
     upstream = await userFetch(url, { method: "POST", headers: upstreamHeaders, body, signal: request.signal });
   } catch (err) {
-    return NextResponse.json({ error: `Could not reach ${url}: ${String(err)}` }, { status: 502 });
+    return NextResponse.json({ error: `Could not reach ${url}: ${String(err)}` }, { status: 503 });
   }
 
   if (!upstream.ok) {

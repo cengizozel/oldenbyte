@@ -310,7 +310,7 @@ export async function GET(request: NextRequest) {
     try {
       return NextResponse.json(await cachedFeed(`ytv|${id}`, () => fetchVideoDetails(id), force));
     } catch (err) {
-      return NextResponse.json({ error: String(err) }, { status: 502 });
+      return NextResponse.json({ error: String(err) }, { status: 503 });
     }
   }
 

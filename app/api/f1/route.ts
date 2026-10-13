@@ -97,5 +97,5 @@ export async function GET(request: NextRequest) {
       // try the next source
     }
   }
-  return NextResponse.json({ error: "Failed to fetch F1 data" }, { status: 502 });
+  return NextResponse.json({ error: "Failed to fetch F1 data" }, { status: 503 });
 }

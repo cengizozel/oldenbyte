@@ -44,6 +44,10 @@ export function errorResponse(err: unknown, tag: string, fallback = "Request fai
   return NextResponse.json({ error: fallback }, { status: 500 });
 }
 
+// Upstream integrations that are down answer 503, never 502 or 504: behind
+// Cloudflare those two are replaced by Cloudflare's own HTML error page, so
+// the widget would get no JSON error to show.
+
 export function unauthorized(): NextResponse {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }

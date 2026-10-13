@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     try {
       return NextResponse.json({ extract: await articleExtract(baseUrl, article, request.signal) });
     } catch (err) {
-      return NextResponse.json({ error: `Could not load article: ${String(err)}` }, { status: 502 });
+      return NextResponse.json({ error: `Could not load article: ${String(err)}` }, { status: 503 });
     }
   }
 
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     try {
       return NextResponse.json({ sources: await listSources(baseUrl, request.signal) });
     } catch (err) {
-      return NextResponse.json({ error: `Could not list sources: ${String(err)}` }, { status: 502 });
+      return NextResponse.json({ error: `Could not list sources: ${String(err)}` }, { status: 503 });
     }
   }
 
@@ -52,6 +52,6 @@ export async function GET(request: NextRequest) {
   try {
     return NextResponse.json({ results: await search(baseUrl, source, q, limit, request.signal) });
   } catch (err) {
-    return NextResponse.json({ error: String(err instanceof Error ? err.message : err) }, { status: 502 });
+    return NextResponse.json({ error: String(err instanceof Error ? err.message : err) }, { status: 503 });
   }
 }

@@ -142,6 +142,6 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     // Even a forced refresh prefers yesterday's posts over an empty panel.
     if (hit && Date.now() - hit.at < STALE_MS) return NextResponse.json(hit.posts);
-    return NextResponse.json({ error: String(err) }, { status: 502 });
+    return NextResponse.json({ error: String(err) }, { status: 503 });
   }
 }

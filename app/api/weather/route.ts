@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       }));
       return NextResponse.json({ results });
     } catch (err) {
-      return NextResponse.json({ error: `Could not search locations: ${String(err)}` }, { status: 502 });
+      return NextResponse.json({ error: `Could not search locations: ${String(err)}` }, { status: 503 });
     }
   }
 
@@ -76,6 +76,6 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (err) {
-    return NextResponse.json({ error: `Could not fetch forecast: ${String(err)}` }, { status: 502 });
+    return NextResponse.json({ error: `Could not fetch forecast: ${String(err)}` }, { status: 503 });
   }
 }

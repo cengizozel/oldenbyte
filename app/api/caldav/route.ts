@@ -74,6 +74,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: `Unknown op "${op}"` }, { status: 400 });
   } catch (err) {
-    return NextResponse.json({ error: String(err instanceof Error ? err.message : err) }, { status: 502 });
+    return NextResponse.json({ error: String(err instanceof Error ? err.message : err) }, { status: 503 });
   }
 }

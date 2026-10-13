@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });
   } catch (err) {
-    return NextResponse.json({ error: anytypeError(err, baseUrl) }, { status: 502 });
+    return NextResponse.json({ error: anytypeError(err, baseUrl) }, { status: 503 });
   }
 }
 
@@ -131,9 +131,9 @@ export async function POST(request: NextRequest) {
         signal: request.signal,
       });
       const data = await res.json().catch(() => ({ error: `bridge HTTP ${res.status}` }));
-      return NextResponse.json(data, { status: res.ok ? 200 : 502 });
+      return NextResponse.json(data, { status: res.ok ? 200 : 503 });
     } catch (err) {
-      return NextResponse.json({ error: `Bridge unreachable: ${String(err instanceof Error ? err.message : err)}` }, { status: 502 });
+      return NextResponse.json({ error: `Bridge unreachable: ${String(err instanceof Error ? err.message : err)}` }, { status: 503 });
     }
   }
 
@@ -168,6 +168,6 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });
   } catch (err) {
-    return NextResponse.json({ error: anytypeError(err, baseUrl) }, { status: 502 });
+    return NextResponse.json({ error: anytypeError(err, baseUrl) }, { status: 503 });
   }
 }
