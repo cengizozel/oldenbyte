@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import TopBar from "@/components/TopBar";
 import WidgetGrid from "@/components/WidgetGrid";
+import KeyboardLayer from "@/components/KeyboardLayer";
 import { widgets } from "@/lib/widgets";
 import { getDashboards, saveDashboards, PRELOAD_KEY, PRELOAD_EVENT, type DashboardsState } from "@/lib/dashboards";
 import { maybeSeedFirstRun } from "@/lib/seed";
@@ -76,6 +77,11 @@ export default function Home() {
         onCancelEdit={() => { if (dashboards) editControls.current[dashboards.activeId]?.cancel(); setEditing(false); }}
         dashboards={dashboards}
         onDashboardsChange={handleDashboardsChange}
+      />
+      <KeyboardLayer
+        dashboards={dashboards}
+        onDashboardsChange={handleDashboardsChange}
+        onToggleEdit={() => setEditing(e => !e)}
       />
       {dashboards && visited.map(id => {
         const active = id === dashboards.activeId;

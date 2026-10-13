@@ -70,6 +70,7 @@ Global keys:
 | `widget-layout` / `widget-layout:<id>` | Layout of the default / other dashboards: JSON array of react-grid-layout items |
 | `widget-instances` / `widget-instances:<id>` | Instance ID to Widget config map, per dashboard |
 | `preload-dashboards` | `"1"` to mount every dashboard at page load |
+| `keyboard-config` | Keyboard layer: `{ enabled, leader, bindings: { [action]: key } }` (see [keyboard.md](keyboard.md)) |
 | `theme` | `"dark"` or `"light"` (mirrored to `localStorage` for the pre-paint script) |
 | `timezone` | IANA timezone chosen in settings (empty means follow the device) |
 | `topbar-phrase` | Left TopBar field config |

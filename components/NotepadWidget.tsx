@@ -165,6 +165,7 @@ function RichTextEditor({
       <div
         ref={ref}
         contentEditable={editable}
+        data-autofocus={editable || undefined}
         suppressContentEditableWarning
         data-ph={placeholder}
         onInput={emit}

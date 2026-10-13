@@ -327,7 +327,10 @@ export default function TypingWidget({
   const runRef = useRef<RunStat>(freshRun());
   const statsRef = useRef<Stats>(DEFAULT_STATS);
   const configRef = useRef<Config>(DEFAULT_CONFIG);
-  const fieldRef = useRef<HTMLDivElement>(null);
+  // Keys are read from a real (visually hidden) text input rather than a
+  // focusable div: browser extensions such as Vimium only step aside while a
+  // text field is focused, and otherwise swallow letters like "f" and "j".
+  const fieldRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const topWordRef = useRef(0); // first word of the top visible line; you can't backspace above it
   const calmRef = useRef(false);
@@ -875,14 +878,24 @@ export default function TypingWidget({
 
         {/* Body */}
         <div
-          ref={fieldRef}
-          tabIndex={0}
           onKeyDown={onKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onClick={() => { if (idle) startClick(); else focusField(); }}
           className={`flex-1 min-h-0 outline-none relative cursor-text flex flex-col ${finished ? "overflow-y-auto" : "justify-center overflow-hidden"}`}
         >
+          <input
+            ref={fieldRef}
+            data-autofocus
+            aria-label="Typing input"
+            value=""
+            onChange={() => {}}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            className="absolute opacity-0 w-px h-px -z-10 pointer-events-none"
+          />
           {!loaded ? null : finished && result ? (
             <div className="tw-rise h-full">
               <Results c={c} r={result} onRestart={restart} onPracticeWeak={() => applyConfig({ ...config, mode: "drill", drill: "weak" })} />

@@ -8,6 +8,8 @@ import { layoutKey, instancesKey, PRELOAD_KEY, PRELOAD_EVENT, type DashboardsSta
 import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
 import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, TZ_AUTO } from "@/lib/timezone";
 import Toggle from "@/components/ui/Toggle";
+import { KeyboardSettings } from "@/components/KeyboardLayer";
+import { NEW_DASHBOARD_EVENT } from "@/lib/keyboard";
 import { FOCUS_RING } from "@/components/ui/Field";
 
 // ── EditableField ─────────────────────────────────────────────────────────
@@ -717,6 +719,8 @@ function SettingsPanel({
             </p>
           </section>
 
+          <KeyboardSettings />
+
           <section className="flex flex-col gap-3">
             <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Preview</span>
             <div className="flex items-center justify-between">
@@ -797,6 +801,13 @@ function DashboardSwitcher({
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
+
+  // The keyboard layer's "new dashboard" opens the switcher at the name prompt.
+  useEffect(() => {
+    const onNew = () => { setOpen(true); setCreating(true); setNewName(""); };
+    window.addEventListener(NEW_DASHBOARD_EVENT, onNew);
+    return () => window.removeEventListener(NEW_DASHBOARD_EVENT, onNew);
+  }, []);
 
   const active = dashboards.list.find(d => d.id === dashboards.activeId) ?? dashboards.list[0];
 

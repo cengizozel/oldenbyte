@@ -1192,6 +1192,7 @@ export default function ChatWidget({
             <div className="flex items-end gap-2 bg-[var(--surface)] rounded-2xl border border-[var(--surface-border)] px-3 py-1.5">
               <textarea
                 ref={composerRef}
+                data-autofocus
                 value={input}
                 onChange={e => {
                   setInput(e.target.value);

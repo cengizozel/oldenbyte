@@ -205,6 +205,11 @@ export default function WidgetGrid({
     if (!node) {
       node = document.createElement("div");
       node.style.height = "100%";
+      // Found and focused by the keyboard layer (components/KeyboardLayer),
+      // which draws its ring on the cell instead.
+      node.dataset.widgetId = id;
+      node.tabIndex = -1;
+      node.style.outline = "none";
       nodesRef.current.set(id, node);
     }
     return node;
@@ -575,13 +580,14 @@ export default function WidgetGrid({
     return (
       <div className={`flex flex-col h-full rounded-2xl overflow-hidden border ${activeC.border} ${activeC.bg} ${activeC.glow}`}>
         <div className={`shrink-0 flex gap-1 px-2 pt-1.5 pb-1 overflow-x-auto border-b ${activeC.border}`}>
-          {[item.i, ...(item.tabs ?? [])].map(tabId => {
+          {[item.i, ...(item.tabs ?? [])].map((tabId, tabIndex) => {
             const w = instances[tabId];
             const c = colorMap[w?.color ?? "neutral"];
             const isActive = tabId === activeId;
             return (
               <button
                 key={tabId}
+                data-tab-index={tabIndex}
                 onMouseDown={e => e.stopPropagation()}
                 onClick={() => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
                 className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-all border ${
@@ -635,6 +641,12 @@ export default function WidgetGrid({
   }
   const mountedKey = mounted.map(m => m.id).join("|");
 
+  // Reading order of the cells (top to bottom, then left to right), exposed as
+  // data-cell-index for the keyboard layer's widget numbers.
+  const cellOrder = new Map(
+    [...layout].sort((a, b) => a.y === b.y ? a.x - b.x : a.y - b.y).map((item, n) => [item.i, n])
+  );
+
   // Drop the DOM nodes of widgets that left the dashboard (their portals have
   // unmounted by now). Undoing a removal mounts the widget fresh.
   useEffect(() => {
@@ -674,7 +686,7 @@ export default function WidgetGrid({
     <div className={`flex flex-col gap-2 ${fillViewport ? "flex-1 min-h-0" : ""}`}>
 
       {/* Grid */}
-      <div ref={containerRef} className={`relative ${fillViewport ? "flex-1 min-h-0" : ""} ${editing && !gridReady ? "[&_.react-grid-item]:!transition-none" : ""}`}>
+      <div ref={containerRef} data-widget-grid data-active={active ? "true" : "false"} className={`relative ${fillViewport ? "flex-1 min-h-0" : ""} ${editing && !gridReady ? "[&_.react-grid-item]:!transition-none" : ""}`}>
         {editing && size.width > 0 && (
           <div
             className="absolute inset-0 pointer-events-none z-0"
@@ -853,7 +865,7 @@ export default function WidgetGrid({
                 const widget = instances[item.i];
                 if (!widget) return null;
                 return (
-                  <div key={item.i} className="h-80 shrink-0">
+                  <div key={item.i} data-cell-index={cellOrder.get(item.i)} className="h-80 shrink-0">
                     {renderWithTabs(item, false)}
                   </div>
                 );
@@ -876,6 +888,7 @@ export default function WidgetGrid({
                 return (
                   <div
                     key={item.i}
+                    data-cell-index={cellOrder.get(item.i)}
                     className="min-h-0 min-w-0"
                     style={{
                       gridColumn: `span ${Math.min(item.w, 2)}`,
@@ -904,6 +917,7 @@ export default function WidgetGrid({
               return (
                 <div
                   key={item.i}
+                  data-cell-index={cellOrder.get(item.i)}
                   className="min-h-0 min-w-0"
                   style={{
                     gridColumn: `${item.x + 1} / span ${item.w}`,

@@ -17,6 +17,7 @@ export function PencilButton({ c, onClick, title }: { c: ColorClasses; onClick: 
       onClick={onClick}
       title={title}
       aria-label={title ?? "Settings"}
+      data-widget-settings
       className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
     >
       <Pencil size={14} />
@@ -33,6 +34,7 @@ export function RefreshButton({ c, onClick, busy }: { c: ColorClasses; onClick: 
       disabled={busy}
       title="Refresh now"
       aria-label="Refresh now"
+      data-widget-refresh
       className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 disabled:opacity-40 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
     >
       <RefreshCw size={13} className={busy ? "animate-spin" : undefined} />
