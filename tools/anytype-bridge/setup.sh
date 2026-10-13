@@ -9,7 +9,8 @@ python3 -m venv "$VENV"
 # protobuf 7 removed FieldDescriptor.label, which anytype-grpc's generic request
 # builder still uses; pin below 7 until the library migrates.
 "$VENV/bin/pip" install "protobuf<7"
-"$VENV/bin/pip" install "anytype-grpc @ git+https://github.com/cengizozel/anytype-grpc.git"
+# Pinned to a known-good commit; bump it deliberately after testing a newer one.
+"$VENV/bin/pip" install "anytype-grpc @ git+https://github.com/cengizozel/anytype-grpc.git@fecf6b529e1d45ee690b8af1b92d712b7511514b"
 echo
 echo "Done. Venv: $VENV"
 echo "Next steps:"

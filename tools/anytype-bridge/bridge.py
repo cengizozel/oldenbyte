@@ -30,6 +30,7 @@ search, archive_object. Errors come back as {"error": "..."} with HTTP 400/500
 so the caller always gets readable JSON.
 """
 
+import hmac
 import json
 import os
 import re
@@ -418,20 +419,28 @@ class Handler(BaseHTTPRequestHandler):
             version = client().app_version()
             return self._send(200, {"ok": True, "app_version": str(version)})
         except Exception as e:
+            # Unauthenticated endpoint: say what kind of failure, not its details.
             reset_client()
-            return self._send(200, {"ok": False, "error": str(e)})
+            return self._send(200, {"ok": False, "error": type(e).__name__})
 
     def do_POST(self):
         if self.path != "/rpc":
             return self._send(404, {"error": "not found"})
         auth = self.headers.get("Authorization", "")
-        if not BRIDGE_TOKEN or auth != f"Bearer {BRIDGE_TOKEN}":
+        if not BRIDGE_TOKEN or not hmac.compare_digest(auth.encode(), f"Bearer {BRIDGE_TOKEN}".encode()):
             return self._send(401, {"error": "unauthorized"})
         try:
             length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            return self._send(400, {"error": "invalid Content-Length"})
+        if length > MAX_BODY:
+            return self._send(413, {"error": "body too large"})
+        try:
             payload = json.loads(self.rfile.read(length) or b"{}")
         except (ValueError, json.JSONDecodeError):
             return self._send(400, {"error": "invalid JSON body"})
+        if not isinstance(payload, dict):
+            return self._send(400, {"error": "body must be a JSON object"})
 
         op = payload.pop("op", "")
         fn = OPS.get(op)
@@ -448,6 +457,10 @@ class Handler(BaseHTTPRequestHandler):
             # a dead channel usually means the app restarted; reconnect next call
             reset_client()
             return self._send(500, {"error": f"{type(e).__name__}: {e}"})
+
+
+# Requests are small JSON commands; anything bigger is refused unread.
+MAX_BODY = 1024 * 1024
 
 
 def main():
