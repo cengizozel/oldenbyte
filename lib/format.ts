@@ -1,6 +1,15 @@
 // Shared formatting helpers. Single source of truth for the relative-time,
 // count, date, and duration strings that several widgets previously duplicated.
 
+// "2026-10-13" for the device's local day (default: now). Day-keyed data
+// (notes, habits, caches) uses this; toISOString() would give the UTC day,
+// which in Istanbul is still yesterday until 03:00.
+export function localDateStr(d: Date = new Date()): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
 export function timeAgo(iso: string | number | Date): string {
   if (!iso) return "";
   const diff = Date.now() - new Date(iso).getTime();

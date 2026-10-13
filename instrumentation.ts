@@ -91,4 +91,7 @@ export async function register() {
       await tx.$executeRawUnsafe(`DROP TABLE "Setting_legacy"`);
     });
   }
+
+  // Old cache rows and expired sessions (see lib/maintenance.ts).
+  (await import("./lib/maintenance")).scheduleMaintenance();
 }

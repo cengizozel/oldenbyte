@@ -12,6 +12,9 @@ import { prisma } from "@/lib/prisma";
 import { fetchFeed } from "@/lib/rss";
 import { listEvents, type CalDAVCalendar } from "@/lib/caldav";
 import { summarizeForecast } from "@/lib/weather";
+import { userFetch } from "@/lib/requestUser";
+import { todayIn } from "@/lib/timezone";
+import { decodeEntities } from "@/lib/text";
 
 async function read(userId: string, key: string): Promise<string | null> {
   const row = await prisma.setting.findUnique({ where: { userId_key: { userId, key } } });
@@ -24,15 +27,16 @@ async function readJSON<T>(userId: string, key: string): Promise<T | null> {
   try { return JSON.parse(raw) as T; } catch { return null; }
 }
 
-const today = () => new Date().toISOString().split("T")[0];
+// The user's day: what the chat client relayed, else their zone's date. The
+// server's own clock (UTC in the container) would be yesterday until 03:00
+// in Istanbul.
+function userToday(opts?: ReadOpts): string {
+  if (opts?.today && /^\d{4}-\d{2}-\d{2}$/.test(opts.today)) return opts.today;
+  return todayIn(opts?.timezone || "UTC");
+}
 
 function stripTags(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .replace(/\s+/g, " ")
-    .trim();
+  return decodeEntities(html.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
 }
 
 function truncate(s: string, max: number): string {
@@ -53,13 +57,19 @@ function formatItems(items: { title: string; meta?: string; body?: string; link?
 
 // ── Per-type readers ─────────────────────────────────────────────────────────
 
+// Notes are stored one key per day (`notebook-<id>-day-<date>`, listed in
+// `notebook-<id>-days`); a notepad not yet opened since that change still has
+// its whole history in the legacy `notebook-<id>-dates` blob.
 async function readNotebook(userId: string, id: string, title: string): Promise<string> {
-  const [dates, name] = await Promise.all([
+  const prefix = `notebook-${id}-day-`;
+  const [dayRows, legacy, name] = await Promise.all([
+    prisma.setting.findMany({ where: { userId, key: { startsWith: prefix } }, select: { key: true, value: true } }),
     readJSON<Record<string, string>>(userId, `notebook-${id}-dates`),
     read(userId, `notebook-${id}-name`),
   ]);
-  if (!dates) return "This notepad has no entries.";
-  const entries = Object.entries(dates)
+  const byDate: Record<string, string> = { ...(legacy ?? {}) };
+  for (const r of dayRows) byDate[r.key.slice(prefix.length)] = r.value;
+  const entries = Object.entries(byDate)
     .map(([date, html]) => ({ date, text: stripTags(html) }))
     .filter(e => e.text)
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -74,7 +84,7 @@ async function readText(userId: string, id: string, title: string): Promise<stri
   if (!config?.source?.value) return "This text widget is empty.";
   if (config.source.type === "text") return `## ${title} (Text)\n${config.source.value}`;
   try {
-    const res = await fetch(config.source.value, { headers: { "User-Agent": "curl/8" } });
+    const res = await userFetch(config.source.value, { headers: { "User-Agent": "curl/8" }, signal: AbortSignal.timeout(8000) });
     const text = res.ok ? (await res.text()).trim() : "";
     return text ? `## ${title} (Text, live from URL)\n${truncate(text, 500)}` : "The text widget's URL returned nothing.";
   } catch {
@@ -118,7 +128,7 @@ async function readCalendar(userId: string, id: string, title: string, opts?: Re
   const days = cfg.days ?? 7;
   // Anchor "today" and the window to the USER's day (relayed by the chat
   // client), not the server's UTC date — at 9pm in a UTC-5 zone those differ.
-  const start = opts?.today && /^\d{4}-\d{2}-\d{2}$/.test(opts.today) ? opts.today : today();
+  const start = userToday(opts);
   const end = new Date(Date.parse(start) + days * 86400000).toISOString().slice(0, 10);
   const account = { baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password };
   const settled = await Promise.allSettled(cfg.calendars.slice(0, 20).map(c => listEvents(account, c, start, end, undefined, opts?.timezone)));
@@ -177,7 +187,7 @@ async function readTracker(userId: string, id: string, title: string): Promise<s
   }).join("\n");
 }
 
-async function readRhythm(userId: string, id: string, title: string): Promise<string> {
+async function readRhythm(userId: string, id: string, title: string, opts?: ReadOpts): Promise<string> {
   type Item = { id: string; name: string; kind?: "moment" | "session"; mode?: "build" | "reduce"; target?: number };
   const [config, logData] = await Promise.all([
     readJSON<{ items: Item[] }>(userId, `rhythm-config-${id}`),
@@ -223,10 +233,10 @@ async function readRhythm(userId: string, id: string, title: string): Promise<st
     const tgt = it.target != null ? `, ${it.mode === "reduce" ? "limit" : "target"} ${it.target}/day` : "";
     return `- ${it.name} (${goal}${tgt}): ${(last7 / 7).toFixed(1)}x/day over the last week, ${evs.length} in 30 days, last ${since(last)}`;
   });
-  return `## ${title} (Rhythm, habit logging)\nToday is ${today()}. Times are local.\n` + lines.join("\n");
+  return `## ${title} (Rhythm, habit logging)\nToday is ${userToday(opts)}. Times are local.\n` + lines.join("\n");
 }
 
-async function readUpkeep(userId: string, id: string, title: string): Promise<string> {
+async function readUpkeep(userId: string, id: string, title: string, opts?: ReadOpts): Promise<string> {
   type Item = { id: string; name: string; weight: number };
   const [config, daysMap] = await Promise.all([
     readJSON<{ items: Item[] }>(userId, `upkeep-config-${id}`),
@@ -247,7 +257,7 @@ async function readUpkeep(userId: string, id: string, title: string): Promise<st
     const done = active.filter(it => checked.has(it.id)).reduce((a, it) => a + it.weight, 0);
     return Math.round((done / total) * 100);
   };
-  const t = today();
+  const t = userToday(opts);
   const checkedToday = new Set(days[t] ?? []);
   const todayLines = items.map(it => `  ${it.name} (${it.weight}pts): ${checkedToday.has(it.id) ? "done" : "not yet"}`);
   const recent = Object.keys(days).filter(d => d < t).sort((a, b) => b.localeCompare(a)).slice(0, 6)
@@ -256,10 +266,10 @@ async function readUpkeep(userId: string, id: string, title: string): Promise<st
   return `## ${title} (Upkeep, daily essentials score)\nToday is ${t}. Score ${score(t) ?? "—"}/100.\n${todayLines.join("\n")}${recentBlock}`;
 }
 
-async function readF1(userId: string, title: string): Promise<string> {
+async function readF1(userId: string, title: string, opts?: ReadOpts): Promise<string> {
   // The F1 widget caches hourly; read today's freshest snapshot.
   const rows = await prisma.setting.findMany({
-    where: { userId, key: { startsWith: `f1-cache-${today()}` } },
+    where: { userId, key: { startsWith: `f1-cache-${userToday(opts)}` } },
     orderBy: { key: "desc" },
     take: 1,
   });
@@ -274,7 +284,6 @@ async function readF1(userId: string, title: string): Promise<string> {
   }
   if (data.standings?.length) {
     lines.push("Standings:");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const s of data.standings.slice(0, 5)) {
       lines.push(`  ${s.position}. ${s.Driver?.givenName} ${s.Driver?.familyName}: ${s.points} pts (${s.Constructors?.[0]?.name})`);
     }
@@ -378,10 +387,10 @@ export async function readWidgetData(userId: string, id: string, type: string, t
       case "calendar": return await readCalendar(userId, id, title, opts);
       case "schedule": return await readSchedule(userId, id, title);
       case "tracker":  return await readTracker(userId, id, title);
-      case "rhythm":   return await readRhythm(userId, id, title);
-      case "upkeep":   return await readUpkeep(userId, id, title);
+      case "rhythm":   return await readRhythm(userId, id, title, opts);
+      case "upkeep":   return await readUpkeep(userId, id, title, opts);
       case "bookmarks": return await readBookmarks(userId, id, title);
-      case "f1":       return await readF1(userId, title);
+      case "f1":       return await readF1(userId, title, opts);
       case "rss":      return await readRss(userId, id, title);
       case "reddit":   return await readReddit(userId, id, title);
       case "youtube":  return await readYoutube(userId, id, title);

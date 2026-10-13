@@ -137,7 +137,7 @@ export function calendarProvider(cfg: CalendarConfig): Provider {
         const start = String(args?.start ?? "").trim();
         if (!title || !start) return { kind: "message", text: "Missing title or start." };
         if (!/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/.test(start)) {
-          return { kind: "message", text: `Invalid start "${start}" — use YYYY-MM-DD or YYYY-MM-DDTHH:mm.` };
+          return { kind: "message", text: `Invalid start "${start}". Use YYYY-MM-DD or YYYY-MM-DDTHH:mm.` };
         }
         const wanted = String(args?.calendar ?? "").trim().toLowerCase();
         const calendar = (wanted && writable.find(c => c.name.toLowerCase().includes(wanted))) || writable[0];
@@ -198,7 +198,7 @@ export function calendarProvider(cfg: CalendarConfig): Provider {
           kind: "proposal",
           note: `proposing to delete "${e.title}" (${whenLabel})`,
           text:
-            `Proposed deleting "${e.title}" (${whenLabel}) from calendar "${e.calendar}"${e.recurring ? " — recurring, the WHOLE series would go" : ""}. ` +
+            `Proposed deleting "${e.title}" (${whenLabel}) from calendar "${e.calendar}"${e.recurring ? ", recurring, the WHOLE series would go" : ""}. ` +
             `Nothing is deleted yet: the user sees a confirmation card and must approve it. ` +
             `Tell them it is awaiting their confirmation; never claim it was deleted.`,
           proposal: {

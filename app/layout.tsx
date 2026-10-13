@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display } from "next/font/google";
 import Script from "next/script";
 import ThemeHotkey from "@/components/ThemeHotkey";
+import SaveErrorNotice from "@/components/SaveErrorNotice";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -29,6 +30,7 @@ export default function RootLayout({
         </Script>
         <ThemeHotkey />
         {children}
+        <SaveErrorNotice />
       </body>
     </html>
   );

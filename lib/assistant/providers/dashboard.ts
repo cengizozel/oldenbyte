@@ -133,8 +133,8 @@ export function dashboardProvider(widgets: DashWidget[], readOpts?: ReadOpts): P
           .map(r => r.value);
         const { text, hitIds } = searchWidgets(filled, q);
         const note = hitIds.length
-          ? `searching dashboard for "${q}" — matches in ${hitIds.join(", ")}`
-          : `searching dashboard for "${q}" — no matches`;
+          ? `searching dashboard for "${q}": matches in ${hitIds.join(", ")}`
+          : `searching dashboard for "${q}": no matches`;
         return { kind: "widget", note, text };
       }
       return null;

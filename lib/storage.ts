@@ -34,26 +34,50 @@ export async function getItemResult(key: string): Promise<{ ok: boolean; value: 
   }
 }
 
-export async function setItem(key: string, value: string): Promise<void> {
-  if (isDemoMode()) return demoSetItem(key, value);
+// Fired on window when a write fails, so the page can tell the user instead of
+// showing an edit that was never saved (detail: { key, reason }).
+export const SAVE_FAILED_EVENT = "savefailed";
+
+function reportSaveFailure(key: string, reason: string) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SAVE_FAILED_EVENT, { detail: { key, reason } }));
+  }
+}
+
+// Resolves true when the server stored the value. A rejection (too large,
+// server down, network error) resolves false and raises SAVE_FAILED_EVENT;
+// callers that must not continue after a failed write (migrations, deletes
+// that depend on a copy) check the result.
+export async function setItem(key: string, value: string): Promise<boolean> {
+  if (isDemoMode()) { demoSetItem(key, value); return true; }
   try {
-    check401(
+    const res = check401(
       await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key, value }),
       })
     );
-  } catch {}
+    if (res.ok) return true;
+    const data = await res.json().catch(() => ({}));
+    reportSaveFailure(key, typeof data.error === "string" ? data.error : `HTTP ${res.status}`);
+    return false;
+  } catch {
+    reportSaveFailure(key, "network error");
+    return false;
+  }
 }
 
-export async function removeItem(key: string): Promise<void> {
-  if (isDemoMode()) return demoRemoveItem(key);
+export async function removeItem(key: string): Promise<boolean> {
+  if (isDemoMode()) { demoRemoveItem(key); return true; }
   try {
-    check401(
+    const res = check401(
       await fetch(`/api/settings?key=${encodeURIComponent(key)}`, {
         method: "DELETE",
       })
     );
-  } catch {}
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

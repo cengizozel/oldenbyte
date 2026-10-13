@@ -8,6 +8,9 @@ import { widgets as widgetDefs } from "@/lib/widgets";
 import { normalizeCitations } from "@/lib/citations";
 import { getActiveDataKeys } from "@/lib/dashboards";
 import { summarizeForecast } from "@/lib/weather";
+import { decodeEntities } from "@/lib/text";
+import { localDateStr } from "@/lib/format";
+import { f1CacheKey, redditCacheKey, youtubeCacheKey } from "@/lib/cacheKeys";
 
 type TabLayoutItem = { i: string; tabs?: string[] };
 type WidgetInstance = { id: string; type: string; title: string };
@@ -34,11 +37,6 @@ function stripTags(html: string): string {
   return new DOMParser().parseFromString(html, "text/html").body.textContent ?? "";
 }
 
-function decodeEntities(raw: string): string {
-  const ta = document.createElement("textarea");
-  ta.innerHTML = raw;
-  return ta.value;
-}
 
 function parseArxivContent(raw: string) {
   const text = stripTags(raw);
@@ -91,7 +89,7 @@ export default function DigestPage() {
   const composeAbortRef                 = useRef<AbortController | null>(null);
   useEffect(() => () => composeAbortRef.current?.abort(), []);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
   const dateLabel = new Date().toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
@@ -142,8 +140,7 @@ export default function DigestPage() {
     setDraft(d => ({ ...d, model: "" })); // empty while searching
     try {
       const params = new URLSearchParams({ baseUrl: url });
-      if (key) params.set("apiKey", key);
-      const res = await fetch(`/api/chat?${params.toString()}`);
+      const res = await fetch(`/api/chat?${params.toString()}`, { headers: key ? { "X-Api-Key": key } : {} });
       const data = await res.json();
       const list: string[] = res.ok && Array.isArray(data.models) ? data.models : [];
       setModels(list);
@@ -329,7 +326,7 @@ export default function DigestPage() {
             target="_blank"
             rel="noopener noreferrer"
             title={ref.title}
-            className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors align-super text-[10px] ml-0.5"
+            className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors align-super text-[12px] ml-0.5"
           >
             [{n}]
           </a>
@@ -388,7 +385,6 @@ export default function DigestPage() {
 
   async function loadSection(id: string, widget: WidgetInstance): Promise<Section | null> {
     switch (widget.type) {
-      case "notebook": return loadNotepad(id, widget);
       case "text":     return loadText(id, widget);
       case "weather":  return loadWeather(id, widget);
       case "calendar": return loadCalendar(id, widget);
@@ -400,17 +396,6 @@ export default function DigestPage() {
       case "hf":       return loadHf(id, widget);
       default:         return null;
     }
-  }
-
-  async function loadNotepad(id: string, widget: WidgetInstance): Promise<Section | null> {
-    const [rawDates, rawName] = await Promise.all([
-      storage.getItem(`notebook-${id}-dates`),
-      storage.getItem(`notebook-${id}-name`),
-    ]);
-    const dates: Record<string, string> = rawDates ? JSON.parse(rawDates) : {};
-    const text = dates[today];
-    if (!text) return null;
-    return { id, label: rawName ?? widget.title, type: "notebook", entries: [{ text }] };
   }
 
   async function loadText(id: string, widget: WidgetInstance): Promise<Section | null> {
@@ -454,11 +439,11 @@ export default function DigestPage() {
       if (!cfg?.baseUrl || !cfg.username || !cfg.calendars?.length) return null;
       const start = new Date();
       const end = new Date(start.getTime() + 2 * 86400000);
-      const fmt = (d: Date) => d.toISOString().slice(0, 10);
+      const fmt = (d: Date) => localDateStr(d);
       const res = await fetch("/api/caldav", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "events", baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password, calendars: cfg.calendars, start: fmt(start), end: fmt(end) }),
+        body: JSON.stringify({ op: "events", baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password, calendars: cfg.calendars, start: fmt(start), end: fmt(end), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
       });
       if (!res.ok) return null;
       const data = await res.json();
@@ -475,7 +460,7 @@ export default function DigestPage() {
   }
 
   async function loadF1(widget: WidgetInstance): Promise<Section | null> {
-    const cacheKey = `f1-cache-${new Date().toISOString().slice(0, 13)}`;
+    const cacheKey = f1CacheKey();
     const cached = await storage.getItem(cacheKey);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let data: any;
@@ -503,7 +488,6 @@ export default function DigestPage() {
     if (data.standings?.length) {
       entries.push({
         text: data.standings
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .slice(0, 5)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map((s: any) => `${s.position}. ${s.Driver.code} ${s.Driver.familyName} — ${s.points}pts`)
@@ -552,7 +536,7 @@ export default function DigestPage() {
     const config = JSON.parse(raw);
     const subreddits: { name: string; limit: number; period: string }[] = config.subreddits ?? [];
 
-    const cacheKey = `${storageKey}-v2-${today}-${subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
+    const cacheKey = redditCacheKey(id, today, subreddits);
     const cached = await storage.getItem(cacheKey);
 
     let entries: Entry[];
@@ -604,9 +588,9 @@ export default function DigestPage() {
     const storageKey = `youtube-widget-${id}`;
     const raw = await storage.getItem(storageKey);
     if (!raw) return null;
-    const config: { channels: { channelId: string; name: string; limit: number }[] } = JSON.parse(raw);
+    const config: { channels: { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean }[] } = JSON.parse(raw);
 
-    const cacheKey = `${storageKey}-${today}-${config.channels.map(ch => `${ch.channelId}:${ch.limit}`).join(",")}`;
+    const cacheKey = youtubeCacheKey(id, today, config.channels);
     const cached = await storage.getItem(cacheKey);
 
     let entries: Entry[];
@@ -729,11 +713,11 @@ export default function DigestPage() {
           <div className="flex items-baseline justify-between mb-3">
             <Link
               href="/"
-              className="font-ui text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+              className="font-ui text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
             >
               ← back
             </Link>
-            <span suppressHydrationWarning className="font-ui text-[11px] text-[var(--text-muted)]">
+            <span suppressHydrationWarning className="font-ui text-[12px] text-[var(--text-muted)]">
               {dateLabel}
             </span>
           </div>
@@ -743,13 +727,13 @@ export default function DigestPage() {
             </h1>
           </div>
           <div className="border-t border-b border-[var(--text-primary)] py-1.5 flex items-center justify-between">
-            <span className="font-ui text-[11px] text-[var(--text-muted)]">
+            <span className="font-ui text-[12px] text-[var(--text-muted)]">
               morning briefing
             </span>
             <div className="flex items-center gap-4">
-              <button onClick={() => (showSettings ? setShowSettings(false) : openSettings())} className="font-ui text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">{showSettings ? "close" : "model"}</button>
+              <button onClick={() => (showSettings ? setShowSettings(false) : openSettings())} className="font-ui text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">{showSettings ? "close" : "model"}</button>
               {configured && !aiLoading && !generating && (
-                <button onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; storage.removeItem(`digest-ai-sections-${today}`); generateSummary(); }} className="font-ui text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">regenerate</button>
+                <button onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; storage.removeItem(`digest-ai-sections-${today}`); generateSummary(); }} className="font-ui text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">regenerate</button>
               )}
               <button
                 onClick={() => {
@@ -769,7 +753,7 @@ export default function DigestPage() {
           {(showSettings || !configured) && (
             <div className="border-b border-[var(--surface-border)] py-3 flex flex-col gap-2.5 text-[var(--text-primary)]">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-ui text-[11px] text-[var(--text-muted)] w-20 shrink-0">endpoint</span>
+                <span className="font-ui text-[12px] text-[var(--text-muted)] w-20 shrink-0">endpoint</span>
                 <input
                   value={draft.baseUrl}
                   onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, baseUrl: v })); setModels(defaultModelsFor(v)); }}
@@ -777,11 +761,11 @@ export default function DigestPage() {
                   className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono"
                 />
                 {PRESETS.map(p => (
-                  <button key={p.label} onClick={() => setEndpoint(p.url)} className="text-[11px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">{p.label}</button>
+                  <button key={p.label} onClick={() => setEndpoint(p.url)} className="text-[12px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">{p.label}</button>
                 ))}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-ui text-[11px] text-[var(--text-muted)] w-20 shrink-0">model</span>
+                <span className="font-ui text-[12px] text-[var(--text-muted)] w-20 shrink-0">model</span>
                 {loadingModels ? (
                   <span className="flex-1 min-w-[12rem] text-[12px] italic text-[var(--text-muted)] py-0.5 font-ui animate-pulse">searching models…</span>
                 ) : models.length > 0 ? (
@@ -794,13 +778,13 @@ export default function DigestPage() {
                   <input value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} placeholder="e.g. gpt-4o-mini or llama3.2" className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono" />
                 )}
                 {!loadingModels && (
-                  <button onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey, draft.model || model)} className="text-[11px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">load models</button>
+                  <button onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey, draft.model || model)} className="text-[12px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">load models</button>
                 )}
               </div>
               {/* API key — only for hosted providers that need one */}
               {NEEDS_KEY.test(draft.baseUrl) && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-ui text-[11px] text-[var(--text-muted)] w-20 shrink-0">api key</span>
+                  <span className="font-ui text-[12px] text-[var(--text-muted)] w-20 shrink-0">api key</span>
                   <input
                     type="password"
                     value={draft.apiKey}
@@ -813,9 +797,9 @@ export default function DigestPage() {
               )}
               <div className="flex justify-end gap-4">
                 {Boolean(draft.baseUrl && draft.model && (draft.apiKey || !NEEDS_KEY.test(draft.baseUrl))) && (
-                  <button onClick={() => saveSettings(true)} className="text-[11px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">save &amp; recompose</button>
+                  <button onClick={() => saveSettings(true)} className="text-[12px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">save &amp; recompose</button>
                 )}
-                <button onClick={() => saveSettings(false)} className="text-[11px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">save</button>
+                <button onClick={() => saveSettings(false)} className="text-[12px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">save</button>
               </div>
             </div>
           )}
@@ -828,7 +812,7 @@ export default function DigestPage() {
               Set a model above to generate today&apos;s briefing, with a local one (Ollama, LM Studio) or a hosted provider with an API key.
             </p>
           ) : aiLoading ? (
-            <p className="font-ui text-[11px] text-[var(--text-muted)] text-center mt-16 animate-pulse">
+            <p className="font-ui text-[12px] text-[var(--text-muted)] text-center mt-16 animate-pulse">
               composing briefing…
             </p>
           ) : aiError ? (
@@ -842,7 +826,7 @@ export default function DigestPage() {
                     onClick={() => setCollapsed(c => ({ ...c, [s.label]: !c[s.label] }))}
                     className="w-full flex items-center gap-3 mb-4 group"
                   >
-                    <span className="font-ui text-[11px] tracking-[0.2em] text-[var(--page-bg)] bg-[var(--text-primary)] px-2 py-0.5">
+                    <span className="font-ui text-[12px] tracking-[0.2em] text-[var(--page-bg)] bg-[var(--text-primary)] px-2 py-0.5">
                       {s.label}
                     </span>
                     <div className="flex-1 h-px bg-[var(--surface-border)]" />
@@ -854,7 +838,7 @@ export default function DigestPage() {
                       {s.prose
                         ? renderProse(s.prose, s.refs)
                         : generating
-                          ? <p className="font-ui text-[11px] text-[var(--text-muted)] animate-pulse">composing…</p>
+                          ? <p className="font-ui text-[12px] text-[var(--text-muted)] animate-pulse">composing…</p>
                           : <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-muted)]">no content.</p>}
                     </div>
                   )}
