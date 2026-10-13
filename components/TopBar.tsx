@@ -534,7 +534,7 @@ function AccountSection({ open }: { open: boolean }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Account</span>
+      <span className="text-[12px] text-[var(--text-muted)]">Account</span>
 
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-[var(--text-secondary)] truncate" title={me.username}>{me.username}</span>
@@ -685,7 +685,7 @@ function SettingsPanel({
           <AccountSection open={open} />
 
           <section className="flex flex-col gap-3">
-            <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Appearance</span>
+            <span className="text-[12px] text-[var(--text-muted)]">Appearance</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">
                 Dark mode
@@ -696,7 +696,7 @@ function SettingsPanel({
           </section>
 
           <section className="flex flex-col gap-2">
-            <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Time</span>
+            <span className="text-[12px] text-[var(--text-muted)]">Time</span>
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-[var(--text-secondary)] shrink-0">Timezone</span>
               <TimezoneSelect value={timezone} onChange={onChangeTimezone} />
@@ -704,7 +704,7 @@ function SettingsPanel({
           </section>
 
           <section className="flex flex-col gap-3">
-            <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Performance</span>
+            <span className="text-[12px] text-[var(--text-muted)]">Performance</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">Preload dashboards</span>
               <Toggle
@@ -722,7 +722,7 @@ function SettingsPanel({
           <KeyboardSettings />
 
           <section className="flex flex-col gap-3">
-            <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Preview</span>
+            <span className="text-[12px] text-[var(--text-muted)]">Preview</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">Demo mode</span>
               <Toggle checked={demo} onChange={onToggleDemo} label="Demo mode" title={demo ? "Exit demo mode" : "Enter demo mode"} />

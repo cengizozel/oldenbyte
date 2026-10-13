@@ -402,7 +402,7 @@ export default function TrackerWidget({
               ) : (
                 <>
                   <span className={`text-sm font-semibold tabular-nums ${c.text}`}>{formatClock(total)}</span>
-                  <span className={`text-[12px] uppercase tracking-widest opacity-60 ${c.label}`}>total</span>
+                  <span className={`text-[12px] opacity-60 ${c.label}`}>total</span>
                 </>
               )}
             />
@@ -535,7 +535,7 @@ export default function TrackerWidget({
                       <span className={`text-xs font-semibold tabular-nums ${c.text}`}>
                         {formatDuration(dayRows(detailDate).reduce((a, b) => a + b.secs, 0))}
                       </span>
-                      <span className={`text-[11px] uppercase tracking-widest opacity-60 ${c.label}`}>total</span>
+                      <span className={`text-[11px] opacity-60 ${c.label}`}>total</span>
                     </>
                   }
                 />

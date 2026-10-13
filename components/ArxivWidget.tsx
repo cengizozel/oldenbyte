@@ -252,7 +252,7 @@ export default function ArxivWidget({
             <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
               <span className="opacity-50"><BookOpen size={14} /></span>
               <span className="text-xs font-medium opacity-60">arXiv</span>
-              <span className={`text-[12px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md opacity-60 truncate ${c.bg} border ${c.border}`}>
+              <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded-md opacity-60 truncate ${c.bg} border ${c.border}`}>
                 {config.category}
               </span>
             </div>
@@ -354,7 +354,7 @@ export default function ArxivWidget({
       back={
         <>
           <div className="flex flex-col gap-1.5">
-            <label className={`text-[12px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
+            <label className={`text-[12px] font-semibold opacity-50 ${c.label}`}>
               Field
             </label>
             <SettingsSelect
@@ -370,7 +370,7 @@ export default function ArxivWidget({
             </SettingsSelect>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className={`text-[12px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
+            <label className={`text-[12px] font-semibold opacity-50 ${c.label}`}>
               Topic
             </label>
             <SettingsSelect

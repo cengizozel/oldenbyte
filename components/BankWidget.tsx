@@ -198,7 +198,7 @@ export default function BankWidget({
               if (!text) return null;
               const tc = tagColor(text.toLowerCase());
               return (
-                <span key={j} className={`px-1.5 py-0.5 rounded-md text-[12px] font-medium uppercase tracking-widest ${tc.bg} ${tc.label}`}>
+                <span key={j} className={`px-1.5 py-0.5 rounded-md text-[12px] font-medium ${tc.bg} ${tc.label}`}>
                   {text}
                 </span>
               );

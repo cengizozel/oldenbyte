@@ -365,7 +365,7 @@ export default function KeyboardLayer({
           onMouseDown={e => { e.preventDefault(); finish(); }}
         >
           <div aria-label="Keyboard shortcuts" className="w-full max-w-sm bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-2xl p-5 flex flex-col gap-3">
-            <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Keyboard shortcuts</span>
+            <span className="text-[12px] text-[var(--text-muted)]">Keyboard shortcuts</span>
             <ul className="flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
               <li className="flex items-center justify-between gap-3"><span>Focus widget 1 to 10</span><Kbd>{`${L} 1..9, 0`}</Kbd></li>
               <li className="flex items-center justify-between gap-3"><span>Then pick a tab</span><Kbd>1..9 or q w e r t</Kbd></li>
@@ -428,7 +428,7 @@ export function KeyboardSettings() {
 
   return (
     <section className="flex flex-col gap-3">
-      <span className="text-[12px] uppercase tracking-widest text-[var(--text-muted)]">Keyboard</span>
+      <span className="text-[12px] text-[var(--text-muted)]">Keyboard</span>
       <div className="flex items-center justify-between">
         <span className="text-sm text-[var(--text-secondary)]">Keyboard shortcuts</span>
         <Toggle checked={config.enabled} onChange={() => update({ ...config, enabled: !config.enabled })} label="Keyboard shortcuts" />

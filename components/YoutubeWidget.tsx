@@ -342,7 +342,7 @@ export default function YoutubeWidget({
                               )}
                             </button>
                             <span className="flex items-center gap-1.5 min-w-0">
-                              <span className={`inline-block min-w-0 truncate text-[11px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>
+                              <span className={`inline-block min-w-0 truncate text-[11px] font-semibold px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>
                                 {v.channelName}
                               </span>
                               {v.published && (
@@ -389,11 +389,11 @@ export default function YoutubeWidget({
                             )}
                             <div className="flex-1 min-w-0">
                           <span className="flex items-center gap-1.5 mb-1 min-w-0">
-                            <span className={`inline-block min-w-0 truncate text-[12px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                            <span className={`inline-block min-w-0 truncate text-[12px] font-semibold px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                               {v.channelName}
                             </span>
                             {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
-                              <span className={`shrink-0 text-[11px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
+                              <span className={`shrink-0 text-[11px] font-semibold px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
                             )}
                             {v.published && (
                               <span className={`shrink-0 text-[12px] opacity-60 ${c.text}`}>{timeAgo(v.published)}</span>

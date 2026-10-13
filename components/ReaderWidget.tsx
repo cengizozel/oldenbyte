@@ -541,7 +541,7 @@ function FullscreenOverlay({
         <div className="flex items-center justify-between px-5 py-3 shrink-0 border-b border-[var(--surface-border)]">
           <div className="min-w-0">
             <p className="text-sm font-medium text-[var(--text-primary)] truncate">{config.displayName}</p>
-            <span className="text-xs text-[var(--text-secondary)] opacity-70 uppercase tracking-widest">{config.fileType}</span>
+            <span className="text-xs text-[var(--text-secondary)] opacity-70">{config.fileType}</span>
           </div>
           <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-4">
             <X size={18} />

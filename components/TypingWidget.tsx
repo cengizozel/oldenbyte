@@ -867,7 +867,7 @@ export default function TypingWidget({
           )}
           {/* get-ready countdown */}
           <span className="flex items-center gap-1 ml-auto">
-            <span className={`text-[12px] uppercase tracking-wider opacity-60 ${c.label}`}>ready</span>
+            <span className={`text-[12px] opacity-60 ${c.label}`} title="Count down before the test starts">countdown</span>
             {COUNTDOWNS.map(n => (
               <button key={n} onClick={() => applyConfig({ ...config, countdown: n })} className={chip(config.countdown === n)}>
                 {n === 0 ? "off" : `${n}s`}
@@ -1131,13 +1131,13 @@ function Results({
 }) {
   const big = (value: React.ReactNode, label: string, cls = c.text) => (
     <div>
-      <div className={`text-[12px] uppercase tracking-widest opacity-60 mb-1 ${c.label}`}>{label}</div>
+      <div className={`text-[12px] opacity-60 mb-1 ${c.label}`}>{label}</div>
       <div className={`text-4xl font-semibold tabular-nums leading-none ${cls}`}>{value}</div>
     </div>
   );
   const small = (value: React.ReactNode, label: string, title?: string) => (
     <div title={title}>
-      <div className={`text-[12px] uppercase tracking-widest opacity-60 ${c.label}`}>{label}</div>
+      <div className={`text-[12px] opacity-60 ${c.label}`}>{label}</div>
       <div className={`text-sm tabular-nums ${c.text}`}>{value}</div>
     </div>
   );
@@ -1177,7 +1177,7 @@ function Results({
 
       {r.weak.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={`text-[12px] uppercase tracking-widest opacity-60 ${c.label}`}>missed</span>
+          <span className={`text-[12px] opacity-60 ${c.label}`}>missed</span>
           {r.weak.map(w => (
             <span key={w.k} className="px-1.5 py-0.5 rounded-md text-[12px] font-mono bg-red-500/10 text-red-500 dark:text-red-400" title={`${w.miss}/${w.total} wrong`}>
               {w.k === " " ? "space" : w.k}<span className="opacity-50"> {w.miss}</span>

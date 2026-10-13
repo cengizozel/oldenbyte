@@ -196,7 +196,7 @@ export default function HuggingFaceWidget({
       back={
         <>
           <div className="flex flex-col gap-1.5">
-            <label className={`text-[12px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
+            <label className={`text-[12px] font-semibold opacity-50 ${c.label}`}>
               Papers to show
             </label>
             <div className="flex gap-2">

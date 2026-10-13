@@ -20,7 +20,7 @@ export default function WidgetCard({
         ${className}
       `}
     >
-      <p className={`text-xs font-semibold tracking-widest uppercase mb-2 ${c.label}`}>
+      <p className={`text-xs font-semibold mb-2 ${c.label}`}>
         {widget.title}
       </p>
       <p className={`text-sm ${muted ? "text-neutral-500" : c.text}`}>

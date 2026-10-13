@@ -308,7 +308,7 @@ export default function RedditWidget({
                     return (
                       <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
                         <span className="flex items-center gap-1.5 mb-1 min-w-0">
-                          <span className={`inline-block min-w-0 truncate text-[12px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                          <span className={`inline-block min-w-0 truncate text-[12px] font-semibold px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                             r/{post.subreddit}
                           </span>
                           {post.pubDate && (

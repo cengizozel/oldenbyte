@@ -107,7 +107,7 @@ export default function F1Widget({
               {data.race ? (
                 <div className="flex items-start gap-3">
                   <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                    <p className={`text-[12px] font-semibold uppercase tracking-widest opacity-50 mb-0.5 ${c.label}`}>
+                    <p className={`text-[12px] font-semibold opacity-50 mb-0.5 ${c.label}`}>
                       Next Race · Round {data.race.round}
                     </p>
                     <p className={`text-sm font-medium leading-snug ${c.text}`}>{data.race.raceName}</p>
@@ -131,7 +131,7 @@ export default function F1Widget({
                 <>
                   <div className="border-t border-black/5" />
                   <div className="flex flex-col">
-                    <p className={`text-[12px] font-semibold uppercase tracking-widest opacity-50 mb-1.5 ${c.label}`}>
+                    <p className={`text-[12px] font-semibold opacity-50 mb-1.5 ${c.label}`}>
                       Standings
                     </p>
                     {data.standings.map((s, i) => (

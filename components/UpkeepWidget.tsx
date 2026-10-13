@@ -255,7 +255,7 @@ export default function UpkeepWidget({
                   <span className={`text-2xl font-semibold tabular-nums leading-none ${perfect ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>
                     {pct ?? "—"}
                   </span>
-                  <span className={`mt-1 text-[12px] uppercase tracking-widest opacity-60 ${c.label}`}>
+                  <span className={`mt-1 text-[12px] opacity-60 ${c.label}`}>
                     {perfect ? "perfect" : "/ 100"}
                   </span>
                 </>
@@ -424,7 +424,7 @@ export default function UpkeepWidget({
                       center={
                         <>
                           <span className={`text-xl font-semibold tabular-nums leading-none ${s.pct === 100 ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>{s.pct ?? "—"}</span>
-                          <span className={`mt-1 text-[11px] uppercase tracking-widest opacity-60 ${c.label}`}>{s.pct === 100 ? "perfect" : "/ 100"}</span>
+                          <span className={`mt-1 text-[11px] opacity-60 ${c.label}`}>{s.pct === 100 ? "perfect" : "/ 100"}</span>
                         </>
                       }
                     />

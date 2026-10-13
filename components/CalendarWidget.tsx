@@ -301,7 +301,7 @@ export default function CalendarWidget({
                   />
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tagColor(cal.name).dot }} />
                   <span className="truncate">{cal.name}</span>
-                  {cal.readOnly && <span className={`text-[11px] uppercase tracking-widest opacity-50 ${c.label}`}>read-only</span>}
+                  {cal.readOnly && <span className={`text-[11px] opacity-50 ${c.label}`}>read-only</span>}
                 </label>
               );
             })}
