@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 
-// Minimal Markdown renderer for chat replies — covers the subset models emit:
+// Minimal Markdown renderer for chat replies, covering the subset models emit:
 // headings, bold/italic, inline code, fenced code blocks, ordered/unordered
 // lists, blockquotes, links, and paragraphs. Not a full CommonMark parser, but
 // enough to make replies readable. Partial/unclosed markup (during streaming)
@@ -39,7 +39,7 @@ function renderInline(text: string, prefix: string, cites: Cites = {}): ReactNod
           </a>
         );
       } else {
-        nodes.push(tok); // not a known source — leave as literal text
+        nodes.push(tok); // not a known source: leave as literal text
       }
     } else {
       const mm = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(tok)!;
@@ -112,7 +112,7 @@ function parseBlocks(src: string, cites: Cites = {}): ReactNode[] {
       continue;
     }
 
-    // Paragraph — collect until a blank line or a block starter.
+    // Paragraph: collect until a blank line or a block starter.
     const buf: string[] = [];
     while (i < lines.length && lines[i].trim() !== "" &&
            !/^```/.test(lines[i].trim()) && !isHeading(lines[i]) &&
@@ -131,6 +131,11 @@ function parseBlocks(src: string, cites: Cites = {}): ReactNode[] {
   return out;
 }
 
-export default function Markdown({ text, className = "", cites }: { text: string; className?: string; cites?: Cites }) {
-  return <div className={className}>{parseBlocks(text, cites ?? {})}</div>;
+// Memoized on its props, and the parse is cached per source string, so a
+// finished chat reply never re-parses while another one streams.
+function Markdown({ text, className = "", cites }: { text: string; className?: string; cites?: Cites }) {
+  const blocks = useMemo(() => parseBlocks(text, cites ?? {}), [text, cites]);
+  return <div className={className}>{blocks}</div>;
 }
+
+export default memo(Markdown);
