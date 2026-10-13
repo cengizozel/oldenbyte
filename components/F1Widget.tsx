@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Flag, RotateCcw } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { formatDate } from "@/lib/format";
+import { formatDate, localDateStr } from "@/lib/format";
+import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import { LoadingState, ScrollFades } from "@/components/ui/WidgetChrome";
+import { f1CacheKey } from "@/lib/cacheKeys";
 
 type Race = {
   raceName: string;
@@ -43,32 +45,40 @@ export default function F1Widget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
-  const cacheKey = `f1-cache-${new Date().toISOString().slice(0, 13)}`;
+  // Hourly cache, keyed to the local day and hour.
+  const cacheKey = f1CacheKey();
 
   const [data, setData] = useState<F1Data | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([data]);
+  // Aborts the previous request so an older load can never land last.
+  const fetchAbort = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    fetchAbort.current?.abort();
+    const ctrl = new AbortController();
+    fetchAbort.current = ctrl;
     setLoading(true);
     setError(false);
     try {
-      const res = await fetch("/api/f1");
+      const res = await fetch("/api/f1", { signal: ctrl.signal });
       if (!res.ok) throw new Error();
       const json: F1Data = await res.json();
       setData(json);
       await storage.setItem(cacheKey, JSON.stringify(json));
-    } catch {
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
       setError(true);
     } finally {
-      setLoading(false);
+      if (fetchAbort.current === ctrl) setLoading(false);
     }
   }, [cacheKey]);
 
   useEffect(() => {
     storage.getItem(cacheKey).then(cached => {
-      if (cached) { setData(JSON.parse(cached)); return; }
+      const parsed = parseJson<F1Data | null>(cached, null);
+      if (parsed) { setData(parsed); return; }
       load();
     });
   }, [cacheKey, load]);
@@ -97,7 +107,7 @@ export default function F1Widget({
               {data.race ? (
                 <div className="flex items-start gap-3">
                   <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                    <p className={`text-[10px] font-semibold uppercase tracking-widest opacity-50 mb-0.5 ${c.label}`}>
+                    <p className={`text-[12px] font-semibold uppercase tracking-widest opacity-50 mb-0.5 ${c.label}`}>
                       Next Race · Round {data.race.round}
                     </p>
                     <p className={`text-sm font-medium leading-snug ${c.text}`}>{data.race.raceName}</p>
@@ -121,7 +131,7 @@ export default function F1Widget({
                 <>
                   <div className="border-t border-black/5" />
                   <div className="flex flex-col">
-                    <p className={`text-[10px] font-semibold uppercase tracking-widest opacity-50 mb-1.5 ${c.label}`}>
+                    <p className={`text-[12px] font-semibold uppercase tracking-widest opacity-50 mb-1.5 ${c.label}`}>
                       Standings
                     </p>
                     {data.standings.map((s, i) => (
@@ -129,7 +139,7 @@ export default function F1Widget({
                         key={s.position}
                         className={`flex items-center gap-2 py-1.5 ${i > 0 ? "border-t border-black/10" : ""}`}
                       >
-                        <span className={`text-xs font-semibold opacity-40 w-4 shrink-0 tabular-nums ${c.label}`}>{s.position}</span>
+                        <span className={`text-xs font-semibold opacity-60 w-4 shrink-0 tabular-nums ${c.label}`}>{s.position}</span>
                         <span className={`text-xs font-bold w-8 shrink-0 ${c.label}`}>{s.Driver.code}</span>
                         <span className={`text-xs flex-1 opacity-70 truncate ${c.text}`}>{s.Driver.familyName}</span>
                         <span className={`text-xs font-medium tabular-nums opacity-80 ${c.text}`}>{s.points}</span>

@@ -118,8 +118,8 @@ export default function BankWidget({
   if (!def) {
     return (
       <div className={`rounded-2xl border h-full p-5 ${c.bg} ${c.border} ${c.glow} ${className}`}>
-        <p className={`text-xs opacity-45 ${c.text}`}>
-          This community widget's definition is no longer in the bank.
+        <p className={`text-xs opacity-60 ${c.text}`}>
+          This community widget&apos;s definition is no longer in the bank.
         </p>
       </div>
     );
@@ -130,7 +130,7 @@ export default function BankWidget({
       case "label": {
         const text = resolveText(p.value, data);
         if (!text) return null;
-        const size = p.size === "lg" ? "text-lg font-medium" : p.size === "xs" ? "text-[11px]" : "text-sm";
+        const size = p.size === "lg" ? "text-lg font-medium" : p.size === "xs" ? "text-[12px]" : "text-sm";
         return <p key={i} className={`${size} ${p.muted ? `opacity-60 ${c.label}` : c.text}`}>{text}</p>;
       }
       case "list": {
@@ -154,7 +154,7 @@ export default function BankWidget({
                 <li key={j} className={`py-2.5 ${j > 0 ? "border-t border-black/10" : ""}`}>
                   <div className="flex items-baseline gap-2">
                     <div className="flex-1 min-w-0">{head}</div>
-                    {meta && <span className={`shrink-0 text-[10px] tabular-nums opacity-50 ${c.label}`}>{meta}</span>}
+                    {meta && <span className={`shrink-0 text-[12px] tabular-nums opacity-50 ${c.label}`}>{meta}</span>}
                   </div>
                   {subtitle && <p className={`mt-0.5 text-xs leading-snug opacity-60 line-clamp-2 ${c.text}`}>{subtitle}</p>}
                 </li>
@@ -198,7 +198,7 @@ export default function BankWidget({
               if (!text) return null;
               const tc = tagColor(text.toLowerCase());
               return (
-                <span key={j} className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-widest ${tc.bg} ${tc.label}`}>
+                <span key={j} className={`px-1.5 py-0.5 rounded-md text-[12px] font-medium uppercase tracking-widest ${tc.bg} ${tc.label}`}>
                   {text}
                 </span>
               );
@@ -216,7 +216,7 @@ export default function BankWidget({
           <figure key={i} className="flex-1 min-h-0 flex flex-col items-center gap-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={src} alt={caption || resolveText(p.src, data)} className="w-full flex-1 min-h-0 object-contain rounded-lg" />
-            {caption && <ExpandableCaption text={caption} className={`shrink-0 text-[10px] text-center opacity-50 ${c.text}`} />}
+            {caption && <ExpandableCaption text={caption} className={`shrink-0 text-[12px] text-center opacity-50 ${c.text}`} />}
           </figure>
         );
       }
@@ -294,16 +294,16 @@ export default function BankWidget({
           </div>
         ))}
         {(def.config ?? []).length === 0 && (
-          <p className={`text-xs opacity-45 ${c.text}`}>This widget has no settings.</p>
+          <p className={`text-xs opacity-60 ${c.text}`}>This widget has no settings.</p>
         )}
-        <div className={`text-[10px] leading-relaxed opacity-50 ${c.label}`}>
+        <div className={`text-[12px] leading-relaxed opacity-50 ${c.label}`}>
           <p>{def.description}</p>
           <p className="mt-1 break-all">source: {def.fetch.url.split("?")[0]}</p>
         </div>
         <button
           onClick={() => fetchData(config, true)}
           disabled={loading}
-          className={`self-start flex items-center gap-1 text-[11px] opacity-60 hover:opacity-100 disabled:opacity-30 ${c.label}`}
+          className={`self-start flex items-center gap-1 text-[12px] opacity-60 hover:opacity-100 disabled:opacity-30 ${c.label}`}
         >
           <RefreshCw size={11} className={loading ? "animate-spin" : ""} />
           Refresh now

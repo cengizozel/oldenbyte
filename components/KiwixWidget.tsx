@@ -296,7 +296,7 @@ export default function KiwixWidget({
                         ) : extract ? (
                           <p className={`text-xs leading-relaxed opacity-75 whitespace-pre-line break-words ${c.text}`}>{extract}</p>
                         ) : (
-                          <p className={`text-xs opacity-45 ${c.text}`}>No preview available, open in Kiwix.</p>
+                          <p className={`text-xs opacity-60 ${c.text}`}>No preview available, open in Kiwix.</p>
                         )}
                       </div>
                       <ScrollFades c={c} top={articleFade.topFade} bottom={articleFade.bottomFade} />

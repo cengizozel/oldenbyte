@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sparkles, ChevronLeft, ExternalLink } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { formatCount, formatDate } from "@/lib/format";
+import { formatCount, formatDate, localDateStr } from "@/lib/format";
+import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { PencilButton, RefreshButton, ScrollFades, LoadingState, SaveCancelRow } from "@/components/ui/WidgetChrome";
@@ -31,7 +32,7 @@ export default function HuggingFaceWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
   const configKey = `hf-widget-${widget.id}`;
 
   const [config, setConfig]             = useState<HFConfig>(DEFAULT);
@@ -42,30 +43,36 @@ export default function HuggingFaceWidget({
   const [draft, setDraft]               = useState<HFConfig>(DEFAULT);
   const listFade   = useScrollFade<HTMLDivElement>([papers]);
   const detailFade = useScrollFade<HTMLDivElement>([selected]);
+  // Aborts the previous fetch so a slow initial load can never land over a
+  // newer limit.
+  const fetchAbort = useRef<AbortController | null>(null);
 
   useEffect(() => {
     storage.getItem(configKey).then(async saved => {
-      const cfg: HFConfig = saved ? JSON.parse(saved) : DEFAULT;
+      const cfg = parseJson<HFConfig>(saved, DEFAULT);
       setConfig(cfg);
       setDraft(cfg);
       const cacheKey = `hf-papers-${cfg.limit}-${today}`;
       const cached = await storage.getItem(cacheKey);
-      if (cached) setPapers(JSON.parse(cached));
+      if (cached) setPapers(parseJson<HFPaper[]>(cached, []));
       fetchPapers(cfg);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchPapers(cfg: HFConfig, force = false) {
+    fetchAbort.current?.abort();
+    const ctrl = new AbortController();
+    fetchAbort.current = ctrl;
     setLoading(true);
     try {
-      const res = await fetch(`/api/hf?limit=${cfg.limit}${force ? "&refresh=1" : ""}`);
+      const res = await fetch(`/api/hf?limit=${cfg.limit}${force ? "&refresh=1" : ""}`, { signal: ctrl.signal });
       if (!res.ok) throw new Error();
       const data: HFPaper[] = await res.json();
       setPapers(data);
       await storage.setItem(`hf-papers-${cfg.limit}-${today}`, JSON.stringify(data));
     } catch {}
-    finally { setLoading(false); }
+    finally { if (fetchAbort.current === ctrl) setLoading(false); }
   }
 
   function handleSave() {
@@ -160,7 +167,7 @@ export default function HuggingFaceWidget({
                           {selected.authors.join(", ")}
                         </p>
                       )}
-                      <div className={`flex items-center gap-2 text-xs opacity-35 ${c.text}`}>
+                      <div className={`flex items-center gap-2 text-xs opacity-60 ${c.text}`}>
                         {selected.publishedAt && (
                           <span>{formatDate(selected.publishedAt)}</span>
                         )}
@@ -189,7 +196,7 @@ export default function HuggingFaceWidget({
       back={
         <>
           <div className="flex flex-col gap-1.5">
-            <label className={`text-[10px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
+            <label className={`text-[12px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
               Papers to show
             </label>
             <div className="flex gap-2">

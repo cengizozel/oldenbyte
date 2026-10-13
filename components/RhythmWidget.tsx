@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { Activity, Plus, Minus, Play, Square, History, Trash2, X, Flame, ChevronLeft } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
-import { formatClock, formatDuration, formatDate } from "@/lib/format";
+import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput } from "./ui/Field";
 import { PencilButton, EmptyState, SaveCancelRow } from "./ui/WidgetChrome";
@@ -36,11 +37,6 @@ function newId() {
 
 // Local-calendar day helpers — the day boundary is the user's midnight, matching
 // Tracker, so a late-night tap belongs to the day they experienced.
-function localDateStr(d: Date = new Date()): string {
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
 function dayStartMs(date: string): number {
   return new Date(`${date}T00:00:00`).getTime();
 }
@@ -179,7 +175,7 @@ function Seg<T extends string>({
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
-          className={`px-2 py-1 text-[10px] transition-colors ${
+          className={`px-2 py-1 text-[12px] transition-colors ${
             value === o.value ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-55 hover:opacity-90`
           }`}
         >
@@ -221,14 +217,14 @@ export default function RhythmWidget({
     Promise.all([storage.getItem(configKey), storage.getItem(logKey)]).then(([cfgRaw, logRaw]) => {
       try {
         if (cfgRaw) {
-          const cfg = JSON.parse(cfgRaw) as { items?: Item[]; open?: Record<string, number> };
+          const cfg = parseJson<{ items?: Item[]; open?: Record<string, number> }>(cfgRaw, {});
           const its = (cfg.items ?? []).map(i => ({ ...i, kind: i.kind ?? "moment", mode: i.mode ?? "build" }));
           setItems(its);
           setDraft(its);
           setOpen(cfg.open ?? {});
         }
         if (logRaw) {
-          const parsed = JSON.parse(logRaw) as Partial<Log>;
+          const parsed = parseJson<Partial<Log>>(logRaw, {});
           setLog({ events: parsed.events ?? {}, sessions: parsed.sessions ?? {} });
         }
       } catch {}
@@ -324,7 +320,6 @@ export default function RhythmWidget({
   }
 
   // ── Derived data ───────────────────────────────────────────────────────────
-  const itemName = new Map(items.map(it => [it.id, it.name]));
 
   // Count for one item on one local day (sessions counted on their start day,
   // plus an open session if it began that day).
@@ -453,7 +448,7 @@ export default function RhythmWidget({
                 </line>
               ))}
             </svg>
-            <div className={`flex justify-between text-[8px] opacity-35 ${c.label} -mt-0.5`}>
+            <div className={`flex justify-between text-[11px] opacity-60 ${c.label} -mt-0.5`}>
               <span>0</span><span>6</span><span>12</span><span>18</span><span>24</span>
             </div>
           </div>
@@ -485,7 +480,7 @@ export default function RhythmWidget({
                   ? <span className={`text-xs tabular-nums font-medium ${c.label}`}>{formatClock((now - open[it.id]) / 1000)}</span>
                   : lastDur > 0
                     ? <span className={`text-xs tabular-nums opacity-60 ${c.text}`}>{formatDuration(lastDur)}</span>
-                    : <span className={`text-xs opacity-30 ${c.text}`}>—</span>;
+                    : <span className={`text-xs opacity-60 ${c.text}`}>—</span>;
               } else if (it.mode === "reduce") {
                 const limitHit = it.target != null && count > it.target;
                 secondary = (
@@ -495,7 +490,7 @@ export default function RhythmWidget({
                 );
                 primary = last != null
                   ? <span className={`text-xs tabular-nums font-medium ${c.text}`}>{agoLabel(now - last)}</span>
-                  : <span className={`text-xs opacity-30 ${c.text}`}>none yet</span>;
+                  : <span className={`text-xs opacity-60 ${c.text}`}>none yet</span>;
               } else {
                 const met = metGoal(it, count);
                 secondary = last != null ? <span>{agoLabel(now - last)}</span> : <span>tap to log</span>;
@@ -522,12 +517,12 @@ export default function RhythmWidget({
                         <span className="flex items-center gap-1.5">
                           <span className={`truncate text-sm ${c.text}`}>{it.name}</span>
                           {streak >= 2 && (
-                            <span className={`flex items-center gap-0.5 text-[10px] tabular-nums shrink-0 ${c.label} opacity-60`} title={`${streak}-day ${it.mode === "reduce" ? "clean " : ""}streak`}>
+                            <span className={`flex items-center gap-0.5 text-[12px] tabular-nums shrink-0 ${c.label} opacity-60`} title={`${streak}-day ${it.mode === "reduce" ? "clean " : ""}streak`}>
                               <Flame size={10} />{streak}
                             </span>
                           )}
                         </span>
-                        <span className={`block text-[10px] leading-tight ${c.label} opacity-55 truncate`}>{secondary}</span>
+                        <span className={`block text-[12px] leading-tight ${c.label} opacity-55 truncate`}>{secondary}</span>
                       </span>
                       {primary}
                     </button>
@@ -612,7 +607,7 @@ export default function RhythmWidget({
                     options={[{ value: "build", label: "Build" }, { value: "reduce", label: "Reduce" }]}
                   />
                   {it.kind === "moment" && (
-                    <label className={`flex items-center gap-1 text-[10px] ${c.label} opacity-70`} title={it.mode === "reduce" ? "Daily limit (optional)" : "Daily target (optional)"}>
+                    <label className={`flex items-center gap-1 text-[12px] ${c.label} opacity-70`} title={it.mode === "reduce" ? "Daily limit (optional)" : "Daily target (optional)"}>
                       <input
                         inputMode="numeric"
                         value={it.target ?? ""}
@@ -632,7 +627,7 @@ export default function RhythmWidget({
           </div>
         )}
         {draft.length === 0 && (
-          <p className={`text-[11px] leading-relaxed opacity-55 ${c.text}`}>
+          <p className={`text-[12px] leading-relaxed opacity-55 ${c.text}`}>
             Add things you want to track by tapping: <b>moments</b> like brushing teeth or coffee, or <b>sessions</b> like sleep that you start and stop. Mark each <b>build</b> (do it more) or <b>reduce</b> (do it less), and set an optional daily target.
           </p>
         )}
@@ -751,21 +746,21 @@ export default function RhythmWidget({
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dot }} />
                             <span className={`text-xs font-medium truncate ${c.text}`}>{it.name}</span>
                             {streak >= 2 && (
-                              <span className={`flex items-center gap-0.5 text-[10px] tabular-nums ${c.label} opacity-60`}>
+                              <span className={`flex items-center gap-0.5 text-[12px] tabular-nums ${c.label} opacity-60`}>
                                 <Flame size={9} />{streak}
                               </span>
                             )}
                           </span>
                           {!hasData ? (
-                            <span className={`text-[11px] opacity-50 ${c.text}`}>no taps yet</span>
+                            <span className={`text-[12px] opacity-50 ${c.text}`}>no taps yet</span>
                           ) : isSession ? (
-                            <span className={`text-[11px] opacity-70 ${c.text} tabular-nums`}>
+                            <span className={`text-[12px] opacity-70 ${c.text} tabular-nums`}>
                               avg {formatDuration(avgDur)}
                               {bed && wake && <> · {fmtTimeOfDay(bed.mean)} → {fmtTimeOfDay(wake.mean)}</>}
                               <span className="opacity-60"> · {sess.length} in {STATS_DAYS}d</span>
                             </span>
                           ) : (
-                            <span className={`text-[11px] opacity-70 ${c.text} tabular-nums`}>
+                            <span className={`text-[12px] opacity-70 ${c.text} tabular-nums`}>
                               ≈{perDay.toFixed(1)}×/day
                               {gap != null && <> · every {fmtGap(gap)}</>}
                             </span>
@@ -805,7 +800,7 @@ export default function RhythmWidget({
                         );
                       })}
                     </div>
-                    <div className={`flex justify-between text-[8px] opacity-40 ${c.label} mt-1 pl-2.5`}>
+                    <div className={`flex justify-between text-[11px] opacity-60 ${c.label} mt-1 pl-2.5`}>
                       <span>{fmtDay(gridDates[0])}</span>
                       <span>{fmtDay(today)}</span>
                     </div>

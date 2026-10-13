@@ -124,7 +124,6 @@ export default function TvWidget({
       cancelled = true;
       destroyPlayer();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, config.channelUrl]);
 
   // Hard-stop when the widget is hidden (dashboard switched away, edit shelf

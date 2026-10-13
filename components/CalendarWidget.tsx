@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarDays, Loader, Plug } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
-import { formatDate } from "@/lib/format";
+import { localDateStr } from "@/lib/format";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
@@ -30,7 +30,7 @@ const DEFAULT: CalendarConfig = { baseUrl: "", username: "", password: "", calen
 // Demo mode seeds a fake "demo" account (lib/demo.ts) since the sandbox can't
 // reach a real CalDAV server; answer it with a believable agenda instead.
 function demoEvents(): CalEvent[] {
-  const day = (n: number) => localDate(new Date(Date.now() + n * 86400000));
+  const day = (n: number) => localDateStr(new Date(Date.now() + n * 86400000));
   return [
     { uid: "demo-1", calendar: "Personal", title: "Gym", start: `${day(0)}T18:30`, end: `${day(0)}T19:30`, allDay: false },
     { uid: "demo-2", calendar: "Personal", title: "Dentist", start: `${day(1)}T09:00`, end: `${day(1)}T09:30`, allDay: false, location: "Smile Clinic" },
@@ -39,11 +39,6 @@ function demoEvents(): CalEvent[] {
     { uid: "demo-5", calendar: "Work", title: "Design review", start: `${day(3)}T11:00`, end: `${day(3)}T11:45`, allDay: false },
     { uid: "demo-6", calendar: "Personal", title: "Dinner with Deniz", start: `${day(4)}T19:30`, end: `${day(4)}T21:00`, allDay: false, location: "Karakoy" },
   ];
-}
-
-function localDate(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 function dayHeading(date: string, today: string, tomorrow: string): string {
@@ -74,11 +69,17 @@ export default function CalendarWidget({
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState("");
   const { ref, onScroll, topFade, bottomFade } = useScrollFade<HTMLDivElement>([events]);
+  // Aborts the previous events request so a slow initial load can never land
+  // over a newly saved account or calendar selection.
+  const fetchAbort = useRef<AbortController | null>(null);
 
   const configured = (cfg: CalendarConfig) => !!(cfg.baseUrl && cfg.username && cfg.calendars.length);
 
   const fetchEvents = useCallback(async (cfg: CalendarConfig) => {
     if (!configured(cfg)) return;
+    fetchAbort.current?.abort();
+    const ctrl = new AbortController();
+    fetchAbort.current = ctrl;
     if (isDemoMode() && cfg.baseUrl === "demo") {
       setEvents(demoEvents());
       return;
@@ -95,19 +96,21 @@ export default function CalendarWidget({
           op: "events",
           baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password,
           calendars: cfg.calendars,
-          start: localDate(start), end: localDate(end),
+          start: localDateStr(start), end: localDateStr(end),
           // Convert event times into this device's zone (UTC- and TZID-stamped
           // times would otherwise show the server's wall clock).
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
+        signal: ctrl.signal,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to load events.");
       setEvents(data.events ?? []);
     } catch (e) {
+      if ((e as Error).name === "AbortError") return;
       setError(String(e instanceof Error ? e.message : e));
     } finally {
-      setLoading(false);
+      if (fetchAbort.current === ctrl) setLoading(false);
     }
   }, []);
 
@@ -175,6 +178,9 @@ export default function CalendarWidget({
   }
 
   async function handleReset() {
+    fetchAbort.current?.abort();
+    fetchAbort.current = null;
+    setLoading(false);
     await storage.removeItem(storageKey);
     setConfig(DEFAULT);
     setDraft(DEFAULT);
@@ -183,8 +189,8 @@ export default function CalendarWidget({
     setSettingsOpen(false);
   }
 
-  const today = localDate(new Date());
-  const tomorrow = localDate(new Date(Date.now() + 86400000));
+  const today = localDateStr();
+  const tomorrow = localDateStr(new Date(Date.now() + 86400000));
   const byDay = new Map<string, CalEvent[]>();
   for (const ev of events) {
     const day = ev.start.slice(0, 10);
@@ -225,7 +231,7 @@ export default function CalendarWidget({
                       <span className="w-2 h-2 mt-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(ev.calendar).dot }} />
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm leading-snug truncate ${c.text}`}>{ev.title}</p>
-                        {ev.location && <p className={`text-[10px] opacity-50 truncate ${c.label}`}>{ev.location}</p>}
+                        {ev.location && <p className={`text-[12px] opacity-50 truncate ${c.label}`}>{ev.location}</p>}
                       </div>
                       <span className={`shrink-0 text-xs tabular-nums opacity-50 ${c.text}`}>
                         {ev.allDay ? "all day" : ev.start.slice(11, 16)}
@@ -281,7 +287,7 @@ export default function CalendarWidget({
             {available.map(cal => {
               const on = draft.calendars.some(s => s.url === cal.url);
               return (
-                <label key={cal.url} className={`flex items-center gap-2 text-xs cursor-pointer ${c.text} ${on ? "opacity-85" : "opacity-45"}`}>
+                <label key={cal.url} className={`flex items-center gap-2 text-xs cursor-pointer ${c.text} ${on ? "opacity-85" : "opacity-60"}`}>
                   <input
                     type="checkbox"
                     checked={on}
@@ -295,7 +301,7 @@ export default function CalendarWidget({
                   />
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tagColor(cal.name).dot }} />
                   <span className="truncate">{cal.name}</span>
-                  {cal.readOnly && <span className={`text-[9px] uppercase tracking-widest opacity-50 ${c.label}`}>read-only</span>}
+                  {cal.readOnly && <span className={`text-[11px] uppercase tracking-widest opacity-50 ${c.label}`}>read-only</span>}
                 </label>
               );
             })}
@@ -318,7 +324,7 @@ export default function CalendarWidget({
           ))}
         </div>
         {connectError && <p className="text-red-400 text-xs">{connectError}</p>}
-        <p className="text-[10px] text-[var(--text-muted)]">
+        <p className="text-[12px] text-[var(--text-muted)]">
           Works with Nextcloud, Radicale, and other CalDAV servers. For Nextcloud use an app password (Settings, Security) and the URL ending in /remote.php/dav.
         </p>
       </div>

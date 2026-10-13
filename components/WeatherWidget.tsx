@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Sun, Cloud, CloudSun, CloudRain, CloudDrizzle, CloudSnow, CloudLightning, CloudFog,
   Search, Loader, Droplets, Wind,
@@ -61,24 +61,31 @@ export default function WeatherWidget({
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<GeoResult[]>([]);
   const [searchError, setSearchError] = useState("");
+  // Aborts the previous forecast request so a slow initial load can never
+  // land over a newly saved place.
+  const fetchAbort = useRef<AbortController | null>(null);
 
   const configured = (cfg: WeatherConfig) => isFinite(cfg.lat) && isFinite(cfg.lon);
 
   const fetchForecast = useCallback(async (cfg: WeatherConfig) => {
     if (!configured(cfg)) return false;
+    fetchAbort.current?.abort();
+    const ctrl = new AbortController();
+    fetchAbort.current = ctrl;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/weather?lat=${cfg.lat}&lon=${cfg.lon}&unit=${cfg.unit}`);
+      const res = await fetch(`/api/weather?lat=${cfg.lat}&lon=${cfg.lon}&unit=${cfg.unit}`, { signal: ctrl.signal });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to load forecast.");
       setForecast(data);
       return true;
     } catch (e) {
+      if ((e as Error).name === "AbortError") return false;
       setError(String(e instanceof Error ? e.message : e));
       return false;
     } finally {
-      setLoading(false);
+      if (fetchAbort.current === ctrl) setLoading(false);
     }
   }, []);
 
@@ -134,6 +141,9 @@ export default function WeatherWidget({
   }
 
   async function handleReset() {
+    fetchAbort.current?.abort();
+    fetchAbort.current = null;
+    setLoading(false);
     await storage.removeItem(storageKey);
     setConfig(DEFAULT);
     setDraft(DEFAULT);
@@ -172,12 +182,12 @@ export default function WeatherWidget({
               <span className={`text-2xl font-semibold tabular-nums leading-none ${c.text}`}>
                 {Math.round(current.temp)}{unitSuffix}
               </span>
-              <span className={`text-[10px] opacity-50 ${c.label}`}>
+              <span className={`text-[12px] opacity-50 ${c.label}`}>
                 feels {Math.round(current.feelsLike)}° · {codeInfo(current.code).label}
               </span>
             </div>
           </div>
-          <div className={`shrink-0 flex items-center justify-center gap-4 text-[10px] opacity-50 ${c.label}`}>
+          <div className={`shrink-0 flex items-center justify-center gap-4 text-[12px] opacity-50 ${c.label}`}>
             <span className="flex items-center gap-1"><Droplets size={10} />{current.humidity}%</span>
             <span className="flex items-center gap-1"><Wind size={10} />{Math.round(current.windKmh)} km/h</span>
           </div>
@@ -192,7 +202,7 @@ export default function WeatherWidget({
                     <span className={`w-10 shrink-0 text-xs ${c.text} ${i === 0 ? "font-medium" : "opacity-70"}`}>{dayLabel(d.date, i)}</span>
                     <Icon size={14} className={`shrink-0 opacity-60 ${c.label}`} />
                     {d.rainPct > 20 ? (
-                      <span className={`text-[10px] tabular-nums opacity-50 ${c.label}`}>{d.rainPct}%</span>
+                      <span className={`text-[12px] tabular-nums opacity-50 ${c.label}`}>{d.rainPct}%</span>
                     ) : <span />}
                     <span className={`flex-1 text-right text-xs tabular-nums ${c.text}`}>
                       <span className="opacity-50">{Math.round(d.min)}°</span>
@@ -246,7 +256,7 @@ export default function WeatherWidget({
           </div>
         )}
         {configured(draft) && (
-          <p className={`text-[10px] opacity-50 ${c.label}`}>chosen: {draft.name}{draft.region ? `, ${draft.region}` : ""}</p>
+          <p className={`text-[12px] opacity-50 ${c.label}`}>chosen: {draft.name}{draft.region ? `, ${draft.region}` : ""}</p>
         )}
         <div className="flex items-center gap-2">
           <span className={`text-xs opacity-60 ${c.label}`}>Unit</span>

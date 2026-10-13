@@ -336,7 +336,7 @@ export default function BookmarksWidget({
                     className="flex flex-col items-center gap-1 px-1 py-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   >
                     <Favicon bm={bm} size={iconSize} />
-                    <span className={`w-full text-center truncate text-[10px] leading-tight ${c.text} opacity-70`}>{displayName(bm)}</span>
+                    <span className={`w-full text-center truncate text-[12px] leading-tight ${c.text} opacity-70`}>{displayName(bm)}</span>
                   </a>
                 ))}
               </div>
@@ -408,7 +408,7 @@ export default function BookmarksWidget({
         </div>
 
         {draft.length > 1 && (
-          <p className={`text-[10px] opacity-40 -mt-1 ${c.text}`}>Drag the handle to reorder.</p>
+          <p className={`text-[12px] opacity-60 -mt-1 ${c.text}`}>Drag the handle to reorder.</p>
         )}
 
         {draft.length > 0 && (
@@ -470,13 +470,13 @@ export default function BookmarksWidget({
                   value={bm.url}
                   onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, url: e.target.value } : x))}
                   placeholder="https://..."
-                  className={`w-full bg-transparent dark:!bg-transparent text-[11px] opacity-60 outline-none ${c.label}`}
+                  className={`w-full bg-transparent dark:!bg-transparent text-[12px] opacity-60 outline-none ${c.label}`}
                 />
                 <input
                   value={bm.icon ?? ""}
                   onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, icon: e.target.value } : x))}
                   placeholder="icon: emoji or image URL (optional)"
-                  className={`w-full bg-transparent dark:!bg-transparent text-[11px] opacity-60 outline-none ${c.label}`}
+                  className={`w-full bg-transparent dark:!bg-transparent text-[12px] opacity-60 outline-none ${c.label}`}
                 />
               </div>
             ))}
@@ -484,7 +484,7 @@ export default function BookmarksWidget({
         )}
 
         {draft.length === 0 && (
-          <p className={`text-[11px] leading-relaxed opacity-55 ${c.text}`}>
+          <p className={`text-[12px] leading-relaxed opacity-55 ${c.text}`}>
             Add the sites you visit most. Each shows its favicon, with a tidy colored tile when one is not available. To override it, set an emoji or an image URL in a bookmark&apos;s icon field.
           </p>
         )}

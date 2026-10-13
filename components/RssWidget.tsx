@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Rss } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { localDateStr } from "@/lib/format";
+import { parseJson } from "@/lib/text";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
 import { useScrollFade } from "@/lib/useScrollFade";
@@ -30,7 +32,7 @@ export default function RssWidget({
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
   const storageKey = `rss-widget-${widget.id}`;
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
 
   const [config, setConfig] = useState<RssConfig>(DEFAULT);
   const [items, setItems] = useState<RssItem[]>([]);
@@ -39,6 +41,9 @@ export default function RssWidget({
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<RssConfig>(DEFAULT);
+  // Aborts the previous feed request so a slow initial load can never land
+  // over (or be cached under) a newer config.
+  const fetchAbort = useRef<AbortController | null>(null);
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -51,28 +56,32 @@ export default function RssWidget({
 
         const cacheKey = `${storageKey}-${today}`;
         const cached = await storage.getItem(cacheKey);
-        if (cached) setItems(JSON.parse(cached));
+        if (cached) setItems(parseJson<RssItem[]>(cached, []));
         fetchFeed(parsed.url, parsed.limit, cacheKey);
       } catch {}
     });
-  }, [storageKey]);
+  }, [storageKey, today]); // `today` changes at midnight: load that day's cache and refetch
 
   async function fetchFeed(url: string, limit: number, cacheKey: string, force = false): Promise<boolean> {
+    fetchAbort.current?.abort();
+    const ctrl = new AbortController();
+    fetchAbort.current = ctrl;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${limit}${force ? "&refresh=1" : ""}`);
+      const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${limit}${force ? "&refresh=1" : ""}`, { signal: ctrl.signal });
       if (!res.ok) throw new Error();
       const data: RssItem[] = await res.json();
       if (!Array.isArray(data) || !data.length) throw new Error("No items found.");
       setItems(data);
       await storage.setItem(cacheKey, JSON.stringify(data));
       return true;
-    } catch {
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return false;
       setError("Failed to load feed. Check the URL.");
       return false;
     } finally {
-      setLoading(false);
+      if (fetchAbort.current === ctrl) setLoading(false);
     }
   }
 
@@ -92,6 +101,9 @@ export default function RssWidget({
   }
 
   async function handleReset() {
+    fetchAbort.current?.abort();
+    fetchAbort.current = null;
+    setLoading(false);
     await storage.removeItem(storageKey);
     setConfig(DEFAULT);
     setDraft(DEFAULT);

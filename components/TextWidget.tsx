@@ -137,9 +137,10 @@ export default function TextWidget({
       el.style.visibility = "";
       setFontSize(lo);
     });
-  }, [display, config.font, config.size]);
+  }, [config.size]);
 
-  useEffect(() => { fitText(); }, [fitText]);
+  // Re-fit whenever the shown text or the font changes.
+  useEffect(() => { fitText(); }, [fitText, display, config.font]);
   useEffect(() => { if (!settingsOpen) fitText(); }, [settingsOpen, fitText]);
 
   useEffect(() => {
@@ -254,7 +255,7 @@ export default function TextWidget({
                     >
                       Aa
                     </button>
-                    <span className={`text-[10px] text-neutral-400 ${FONT_PREVIEW_CLASS[f]}`}>
+                    <span className={`text-[12px] text-neutral-400 ${FONT_PREVIEW_CLASS[f]}`}>
                       {f.charAt(0).toUpperCase() + f.slice(1)}
                     </span>
                   </div>

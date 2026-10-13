@@ -129,7 +129,7 @@ function DurationField({ value, onChange }: { value: string; onChange: (v: strin
         inputMode="numeric"
         className="w-10 text-center text-sm font-mono bg-transparent outline-none text-[var(--text-primary)] py-1.5"
       />
-      <span className="pr-1 text-[10px] text-[var(--text-muted)]">min</span>
+      <span className="pr-1 text-[12px] text-[var(--text-muted)]">min</span>
       <button onClick={() => shift(15)} className="px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="15 minutes more">+</button>
     </div>
   );
@@ -409,7 +409,7 @@ export default function ScheduleWidget({
     const s = normMin(start, config.startHour);
     const e = normMin(end, config.startHour);
     if (e <= s) return err("End must be after start (past-midnight ends are fine if the grid reaches them).");
-    if (e - s > 16 * 60) return err("Longer than 16 hours — double-check the times.");
+    if (e - s > 16 * 60) return err("Longer than 16 hours, double-check the times.");
     const entry: Entry = {
       id: editor.id ?? `s${Date.now()}${Math.floor(Math.random() * 1e3)}`,
       title,
@@ -461,7 +461,7 @@ export default function ScheduleWidget({
             {Array.from({ length: hours + 1 }, (_, h) => (
               <span
                 key={h}
-                className={`absolute right-1.5 text-[9px] font-mono opacity-40 ${c.label}`}
+                className={`absolute right-1.5 text-[11px] font-mono opacity-60 ${c.label}`}
                 style={{ top: h * HOUR_PX, transform: h === 0 ? "none" : h === hours ? "translateY(-100%)" : "translateY(-50%)" }}
               >
                 {fmt((startHour + h) * 60)}
@@ -471,7 +471,7 @@ export default function ScheduleWidget({
           {/* day columns */}
           {DAYS.map((_, dayIdx) => (
             <div key={dayIdx} className="flex-1 min-w-0">
-              <div className={`sticky top-0 z-10 h-6 flex items-center px-1.5 text-[10px] font-medium ${c.bg} ${dayIdx === todayIdx ? c.text : `${c.label} opacity-50`}`}>
+              <div className={`sticky top-0 z-10 h-6 flex items-center px-1.5 text-[12px] font-medium ${c.bg} ${dayIdx === todayIdx ? c.text : `${c.label} opacity-50`}`}>
                 {labels[dayIdx]}
               </div>
               <div
@@ -513,10 +513,10 @@ export default function ScheduleWidget({
                         background: ev.color,
                       }}
                     >
-                      {big && <span className="block font-mono text-[9px] opacity-70">{fmt(ev.start)}–{fmt(ev.end)}</span>}
-                      <span className={`block font-medium truncate ${big ? "text-[11px]" : "text-[10px]"}`}>{ev.title}</span>
+                      {big && <span className="block font-mono text-[11px] opacity-70">{fmt(ev.start)}–{fmt(ev.end)}</span>}
+                      <span className={`block font-medium truncate ${big ? "text-[12px]" : "text-[12px]"}`}>{ev.title}</span>
                       {big && ev.description && bottom - top > 56 && (
-                        <span className="block text-[9px] opacity-70 overflow-hidden">{ev.description}</span>
+                        <span className="block text-[11px] opacity-70 overflow-hidden">{ev.description}</span>
                       )}
                     </button>
                   );
@@ -536,8 +536,8 @@ export default function ScheduleWidget({
                       background: drag.color, opacity: 0.75,
                     }}
                   >
-                    <span className="block font-mono text-[9px]">{fmt(drag.startMin % 1440)}</span>
-                    {drag.grouped && <span className="block text-[9px] font-medium">splits from group</span>}
+                    <span className="block font-mono text-[11px]">{fmt(drag.startMin % 1440)}</span>
+                    {drag.grouped && <span className="block text-[11px] font-medium">splits from group</span>}
                   </div>
                 )}
               </div>
@@ -545,7 +545,7 @@ export default function ScheduleWidget({
           ))}
         </div>
         {loaded && config.entries.length === 0 && !editor && (
-          <div className={`absolute inset-0 flex items-center justify-center text-xs opacity-45 pointer-events-none ${c.text}`}>
+          <div className={`absolute inset-0 flex items-center justify-center text-xs opacity-60 pointer-events-none ${c.text}`}>
             click a slot (or +) to plan your week
           </div>
         )}
@@ -556,7 +556,7 @@ export default function ScheduleWidget({
   // ── Card (shared between the grid tile and the fullscreen overlay) ─────────
   const actionCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`;
   const chip = (active: boolean) =>
-    `px-2 py-0.5 rounded-md text-[11px] transition-colors ${active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-50 hover:opacity-90`}`;
+    `px-2 py-0.5 rounded-md text-[12px] transition-colors ${active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-50 hover:opacity-90`}`;
 
   function card(big: boolean) {
     return (
@@ -596,7 +596,7 @@ export default function ScheduleWidget({
         {/* Entry editor */}
         {editor && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 overflow-y-auto ${c.bg}`}>
-            <p className={`text-[11px] font-ui opacity-50 ${c.label}`}>
+            <p className={`text-[12px] font-ui opacity-50 ${c.label}`}>
               {editor.id ? "Edit entry" : "New entry"}
             </p>
             <SettingsInput
@@ -626,7 +626,7 @@ export default function ScheduleWidget({
                       ...editor, error: "",
                       days: on ? editor.days.filter(x => x !== i) : [...editor.days, i],
                     })}
-                    className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-colors ${
+                    className={`px-2 py-1 rounded-lg text-[12px] font-medium transition-colors ${
                       on ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-45 hover:opacity-80`
                     }`}
                   >
@@ -635,16 +635,16 @@ export default function ScheduleWidget({
                 );
               })}
               <span className={`opacity-20 ${c.label}`}>|</span>
-              <button onClick={() => setEditor({ ...editor, error: "", days: [0, 1, 2, 3, 4] })} className={`text-[10px] ${c.label} opacity-50 hover:opacity-90`}>
+              <button onClick={() => setEditor({ ...editor, error: "", days: [0, 1, 2, 3, 4] })} className={`text-[12px] ${c.label} opacity-50 hover:opacity-90`}>
                 weekdays
               </button>
-              <button onClick={() => setEditor({ ...editor, error: "", days: [0, 1, 2, 3, 4, 5, 6] })} className={`text-[10px] ${c.label} opacity-50 hover:opacity-90`}>
+              <button onClick={() => setEditor({ ...editor, error: "", days: [0, 1, 2, 3, 4, 5, 6] })} className={`text-[12px] ${c.label} opacity-50 hover:opacity-90`}>
                 every day
               </button>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <TimeField value={editor.start} onChange={v => setEditor({ ...editor, start: v })} />
-              <span className={`opacity-40 text-xs ${c.label}`}>to</span>
+              <span className={`opacity-60 text-xs ${c.label}`}>to</span>
               {editor.byDuration ? (
                 <DurationField value={editor.minutes} onChange={v => setEditor({ ...editor, minutes: v })} />
               ) : (
@@ -686,7 +686,7 @@ export default function ScheduleWidget({
                 );
               })()}
             </div>
-            {editor.error && <p className="text-red-400 text-[11px]">{editor.error}</p>}
+            {editor.error && <p className="text-red-400 text-[12px]">{editor.error}</p>}
             <div className="flex items-center gap-3 mt-auto">
               {editor.id && (
                 <button onClick={deleteEntry} title="Delete entry" className="text-red-400/80 hover:text-red-400">
@@ -707,7 +707,7 @@ export default function ScheduleWidget({
         {/* Grid-hours settings */}
         {settingsOpen && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
-            <p className={`text-[11px] font-ui opacity-50 ${c.label}`}>Grid hours</p>
+            <p className={`text-[12px] font-ui opacity-50 ${c.label}`}>Grid hours</p>
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Day starts</p>
@@ -725,7 +725,7 @@ export default function ScheduleWidget({
                 </SettingsSelect>
               </div>
             </div>
-            {draftEnd - draftStart < 6 && <p className="text-red-400 text-[11px]">The grid must span at least 6 hours.</p>}
+            {draftEnd - draftStart < 6 && <p className="text-red-400 text-[12px]">The grid must span at least 6 hours.</p>}
             <div className="flex items-center justify-end gap-3 mt-auto">
               <button onClick={() => setSettingsOpen(false)} title="Cancel" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                 <X size={14} />
@@ -746,7 +746,7 @@ export default function ScheduleWidget({
         {exportOpen && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
             <div className="flex items-center justify-between">
-              <p className={`text-[11px] font-ui opacity-50 ${c.label}`}>Export</p>
+              <p className={`text-[12px] font-ui opacity-50 ${c.label}`}>Export</p>
               <button
                 onClick={copyExport}
                 className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}
@@ -755,7 +755,7 @@ export default function ScheduleWidget({
                 {copied ? "copied" : "copy"}
               </button>
             </div>
-            <pre className={`flex-1 min-h-0 overflow-auto text-[11px] leading-relaxed font-mono whitespace-pre rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-primary)] p-3`}>
+            <pre className={`flex-1 min-h-0 overflow-auto text-[12px] leading-relaxed font-mono whitespace-pre rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-primary)] p-3`}>
               {exportText()}
             </pre>
             <div className="flex items-center justify-end">
@@ -773,21 +773,21 @@ export default function ScheduleWidget({
           const groupDays = src.days.map(d => DAYS_SHORT[d]).join(", ");
           return (
             <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
-              <p className={`text-[11px] font-ui opacity-50 ${c.label}`}>Split from group</p>
+              <p className={`text-[12px] font-ui opacity-50 ${c.label}`}>Split from group</p>
               <p className={`text-xs leading-relaxed ${c.text} opacity-80`}>
-                "{src.title}" repeats on {groupDays}. Moving this block pulls {DAYS[splitAsk.fromDay]} out of that group:
+                &ldquo;{src.title}&rdquo; repeats on {groupDays}. Moving this block pulls {DAYS[splitAsk.fromDay]} out of that group:
                 it becomes its own entry at {DAYS[splitAsk.toDay]} {fmt(splitAsk.toStartMin % 1440)}, and the others stay put.
               </p>
               <div className="flex items-center justify-end gap-2 mt-auto">
                 <button
                   onClick={() => setSplitAsk(null)}
-                  className="text-[11px] px-2.5 py-1 rounded-lg border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  className="text-[12px] px-2.5 py-1 rounded-lg border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={applySplit}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}
+                  className={`text-[12px] px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}
                 >
                   Split and move
                 </button>

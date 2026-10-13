@@ -4,12 +4,14 @@ import { useState, useEffect, useRef } from "react";
 import { Loader, Plus, PlaySquare, ExternalLink, ChevronLeft } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { timeAgo, formatCount, formatClock } from "@/lib/format";
+import { timeAgo, formatCount, formatClock, localDateStr } from "@/lib/format";
+import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
 import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { youtubeCacheKey } from "@/lib/cacheKeys";
 
 type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean };
 type YtView         = "list" | "thumbs" | "gallery";
@@ -46,16 +48,6 @@ const taActive = (ta?: TaConfig): ta is TaConfig => !!(ta && ta.open === "ta" &&
 // any of them and all of them use it.
 const TA_KEY = "youtube-tubearchivist";
 
-// Two independent 32-bit FNV-1a passes: short, stable, collision-safe enough
-// for a per-widget cache key.
-function hashSig(s: string): string {
-  let a = 0x811c9dc5, b = 0x01000193 ^ s.length;
-  for (let i = 0; i < s.length; i++) {
-    a = Math.imul(a ^ s.charCodeAt(i), 0x01000193);
-    b = Math.imul(b ^ s.charCodeAt(s.length - 1 - i), 0x01000193);
-  }
-  return (a >>> 0).toString(36) + (b >>> 0).toString(36);
-}
 
 // Pulse the placeholder square until the image paints.
 function unpulse(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -71,7 +63,7 @@ export default function YoutubeWidget({
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
   const storageKey = `youtube-widget-${widget.id}`;
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
 
   const [config, setConfig]             = useState<YoutubeConfig>(DEFAULT);
   const [videos, setVideos]             = useState<Video[]>([]);
@@ -82,6 +74,9 @@ export default function YoutubeWidget({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft]               = useState<YoutubeConfig>(DEFAULT);
   const [chInput, setChInput]           = useState("");
+  // Aborts the previous feed load so a slow initial fetch can never land over
+  // (or be cached under) a newer channel list.
+  const fetchAbort                      = useRef<AbortController | null>(null);
 
   // TubeArchivist: which feed videos exist in the archive, and the settings
   // face's connection test.
@@ -191,7 +186,7 @@ export default function YoutubeWidget({
         if (!parsed.channels.length) return;
         const cacheKey = cacheKeyFor(parsed);
         const cached = await storage.getItem(cacheKey);
-        if (cached) setVideos(JSON.parse(cached));
+        if (cached) setVideos(parseJson<Video[]>(cached, []));
         fetchVideos(parsed, cacheKey);
       } catch {}
     });
@@ -199,15 +194,14 @@ export default function YoutubeWidget({
   }, [storageKey]);
 
   function cacheKeyFor(cfg: YoutubeConfig) {
-    // Hashed: the settings API caps keys at 256 chars, and the raw signature
-    // (every channel id) outgrows that past a handful of channels, which made
-    // the day cache fail silently.
-    const sig = cfg.channels.map(ch => `${ch.channelId}:${ch.limit}:${ch.filterMembers ? 1 : 0}:${ch.includeShorts ? 1 : 0}`).join(",");
-    return `${storageKey}-${today}-${hashSig(sig)}`;
+    return youtubeCacheKey(widget.id, today, cfg.channels);
   }
 
   async function fetchVideos(cfg: YoutubeConfig, cacheKey: string, force = false): Promise<boolean> {
     if (force) forceTaRef.current = true;
+    fetchAbort.current?.abort();
+    const ctrl = new AbortController();
+    fetchAbort.current = ctrl;
     setLoading(true);
     setError("");
     try {
@@ -217,7 +211,7 @@ export default function YoutubeWidget({
           if (ch.filterMembers) params.set("filterMembers", "true");
           if (ch.includeShorts) params.set("includeShorts", "true");
           if (force) params.set("refresh", "1");
-          const res = await fetch(`/api/youtube?${params}`);
+          const res = await fetch(`/api/youtube?${params}`, { signal: ctrl.signal });
           if (!res.ok) throw new Error();
           const data: { videos: { title: string; link: string; published: string }[] } = await res.json();
           return data.videos.map(v => ({ ...v, channelId: ch.channelId, channelName: ch.name }));
@@ -236,14 +230,16 @@ export default function YoutubeWidget({
       };
       interleaved.sort((a, b) => ts(b.published) - ts(a.published));
       if (!interleaved.length) throw new Error();
+      if (ctrl.signal.aborted) return false;
       setVideos(interleaved);
       await storage.setItem(cacheKey, JSON.stringify(interleaved));
       return true;
-    } catch {
+    } catch (e) {
+      if ((e as Error).name === "AbortError" || ctrl.signal.aborted) return false;
       setError("Failed to load videos.");
       return false;
     } finally {
-      setLoading(false);
+      if (fetchAbort.current === ctrl) setLoading(false);
     }
   }
 
@@ -296,6 +292,9 @@ export default function YoutubeWidget({
   }
 
   async function handleReset() {
+    fetchAbort.current?.abort();
+    fetchAbort.current = null;
+    setLoading(false);
     await storage.removeItem(storageKey);
     setConfig(DEFAULT);
     setDraft(DEFAULT);
@@ -343,14 +342,14 @@ export default function YoutubeWidget({
                               )}
                             </button>
                             <span className="flex items-center gap-1.5 min-w-0">
-                              <span className={`inline-block min-w-0 truncate text-[9px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>
+                              <span className={`inline-block min-w-0 truncate text-[11px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>
                                 {v.channelName}
                               </span>
                               {v.published && (
-                                <span className={`shrink-0 text-[9px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
+                                <span className={`shrink-0 text-[11px] opacity-60 ${c.text}`}>{timeAgo(v.published)}</span>
                               )}
                               {onTa(v) && (
-                                <span className={`shrink-0 text-[8px] font-semibold tracking-widest px-1 py-0.5 rounded bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
+                                <span className={`shrink-0 text-[11px] font-semibold tracking-widest px-1 py-0.5 rounded bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
                               )}
                             </span>
                             <div className="flex items-start gap-1 group/title">
@@ -390,17 +389,17 @@ export default function YoutubeWidget({
                             )}
                             <div className="flex-1 min-w-0">
                           <span className="flex items-center gap-1.5 mb-1 min-w-0">
-                            <span className={`inline-block min-w-0 truncate text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                            <span className={`inline-block min-w-0 truncate text-[12px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                               {v.channelName}
                             </span>
                             {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
-                              <span className={`shrink-0 text-[9px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
+                              <span className={`shrink-0 text-[11px] font-semibold uppercase tracking-widest px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
                             )}
                             {v.published && (
-                              <span className={`shrink-0 text-[10px] opacity-40 ${c.text}`}>{timeAgo(v.published)}</span>
+                              <span className={`shrink-0 text-[12px] opacity-60 ${c.text}`}>{timeAgo(v.published)}</span>
                             )}
                             {onTa(v) && (
-                              <span className={`shrink-0 text-[9px] font-semibold tracking-widest px-1 py-0.5 rounded bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
+                              <span className={`shrink-0 text-[11px] font-semibold tracking-widest px-1 py-0.5 rounded bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
                             )}
                           </span>
                           <div className="flex items-start gap-1 group/title">
@@ -461,7 +460,7 @@ export default function YoutubeWidget({
                     ) : details ? (
                       <div className="flex flex-col gap-2">
                         <p className={`text-sm font-medium leading-snug break-words ${c.text}`}>{details.title || selected.title}</p>
-                        <p className={`text-[11px] opacity-50 ${c.text}`}>
+                        <p className={`text-[12px] opacity-50 ${c.text}`}>
                           {[
                             details.author,
                             details.viewCount ? `${formatCount(details.viewCount)} views` : "",
@@ -474,7 +473,7 @@ export default function YoutubeWidget({
                             <p className={`text-xs leading-relaxed opacity-75 whitespace-pre-line break-words ${c.text}`}>{details.description}</p>
                           </>
                         ) : (
-                          <p className={`text-xs opacity-45 ${c.text}`}>No description.</p>
+                          <p className={`text-xs opacity-60 ${c.text}`}>No description.</p>
                         )}
                       </div>
                     ) : null}
@@ -532,7 +531,7 @@ export default function YoutubeWidget({
                 </div>
               )}
               {draft.ta?.open === "ta" && (
-                <p className={`text-[10px] opacity-60 ${c.text}`}>
+                <p className={`text-[12px] opacity-60 ${c.text}`}>
                   {taActive(config.ta) && videos.length
                     ? `${videos.filter(v => archived.has(videoId(v.link))).length} of ${videos.length} videos here are in your archive and open there (marked TA). The rest open on YouTube.`
                     : "Archived videos open on TubeArchivist (marked TA). The rest open on YouTube."}

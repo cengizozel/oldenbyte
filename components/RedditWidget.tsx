@@ -4,12 +4,14 @@ import { useState, useEffect, useRef } from "react";
 import { Plus, ChevronLeft, ExternalLink, Flame } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { timeAgo, formatCount } from "@/lib/format";
+import { timeAgo, formatCount, localDateStr } from "@/lib/format";
+import { decodeEntities, parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
 import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { redditCacheKey } from "@/lib/cacheKeys";
 
 type Period = "day" | "week" | "month" | "year" | "all";
 type SubEntry = { name: string; limit: number; period: Period };
@@ -19,11 +21,8 @@ type Post = { title: string; link: string; subreddit: string; pubDate: string; c
 function sanitizeRedditHtml(raw: string | undefined): string {
   if (!raw) return "";
   try {
-    // Reddit RSS entity-encodes the HTML body — decode it first
-    const ta = document.createElement("textarea");
-    ta.innerHTML = raw;
-    const decoded = ta.value;
-    const doc = new DOMParser().parseFromString(decoded, "text/html");
+    // Reddit RSS entity-encodes the HTML body, so decode it first
+    const doc = new DOMParser().parseFromString(decodeEntities(raw), "text/html");
     const mdDiv = doc.querySelector(".md");
     if (!mdDiv) return "";
   const ALLOWED = new Set(["p","em","strong","b","i","ol","ul","li","hr","a","blockquote","code","pre","br"]);
@@ -37,8 +36,17 @@ function sanitizeRedditHtml(raw: string | undefined): string {
     if (tag === "hr" || tag === "br") return `<${tag}/>`;
     if (!ALLOWED.has(tag)) return children;
     if (tag === "a") {
-      const href = el.getAttribute("href") ?? "";
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${children}</a>`;
+      // Only real web/mail links survive, resolved against reddit.com (posts
+      // use relative "/r/..." links) and attribute-escaped; anything else,
+      // such as javascript: URLs, keeps its text but loses the link.
+      let href = "";
+      try {
+        const u = new URL(el.getAttribute("href") ?? "", "https://www.reddit.com");
+        if (u.protocol === "https:" || u.protocol === "http:" || u.protocol === "mailto:") href = u.href;
+      } catch {}
+      if (!href) return children;
+      const safe = href.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${children}</a>`;
     }
     return `<${tag}>${children}</${tag}>`;
   }
@@ -64,7 +72,7 @@ export default function RedditWidget({
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
   const storageKey = `reddit-widget-${widget.id}`;
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
 
   const [config, setConfig]             = useState<RedditConfig>(DEFAULT);
   const [posts, setPosts]               = useState<Post[]>([]);
@@ -86,6 +94,9 @@ export default function RedditWidget({
   // Last good posts per subreddit, kept across scans: a rescan that fails for
   // a feed keeps showing what it had instead of dropping it.
   const receivedRef = useRef<Map<string, Post[]>>(new Map());
+  // Aborts the previous scan so a slow initial load can never paint over (or
+  // be cached under) a newer config.
+  const fetchAbort = useRef<AbortController | null>(null);
 
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
@@ -105,7 +116,7 @@ export default function RedditWidget({
         const cacheKey = cacheKeyFor(parsed);
         const cached = await storage.getItem(cacheKey);
         if (cached) {
-          const posts: Post[] = JSON.parse(cached);
+          const posts = parseJson<Post[]>(cached, []);
           setPosts(posts);
           // Seed the per-feed map so the counter starts from what the day
           // cache already shows instead of 0/N.
@@ -121,10 +132,15 @@ export default function RedditWidget({
   }, [storageKey]);
 
   function cacheKeyFor(cfg: RedditConfig) {
-    return `${storageKey}-v3-${today}-${cfg.subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
+    return redditCacheKey(widget.id, today, cfg.subreddits);
   }
 
   async function fetchPosts(cfg: RedditConfig, cacheKey: string, force = false): Promise<boolean> {
+    fetchAbort.current?.abort();
+    const ctrl = new AbortController();
+    fetchAbort.current = ctrl;
+    // A pending self-heal retry belongs to the previous scan.
+    if (retryRef.current.timer) { clearTimeout(retryRef.current.timer); retryRef.current.timer = null; }
     setLoading(true);
     setError("");
     try {
@@ -156,15 +172,17 @@ export default function RedditWidget({
           try {
             const params = new URLSearchParams({ subreddit: sub.name, period: sub.period, limit: String(sub.limit) });
             if (force) params.set("refresh", "1");
-            const res = await fetch(`/api/reddit?${params}`);
+            const res = await fetch(`/api/reddit?${params}`, { signal: ctrl.signal });
             if (!res.ok) throw new Error();
             const items: Post[] = await res.json();
+            if (ctrl.signal.aborted) return null;
             received.set(keyOf(sub), items);
             const now = combined();
             if (now.length) setPosts(now);
             mark(sub.name, true);
             return items;
           } catch {
+            if (ctrl.signal.aborted) return null;
             // One bad feed must not blank the others; a feed that loaded on an
             // earlier scan keeps its old posts and stays counted as loaded.
             mark(sub.name, received.has(keyOf(sub)));
@@ -172,6 +190,7 @@ export default function RedditWidget({
           }
         })
       );
+      if (ctrl.signal.aborted) return false;
       const all = combined();
       if (!all.length) throw new Error();
       if (results.some(r => r === null)) {
@@ -188,10 +207,11 @@ export default function RedditWidget({
       }
       return true;
     } catch {
+      if (ctrl.signal.aborted) return false;
       setError("Failed to load posts. Check the subreddit names.");
       return false;
     } finally {
-      setLoading(false);
+      if (fetchAbort.current === ctrl) setLoading(false);
     }
   }
 
@@ -221,6 +241,10 @@ export default function RedditWidget({
   }
 
   async function handleReset() {
+    fetchAbort.current?.abort();
+    fetchAbort.current = null;
+    if (retryRef.current.timer) { clearTimeout(retryRef.current.timer); retryRef.current.timer = null; }
+    setLoading(false);
     await storage.removeItem(storageKey);
     setConfig(DEFAULT);
     setDraft(DEFAULT);
@@ -246,7 +270,7 @@ export default function RedditWidget({
               <button
                 onClick={() => setStatusOpen(o => !o)}
                 title="Which subreddits loaded"
-                className={`text-[10px] tabular-nums font-medium ${subStatus.some(s => s.ok === false) ? "text-red-500/80" : `${c.label} opacity-50`} hover:opacity-100 transition-opacity`}
+                className={`text-[12px] tabular-nums font-medium ${subStatus.some(s => s.ok === false) ? "text-red-500/80" : `${c.label} opacity-50`} hover:opacity-100 transition-opacity`}
               >
                 {subStatus.filter(s => s.ok).length}/{subStatus.length}
               </button>
@@ -256,7 +280,7 @@ export default function RedditWidget({
                 <div className="fixed inset-0 z-40" onClick={() => setStatusOpen(false)} />
                 <div className={`absolute right-0 top-5 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2 flex flex-col gap-1`}>
                   {subStatus.map(s => (
-                    <span key={s.name} className="flex items-center justify-between gap-2 text-[11px]">
+                    <span key={s.name} className="flex items-center justify-between gap-2 text-[12px]">
                       <span className={`truncate ${c.text} opacity-80`}>r/{s.name}</span>
                       <span className={`shrink-0 ${s.ok === true ? "text-emerald-600 dark:text-emerald-400" : s.ok === false ? "text-red-500" : `${c.label} opacity-50`}`}>
                         {s.ok === true ? "loaded" : s.ok === false ? "failed" : "loading"}
@@ -284,14 +308,14 @@ export default function RedditWidget({
                     return (
                       <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
                         <span className="flex items-center gap-1.5 mb-1 min-w-0">
-                          <span className={`inline-block min-w-0 truncate text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                          <span className={`inline-block min-w-0 truncate text-[12px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                             r/{post.subreddit}
                           </span>
                           {post.pubDate && (
-                            <span className={`shrink-0 text-[10px] opacity-40 ${c.text}`}>{timeAgo(post.pubDate)}</span>
+                            <span className={`shrink-0 text-[12px] opacity-60 ${c.text}`}>{timeAgo(post.pubDate)}</span>
                           )}
                           {post.score > 0 && (
-                            <span className={`shrink-0 text-[10px] opacity-40 ${c.text}`}>▲ {formatCount(post.score)}</span>
+                            <span className={`shrink-0 text-[12px] opacity-60 ${c.text}`}>▲ {formatCount(post.score)}</span>
                           )}
                         </span>
                         <div className="flex items-start gap-1 group/title">
@@ -381,7 +405,7 @@ export default function RedditWidget({
                       dangerouslySetInnerHTML={{ __html: sanitizeRedditHtml(selected.content) }}
                     />
                   ) : (
-                    <p className={`text-xs opacity-40 ${c.text}`}>No text content: this is a link post.</p>
+                    <p className={`text-xs opacity-60 ${c.text}`}>No text content: this is a link post.</p>
                   )}
                 </div>
                 <ScrollFades c={c} top={detail.topFade} bottom={detail.bottomFade} />
@@ -455,10 +479,10 @@ export default function RedditWidget({
                         <button
                           key={p.value}
                           onClick={() => setSubPeriod(sub.name, p.value)}
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors ${
+                          className={`px-2 py-0.5 rounded-md text-[12px] font-medium transition-colors ${
                             sub.period === p.value
                               ? "bg-white/80 shadow-sm"
-                              : "opacity-40 hover:opacity-70"
+                              : "opacity-60 hover:opacity-70"
                           }`}
                         >
                           {p.label}

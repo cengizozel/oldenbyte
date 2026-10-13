@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { Timer, Plus, Play, Pause, History, Trash2, X, Check, Flame, ChevronLeft, Pencil } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
-import { formatClock, formatDuration, formatDate } from "@/lib/format";
+import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput } from "./ui/Field";
 import { PencilButton, EmptyState, SaveCancelRow } from "./ui/WidgetChrome";
@@ -20,11 +21,6 @@ function newId() {
 
 // Local-calendar day helpers. The day boundary is the user's midnight, not
 // UTC's: a timer running at 23:59 belongs to the day the user experienced.
-function localDateStr(d: Date = new Date()): string {
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
 function dayStartMs(date: string): number {
   return new Date(`${date}T00:00:00`).getTime();
 }
@@ -157,7 +153,7 @@ export default function TrackerWidget({
     ]).then(([cfgRaw, daysRaw, legacyRaw]) => {
       try {
         if (cfgRaw) {
-          const cfg = JSON.parse(cfgRaw) as { items?: Item[]; activeId?: string | null; since?: number | null };
+          const cfg = parseJson<{ items?: Item[]; activeId?: string | null; since?: number | null }>(cfgRaw, {});
           setItems(cfg.items ?? []);
           setDraft(cfg.items ?? []);
           setActiveId(cfg.activeId ?? null);
@@ -165,10 +161,10 @@ export default function TrackerWidget({
         }
         let stored: Days = {};
         if (daysRaw) {
-          stored = (JSON.parse(daysRaw) as Days) ?? {};
+          stored = parseJson<Days | null>(daysRaw, null) ?? {};
         } else if (legacyRaw) {
           // Migrate the old one-key-per-day format (only today's key is reachable).
-          const d = JSON.parse(legacyRaw) as { elapsed?: Record<string, number> };
+          const d = parseJson<{ elapsed?: Record<string, number> }>(legacyRaw, {});
           if (d.elapsed) stored[localDateStr()] = d.elapsed;
           storage.setItem(daysKey, JSON.stringify(stored));
         }
@@ -401,12 +397,12 @@ export default function TrackerWidget({
               center={hoveredRow ? (
                 <>
                   <span className={`text-sm font-semibold tabular-nums ${c.text}`}>{hoveredPct}%</span>
-                  <span className={`text-[10px] leading-tight line-clamp-2 ${c.label} opacity-60`}>{hoveredRow.name}</span>
+                  <span className={`text-[12px] leading-tight line-clamp-2 ${c.label} opacity-60`}>{hoveredRow.name}</span>
                 </>
               ) : (
                 <>
                   <span className={`text-sm font-semibold tabular-nums ${c.text}`}>{formatClock(total)}</span>
-                  <span className={`text-[10px] uppercase tracking-widest opacity-40 ${c.label}`}>total</span>
+                  <span className={`text-[12px] uppercase tracking-widest opacity-60 ${c.label}`}>total</span>
                 </>
               )}
             />
@@ -426,7 +422,7 @@ export default function TrackerWidget({
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
                     <span className={`flex-1 min-w-0 truncate text-sm ${c.text}`}>{r.name}</span>
                     {r.streak >= 2 && (
-                      <span className={`flex items-center gap-0.5 text-[10px] tabular-nums shrink-0 ${c.label} opacity-60`} title={`${r.streak}-day streak`}>
+                      <span className={`flex items-center gap-0.5 text-[12px] tabular-nums shrink-0 ${c.label} opacity-60`} title={`${r.streak}-day streak`}>
                         <Flame size={10} />{r.streak}
                       </span>
                     )}
@@ -539,7 +535,7 @@ export default function TrackerWidget({
                       <span className={`text-xs font-semibold tabular-nums ${c.text}`}>
                         {formatDuration(dayRows(detailDate).reduce((a, b) => a + b.secs, 0))}
                       </span>
-                      <span className={`text-[9px] uppercase tracking-widest opacity-40 ${c.label}`}>total</span>
+                      <span className={`text-[11px] uppercase tracking-widest opacity-60 ${c.label}`}>total</span>
                     </>
                   }
                 />
@@ -567,7 +563,7 @@ export default function TrackerWidget({
                             onChange={e => setEditH(e.target.value.replace(/\D/g, ""))}
                             className={`w-9 text-xs text-right tabular-nums border border-[var(--surface-border)] rounded-lg px-1.5 py-1 outline-none bg-[var(--surface)] ${c.text}`}
                           />
-                          <span className={`text-[10px] opacity-50 ${c.label}`}>h</span>
+                          <span className={`text-[12px] opacity-50 ${c.label}`}>h</span>
                           <input
                             inputMode="numeric"
                             value={editM}
@@ -575,7 +571,7 @@ export default function TrackerWidget({
                             onKeyDown={e => { if (e.key === "Enter") saveRowEdit(detailDate, r.id); if (e.key === "Escape") setEditRowId(null); }}
                             className={`w-9 text-xs text-right tabular-nums border border-[var(--surface-border)] rounded-lg px-1.5 py-1 outline-none bg-[var(--surface)] ${c.text}`}
                           />
-                          <span className={`text-[10px] opacity-50 ${c.label}`}>m</span>
+                          <span className={`text-[12px] opacity-50 ${c.label}`}>m</span>
                           <button onClick={() => setEditRowId(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] ml-1"><X size={12} /></button>
                           <button onClick={() => saveRowEdit(detailDate, r.id)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Check size={12} /></button>
                         </span>
@@ -623,13 +619,13 @@ export default function TrackerWidget({
                           />
                         ))}
                       </svg>
-                      <div className={`flex justify-between text-[9px] opacity-40 ${c.label}`}>
+                      <div className={`flex justify-between text-[11px] opacity-60 ${c.label}`}>
                         <span>{fmtDay(chartDates[0])}</span>
                         <span>{fmtDay(today)}</span>
                       </div>
                       <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
                         {chartSeries.map(s => (
-                          <span key={s.id} className={`flex items-center gap-1 text-[10px] opacity-70 ${c.text}`}>
+                          <span key={s.id} className={`flex items-center gap-1 text-[12px] opacity-70 ${c.text}`}>
                             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.color }} />
                             {s.name}
                           </span>
@@ -639,7 +635,7 @@ export default function TrackerWidget({
                   )}
 
                   {/* Minimal insights */}
-                  <div className={`shrink-0 flex flex-col gap-1 text-[11px] ${c.text} opacity-75`}>
+                  <div className={`shrink-0 flex flex-col gap-1 text-[12px] ${c.text} opacity-75`}>
                     <span>
                       last 7 days: <span className="tabular-nums font-medium">{formatDuration(thisWeek)}</span>
                       {weekDelta !== null && (
@@ -674,8 +670,8 @@ export default function TrackerWidget({
                           title={`${fmtDay(date)}: ${formatDuration(dayTotal)}`}
                         >
                           <Donut rows={rows} size={48} stroke={16} />
-                          <span className={`text-[9px] leading-none ${c.label} ${date === today ? "font-semibold" : "opacity-60"}`}>{fmtDay(date)}</span>
-                          <span className={`text-[9px] leading-none tabular-nums opacity-45 ${c.text}`}>{formatDuration(dayTotal)}</span>
+                          <span className={`text-[11px] leading-none ${c.label} ${date === today ? "font-semibold" : "opacity-60"}`}>{fmtDay(date)}</span>
+                          <span className={`text-[11px] leading-none tabular-nums opacity-60 ${c.text}`}>{formatDuration(dayTotal)}</span>
                         </button>
                       );
                     })}

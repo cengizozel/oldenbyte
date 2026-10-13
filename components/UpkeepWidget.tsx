@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldCheck, Plus, History, Trash2, X, Flame, ChevronLeft, Circle, CircleCheck } from "lucide-react";
+import { ShieldCheck, Plus, History, X, Flame, ChevronLeft, Circle, CircleCheck } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
-import { formatDate } from "@/lib/format";
+import { formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput } from "./ui/Field";
 import { PencilButton, EmptyState, SaveCancelRow } from "./ui/WidgetChrome";
@@ -28,11 +29,6 @@ function newId() {
 
 // Local-calendar day helpers — the day boundary is the user's midnight, matching
 // Tracker and Rhythm, so a late-night check-off belongs to the day they lived.
-function localDateStr(d: Date = new Date()): string {
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
 function shiftDay(date: string, delta: number): string {
   const t = new Date(`${date}T12:00:00`);
   t.setDate(t.getDate() + delta);
@@ -113,7 +109,8 @@ export default function UpkeepWidget({
 
   const [items, setItems] = useState<Item[]>([]);
   const [days, setDays] = useState<Days>({});
-  const [now, setNow] = useState(0);
+  // Ticks every 30s only to re-render, so "today" rolls over at midnight.
+  const [, setNow] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -131,12 +128,12 @@ export default function UpkeepWidget({
     Promise.all([storage.getItem(configKey), storage.getItem(daysKey)]).then(([cfgRaw, daysRaw]) => {
       try {
         if (cfgRaw) {
-          const cfg = JSON.parse(cfgRaw) as { items?: Item[] };
+          const cfg = parseJson<{ items?: Item[] }>(cfgRaw, {});
           const its = (cfg.items ?? []).map(i => ({ ...i, weight: i.weight > 0 ? i.weight : 1 }));
           setItems(its);
           setDraft(its);
         }
-        if (daysRaw) setDays((JSON.parse(daysRaw) as Days) ?? {});
+        if (daysRaw) setDays(parseJson<Days | null>(daysRaw, null) ?? {});
       } catch {}
       setNow(Date.now());
       setLoaded(true);
@@ -258,7 +255,7 @@ export default function UpkeepWidget({
                   <span className={`text-2xl font-semibold tabular-nums leading-none ${perfect ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>
                     {pct ?? "—"}
                   </span>
-                  <span className={`mt-1 text-[10px] uppercase tracking-widest opacity-40 ${c.label}`}>
+                  <span className={`mt-1 text-[12px] uppercase tracking-widest opacity-60 ${c.label}`}>
                     {perfect ? "perfect" : "/ 100"}
                   </span>
                 </>
@@ -267,7 +264,7 @@ export default function UpkeepWidget({
           </div>
 
           {streak >= 2 && (
-            <div className={`shrink-0 flex items-center justify-center gap-1 text-[11px] tabular-nums ${c.label} opacity-70`}>
+            <div className={`shrink-0 flex items-center justify-center gap-1 text-[12px] tabular-nums ${c.label} opacity-70`}>
               <Flame size={12} />
               <span>{streak}-day perfect streak</span>
             </div>
@@ -287,7 +284,7 @@ export default function UpkeepWidget({
                   >
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: dot, opacity: done ? 1 : 0.4 }} />
                     <span className={`flex-1 min-w-0 truncate text-sm ${c.text} ${done ? "" : "opacity-70"}`}>{it.name}</span>
-                    <span className={`text-[10px] tabular-nums shrink-0 ${c.label} opacity-45`}>{it.weight}</span>
+                    <span className={`text-[12px] tabular-nums shrink-0 ${c.label} opacity-60`}>{it.weight}</span>
                     <span className={done ? "text-emerald-600 dark:text-emerald-400" : `opacity-30 ${c.label}`}>
                       {done ? <CircleCheck size={16} /> : <Circle size={16} />}
                     </span>
@@ -334,7 +331,7 @@ export default function UpkeepWidget({
                     onChange={e => setDraft(d => d.map(x => x.id === it.id ? { ...x, name: e.target.value } : x))}
                     className={`flex-1 min-w-0 bg-transparent dark:!bg-transparent text-sm outline-none ${c.text}`}
                   />
-                  <label className={`flex items-center gap-1 text-[10px] ${c.label} opacity-70`} title="Points this item is worth">
+                  <label className={`flex items-center gap-1 text-[12px] ${c.label} opacity-70`} title="Points this item is worth">
                     <input
                       inputMode="numeric"
                       value={it.weight}
@@ -355,14 +352,14 @@ export default function UpkeepWidget({
                 </div>
               ))}
             </div>
-            <p className={`text-[11px] leading-relaxed opacity-55 ${c.text}`}>
-              Points add up to <span className="tabular-nums font-medium">{draftTotal}</span> — checking everything always scores 100, so the weights just set how much each one moves the needle.
+            <p className={`text-[12px] leading-relaxed opacity-55 ${c.text}`}>
+              Points add up to <span className="tabular-nums font-medium">{draftTotal}</span>. Checking everything always scores 100, so the weights just set how much each one moves the needle.
             </p>
           </>
         )}
         {draft.length === 0 && (
-          <p className={`text-[11px] leading-relaxed opacity-55 ${c.text}`}>
-            Add the daily essentials you want to stay on top of — brushing teeth, showering, taking medicine, a clean bed. Give each one a point value for how much it matters; checking them all off scores a perfect 100.
+          <p className={`text-[12px] leading-relaxed opacity-55 ${c.text}`}>
+            Add the daily essentials you want to stay on top of: brushing teeth, showering, taking medicine, a clean bed. Give each one a point value for how much it matters; checking them all off scores a perfect 100.
           </p>
         )}
       </div>
@@ -427,7 +424,7 @@ export default function UpkeepWidget({
                       center={
                         <>
                           <span className={`text-xl font-semibold tabular-nums leading-none ${s.pct === 100 ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>{s.pct ?? "—"}</span>
-                          <span className={`mt-1 text-[9px] uppercase tracking-widest opacity-40 ${c.label}`}>{s.pct === 100 ? "perfect" : "/ 100"}</span>
+                          <span className={`mt-1 text-[11px] uppercase tracking-widest opacity-60 ${c.label}`}>{s.pct === 100 ? "perfect" : "/ 100"}</span>
                         </>
                       }
                     />
@@ -448,7 +445,7 @@ export default function UpkeepWidget({
                     >
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color, opacity: r.done ? 1 : 0.4 }} />
                       <span className={`flex-1 min-w-0 truncate text-xs ${c.text} ${r.done ? "opacity-80" : "opacity-55"}`}>{r.name}</span>
-                      <span className={`text-[10px] tabular-nums shrink-0 ${c.label} opacity-45`}>{r.weight}</span>
+                      <span className={`text-[12px] tabular-nums shrink-0 ${c.label} opacity-60`}>{r.weight}</span>
                       <span className={r.done ? "text-emerald-600 dark:text-emerald-400" : `opacity-30 ${c.label}`}>
                         {r.done ? <CircleCheck size={14} /> : <Circle size={14} />}
                       </span>
@@ -488,14 +485,14 @@ export default function UpkeepWidget({
                         />
                       ))}
                     </svg>
-                    <div className={`flex justify-between text-[9px] opacity-40 ${c.label}`}>
+                    <div className={`flex justify-between text-[11px] opacity-60 ${c.label}`}>
                       <span>{fmtDay(gridDates[0])}</span>
                       <span>{fmtDay(today)}</span>
                     </div>
                   </div>
 
                   {/* Insights */}
-                  <div className={`shrink-0 flex flex-col gap-1 text-[11px] ${c.text} opacity-75`}>
+                  <div className={`shrink-0 flex flex-col gap-1 text-[12px] ${c.text} opacity-75`}>
                     {avg7 != null && (
                       <span>last {withScore.length} days: <span className="tabular-nums font-medium">{avg7}</span> average · <span className="tabular-nums font-medium">{perfectDays}</span> perfect</span>
                     )}
@@ -529,7 +526,7 @@ export default function UpkeepWidget({
                         );
                       })}
                     </div>
-                    <div className={`flex justify-between text-[8px] opacity-40 ${c.label} mt-1`}>
+                    <div className={`flex justify-between text-[11px] opacity-60 ${c.label} mt-1`}>
                       <span>{fmtDay(gridDates[0])}</span>
                       <span>{fmtDay(today)}</span>
                     </div>

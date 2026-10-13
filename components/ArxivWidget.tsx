@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BookOpen, ExternalLink, ChevronLeft } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { formatDate } from "@/lib/format";
+import { formatDate, localDateStr } from "@/lib/format";
+import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsSelect } from "@/components/ui/Field";
@@ -167,7 +168,7 @@ export default function ArxivWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
   const configKey = `arxiv-widget-${widget.id}`;
   const cacheKey  = `arxiv-widget-${widget.id}-${today}`;
 
@@ -179,16 +180,19 @@ export default function ArxivWidget({
   const [selected, setSelected]         = useState<Paper | null>(null);
   const listFade   = useScrollFade([cache]);
   const detailFade = useScrollFade([selected]);
+  // Aborts the previous fetch so a slow initial load can never land over (or
+  // be cached as) a newer category.
+  const fetchAbort = useRef<AbortController | null>(null);
 
   useEffect(() => {
     storage.getItem(configKey).then(async saved => {
-      const cfg: ArxivConfig = saved ? JSON.parse(saved) : DEFAULT;
+      const cfg = parseJson<ArxivConfig>(saved, DEFAULT);
       setConfig(cfg);
       setDraft(cfg);
       const cachedRaw = await storage.getItem(cacheKey);
       if (cachedRaw) {
-        const parsed: Cache = JSON.parse(cachedRaw);
-        if (parsed.papers?.length) setCache(parsed);
+        const parsed = parseJson<Cache | null>(cachedRaw, null);
+        if (parsed?.papers?.length) setCache(parsed);
       }
       fetchPapers(cfg);
     });
@@ -196,10 +200,13 @@ export default function ArxivWidget({
   }, []);
 
   async function fetchPapers(cfg: ArxivConfig, force = false) {
+    fetchAbort.current?.abort();
+    const ctrl = new AbortController();
+    fetchAbort.current = ctrl;
     setLoading(true);
     try {
       const load = async (url: string): Promise<Paper[]> => {
-        const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=25${force ? "&refresh=1" : ""}`);
+        const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=25${force ? "&refresh=1" : ""}`, { signal: ctrl.signal });
         if (!res.ok) throw new Error();
         return res.json();
       };
@@ -214,13 +221,15 @@ export default function ArxivWidget({
       setCache(newCache);
       await storage.setItem(cacheKey, JSON.stringify(newCache));
     } catch {
-      /* leave existing cache */
+      /* leave existing cache (or an aborted, superseded fetch) */
     } finally {
-      setLoading(false);
+      if (fetchAbort.current === ctrl) setLoading(false);
     }
   }
 
   async function handleSave() {
+    // Drop the in-flight fetch for the old category before clearing its cache.
+    fetchAbort.current?.abort();
     setConfig(draft);
     await storage.setItem(configKey, JSON.stringify(draft));
     setSettingsOpen(false);
@@ -243,7 +252,7 @@ export default function ArxivWidget({
             <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
               <span className="opacity-50"><BookOpen size={14} /></span>
               <span className="text-xs font-medium opacity-60">arXiv</span>
-              <span className={`text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md opacity-60 truncate ${c.bg} border ${c.border}`}>
+              <span className={`text-[12px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-md opacity-60 truncate ${c.bg} border ${c.border}`}>
                 {config.category}
               </span>
             </div>
@@ -321,7 +330,7 @@ export default function ArxivWidget({
                           <p className={`text-xs opacity-55 leading-snug break-words ${c.text}`}>{p.authors}</p>
                         )}
                         {selected.pubDate && (
-                          <p className={`text-xs opacity-35 ${c.text}`}>
+                          <p className={`text-xs opacity-60 ${c.text}`}>
                             {formatDate(selected.pubDate)}
                             {" · "}{config.category}
                           </p>
@@ -345,7 +354,7 @@ export default function ArxivWidget({
       back={
         <>
           <div className="flex flex-col gap-1.5">
-            <label className={`text-[10px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
+            <label className={`text-[12px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
               Field
             </label>
             <SettingsSelect
@@ -361,7 +370,7 @@ export default function ArxivWidget({
             </SettingsSelect>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className={`text-[10px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
+            <label className={`text-[12px] font-semibold uppercase tracking-widest opacity-50 ${c.label}`}>
               Topic
             </label>
             <SettingsSelect
