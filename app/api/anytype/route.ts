@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/http";
+import { requireUser, readJsonBody } from "@/lib/http";
 import { anytypeSearch, anytypeTypes, anytypeReadObject, ANYTYPE_VERSION } from "@/lib/anytype";
+import { actAs, userFetch } from "@/lib/requestUser";
 
 // Proxy to the Anytype local API (embedded in the Anytype desktop app, default
 // http://127.0.0.1:31009). Server-side, like /api/kiwix and /api/model, to dodge
@@ -46,17 +47,19 @@ async function errMsg(res: Response): Promise<string> {
 export async function GET(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+  actAs(user);
 
   const sp = request.nextUrl.searchParams;
   const baseUrl = sp.get("baseUrl");
-  const apiKey = sp.get("apiKey") ?? "";
+  // The key travels in a header, never the URL (URLs end up in proxy and access logs).
+  const apiKey = request.headers.get("x-api-key") ?? "";
   const op = sp.get("op");
   if (!baseUrl || !/^https?:\/\//.test(baseUrl)) {
     return NextResponse.json({ error: "Missing or invalid baseUrl" }, { status: 400 });
   }
   try {
     if (op === "spaces") {
-      const res = await fetch(`${root(baseUrl)}/v1/spaces?limit=100`, { headers: headers(apiKey), signal: request.signal });
+      const res = await userFetch(`${root(baseUrl)}/v1/spaces?limit=100`, { headers: headers(apiKey), signal: request.signal });
       if (!res.ok) throw new Error(await errMsg(res));
       const data = await res.json();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -102,8 +105,11 @@ const BRIDGE_OPS = new Set(["list_types", "style_profile", "create_object", "app
 export async function POST(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+  actAs(user);
 
-  const { op, baseUrl, challengeId, code, bridgeUrl, bridgeToken, rpc } = await request.json();
+  const body = await readJsonBody(request);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  const { op, baseUrl, challengeId, code, bridgeUrl, bridgeToken, rpc } = body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   if (op === "bridge" || op === "bridge-health") {
     if (!bridgeUrl || !/^https?:\/\//.test(bridgeUrl)) {
@@ -112,13 +118,13 @@ export async function POST(request: NextRequest) {
     const bridgeBase = root(bridgeUrl);
     try {
       if (op === "bridge-health") {
-        const res = await fetch(`${bridgeBase}/health`, { signal: request.signal });
+        const res = await userFetch(`${bridgeBase}/health`, { signal: request.signal });
         return NextResponse.json(await res.json());
       }
       if (!rpc?.op || !BRIDGE_OPS.has(rpc.op)) {
         return NextResponse.json({ error: `Unknown bridge op "${rpc?.op ?? ""}"` }, { status: 400 });
       }
-      const res = await fetch(`${bridgeBase}/rpc`, {
+      const res = await userFetch(`${bridgeBase}/rpc`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${bridgeToken ?? ""}` },
         body: JSON.stringify(rpc),
@@ -136,7 +142,7 @@ export async function POST(request: NextRequest) {
   }
   try {
     if (op === "challenge") {
-      const res = await fetch(`${root(baseUrl)}/v1/auth/challenges`, {
+      const res = await userFetch(`${root(baseUrl)}/v1/auth/challenges`, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({ app_name: "oldenbyte" }),
@@ -150,7 +156,7 @@ export async function POST(request: NextRequest) {
       if (!challengeId || !code) {
         return NextResponse.json({ error: "Missing challengeId or code" }, { status: 400 });
       }
-      const res = await fetch(`${root(baseUrl)}/v1/auth/api_keys`, {
+      const res = await userFetch(`${root(baseUrl)}/v1/auth/api_keys`, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({ challenge_id: challengeId, code: String(code) }),

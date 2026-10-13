@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
 import { stripThinking } from "@/lib/citations";
+import { actAs, userFetch } from "@/lib/requestUser";
 
 const SYSTEM =
   "You are a seasoned newspaper editor crafting a personal morning briefing. " +
@@ -46,6 +47,7 @@ const HOSTED = /(openai|anthropic|googleapis|mistral|groq)\.com/i;
 export async function POST(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+  actAs(user);
 
   // Works with any OpenAI-compatible endpoint (local Ollama/LM Studio/llama.cpp
   // or a hosted provider). Defaults to OpenAI for backward compatibility; `key`
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
   if (finalKey) headers["Authorization"] = `Bearer ${finalKey}`;
 
   if (stream) {
-    const res = await fetch(url, {
+    const res = await userFetch(url, {
       method: "POST",
       headers,
       body: buildBody(content, true, model, noThink),
@@ -122,7 +124,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const res = await fetch(url, {
+    const res = await userFetch(url, {
       method: "POST",
       headers,
       body: buildBody(content, false, model, noThink),

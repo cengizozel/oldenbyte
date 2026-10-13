@@ -25,9 +25,14 @@ export async function POST(request: NextRequest) {
     return badRequest("Invalid password");
   }
 
-  const user = await prisma.user.create({
-    data: { username: name, passwordHash: await hashPassword(password), role: "admin" },
+  // Count and create in one transaction, so two setup requests racing in the
+  // first-run window cannot both create an admin.
+  const passwordHash = await hashPassword(password);
+  const user = await prisma.$transaction(async tx => {
+    if ((await tx.user.count()) > 0) return null;
+    return tx.user.create({ data: { username: name, passwordHash, role: "admin" } });
   });
+  if (!user) return forbidden();
 
   await prisma.setting.updateMany({
     where: { userId: "__legacy__" },

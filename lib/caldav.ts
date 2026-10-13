@@ -1,3 +1,5 @@
+import { userFetch } from "@/lib/requestUser";
+import { decodeEntities } from "@/lib/text";
 // Minimal CalDAV client used by /api/caldav and the Chat route's calendar
 // tools. Server-side only (Basic auth + CORS). Tested against Radicale and
 // written for Nextcloud compatibility: discovery via current-user-principal,
@@ -51,18 +53,12 @@ function xmlText(xml: string, tag: string): string {
   const m = xml.match(new RegExp(`<(?:[A-Za-z0-9_-]+:)?${tag}[^>]*>([\\s\\S]*?)</(?:[A-Za-z0-9_-]+:)?${tag}>`));
   return m ? m[1].trim() : "";
 }
-function decodeXml(s: string): string {
-  return s
-    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&amp;/g, "&");
-}
 
 async function dav(
   url: string, method: string, account: CalDAVAccount, body: string,
   headers: Record<string, string> = {}, signal?: AbortSignal,
 ): Promise<string> {
-  const res = await fetch(url, {
+  const res = await userFetch(url, {
     method,
     headers: {
       ...authHeader(account),
@@ -87,14 +83,14 @@ export async function listCalendars(account: CalDAVAccount, signal?: AbortSignal
     `<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:current-user-principal/></d:prop></d:propfind>`,
     { Depth: "0" }, signal);
   const principalHref = xmlText(xmlText(principalXml, "current-user-principal"), "href") || xmlText(principalXml, "href");
-  const principalUrl = resolveHref(base, decodeXml(principalHref || "/"));
+  const principalUrl = resolveHref(base, decodeEntities(principalHref || "/"));
 
   // 2. Where do my calendars live?
   const homeXml = await dav(principalUrl, "PROPFIND", account,
     `<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><c:calendar-home-set/></d:prop></d:propfind>`,
     { Depth: "0" }, signal);
   const homeHref = xmlText(xmlText(homeXml, "calendar-home-set"), "href");
-  const homeUrl = resolveHref(base, decodeXml(homeHref || principalHref || "/"));
+  const homeUrl = resolveHref(base, decodeEntities(homeHref || principalHref || "/"));
 
   // 3. Which children are calendars supporting VEVENT?
   const listXml = await dav(homeUrl, "PROPFIND", account,
@@ -113,14 +109,14 @@ export async function listCalendars(account: CalDAVAccount, signal?: AbortSignal
     // Skip calendars that can't hold events (task-only lists report VTODO only).
     const comps = xmlText(resp, "supported-calendar-component-set");
     if (isCalendar && comps && !/VEVENT/i.test(comps)) continue;
-    const href = decodeXml(xmlText(resp, "href"));
+    const href = decodeEntities(xmlText(resp, "href"));
     if (!href) continue;
-    const name = decodeXml(xmlText(resp, "displayname")) || decodeURIComponent(href.split("/").filter(Boolean).pop() ?? "calendar");
+    const name = decodeEntities(xmlText(resp, "displayname")) || decodeURIComponent(href.split("/").filter(Boolean).pop() ?? "calendar");
     const privileges = xmlText(resp, "current-user-privilege-set");
     const readOnly = isSubscribed || (privileges ? !/write(?:-content)?[\s/>]/.test(privileges) : false);
     // Subscriptions carry the upstream webcal/ICS URL; Nextcloud serves the
     // node itself empty over DAV, so events are read from the source feed.
-    const source = isSubscribed ? decodeXml(xmlText(xmlText(resp, "source"), "href")) || undefined : undefined;
+    const source = isSubscribed ? decodeEntities(xmlText(xmlText(resp, "source"), "href")) || undefined : undefined;
     calendars.push({ name, url: resolveHref(base, href), readOnly, source });
   }
   return calendars;
@@ -155,7 +151,8 @@ function zoneOffsetMs(zone: string, utcMs: number): number {
 }
 
 // Epoch ms of the wall-clock time y-mo-d h:mi:s in `zone` (two-pass for DST).
-function wallToEpoch(y: number, mo: number, d: number, h: number, mi: number, s: number, zone: string): number {
+// Exported for tests.
+export function wallToEpoch(y: number, mo: number, d: number, h: number, mi: number, s: number, zone: string): number {
   const guess = Date.UTC(y, mo - 1, d, h, mi, s);
   let t = guess - zoneOffsetMs(zone, guess);
   t = guess - zoneOffsetMs(zone, t);
@@ -266,7 +263,8 @@ function parseRawEvents(ics: string, href: string, tz: string): RawEvent[] {
 const WEEKDAYS: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
 
 // Occurrence starts (epoch ms) of an RRULE within [rangeStart, rangeEnd).
-function expandRrule(rule: string, startMs: number, rangeStart: number, rangeEnd: number): number[] {
+// Exported for tests.
+export function expandRrule(rule: string, startMs: number, rangeStart: number, rangeEnd: number): number[] {
   const parts: Record<string, string> = {};
   for (const kv of rule.split(";")) {
     const [k, v] = kv.split("=");
@@ -393,7 +391,7 @@ async function listSubscriptionEvents(
   calendar: CalDAVCalendar, rangeStart: number, rangeEnd: number, tz: string, signal?: AbortSignal,
 ): Promise<CalDAVEvent[]> {
   const url = calendar.source!.replace(/^webcal:/i, "https:");
-  const res = await fetch(url, { headers: { "User-Agent": "oldenbyte-dashboard" }, signal });
+  const res = await userFetch(url, { headers: { "User-Agent": "oldenbyte-dashboard" }, signal });
   if (!res.ok) throw new Error(`Subscription feed failed (HTTP ${res.status})`);
   const raws = parseRawEvents(await res.text(), url, tz);
   return expandRaws(raws, calendar.name, rangeStart, rangeEnd, tz);
@@ -425,9 +423,9 @@ export async function listEvents(
   const raws: RawEvent[] = [];
   const missing: string[] = [];
   for (const resp of xmlTags(xml, "response")) {
-    const href = decodeXml(xmlText(resp, "href"));
+    const href = decodeEntities(xmlText(resp, "href"));
     if (!href || href.endsWith("/")) continue;
-    const data = decodeXml(xmlText(resp, "calendar-data"));
+    const data = decodeEntities(xmlText(resp, "calendar-data"));
     if (data && /BEGIN:VEVENT/i.test(data)) {
       raws.push(...parseRawEvents(data, resolveHref(account.baseUrl, href), zone));
     } else {
@@ -441,7 +439,7 @@ export async function listEvents(
     const batch = missing.slice(i, i + 8);
     const settled = await Promise.allSettled(batch.map(async href => {
       const url = resolveHref(account.baseUrl, href);
-      const res = await fetch(url, { headers: authHeader(account), signal });
+      const res = await userFetch(url, { headers: authHeader(account), signal });
       if (!res.ok) return [];
       return parseRawEvents(await res.text(), url, zone);
     }));
@@ -496,7 +494,7 @@ export async function createEvent(
     "END:VCALENDAR",
   ].filter(Boolean);
   const href = `${normalizeBase(calendar.url)}/${uid}.ics`;
-  const res = await fetch(href, {
+  const res = await userFetch(href, {
     method: "PUT",
     headers: {
       ...authHeader(account),
@@ -513,6 +511,6 @@ export async function createEvent(
 }
 
 export async function deleteEvent(account: CalDAVAccount, href: string, signal?: AbortSignal): Promise<void> {
-  const res = await fetch(href, { method: "DELETE", headers: authHeader(account), signal });
+  const res = await userFetch(href, { method: "DELETE", headers: authHeader(account), signal });
   if (!res.ok && res.status !== 204) throw new Error(`Delete failed (HTTP ${res.status})`);
 }

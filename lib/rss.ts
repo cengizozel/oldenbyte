@@ -1,18 +1,10 @@
+import { userFetch } from "@/lib/requestUser";
+import { decodeEntities } from "@/lib/text";
 // Shared RSS/Atom fetching + parsing, used by /api/rss and the server-side
 // widget readers (lib/widgetData.ts). Dependency-free regex parsing.
 
 export type FeedItem = { title: string; link: string; pubDate: string; content: string };
 
-function decodeEntities(str: string): string {
-  return str
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
-}
 
 function extractCdata(str: string): string {
   const m = str.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
@@ -25,7 +17,7 @@ function extractTag(xml: string, tag: string): string {
 }
 
 export async function fetchFeed(url: string, limit: number, signal?: AbortSignal): Promise<FeedItem[]> {
-  const res = await fetch(url, {
+  const res = await userFetch(url, {
     headers: { "User-Agent": "Mozilla/5.0 (compatible; RSS reader)" },
     next: { revalidate: 3600 },
     signal,

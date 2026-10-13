@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { destroyAllSessions } from "@/lib/session";
 import { hashPassword } from "@/lib/password";
 
+const libraryDir = process.env.LIBRARY_DIR ?? path.join(process.cwd(), "data", "library");
 const uploadsDir = process.env.UPLOADS_DIR ?? path.join(process.cwd(), "data", "uploads");
 
 export async function DELETE(
@@ -26,10 +27,14 @@ export async function DELETE(
     return badRequest("Cannot delete the only admin");
   }
 
-  await prisma.setting.deleteMany({ where: { userId: targetId } });
-  await destroyAllSessions(targetId);
-  await prisma.user.delete({ where: { id: targetId } });
+  // Database rows go in one transaction; files are removed after it commits.
+  await prisma.$transaction([
+    prisma.setting.deleteMany({ where: { userId: targetId } }),
+    prisma.session.deleteMany({ where: { userId: targetId } }),
+    prisma.user.delete({ where: { id: targetId } }),
+  ]);
   await rm(path.join(uploadsDir, targetId), { recursive: true, force: true });
+  await rm(path.join(libraryDir, targetId), { recursive: true, force: true });
 
   return json({ ok: true });
 }

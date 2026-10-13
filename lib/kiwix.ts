@@ -1,3 +1,5 @@
+import { userFetch } from "@/lib/requestUser";
+import { decodeEntities } from "@/lib/text";
 // Core Kiwix (kiwix-serve) access — fetching + XML parsing — shared by the
 // /api/kiwix route and the Chat route's agentic tool loop. Keeping it here lets
 // the Chat route call it directly instead of fetching its own /api/kiwix over
@@ -19,17 +21,6 @@ export function isValidBase(b: string | null | undefined): b is string {
   return Boolean(b && /^https?:\/\//.test(b));
 }
 
-function decodeEntities(str: string): string {
-  return str
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
-    .replace(/&amp;/g, "&"); // last, so "&amp;lt;" doesn't double-decode
-}
 
 function blocks(xml: string, tag: string): string[] {
   const re = new RegExp(`<${tag}[\\s>][\\s\\S]*?</${tag}>`, "g");
@@ -57,7 +48,7 @@ function cleanField(s: string): string {
 // List the sources (ZIMs) from the OPDS catalog.
 export async function listSources(baseUrl: string, signal?: AbortSignal): Promise<KiwixSource[]> {
   const base = normalizeBase(baseUrl);
-  const res = await fetch(`${base}/catalog/v2/entries`, { signal });
+  const res = await userFetch(`${base}/catalog/v2/entries`, { signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const xml = await res.text();
   return blocks(xml, "entry")
@@ -98,10 +89,10 @@ export async function search(
     format: "xml",
     pageLength: String(Math.min(Math.max(limit, 1), 20)),
   });
-  const res = await fetch(`${base}/search?${params}`, { signal });
+  const res = await userFetch(`${base}/search?${params}`, { signal });
   if (!res.ok) {
     // kiwix returns 500 + an HTML/XML error body when a ZIM can't be read.
-    throw new Error(`Search failed (HTTP ${res.status}) — is the source available on the server?`);
+    throw new Error(`Search failed (HTTP ${res.status}). Is the source available on the server?`);
   }
   const xml = await res.text();
   return parseResults(xml, base);
@@ -123,7 +114,7 @@ async function searchBooks(
     pageLength: String(Math.min(Math.max(limit, 1), 20)),
   });
   for (const id of bookIds) params.append("books.name", id);
-  const res = await fetch(`${base}/search?${params}`, { signal });
+  const res = await userFetch(`${base}/search?${params}`, { signal });
   if (!res.ok) throw new Error(`Search failed (HTTP ${res.status})`);
   return parseResults(await res.text(), base);
 }
@@ -221,7 +212,7 @@ export async function articleExtract(
   const base = normalizeBase(baseUrl);
   // Only allow fetching from the same kiwix host the user configured.
   if (!articleUrl.startsWith(base)) throw new Error("Article URL outside the configured server");
-  const res = await fetch(articleUrl, { signal });
+  const res = await userFetch(articleUrl, { signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   let html = await res.text();
   // Drop <style>/<script> blocks first — otherwise their CSS/JS *text* survives

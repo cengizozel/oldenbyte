@@ -5,7 +5,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import busboy from "busboy";
 import { Readable } from "stream";
-import { requireUser } from "@/lib/http";
+import { requireUser, ClientError, errorResponse } from "@/lib/http";
 
 const uploadsDir = process.env.UPLOADS_DIR ?? path.join(process.cwd(), "data", "uploads");
 
@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     await mkdir(userDir, { recursive: true });
 
     const contentType = request.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("multipart/form-data")) throw new ClientError("Expected a multipart upload.");
     const bb = busboy({
       headers: { "content-type": contentType },
       limits: { fileSize: 50 * 1024 * 1024, files: 1 },
@@ -25,12 +26,14 @@ export async function POST(request: NextRequest) {
 
     const result = await new Promise<{ filename: string }>((resolve, reject) => {
       let resolved = false;
+      let sawFile = false;
 
       bb.on("file", (_field, stream, info) => {
+        sawFile = true;
         const ext = info.filename.split(".").pop()?.toLowerCase();
         if (ext !== "pdf" && ext !== "epub") {
           stream.resume();
-          reject(new Error("Only PDF and EPUB files are supported."));
+          reject(new ClientError("Only PDF and EPUB files are supported.", 415));
           return;
         }
 
@@ -42,7 +45,7 @@ export async function POST(request: NextRequest) {
         stream.on("limit", () => {
           dest.destroy();
           unlink(filePath).catch(() => {});
-          reject(new Error("File too large (max 50MB)"));
+          reject(new ClientError("File too large (max 50MB)", 413));
         });
         dest.on("finish", () => {
           if (!resolved) { resolved = true; resolve({ filename }); }
@@ -52,6 +55,11 @@ export async function POST(request: NextRequest) {
       });
 
       bb.on("error", reject);
+      // A body with no file part never reaches the "file" handler; without
+      // this the request would hang until the platform timeout.
+      bb.on("close", () => {
+        if (!sawFile) reject(new ClientError("No file in the upload."));
+      });
 
       // Pipe the request body as a Node.js stream into busboy
       const nodeStream = Readable.fromWeb(request.body as import("stream/web").ReadableStream);
@@ -60,8 +68,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[upload]", err);
-    const message = err instanceof Error ? err.message : "Upload failed.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(err, "upload", "Upload failed.");
   }
 }

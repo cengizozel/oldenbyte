@@ -19,6 +19,7 @@ type F1Data = { race: Race | null; standings: Standing[] };
 
 const TIMEOUT_MS = 7000;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped upstream JSON, narrowed by the callers
 async function fetchJson(url: string): Promise<any> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -55,7 +56,7 @@ async function fromF1Api(): Promise<F1Data> {
         },
       }
     : null;
-  const standings: Standing[] = (drivers.drivers_championship ?? []).slice(0, 5).map((s: any) => ({
+  const standings: Standing[] = (drivers.drivers_championship ?? []).slice(0, 5).map((s: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
     position: String(s.position),
     points: String(s.points),
     Driver: { givenName: s.driver?.name ?? "", familyName: s.driver?.surname ?? "", code: s.driver?.shortName ?? "" },

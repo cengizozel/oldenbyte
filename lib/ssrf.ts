@@ -29,7 +29,8 @@ function isPrivateV6(ip: string): boolean {
   return false;
 }
 
-function isBlocked(ip: string): boolean {
+// Exported for tests.
+export function isBlocked(ip: string): boolean {
   return net.isIPv6(ip) ? isPrivateV6(ip) : isPrivateV4(ip);
 }
 
@@ -83,4 +84,59 @@ export async function safeFetch(
     return res;
   }
   throw new Error("Too many redirects");
+}
+
+// Fetch for the self-hosted integrations (Kiwix, TubeArchivist, Anytype,
+// CalDAV, LLM servers, TV playlists), which legitimately live on the LAN or
+// tailnet. Private addresses are allowed for admin accounts only: the admin
+// runs the server and configures those services, while any other account
+// gets the same public-only check as safeFetch, so it cannot use the server
+// to reach the owner's network. Accepts full RequestInit (method, body,
+// streaming signal); for non-admins redirects are followed manually and each
+// hop is re-validated.
+export async function fetchForUser(
+  user: { role: string },
+  rawUrl: string,
+  init: RequestInit = {},
+  maxRedirects = 5
+): Promise<Response> {
+  if (user.role === "admin") return fetch(rawUrl, init);
+  let url = await assertPublicUrl(rawUrl);
+  for (let i = 0; i <= maxRedirects; i++) {
+    const res = await fetch(url.toString(), { ...init, redirect: "manual" });
+    const loc = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
+    if (loc) {
+      url = await assertPublicUrl(new URL(loc, url).toString());
+      continue;
+    }
+    return res;
+  }
+  throw new Error("Too many redirects");
+}
+
+// A response body as text, read with a hard byte cap so a huge (or endless)
+// upstream cannot exhaust memory. Anything past the cap is dropped.
+export async function readCappedText(res: Response, maxBytes: number): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const room = maxBytes - received;
+    chunks.push(value.length > room ? value.subarray(0, room) : value);
+    received += Math.min(value.length, room);
+    if (received >= maxBytes) {
+      await reader.cancel();
+      break;
+    }
+  }
+  const merged = new Uint8Array(received);
+  let offset = 0;
+  for (const c of chunks) {
+    merged.set(c, offset);
+    offset += c.length;
+  }
+  return new TextDecoder().decode(merged);
 }

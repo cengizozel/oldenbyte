@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const auth = await requireUser(request);
   if (auth instanceof NextResponse) return auth;
 
-  const limit = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "50"), 50);
+  const limit = Math.min(Math.max(1, parseInt(request.nextUrl.searchParams.get("limit") ?? "50") || 50), 50);
   const force = request.nextUrl.searchParams.get("refresh") === "1";
 
   try {

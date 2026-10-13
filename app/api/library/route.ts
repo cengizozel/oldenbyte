@@ -4,7 +4,7 @@ import { mkdir, readdir, stat, unlink, readFile } from "fs/promises";
 import path from "path";
 import busboy from "busboy";
 import { Readable } from "stream";
-import { requireUser } from "@/lib/http";
+import { requireUser, ClientError, errorResponse, readJsonBody } from "@/lib/http";
 
 // Per-user reader library: a real folder of PDFs and EPUBs (with subfolders)
 // that the reader widget browses, uploads into, and reads from. Files keep
@@ -37,11 +37,13 @@ export async function GET(request: NextRequest) {
   if (!target) return NextResponse.json({ error: "Invalid path" }, { status: 400 });
 
   if (op === "list") {
-    await mkdir(userRoot, { recursive: true });
     let entries;
     try {
       entries = await readdir(target, { withFileTypes: true });
     } catch {
+      // A user who never uploaded has no folder yet: an empty library, not an
+      // error. (Listing used to create it, a write on a GET.)
+      if (target === userRoot) return NextResponse.json({ dirs: [], files: [] });
       return NextResponse.json({ error: "Folder not found" }, { status: 404 });
     }
     const dirs: string[] = [];
@@ -89,7 +91,9 @@ export async function POST(request: NextRequest) {
 
   // {op:"mkdir", path, name} → create a subfolder
   if (contentType.includes("application/json")) {
-    const { op, path: rel, name } = await request.json();
+    const body = await readJsonBody(request);
+    if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    const { op, path: rel, name } = body;
     if (op !== "mkdir") return NextResponse.json({ error: "Unknown op" }, { status: 400 });
     const clean = cleanName(String(name ?? ""));
     if (!clean) return NextResponse.json({ error: "Missing folder name" }, { status: 400 });
@@ -101,6 +105,7 @@ export async function POST(request: NextRequest) {
 
   // multipart upload: file + dir (the subfolder it goes to)
   try {
+    if (!contentType.startsWith("multipart/form-data")) throw new ClientError("Expected a multipart upload.");
     const bb = busboy({
       headers: { "content-type": contentType },
       limits: { fileSize: 100 * 1024 * 1024, files: 1 },
@@ -109,18 +114,20 @@ export async function POST(request: NextRequest) {
     const result = await new Promise<{ name: string; path: string }>((resolve, reject) => {
       let dir = "";
       let resolved = false;
+      let sawFile = false;
       bb.on("field", (field, value) => { if (field === "dir") dir = value; });
       bb.on("file", (_field, stream, info) => {
+        sawFile = true;
         const name = cleanName(info.filename);
         if (!EXT.test(name)) {
           stream.resume();
-          reject(new Error("Only PDF and EPUB files are supported."));
+          reject(new ClientError("Only PDF and EPUB files are supported.", 415));
           return;
         }
         const parent = resolveSafe(userRoot, dir);
         if (!parent) {
           stream.resume();
-          reject(new Error("Invalid folder."));
+          reject(new ClientError("Invalid folder."));
           return;
         }
         mkdir(parent, { recursive: true }).then(() => {
@@ -130,7 +137,7 @@ export async function POST(request: NextRequest) {
           stream.on("limit", () => {
             dest.destroy();
             unlink(filePath).catch(() => {});
-            reject(new Error("File too large (max 100MB)"));
+            reject(new ClientError("File too large (max 100MB)", 413));
           });
           dest.on("finish", () => {
             if (!resolved) { resolved = true; resolve({ name, path: dir ? `${dir}/${name}` : name }); }
@@ -140,14 +147,17 @@ export async function POST(request: NextRequest) {
         }).catch(reject);
       });
       bb.on("error", reject);
+      // A body with no file part never reaches the "file" handler; without
+      // this the request would hang until the platform timeout.
+      bb.on("close", () => {
+        if (!sawFile) reject(new ClientError("No file in the upload."));
+      });
       const nodeStream = Readable.fromWeb(request.body as import("stream/web").ReadableStream);
       nodeStream.pipe(bb);
     });
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[library]", err);
-    const message = err instanceof Error ? err.message : "Upload failed.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(err, "library", "Upload failed.");
   }
 }

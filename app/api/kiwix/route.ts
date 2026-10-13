@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
 import { isValidBase, listSources, search, articleExtract } from "@/lib/kiwix";
+import { actAs } from "@/lib/requestUser";
 
 // Server-side proxy to a kiwix-serve instance (https://github.com/kiwix/kiwix-tools).
 // Running it server-side avoids CORS and mixed-content blocking when the dashboard
@@ -14,6 +15,7 @@ import { isValidBase, listSources, search, articleExtract } from "@/lib/kiwix";
 export async function GET(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+  actAs(user);
 
   const p = request.nextUrl.searchParams;
   const baseUrl = p.get("baseUrl");

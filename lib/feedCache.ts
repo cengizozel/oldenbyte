@@ -6,17 +6,26 @@
 // (feedCacheMinutes); widgets carry a refresh button that forces a real fetch
 // with ?refresh=1.
 
-import { getConfig } from "./appconfig";
+import { getFeedCacheMinutes } from "./appconfig";
 
 const STALE_MS = 24 * 60 * 60 * 1000; // upstream down: old beats empty
-export const DEFAULT_FEED_TTL_MIN = 60;
+// Keys include user-supplied URLs, so the map is capped: past this many
+// entries the oldest are dropped (Map keeps insertion order, and set() below
+// re-inserts on refresh, so the front of the map is the least recently stored).
+const MAX_ENTRIES = 2000;
 
 const store = new Map<string, { at: number; value: unknown }>();
 const inflight = new Map<string, Promise<unknown>>();
 
+// The admin TTL setting, re-read at most once a minute instead of a database
+// query on every feed request.
+let ttlCache = { at: 0, ms: 60 * 60 * 1000 };
+
 export async function feedTtlMs(): Promise<number> {
-  const v = Number(await getConfig("feedCacheMinutes").catch(() => null));
-  return (Number.isFinite(v) && v >= 1 ? v : DEFAULT_FEED_TTL_MIN) * 60 * 1000;
+  if (Date.now() - ttlCache.at < 60_000) return ttlCache.ms;
+  const minutes = await getFeedCacheMinutes().catch(() => 60);
+  ttlCache = { at: Date.now(), ms: minutes * 60 * 1000 };
+  return ttlCache.ms;
 }
 
 function run<T>(key: string, fn: () => Promise<T>): Promise<T> {
@@ -24,7 +33,9 @@ function run<T>(key: string, fn: () => Promise<T>): Promise<T> {
   if (going) return going as Promise<T>;
   const p = fn()
     .then(value => {
+      store.delete(key);
       store.set(key, { at: Date.now(), value });
+      while (store.size > MAX_ENTRIES) store.delete(store.keys().next().value as string);
       return value;
     })
     .finally(() => inflight.delete(key));

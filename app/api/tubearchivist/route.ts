@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { requireUser } from "@/lib/http";
+import { actAs, userFetch } from "@/lib/requestUser";
 
 // TubeArchivist bridge for the YouTube widget. Server-side, like /api/kiwix
 // and /api/anytype: the archive usually lives on the LAN over plain http.
@@ -25,7 +26,7 @@ function root(url: string): string {
 }
 
 async function taFetch(url: string, token: string, path: string, signal?: AbortSignal): Promise<Response> {
-  return fetch(`${root(url)}${path}`, {
+  return userFetch(`${root(url)}${path}`, {
     headers: { Authorization: `Token ${token}`, Accept: "application/json" },
     cache: "no-store",
     signal,
@@ -35,6 +36,7 @@ async function taFetch(url: string, token: string, path: string, signal?: AbortS
 export async function POST(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+  actAs(user);
 
   const { op, url, token, ids, force } = await request.json().catch(() => ({}));
   if (typeof url !== "string" || !/^https?:\/\//.test(url)) {

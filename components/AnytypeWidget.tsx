@@ -24,6 +24,9 @@ function deepLink(o: AnytypeObject): string {
   return `anytype://object?objectId=${encodeURIComponent(o.id)}&spaceId=${encodeURIComponent(o.spaceId)}`;
 }
 
+// The API key goes in a header so it never appears in a URL or access log.
+const keyHeader = (apiKey: string): HeadersInit => (apiKey ? { "X-Api-Key": apiKey } : {});
+
 // A reply that is not JSON means the dashboard server itself did not answer
 // (restarting, or a proxy error page); say so instead of a JSON parse error.
 async function readJson(res: Response) {
@@ -96,8 +99,8 @@ export default function AnytypeWidget({
     setError("");
     if (markSearched) setSearched(true);
     try {
-      const url = `/api/anytype?op=search&baseUrl=${encodeURIComponent(cfg.baseUrl)}&apiKey=${encodeURIComponent(cfg.apiKey)}&spaceId=${encodeURIComponent(cfg.spaceId)}&q=${encodeURIComponent(q)}&limit=${cfg.limit}&type=${encodeURIComponent(typeKey)}`;
-      const res = await fetch(url, { signal: ctrl.signal });
+      const url = `/api/anytype?op=search&baseUrl=${encodeURIComponent(cfg.baseUrl)}&spaceId=${encodeURIComponent(cfg.spaceId)}&q=${encodeURIComponent(q)}&limit=${cfg.limit}&type=${encodeURIComponent(typeKey)}`;
+      const res = await fetch(url, { signal: ctrl.signal, headers: keyHeader(cfg.apiKey) });
       const data = await readJson(res);
       if (!res.ok) throw new Error(data.error);
       setObjects(data.objects ?? []);
@@ -114,8 +117,8 @@ export default function AnytypeWidget({
     setLoadingTypes(true);
     setError("");
     try {
-      const url = `/api/anytype?op=types&baseUrl=${encodeURIComponent(cfg.baseUrl)}&apiKey=${encodeURIComponent(cfg.apiKey)}&spaceId=${encodeURIComponent(cfg.spaceId)}`;
-      const res = await fetch(url);
+      const url = `/api/anytype?op=types&baseUrl=${encodeURIComponent(cfg.baseUrl)}&spaceId=${encodeURIComponent(cfg.spaceId)}`;
+      const res = await fetch(url, { headers: keyHeader(cfg.apiKey) });
       const data = await readJson(res);
       if (!res.ok) throw new Error(data.error);
       setTypes(data.types ?? []);
@@ -169,8 +172,8 @@ export default function AnytypeWidget({
     setReaderLoading(true);
     setError("");
     try {
-      const url = `/api/anytype?op=object&baseUrl=${encodeURIComponent(config.baseUrl)}&apiKey=${encodeURIComponent(config.apiKey)}&spaceId=${encodeURIComponent(o.spaceId || config.spaceId)}&id=${encodeURIComponent(o.id)}`;
-      const res = await fetch(url);
+      const url = `/api/anytype?op=object&baseUrl=${encodeURIComponent(config.baseUrl)}&spaceId=${encodeURIComponent(o.spaceId || config.spaceId)}&id=${encodeURIComponent(o.id)}`;
+      const res = await fetch(url, { headers: keyHeader(config.apiKey) });
       const data = await readJson(res);
       if (!res.ok) throw new Error(data.error);
       setReaderObj(data.object);
@@ -232,7 +235,7 @@ export default function AnytypeWidget({
     setLoadingSpaces(true);
     setSpaces([]);
     try {
-      const res = await fetch(`/api/anytype?op=spaces&baseUrl=${encodeURIComponent(baseUrl)}&apiKey=${encodeURIComponent(apiKey)}`);
+      const res = await fetch(`/api/anytype?op=spaces&baseUrl=${encodeURIComponent(baseUrl)}`, { headers: keyHeader(apiKey) });
       const data = await readJson(res);
       if (!res.ok) throw new Error(data.error);
       const list: Space[] = data.spaces ?? [];
@@ -397,7 +400,7 @@ export default function AnytypeWidget({
                                 </a>
                               </div>
                               {o.snippet && <p className={`text-xs mt-0.5 opacity-50 ${c.text} line-clamp-2 break-words`}>{o.snippet}</p>}
-                              {o.type && !activeType && <span className={`text-[10px] opacity-40 ${c.label}`}>{o.type}</span>}
+                              {o.type && !activeType && <span className={`text-[12px] opacity-60 ${c.label}`}>{o.type}</span>}
                             </li>
                           ))}
                         </ul>

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/http";
+import { requireUser, bodyTooLarge } from "@/lib/http";
+import { isCacheKey } from "@/lib/settingKeys";
+
+// A whole dashboard config is well under 1 MB; this only stops abuse.
+const MAX_BODY = 25 * 1024 * 1024;
 
 // Programmatic dashboard configuration. Mirrors the UI's export/import but in a
 // hand-authorable shape: GET returns every config key with its value already
@@ -13,11 +17,6 @@ import { requireUser } from "@/lib/http";
 //   curl -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
 //        -X PUT --data @dash.json "https://host/api/config?mode=replace"
 
-// Date-stamped caches and epub location caches are runtime-regenerated; they are
-// never part of a config and are excluded from both export and import.
-function isCache(key: string): boolean {
-  return /\d{4}-\d{2}-\d{2}/.test(key) || key.startsWith("epub-locs-");
-}
 
 // Stored values are JSON strings for structured config and bare strings for
 // scalars like theme/timezone. Decode only objects/arrays to the structured
@@ -47,7 +46,7 @@ export async function GET(request: NextRequest) {
   const all = await prisma.setting.findMany({ where: { userId: user.id } });
   const data: Record<string, unknown> = {};
   for (const { key, value } of all) {
-    if (!isCache(key)) data[key] = decode(value);
+    if (!isCacheKey(key)) data[key] = decode(value);
   }
   return NextResponse.json(data);
 }
@@ -57,6 +56,10 @@ async function applyConfig(request: NextRequest) {
   if (user instanceof NextResponse) return user;
 
   const replace = new URL(request.url).searchParams.get("mode") === "replace";
+
+  if (bodyTooLarge(request, MAX_BODY)) {
+    return NextResponse.json({ error: "Body too large (max 25 MB)" }, { status: 413 });
+  }
 
   let data: unknown;
   try {
@@ -70,7 +73,7 @@ async function applyConfig(request: NextRequest) {
 
   // Keep only real config entries: skip undefined values and any cache keys.
   const entries = Object.entries(data as Record<string, unknown>)
-    .filter(([k, v]) => v !== undefined && !isCache(k))
+    .filter(([k, v]) => v !== undefined && !isCacheKey(k))
     .map(([k, v]) => [k, encode(v)] as [string, string]);
   const keep = new Set(entries.map(([k]) => k));
 
@@ -88,7 +91,7 @@ async function applyConfig(request: NextRequest) {
   const toDelete = replace
     ? (await prisma.setting.findMany({ where: { userId: user.id }, select: { key: true } }))
         .map(e => e.key)
-        .filter(k => !isCache(k) && !keep.has(k))
+        .filter(k => !isCacheKey(k) && !keep.has(k))
     : [];
 
   const ops = [

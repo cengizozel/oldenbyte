@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/http";
+import { requireUser, readJsonBody } from "@/lib/http";
+import { actAs, userFetch } from "@/lib/requestUser";
 
 // Backend-aware model-residency control. Local model servers manage VRAM
 // differently, so this probes for a known one and adapts:
@@ -31,7 +32,7 @@ type Status = {
 };
 
 async function ollamaStatus(root: string, signal: AbortSignal): Promise<Status> {
-  const res = await fetch(`${root}/api/ps`, { signal });
+  const res = await userFetch(`${root}/api/ps`, { signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   // /api/ps lists only loaded models, so every entry is loaded.
@@ -45,7 +46,7 @@ async function ollamaStatus(root: string, signal: AbortSignal): Promise<Status> 
 }
 
 async function lmstudioStatus(root: string, signal: AbortSignal): Promise<Status> {
-  const res = await fetch(`${root}/api/v1/models`, { signal });
+  const res = await userFetch(`${root}/api/v1/models`, { signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,6 +67,7 @@ async function lmstudioStatus(root: string, signal: AbortSignal): Promise<Status
 export async function GET(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+  actAs(user);
 
   const baseUrl = request.nextUrl.searchParams.get("baseUrl");
   if (!baseUrl || !/^https?:\/\//.test(baseUrl)) {
@@ -78,7 +80,7 @@ export async function GET(request: NextRequest) {
     if (!model) return NextResponse.json({ vision: null });
     // Ollama: /api/show lists capabilities ("completion", "tools", "vision"...).
     try {
-      const res = await fetch(`${root}/api/show`, {
+      const res = await userFetch(`${root}/api/show`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model }),
@@ -93,7 +95,7 @@ export async function GET(request: NextRequest) {
     } catch { /* not Ollama */ }
     // LM Studio: model entries may carry capabilities or a vision flag.
     try {
-      const res = await fetch(`${root}/api/v1/models`, { signal: request.signal });
+      const res = await userFetch(`${root}/api/v1/models`, { signal: request.signal });
       if (res.ok) {
         const data = await res.json();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,8 +123,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+  actAs(user);
 
-  const { baseUrl, backend, model, action, keepAlive } = await request.json();
+  const body = await readJsonBody(request);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  const { baseUrl, backend, model, action, keepAlive } = body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   if (!baseUrl || !/^https?:\/\//.test(baseUrl) || !model || !backend) {
     return NextResponse.json({ error: "Missing baseUrl, backend, or model" }, { status: 400 });
   }
@@ -130,7 +135,7 @@ export async function POST(request: NextRequest) {
   const json = { "Content-Type": "application/json" };
   try {
     if (backend === "ollama") {
-      const res = await fetch(`${root}/api/generate`, {
+      const res = await userFetch(`${root}/api/generate`, {
         method: "POST",
         headers: json,
         body: JSON.stringify({ model, keep_alive: keepAlive, stream: false }),
@@ -139,12 +144,12 @@ export async function POST(request: NextRequest) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } else if (backend === "lmstudio") {
       if (action === "unload") {
-        const res = await fetch(`${root}/api/v1/models/unload`, {
+        const res = await userFetch(`${root}/api/v1/models/unload`, {
           method: "POST", headers: json, body: JSON.stringify({ instance_id: model }), signal: request.signal,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       } else if (action === "pin") {
-        const res = await fetch(`${root}/api/v1/models/load`, {
+        const res = await userFetch(`${root}/api/v1/models/load`, {
           method: "POST", headers: json, body: JSON.stringify({ model }), signal: request.signal,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

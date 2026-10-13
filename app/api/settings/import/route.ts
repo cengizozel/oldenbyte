@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { json, badRequest, requireUser } from "@/lib/http";
+import { json, badRequest, requireUser, bodyTooLarge } from "@/lib/http";
+
+// A whole dashboard config is well under 1 MB; this only stops abuse.
+const MAX_BODY = 25 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+
+  if (bodyTooLarge(request, MAX_BODY)) {
+    return NextResponse.json({ error: "Body too large (max 25 MB)" }, { status: 413 });
+  }
 
   let data: unknown;
   try {

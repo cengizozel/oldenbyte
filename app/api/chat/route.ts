@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/http";
+import { requireUser, readJsonBody } from "@/lib/http";
 import { anytypeReadObject, anytypeDeepLink } from "@/lib/anytype";
 import { buildProviders, type AssistantConfigs } from "@/lib/assistant/registry";
 import type { Proposal, Action } from "@/lib/assistant/types";
+import { actAs, userFetch } from "@/lib/requestUser";
 
 // Server-side proxy to any OpenAI-compatible chat endpoint (Ollama, LM Studio,
 // llama.cpp, vLLM, OpenAI itself, …). Running it server-side avoids CORS and
@@ -29,20 +30,21 @@ function authHeaders(apiKey: string): Record<string, string> {
   return apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
 }
 
-// GET /api/chat?baseUrl=…&apiKey=… — list available models from {baseUrl}/models
+// GET /api/chat?baseUrl=... (key in the X-Api-Key header): list the models at {baseUrl}/models
 export async function GET(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+  actAs(user);
 
   const baseUrl = request.nextUrl.searchParams.get("baseUrl");
-  const apiKey = request.nextUrl.searchParams.get("apiKey") ?? "";
+  const apiKey = request.headers.get("x-api-key") ?? "";
 
   if (!baseUrl || !/^https?:\/\//.test(baseUrl)) {
     return NextResponse.json({ error: "Missing or invalid baseUrl" }, { status: 400 });
   }
 
   try {
-    const res = await fetch(`${normalizeBase(baseUrl)}/models`, {
+    const res = await userFetch(`${normalizeBase(baseUrl)}/models`, {
       headers: authHeaders(apiKey),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -60,6 +62,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+  actAs(user);
 
   const {
     baseUrl,
@@ -86,10 +89,13 @@ export async function POST(request: NextRequest) {
     today?: string;    // the client's local date (YYYY-MM-DD), for calendar anchoring
     timezone?: string; // the client's IANA zone, for event times
     ttl?: number; // LM Studio idle-unload, in seconds; set the model's linger per request
-  } = await request.json();
+  } = ((await readJsonBody(request)) ?? {}) as never; // each field is checked right below
 
   if (!baseUrl || !/^https?:\/\//.test(baseUrl) || !model || !Array.isArray(messages)) {
     return NextResponse.json({ error: "Missing baseUrl, model, or messages" }, { status: 400 });
+  }
+  if (messages.length > 1000) {
+    return NextResponse.json({ error: "Too many messages in one request" }, { status: 413 });
   }
 
   const url = `${normalizeBase(baseUrl)}/chat/completions`;
@@ -161,7 +167,7 @@ export async function POST(request: NextRequest) {
         // local backends (a thinking model would spend the whole cap on <think> and
         // return a truncated reasoning fragment instead of a summary).
         const complete = async (msgs: ChatMessage[]): Promise<string> => {
-          const res = await fetch(url, {
+          const res = await userFetch(url, {
             method: "POST",
             headers: upstreamHeaders,
             body: JSON.stringify({
@@ -194,7 +200,7 @@ export async function POST(request: NextRequest) {
           for (let p = 0; p < md.length && chunks.length < MAX_CHUNKS; p += CHUNK) chunks.push(md.slice(p, p + CHUNK));
           const truncated = md.length > MAX_CHUNKS * CHUNK;
           openThink();
-          emit(`\n🧩 digesting [${n}] ${obj.name} — ${chunks.length} part(s)${truncated ? " (capped)" : ""}; this can take a minute on a long note…\n`);
+          emit(`\n🧩 digesting [${n}] ${obj.name}: ${chunks.length} part(s)${truncated ? " (capped)" : ""}; this can take a minute on a long note…\n`);
           const focusLine = focus ? `Focus on: ${focus}. ` : "";
           const parts: string[] = [];
           for (let k = 0; k < chunks.length; k++) {
@@ -230,7 +236,7 @@ export async function POST(request: NextRequest) {
           const tools = providers.flatMap(p => p.tools());
 
           for (let iter = 0; iter < MAX_ITERS; iter++) {
-            const upstream = await fetch(url, {
+            const upstream = await userFetch(url, {
               method: "POST",
               headers: upstreamHeaders,
               body: JSON.stringify({ model, messages: convo, tools, stream: true, ...extra }),
@@ -425,7 +431,7 @@ export async function POST(request: NextRequest) {
                 "give your best final answer now. Cite sources with [n]. State what you found; for anything still " +
                 "missing, say so briefly rather than continuing to search.",
             });
-            const upstream = await fetch(url, {
+            const upstream = await userFetch(url, {
               method: "POST",
               headers: upstreamHeaders,
               body: JSON.stringify({ model, messages: convo, stream: true, ...extra }),
@@ -482,7 +488,7 @@ export async function POST(request: NextRequest) {
 
   let upstream: Response;
   try {
-    upstream = await fetch(url, { method: "POST", headers: upstreamHeaders, body, signal: request.signal });
+    upstream = await userFetch(url, { method: "POST", headers: upstreamHeaders, body, signal: request.signal });
   } catch (err) {
     return NextResponse.json({ error: `Could not reach ${url}: ${String(err)}` }, { status: 502 });
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
+import { actAs, userFetch } from "@/lib/requestUser";
 
 // Proxy for the TV widget. IPTV servers (e.g. ErsatzTV) usually live on plain
 // http inside the LAN while the dashboard is served over https, so the browser
@@ -60,6 +61,7 @@ function parseChannels(text: string, baseUrl: string): { name: string; url: stri
 export async function GET(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
+  actAs(user);
 
   const sp = request.nextUrl.searchParams;
   const op = sp.get("op");
@@ -68,23 +70,32 @@ export async function GET(request: NextRequest) {
 
   try {
     if (op === "channels") {
-      const res = await fetch(url, { signal: request.signal, cache: "no-store" });
+      const res = await userFetch(url, { signal: request.signal, cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return NextResponse.json({ channels: parseChannels(await res.text(), url) });
     }
     if (op === "playlist") {
-      const res = await fetch(url, { signal: request.signal, cache: "no-store" });
+      const res = await userFetch(url, { signal: request.signal, cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return new NextResponse(rewritePlaylist(await res.text(), url), {
         headers: { "Content-Type": "application/vnd.apple.mpegurl", "Cache-Control": "no-store" },
       });
     }
     if (op === "seg") {
-      const res = await fetch(url, { signal: request.signal, cache: "no-store" });
+      const res = await userFetch(url, { signal: request.signal, cache: "no-store" });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      // Segments are media. Never pass an upstream type that a browser would
+      // render on this origin (an HTML "segment" would run as the dashboard):
+      // anything that is not video/audio goes out as an opaque download.
+      const upstreamType = (res.headers.get("content-type") ?? "").toLowerCase();
+      const mediaType = /^(video|audio)\/[\w.+-]+$/.test(upstreamType.split(";")[0].trim())
+        ? upstreamType.split(";")[0].trim()
+        : "application/octet-stream";
       return new NextResponse(res.body, {
         headers: {
-          "Content-Type": res.headers.get("content-type") ?? "video/mp2t",
+          "Content-Type": mediaType,
+          "X-Content-Type-Options": "nosniff",
+          "Content-Disposition": "attachment",
           "Cache-Control": "no-store",
         },
       });

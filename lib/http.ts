@@ -10,6 +10,40 @@ export function badRequest(message = "Bad request"): NextResponse {
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
+// True when the declared body size is over the limit, so a route can refuse it
+// (413) before parsing. Bodies without a Content-Length are left to the
+// framework-wide cap in next.config.ts.
+export function bodyTooLarge(request: NextRequest, maxBytes: number): boolean {
+  const len = Number(request.headers.get("content-length") ?? 0);
+  return Number.isFinite(len) && len > maxBytes;
+}
+
+// The request body as a JSON object, or null when it is missing, malformed,
+// or not an object. Lets a route answer 400 instead of the framework's HTML 500.
+export async function readJsonBody(request: NextRequest): Promise<Record<string, unknown> | null> {
+  try {
+    const body = await request.json();
+    return body && typeof body === "object" && !Array.isArray(body) ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+// An error caused by the request itself (bad file type, too large, missing
+// part). Routes return its message with its status; anything else is a 500
+// with a generic message, the details only in the server log.
+export class ClientError extends Error {
+  constructor(message: string, public status = 400) {
+    super(message);
+  }
+}
+
+export function errorResponse(err: unknown, tag: string, fallback = "Request failed."): NextResponse {
+  if (err instanceof ClientError) return NextResponse.json({ error: err.message }, { status: err.status });
+  console.error(`[${tag}]`, err);
+  return NextResponse.json({ error: fallback }, { status: 500 });
+}
+
 export function unauthorized(): NextResponse {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }

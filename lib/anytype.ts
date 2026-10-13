@@ -1,3 +1,4 @@
+import { userFetch } from "@/lib/requestUser";
 // Shared server-side Anytype API helpers, used by both /api/anytype (the widget)
 // and /api/chat (the agentic lookup). Kept in lib/ — like lib/kiwix — so the chat
 // route can call Anytype directly; a server-side fetch to /api/anytype carries no
@@ -62,7 +63,7 @@ async function rawSearch(baseUrl: string, apiKey: string, spaceId: string, query
   const url = spaceId
     ? `${root(baseUrl)}/v1/spaces/${encodeURIComponent(spaceId)}/search?limit=${limit}`
     : `${root(baseUrl)}/v1/search?limit=${limit}`;
-  const res = await fetch(url, {
+  const res = await userFetch(url, {
     method: "POST",
     headers: headers(apiKey),
     body: JSON.stringify({
@@ -118,7 +119,7 @@ export type AnytypeType = { id: string; key: string; name: string };
 export async function anytypeTypes(
   baseUrl: string, apiKey: string, spaceId: string, signal?: AbortSignal,
 ): Promise<AnytypeType[]> {
-  const res = await fetch(
+  const res = await userFetch(
     `${root(baseUrl)}/v1/spaces/${encodeURIComponent(spaceId)}/types?limit=100`,
     { headers: headers(apiKey), signal },
   );
@@ -136,7 +137,7 @@ export async function anytypeTypes(
 export async function anytypeReadObject(
   baseUrl: string, apiKey: string, spaceId: string, objectId: string, signal?: AbortSignal,
 ): Promise<{ name: string; markdown: string; type: string; created: string; modified: string; fields: { name: string; value: string }[] }> {
-  const res = await fetch(
+  const res = await userFetch(
     `${root(baseUrl)}/v1/spaces/${encodeURIComponent(spaceId)}/objects/${encodeURIComponent(objectId)}?format=md`,
     { headers: headers(apiKey), signal },
   );

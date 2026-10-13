@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
 import { parseFeed } from "@/lib/rss";
-import { safeFetch } from "@/lib/ssrf";
+import { readCappedText, safeFetch } from "@/lib/ssrf";
 import { cachedFeed } from "@/lib/feedCache";
 
 export async function GET(request: NextRequest) {
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   if (user instanceof NextResponse) return user;
 
   const url = request.nextUrl.searchParams.get("url");
-  const limit = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "5"), 20);
+  const limit = Math.min(Math.max(1, parseInt(request.nextUrl.searchParams.get("limit") ?? "5") || 5), 20);
   const force = request.nextUrl.searchParams.get("refresh") === "1";
 
   if (!url || !url.startsWith("http")) {
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       // redirect hop) against private/loopback/metadata addresses before fetching.
       const res = await safeFetch(url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; RSS reader)" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return parseFeed(await res.text(), limit);
+      return parseFeed(await readCappedText(res, 5 * 1024 * 1024), limit);
     }, force);
     return NextResponse.json(items);
   } catch (err) {

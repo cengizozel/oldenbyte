@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
 import { feedTtlMs } from "@/lib/feedCache";
+import { decodeEntities } from "@/lib/text";
 
 // Reddit blocks its JSON endpoints for non-browser clients (403), but the RSS
 // feeds still serve with a browser User-Agent. RSS carries no vote counts;
@@ -43,13 +44,6 @@ function tag(xml: string, name: string): string {
   return m ? m[1].trim() : "";
 }
 
-function decodeEntities(s: string): string {
-  return s
-    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
-    .replace(/&amp;/g, "&");
-}
 
 async function fetchSubreddit(subreddit: string, period: string, limit: number): Promise<Post[]> {
   const url = `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/top.rss?t=${encodeURIComponent(period)}&limit=${limit}`;
@@ -120,7 +114,7 @@ export async function GET(request: NextRequest) {
 
   const subreddit = request.nextUrl.searchParams.get("subreddit");
   const period    = request.nextUrl.searchParams.get("period") ?? "week";
-  const limit     = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "5"), 25);
+  const limit     = Math.min(Math.max(1, parseInt(request.nextUrl.searchParams.get("limit") ?? "5") || 5), 25);
 
   // Restrict to a valid subreddit name so it can't manipulate the request path.
   if (!subreddit || !/^[A-Za-z0-9_]{1,50}$/.test(subreddit)) {

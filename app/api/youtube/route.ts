@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
 import { cachedFeed } from "@/lib/feedCache";
+import { decodeEntities } from "@/lib/text";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -11,16 +12,6 @@ function isYouTubeHost(host: string): boolean {
   return h === "youtube.com" || h === "www.youtube.com" || h === "m.youtube.com" || h.endsWith(".youtube.com") || h === "youtu.be";
 }
 
-function decodeEntities(str: string): string {
-  return str
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
-}
 
 function extractCdata(str: string): string {
   const m = str.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
@@ -140,7 +131,7 @@ async function fetchViaChannelPage(channelId: string, limit: number): Promise<{ 
   // Collect grid items. YouTube currently wraps each entry in a `lockupViewModel`;
   // older responses used `videoRenderer`. Both are handled below.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let items: any[] = [];
+  const items: any[] = [];
 
   for (const tab of tabs) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -327,10 +318,13 @@ export async function GET(request: NextRequest) {
   const channelId     = request.nextUrl.searchParams.get("channelId");
   const filterMembers = request.nextUrl.searchParams.get("filterMembers") === "true";
   const includeShorts = request.nextUrl.searchParams.get("includeShorts") === "true";
-  const limit = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "5"), 15);
+  const limit = Math.min(Math.max(1, parseInt(request.nextUrl.searchParams.get("limit") ?? "5") || 5), 15);
   // Over-fetch on the scraper paths to compensate for filtered-out items.
   const fetchLimit = Math.min(limit * 4, 30);
 
+  if (channelId && !/^UC[\w-]{22}$/.test(channelId)) {
+    return NextResponse.json({ error: "Invalid channelId" }, { status: 400 });
+  }
   if (!channel && !channelId) {
     return NextResponse.json({ error: "Missing channel or channelId" }, { status: 400 });
   }
