@@ -8,8 +8,8 @@ import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
-import { SettingsInput } from "./ui/Field";
-import { PencilButton, EmptyState, SaveCancelRow } from "./ui/WidgetChrome";
+import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
+import { PencilButton, EmptyState, SaveCancelRow, WidgetHeader, SmallButton } from "./ui/WidgetChrome";
 
 type Item = { id: string; name: string };
 // All days of tracked time: date (YYYY-MM-DD, local) -> activity id -> seconds.
@@ -366,22 +366,24 @@ export default function TrackerWidget({
 
   const bestStreaks = rows.filter(r => r.streak >= 2).sort((a, b) => b.streak - a.streak).slice(0, 3);
 
-  const headerIconCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`;
+  const headerIconCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`;
+  const iconBtnCls = `${HIT_AREA} ${FOCUS_RING}`;
 
   const front = (
     <>
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 ${c.label}`}>
-          <span className="opacity-50"><Timer size={14} /></span>
-          <span className="text-xs font-medium opacity-60">Tracker</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => { setDetailDate(null); setHistoryOpen(true); }} title="History and insights" className={headerIconCls}>
-            <History size={14} />
-          </button>
-          <PencilButton c={c} onClick={() => { setDraft(items); setSettingsOpen(true); }} title="Edit activities" />
-        </div>
-      </div>
+      <WidgetHeader
+        c={c}
+        icon={Timer}
+        title="Tracker"
+        right={
+          <>
+            <button onClick={() => { setDetailDate(null); setHistoryOpen(true); }} title="History and insights" aria-label="History and insights" className={headerIconCls}>
+              <History size={14} />
+            </button>
+            <PencilButton c={c} onClick={() => { setDraft(items); setSettingsOpen(true); }} title="Edit activities" />
+          </>
+        }
+      />
 
       {!loaded ? null : items.length === 0 ? (
         <EmptyState c={c} action="add activities" />
@@ -397,12 +399,12 @@ export default function TrackerWidget({
               center={hoveredRow ? (
                 <>
                   <span className={`text-sm font-semibold tabular-nums ${c.text}`}>{hoveredPct}%</span>
-                  <span className={`text-[12px] leading-tight line-clamp-2 ${c.label} opacity-60`}>{hoveredRow.name}</span>
+                  <span className={`text-xs leading-tight line-clamp-2 ${c.label} opacity-60`}>{hoveredRow.name}</span>
                 </>
               ) : (
                 <>
                   <span className={`text-sm font-semibold tabular-nums ${c.text}`}>{formatClock(total)}</span>
-                  <span className={`text-[12px] opacity-60 ${c.label}`}>total</span>
+                  <span className={`text-xs opacity-60 ${c.label}`}>total</span>
                 </>
               )}
             />
@@ -415,18 +417,18 @@ export default function TrackerWidget({
                 <li key={r.id}>
                   <button
                     onClick={() => select(r.id)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors ${FOCUS_RING} ${
                       isActive ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"
                     }`}
                   >
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
                     <span className={`flex-1 min-w-0 truncate text-sm ${c.text}`}>{r.name}</span>
                     {r.streak >= 2 && (
-                      <span className={`flex items-center gap-0.5 text-[12px] tabular-nums shrink-0 ${c.label} opacity-60`} title={`${r.streak}-day streak`}>
-                        <Flame size={10} />{r.streak}
+                      <span className={`flex items-center gap-0.5 text-xs tabular-nums shrink-0 ${c.label} opacity-60`} title={`${r.streak}-day streak`}>
+                        <Flame size={12} />{r.streak}
                       </span>
                     )}
-                    <span className={`text-xs tabular-nums ${isActive ? c.label : `opacity-50 ${c.text}`}`}>{formatClock(r.secs)}</span>
+                    <span className={`text-xs tabular-nums ${isActive ? c.label : `opacity-60 ${c.text}`}`}>{formatClock(r.secs)}</span>
                     <span className={isActive ? c.label : `opacity-30 ${c.label}`}>
                       {isActive ? <Pause size={14} /> : <Play size={14} />}
                     </span>
@@ -452,12 +454,9 @@ export default function TrackerWidget({
             placeholder="Activity name"
             className="flex-1"
           />
-          <button
-            onClick={addItem}
-            className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
+          <SmallButton c={c} onClick={addItem} title="Add activity" className="self-center">
             <Plus size={14} />
-          </button>
+          </SmallButton>
         </div>
         {draft.length > 0 && (
           <div className="flex flex-col gap-1.5">
@@ -471,7 +470,8 @@ export default function TrackerWidget({
                 />
                 <button
                   onClick={() => setDraft(d => d.filter(x => x.id !== it.id))}
-                  className={`opacity-50 hover:opacity-100 leading-none ${c.label}`}
+                  aria-label={`Remove ${it.name}`}
+                  className={`opacity-60 hover:opacity-100 leading-none ${iconBtnCls} ${c.label}`}
                 >
                   ×
                 </button>
@@ -496,31 +496,34 @@ export default function TrackerWidget({
       {/* History overlay: insights + a grid of day donuts; tap a day to drill in */}
       {historyOpen && (
         <div className={`absolute inset-0 z-40 p-5 flex flex-col rounded-2xl border ${c.bg} ${c.border}`}>
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 ${c.label}`}>
-              {detailDate ? (
-                <button onClick={() => { setDetailDate(null); setEditRowId(null); }} title="Back to history" className="opacity-60 hover:opacity-100 flex items-center gap-1">
-                  <ChevronLeft size={14} />
-                  <span className="text-xs font-medium">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
-                </button>
-              ) : (
-                <>
-                  <span className="opacity-50"><History size={14} /></span>
-                  <span className="text-xs font-medium opacity-60">History</span>
-                </>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {detailDate && (
-                <button onClick={() => deleteDay(detailDate)} title="Delete day" className={`opacity-40 hover:opacity-100 hover:text-red-500 ${c.label}`}>
+          {detailDate ? (
+            /* Day detail header: a back button in place of the title */
+            <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+              <button onClick={() => { setDetailDate(null); setEditRowId(null); }} title="Back to history" className={`opacity-60 hover:opacity-100 flex items-center gap-1 min-w-0 ${iconBtnCls} ${c.label}`}>
+                <ChevronLeft size={14} />
+                <span className="text-xs font-medium truncate">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
+              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => deleteDay(detailDate)} title="Delete day" aria-label="Delete day" className={`opacity-60 hover:opacity-100 hover:text-red-500 ${iconBtnCls} ${c.label}`}>
                   <Trash2 size={14} />
                 </button>
-              )}
-              <button onClick={() => { setHistoryOpen(false); setDetailDate(null); setEditRowId(null); }} className={`opacity-50 hover:opacity-90 ${c.label}`} title="Close">
-                <X size={14} />
-              </button>
+                <button onClick={() => { setHistoryOpen(false); setDetailDate(null); setEditRowId(null); }} className={`opacity-60 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
+                  <X size={14} />
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <WidgetHeader
+              c={c}
+              icon={History}
+              title="History"
+              right={
+                <button onClick={() => { setHistoryOpen(false); setDetailDate(null); setEditRowId(null); }} className={`opacity-60 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
+                  <X size={14} />
+                </button>
+              }
+            />
+          )}
 
           {detailDate ? (
             /* Day detail: breakdown + per-activity time editing */
@@ -535,12 +538,12 @@ export default function TrackerWidget({
                       <span className={`text-xs font-semibold tabular-nums ${c.text}`}>
                         {formatDuration(dayRows(detailDate).reduce((a, b) => a + b.secs, 0))}
                       </span>
-                      <span className={`text-[11px] opacity-60 ${c.label}`}>total</span>
+                      <span className={`text-xs opacity-60 ${c.label}`}>total</span>
                     </>
                   }
                 />
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col">
                 {/* Every current activity is editable (even at 0, to backfill a
                     forgotten day); removed activities appear if they have time. */}
                 {[...items.map(it => ({
@@ -548,12 +551,12 @@ export default function TrackerWidget({
                   name: it.name,
                   color: colorOf(it.id),
                   secs: live[detailDate]?.[it.id] ?? 0,
-                })), ...dayRows(detailDate).filter(r => !itemName.has(r.id))].map(r => {
+                })), ...dayRows(detailDate).filter(r => !itemName.has(r.id))].map((r, i) => {
                   const editing = editRowId === r.id;
                   return (
-                    <div key={r.id} className="group/row flex items-center gap-2 px-1 py-1 rounded-lg">
+                    <div key={r.id} className={`group/row flex items-center gap-2 px-1 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
-                      <span className={`flex-1 min-w-0 truncate text-xs opacity-80 ${c.text}`}>{r.name}</span>
+                      <span className={`flex-1 min-w-0 truncate text-sm ${c.text}`}>{r.name}</span>
                       {editing ? (
                         <span className="flex items-center gap-1">
                           <input
@@ -561,23 +564,23 @@ export default function TrackerWidget({
                             inputMode="numeric"
                             value={editH}
                             onChange={e => setEditH(e.target.value.replace(/\D/g, ""))}
-                            className={`w-9 text-xs text-right tabular-nums border border-[var(--surface-border)] rounded-lg px-1.5 py-1 outline-none bg-[var(--surface)] ${c.text}`}
+                            className={`w-9 text-xs text-right tabular-nums border border-[var(--surface-border)] rounded-md px-1.5 py-1 outline-none bg-[var(--surface)] ${c.text}`}
                           />
-                          <span className={`text-[12px] opacity-50 ${c.label}`}>h</span>
+                          <span className={`text-xs opacity-60 ${c.label}`}>h</span>
                           <input
                             inputMode="numeric"
                             value={editM}
                             onChange={e => setEditM(e.target.value.replace(/\D/g, ""))}
                             onKeyDown={e => { if (e.key === "Enter") saveRowEdit(detailDate, r.id); if (e.key === "Escape") setEditRowId(null); }}
-                            className={`w-9 text-xs text-right tabular-nums border border-[var(--surface-border)] rounded-lg px-1.5 py-1 outline-none bg-[var(--surface)] ${c.text}`}
+                            className={`w-9 text-xs text-right tabular-nums border border-[var(--surface-border)] rounded-md px-1.5 py-1 outline-none bg-[var(--surface)] ${c.text}`}
                           />
-                          <span className={`text-[12px] opacity-50 ${c.label}`}>m</span>
-                          <button onClick={() => setEditRowId(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] ml-1"><X size={12} /></button>
-                          <button onClick={() => saveRowEdit(detailDate, r.id)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Check size={12} /></button>
+                          <span className={`text-xs opacity-60 ${c.label}`}>m</span>
+                          <button onClick={() => setEditRowId(null)} aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ml-1 ${iconBtnCls}`}><X size={14} /></button>
+                          <button onClick={() => saveRowEdit(detailDate, r.id)} aria-label="Save" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${iconBtnCls}`}><Check size={14} /></button>
                         </span>
                       ) : (
                         <>
-                          <span className={`text-xs tabular-nums opacity-50 ${c.text}`}>{formatDuration(r.secs, { seconds: false })}</span>
+                          <span className={`text-xs tabular-nums opacity-60 ${c.text}`}>{formatDuration(r.secs, { seconds: false })}</span>
                           <button
                             onClick={() => {
                               setEditRowId(r.id);
@@ -585,9 +588,10 @@ export default function TrackerWidget({
                               setEditM(String(Math.floor((r.secs % 3600) / 60)));
                             }}
                             title="Edit time"
-                            className={`opacity-0 group-hover/row:opacity-50 hover:!opacity-90 ${c.icon}`}
+                            aria-label="Edit time"
+                            className={`opacity-0 group-hover/row:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${iconBtnCls} ${c.icon}`}
                           >
-                            <Pencil size={11} />
+                            <Pencil size={14} />
                           </button>
                         </>
                       )}
@@ -598,7 +602,7 @@ export default function TrackerWidget({
             </div>
           ) : (
             /* Insights + day grid */
-            <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-4">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-3">
               {historyDates.length === 0 ? (
                 <EmptyState c={c}>no history yet</EmptyState>
               ) : (
@@ -619,13 +623,13 @@ export default function TrackerWidget({
                           />
                         ))}
                       </svg>
-                      <div className={`flex justify-between text-[11px] opacity-60 ${c.label}`}>
+                      <div className={`flex justify-between text-xs opacity-60 ${c.label}`}>
                         <span>{fmtDay(chartDates[0])}</span>
                         <span>{fmtDay(today)}</span>
                       </div>
                       <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
                         {chartSeries.map(s => (
-                          <span key={s.id} className={`flex items-center gap-1 text-[12px] opacity-70 ${c.text}`}>
+                          <span key={s.id} className={`flex items-center gap-1 text-xs opacity-80 ${c.text}`}>
                             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.color }} />
                             {s.name}
                           </span>
@@ -635,7 +639,7 @@ export default function TrackerWidget({
                   )}
 
                   {/* Minimal insights */}
-                  <div className={`shrink-0 flex flex-col gap-1 text-[12px] ${c.text} opacity-75`}>
+                  <div className={`shrink-0 flex flex-col gap-1 text-xs ${c.text} opacity-80`}>
                     <span>
                       last 7 days: <span className="tabular-nums font-medium">{formatDuration(thisWeek)}</span>
                       {weekDelta !== null && (
@@ -648,7 +652,7 @@ export default function TrackerWidget({
                       <span className="flex items-center gap-2 flex-wrap">
                         {bestStreaks.map(r => (
                           <span key={r.id} className="flex items-center gap-0.5">
-                            <Flame size={10} className={c.label} />
+                            <Flame size={12} className={c.label} />
                             <span className="tabular-nums">{r.streak}d</span>
                             <span className="opacity-60">{r.name}</span>
                           </span>
@@ -666,12 +670,12 @@ export default function TrackerWidget({
                         <button
                           key={date}
                           onClick={() => { setDetailDate(date); setEditRowId(null); }}
-                          className="flex flex-col items-center gap-1 p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                          className={`flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${FOCUS_RING}`}
                           title={`${fmtDay(date)}: ${formatDuration(dayTotal)}`}
                         >
                           <Donut rows={rows} size={48} stroke={16} />
-                          <span className={`text-[11px] leading-none ${c.label} ${date === today ? "font-semibold" : "opacity-60"}`}>{fmtDay(date)}</span>
-                          <span className={`text-[11px] leading-none tabular-nums opacity-60 ${c.text}`}>{formatDuration(dayTotal)}</span>
+                          <span className={`text-xs leading-none ${c.label} ${date === today ? "font-medium" : "opacity-60"}`}>{fmtDay(date)}</span>
+                          <span className={`text-xs leading-none tabular-nums opacity-60 ${c.text}`}>{formatDuration(dayTotal)}</span>
                         </button>
                       );
                     })}

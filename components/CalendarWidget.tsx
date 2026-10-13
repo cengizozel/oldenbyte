@@ -10,7 +10,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput } from "./ui/Field";
-import { PencilButton, ScrollFades, EmptyState, LoadingState, SaveCancelRow } from "./ui/WidgetChrome";
+import { PencilButton, ScrollFades, EmptyState, LoadingState, SaveCancelRow, WidgetHeader, Chip, SmallButton } from "./ui/WidgetChrome";
 
 type Calendar = { name: string; url: string; readOnly?: boolean };
 type CalEvent = {
@@ -201,13 +201,12 @@ export default function CalendarWidget({
 
   const front = (
     <>
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 ${c.label}`}>
-          <span className="opacity-50"><CalendarDays size={14} /></span>
-          <span className="text-xs font-medium opacity-60">Calendar</span>
-        </div>
-        <PencilButton c={c} onClick={() => { setDraft(config); setAvailable([]); setConnectError(""); setSettingsOpen(true); }} />
-      </div>
+      <WidgetHeader
+        c={c}
+        icon={CalendarDays}
+        title="Calendar"
+        right={<PencilButton c={c} onClick={() => { setDraft(config); setAvailable([]); setConnectError(""); setSettingsOpen(true); }} />}
+      />
 
       {!loaded ? null : !configured(config) ? (
         <EmptyState c={c} action="connect a CalDAV calendar" />
@@ -222,18 +221,18 @@ export default function CalendarWidget({
               <EmptyState c={c}>nothing scheduled in the next {config.days} days</EmptyState>
             ) : (
               [...byDay.entries()].map(([day, list]) => (
-                <div key={day} className="flex flex-col gap-1">
+                <div key={day} className="flex flex-col">
                   <span className={`text-xs font-medium ${c.label} ${day === today ? "" : "opacity-60"}`}>
                     {dayHeading(day, today, tomorrow)}
                   </span>
-                  {list.map(ev => (
-                    <div key={`${ev.uid}-${ev.start}`} className="flex items-start gap-2 pl-1" title={`${ev.calendar}${ev.location ? ` · ${ev.location}` : ""}`}>
+                  {list.map((ev, i) => (
+                    <div key={`${ev.uid}-${ev.start}`} className={`flex items-start gap-2 pl-1 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`} title={`${ev.calendar}${ev.location ? ` · ${ev.location}` : ""}`}>
                       <span className="w-2 h-2 mt-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(ev.calendar).dot }} />
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm leading-snug truncate ${c.text}`}>{ev.title}</p>
-                        {ev.location && <p className={`text-[12px] opacity-50 truncate ${c.label}`}>{ev.location}</p>}
+                        {ev.location && <p className={`text-xs opacity-60 truncate ${c.label}`}>{ev.location}</p>}
                       </div>
-                      <span className={`shrink-0 text-xs tabular-nums opacity-50 ${c.text}`}>
+                      <span className={`shrink-0 text-xs tabular-nums opacity-60 ${c.text}`}>
                         {ev.allDay ? "all day" : ev.start.slice(11, 16)}
                       </span>
                     </div>
@@ -273,21 +272,17 @@ export default function CalendarWidget({
             className="flex-1"
           />
         </div>
-        <button
-          onClick={connect}
-          disabled={connecting}
-          className="self-start flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-primary)] hover:border-[var(--surface-border-focus)] disabled:opacity-40"
-        >
+        <SmallButton c={c} onClick={connect} disabled={connecting} className="self-start">
           {connecting ? <Loader size={12} className="animate-spin" /> : <Plug size={12} />}
           {connecting ? "connecting…" : "Connect"}
-        </button>
+        </SmallButton>
         {available.length > 0 && (
           <div className="flex flex-col gap-1">
-            <p className={`text-xs opacity-50 ${c.label}`}>Calendars to show</p>
+            <p className={`text-xs opacity-60 ${c.label}`}>Calendars to show</p>
             {available.map(cal => {
               const on = draft.calendars.some(s => s.url === cal.url);
               return (
-                <label key={cal.url} className={`flex items-center gap-2 text-xs cursor-pointer ${c.text} ${on ? "opacity-85" : "opacity-60"}`}>
+                <label key={cal.url} className={`flex items-center gap-2 text-xs cursor-pointer ${c.text} ${on ? "opacity-80" : "opacity-60"}`}>
                   <input
                     type="checkbox"
                     checked={on}
@@ -301,7 +296,7 @@ export default function CalendarWidget({
                   />
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tagColor(cal.name).dot }} />
                   <span className="truncate">{cal.name}</span>
-                  {cal.readOnly && <span className={`text-[11px] opacity-50 ${c.label}`}>read-only</span>}
+                  {cal.readOnly && <span className={`text-[11px] opacity-60 ${c.label}`}>read-only</span>}
                 </label>
               );
             })}
@@ -310,21 +305,13 @@ export default function CalendarWidget({
         <div className="flex items-center gap-2">
           <span className={`text-xs opacity-60 ${c.label}`}>Days ahead</span>
           {[7, 14, 30].map(n => (
-            <button
-              key={n}
-              onClick={() => setDraft(d => ({ ...d, days: n }))}
-              className={`w-8 py-1 rounded-lg text-xs font-medium transition-colors ${
-                draft.days === n
-                  ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm border border-[var(--surface-border)]"
-                  : `${c.text} opacity-50 hover:opacity-80`
-              }`}
-            >
+            <Chip key={n} c={c} active={draft.days === n} onClick={() => setDraft(d => ({ ...d, days: n }))}>
               {n}
-            </button>
+            </Chip>
           ))}
         </div>
         {connectError && <p className="text-red-400 text-xs">{connectError}</p>}
-        <p className="text-[12px] text-[var(--text-muted)]">
+        <p className="text-xs text-[var(--text-muted)]">
           Works with Nextcloud, Radicale, and other CalDAV servers. For Nextcloud use an app password (Settings, Security) and the URL ending in /remote.php/dav.
         </p>
       </div>

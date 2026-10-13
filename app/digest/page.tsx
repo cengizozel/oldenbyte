@@ -326,7 +326,7 @@ export default function DigestPage() {
             target="_blank"
             rel="noopener noreferrer"
             title={ref.title}
-            className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors align-super text-[12px] ml-0.5"
+            className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors align-super text-xs ml-0.5"
           >
             [{n}]
           </a>
@@ -758,7 +758,7 @@ export default function DigestPage() {
                   value={draft.baseUrl}
                   onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, baseUrl: v })); setModels(defaultModelsFor(v)); }}
                   placeholder="http://localhost:11434/v1"
-                  className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono"
+                  className="flex-1 min-w-[12rem] text-xs bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono"
                 />
                 {PRESETS.map(p => (
                   <button key={p.label} onClick={() => setEndpoint(p.url)} className="text-[13px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">{p.label}</button>
@@ -769,13 +769,13 @@ export default function DigestPage() {
                 {loadingModels ? (
                   <span className="flex-1 min-w-[12rem] text-[13px] italic text-[var(--text-muted)] py-0.5 font-ui animate-pulse">searching models…</span>
                 ) : models.length > 0 ? (
-                  <select value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 font-mono">
+                  <select value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} className="flex-1 min-w-[12rem] text-xs bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 font-mono">
                     <option value="" disabled>select a model…</option>
                     {draft.model && !models.includes(draft.model) && <option value={draft.model}>{draft.model}</option>}
                     {models.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 ) : (
-                  <input value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} placeholder="e.g. gpt-4o-mini or llama3.2" className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono" />
+                  <input value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} placeholder="e.g. gpt-4o-mini or llama3.2" className="flex-1 min-w-[12rem] text-xs bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono" />
                 )}
                 {!loadingModels && (
                   <button onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey, draft.model || model)} className="text-[13px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">load models</button>
@@ -791,7 +791,7 @@ export default function DigestPage() {
                     onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
                     onKeyDown={e => e.key === "Enter" && saveSettings(false)}
                     placeholder="sk-..."
-                    className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono"
+                    className="flex-1 min-w-[12rem] text-xs bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono"
                   />
                 </div>
               )}

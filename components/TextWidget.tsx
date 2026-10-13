@@ -6,7 +6,7 @@ import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
-import { PencilButton, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, PencilButton, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type FontFamily = "sans" | "serif" | "mono";
 type SourceConfig = { type: "text" | "url"; value: string };
@@ -179,14 +179,12 @@ export default function TextWidget({
       className={className}
       front={
         <>
-          {/* Header */}
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <span className={`opacity-50 ${c.label}`}><Type size={14} /></span>
-            <PencilButton
-              c={c}
-              onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
-            />
-          </div>
+          <WidgetHeader
+            c={c}
+            icon={Type}
+            title={widget.title}
+            right={<PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />}
+          />
 
           {/* Auto-fit text display */}
           <div ref={containerRef} className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden">
@@ -207,8 +205,9 @@ export default function TextWidget({
       back={
         <>
           {/* Header */}
-          <div className="flex items-center justify-between shrink-0">
-            <span className={`opacity-50 ${c.label}`}><Type size={14} /></span>
+          <div className={`flex items-center gap-1.5 shrink-0 ${c.label}`}>
+            <Type size={14} className="opacity-50 shrink-0" />
+            <span className="text-xs font-medium truncate">{widget.title}</span>
           </div>
 
           <div ref={settingsBodyRef} className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
@@ -216,17 +215,9 @@ export default function TextWidget({
             {/* Source type toggle */}
             <div className="flex gap-1">
               {(["text", "url"] as const).map(t => (
-                <button
-                  key={t}
-                  onClick={() => setDraft(d => ({ ...d, source: { ...d.source, type: t } }))}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    draft.source.type === t
-                      ? "bg-white text-neutral-700 shadow-sm"
-                      : "text-neutral-400 hover:text-neutral-600"
-                  }`}
-                >
+                <Chip key={t} c={c} active={draft.source.type === t} onClick={() => setDraft(d => ({ ...d, source: { ...d.source, type: t } }))}>
                   {t === "text" ? "Text" : "API URL"}
-                </button>
+                </Chip>
               ))}
             </div>
 
@@ -241,21 +232,14 @@ export default function TextWidget({
 
             {/* Font picker */}
             <div>
-              <p className={`text-xs mb-1.5 opacity-50 ${c.label}`}>Font</p>
+              <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Font</p>
               <div className="flex gap-1.5">
                 {(["sans", "serif", "mono"] as FontFamily[]).map(f => (
                   <div key={f} className="flex flex-col items-center gap-1">
-                    <button
-                      onClick={() => setDraft(d => ({ ...d, font: f }))}
-                      className={`px-3 py-1.5 rounded-xl text-xs border transition-colors ${FONT_PREVIEW_CLASS[f]} ${
-                        draft.font === f
-                          ? `border-neutral-300 bg-white text-neutral-700`
-                          : `border-neutral-200 text-neutral-400 hover:border-neutral-300`
-                      }`}
-                    >
+                    <Chip c={c} active={draft.font === f} onClick={() => setDraft(d => ({ ...d, font: f }))} className={FONT_PREVIEW_CLASS[f]}>
                       Aa
-                    </button>
-                    <span className={`text-[12px] text-neutral-400 ${FONT_PREVIEW_CLASS[f]}`}>
+                    </Chip>
+                    <span className={`text-xs opacity-60 ${c.label} ${FONT_PREVIEW_CLASS[f]}`}>
                       {f.charAt(0).toUpperCase() + f.slice(1)}
                     </span>
                   </div>
@@ -265,20 +249,12 @@ export default function TextWidget({
 
             {/* Size picker */}
             <div>
-              <p className={`text-xs mb-1.5 opacity-50 ${c.label}`}>Size</p>
+              <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Size</p>
               <div className="flex gap-1">
                 {SIZES.map(s => (
-                  <button
-                    key={s.id}
-                    onClick={() => setDraft(d => ({ ...d, size: s.id }))}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                      (draft.size ?? "auto") === s.id
-                        ? "bg-white text-neutral-700 shadow-sm"
-                        : "text-neutral-400 hover:text-neutral-600"
-                    }`}
-                  >
+                  <Chip key={s.id} c={c} active={(draft.size ?? "auto") === s.id} onClick={() => setDraft(d => ({ ...d, size: s.id }))}>
                     {s.label}
-                  </button>
+                  </Chip>
                 ))}
               </div>
             </div>

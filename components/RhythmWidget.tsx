@@ -8,8 +8,8 @@ import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
-import { SettingsInput } from "./ui/Field";
-import { PencilButton, EmptyState, SaveCancelRow } from "./ui/WidgetChrome";
+import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
+import { PencilButton, EmptyState, SaveCancelRow, WidgetHeader, Chip, SmallButton } from "./ui/WidgetChrome";
 
 // Rhythm is Tracker's sibling. Tracker answers "how long?" with a live
 // stopwatch; Rhythm answers "when, and how often?" — each tap stamps a moment,
@@ -170,17 +170,11 @@ function Seg<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <div className="flex rounded-lg overflow-hidden border border-[var(--surface-border)]">
+    <div className="flex gap-1">
       {options.map(o => (
-        <button
-          key={o.value}
-          onClick={() => onChange(o.value)}
-          className={`px-2 py-1 text-[12px] transition-colors ${
-            value === o.value ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-55 hover:opacity-90`
-          }`}
-        >
+        <Chip key={o.value} c={c} active={value === o.value} onClick={() => onChange(o.value)}>
           {o.label}
-        </button>
+        </Chip>
       ))}
     </div>
   );
@@ -416,22 +410,24 @@ export default function RhythmWidget({
   }
   const nowFrac = Math.min(1, Math.max(0, (now - dayStart) / DAY_MS));
 
-  const headerIconCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`;
+  const headerIconCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`;
+  const iconBtnCls = `${HIT_AREA} ${FOCUS_RING}`;
 
   const front = (
     <>
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 ${c.label}`}>
-          <span className="opacity-50"><Activity size={14} /></span>
-          <span className="text-xs font-medium opacity-60">Rhythm</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => { setDetailDate(null); setHistoryOpen(true); }} title="History and insights" className={headerIconCls}>
-            <History size={14} />
-          </button>
-          <PencilButton c={c} onClick={() => { setDraft(items); setSettingsOpen(true); }} title="Edit items" />
-        </div>
-      </div>
+      <WidgetHeader
+        c={c}
+        icon={Activity}
+        title="Rhythm"
+        right={
+          <>
+            <button onClick={() => { setDetailDate(null); setHistoryOpen(true); }} title="History and insights" aria-label="History and insights" className={headerIconCls}>
+              <History size={14} />
+            </button>
+            <PencilButton c={c} onClick={() => { setDraft(items); setSettingsOpen(true); }} title="Edit items" />
+          </>
+        }
+      />
 
       {!loaded ? null : items.length === 0 ? (
         <EmptyState c={c} action="add things to log" />
@@ -448,7 +444,7 @@ export default function RhythmWidget({
                 </line>
               ))}
             </svg>
-            <div className={`flex justify-between text-[11px] opacity-60 ${c.label} -mt-0.5`}>
+            <div className={`flex justify-between text-xs opacity-60 ${c.label} -mt-0.5`}>
               <span>0</span><span>6</span><span>12</span><span>18</span><span>24</span>
             </div>
           </div>
@@ -480,7 +476,7 @@ export default function RhythmWidget({
                   ? <span className={`text-xs tabular-nums font-medium ${c.label}`}>{formatClock((now - open[it.id]) / 1000)}</span>
                   : lastDur > 0
                     ? <span className={`text-xs tabular-nums opacity-60 ${c.text}`}>{formatDuration(lastDur)}</span>
-                    : <span className={`text-xs opacity-60 ${c.text}`}>—</span>;
+                    : <span className={`text-xs opacity-60 ${c.text}`}>none yet</span>;
               } else if (it.mode === "reduce") {
                 const limitHit = it.target != null && count > it.target;
                 secondary = (
@@ -510,19 +506,19 @@ export default function RhythmWidget({
                   >
                     <button
                       onClick={() => (isSession ? toggleSession(it.id) : logMoment(it.id))}
-                      className="flex-1 min-w-0 flex items-center gap-2 pl-2 py-1.5 text-left"
+                      className={`flex-1 min-w-0 flex items-center gap-2 pl-2 py-2 text-left ${FOCUS_RING}`}
                     >
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: dot }} />
                       <span className="flex-1 min-w-0">
                         <span className="flex items-center gap-1.5">
                           <span className={`truncate text-sm ${c.text}`}>{it.name}</span>
                           {streak >= 2 && (
-                            <span className={`flex items-center gap-0.5 text-[12px] tabular-nums shrink-0 ${c.label} opacity-60`} title={`${streak}-day ${it.mode === "reduce" ? "clean " : ""}streak`}>
-                              <Flame size={10} />{streak}
+                            <span className={`flex items-center gap-0.5 text-xs tabular-nums shrink-0 ${c.label} opacity-60`} title={`${streak}-day ${it.mode === "reduce" ? "clean " : ""}streak`}>
+                              <Flame size={12} />{streak}
                             </span>
                           )}
                         </span>
-                        <span className={`block text-[12px] leading-tight ${c.label} opacity-55 truncate`}>{secondary}</span>
+                        <span className={`block text-xs leading-tight ${c.label} opacity-60 truncate`}>{secondary}</span>
                       </span>
                       {primary}
                     </button>
@@ -533,17 +529,19 @@ export default function RhythmWidget({
                         onClick={() => removeLastMoment(it.id)}
                         disabled={count === 0}
                         title="Remove last entry"
-                        className={`shrink-0 px-1.5 py-1.5 ${c.label} opacity-40 hover:!opacity-90 disabled:opacity-0 disabled:pointer-events-none`}
+                        aria-label="Remove last entry"
+                        className={`shrink-0 px-1.5 py-2 ${FOCUS_RING} ${c.label} opacity-40 hover:!opacity-90 disabled:opacity-0 disabled:pointer-events-none`}
                       >
-                        <Minus size={13} />
+                        <Minus size={14} />
                       </button>
                     )}
                     <button
                       onClick={() => (isSession ? toggleSession(it.id) : logMoment(it.id))}
                       title={isSession ? (isOpen ? "Stop" : "Start") : "Add one"}
-                      className={`shrink-0 pr-2 pl-0.5 py-1.5 ${isOpen ? c.label : `opacity-40 hover:opacity-90 ${c.label}`}`}
+                      aria-label={isSession ? (isOpen ? "Stop" : "Start") : "Add one"}
+                      className={`shrink-0 pr-2 pl-0.5 py-2 ${FOCUS_RING} ${isOpen ? c.label : `opacity-40 hover:opacity-90 ${c.label}`}`}
                     >
-                      {isSession ? (isOpen ? <Square size={13} /> : <Play size={13} />) : <Plus size={14} />}
+                      {isSession ? (isOpen ? <Square size={14} /> : <Play size={14} />) : <Plus size={14} />}
                     </button>
                   </div>
                 </li>
@@ -568,12 +566,9 @@ export default function RhythmWidget({
             placeholder="e.g. brushed teeth, slept"
             className="flex-1"
           />
-          <button
-            onClick={addItem}
-            className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
+          <SmallButton c={c} onClick={addItem} title="Add item" className="self-center">
             <Plus size={14} />
-          </button>
+          </SmallButton>
         </div>
         {draft.length > 0 && (
           <div className="flex flex-col gap-2">
@@ -588,7 +583,8 @@ export default function RhythmWidget({
                   />
                   <button
                     onClick={() => setDraft(d => d.filter(x => x.id !== it.id))}
-                    className={`opacity-50 hover:opacity-100 leading-none ${c.label}`}
+                    aria-label={`Remove ${it.name}`}
+                    className={`opacity-60 hover:opacity-100 leading-none ${iconBtnCls} ${c.label}`}
                   >
                     ×
                   </button>
@@ -607,7 +603,7 @@ export default function RhythmWidget({
                     options={[{ value: "build", label: "Build" }, { value: "reduce", label: "Reduce" }]}
                   />
                   {it.kind === "moment" && (
-                    <label className={`flex items-center gap-1 text-[12px] ${c.label} opacity-70`} title={it.mode === "reduce" ? "Daily limit (optional)" : "Daily target (optional)"}>
+                    <label className={`flex items-center gap-1 text-xs ${c.label} opacity-80`} title={it.mode === "reduce" ? "Daily limit (optional)" : "Daily target (optional)"}>
                       <input
                         inputMode="numeric"
                         value={it.target ?? ""}
@@ -616,7 +612,7 @@ export default function RhythmWidget({
                           setDraft(d => d.map(x => x.id === it.id ? { ...x, target: v ? parseInt(v) : undefined } : x));
                         }}
                         placeholder="–"
-                        className={`w-9 text-center tabular-nums border border-[var(--surface-border)] rounded-lg px-1 py-1 outline-none bg-[var(--surface)] ${c.text}`}
+                        className={`w-9 text-xs text-center tabular-nums border border-[var(--surface-border)] rounded-md px-1 py-1 outline-none bg-[var(--surface)] ${c.text}`}
                       />
                       <span>{it.mode === "reduce" ? "max/day" : "× /day"}</span>
                     </label>
@@ -627,7 +623,7 @@ export default function RhythmWidget({
           </div>
         )}
         {draft.length === 0 && (
-          <p className={`text-[12px] leading-relaxed opacity-55 ${c.text}`}>
+          <p className={`text-xs leading-relaxed opacity-60 ${c.text}`}>
             Add things you want to track by tapping: <b>moments</b> like brushing teeth or coffee, or <b>sessions</b> like sleep that you start and stop. Mark each <b>build</b> (do it more) or <b>reduce</b> (do it less), and set an optional daily target.
           </p>
         )}
@@ -666,50 +662,56 @@ export default function RhythmWidget({
 
       {historyOpen && (
         <div className={`absolute inset-0 z-40 p-5 flex flex-col rounded-2xl border ${c.bg} ${c.border}`}>
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 ${c.label}`}>
-              {detailDate ? (
-                <button onClick={() => setDetailDate(null)} title="Back to insights" className="opacity-60 hover:opacity-100 flex items-center gap-1">
-                  <ChevronLeft size={14} />
-                  <span className="text-xs font-medium">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
-                </button>
-              ) : (
-                <>
-                  <span className="opacity-50"><History size={14} /></span>
-                  <span className="text-xs font-medium opacity-60">Insights</span>
-                </>
-              )}
+          {detailDate ? (
+            /* Day detail header: a back button in place of the title */
+            <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+              <button onClick={() => setDetailDate(null)} title="Back to insights" className={`opacity-60 hover:opacity-100 flex items-center gap-1 min-w-0 ${iconBtnCls} ${c.label}`}>
+                <ChevronLeft size={14} />
+                <span className="text-xs font-medium truncate">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
+              </button>
+              <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`shrink-0 opacity-60 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
+                <X size={14} />
+              </button>
             </div>
-            <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`opacity-50 hover:opacity-90 ${c.label}`} title="Close">
-              <X size={14} />
-            </button>
-          </div>
+          ) : (
+            <WidgetHeader
+              c={c}
+              icon={History}
+              title="Insights"
+              right={
+                <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`opacity-60 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
+                  <X size={14} />
+                </button>
+              }
+            />
+          )}
 
           {detailDate ? (
-            <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-1">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col">
               {dayDetailRows(detailDate).length === 0 ? (
                 <EmptyState c={c}>nothing logged this day</EmptyState>
               ) : (
-                dayDetailRows(detailDate).map(r => (
-                  <div key={`${r.id}-${r.kind}-${r.idx}`} className="group/row flex items-center gap-2 px-1 py-1 rounded-lg">
+                dayDetailRows(detailDate).map((r, i) => (
+                  <div key={`${r.id}-${r.kind}-${r.idx}`} className={`group/row flex items-center gap-2 px-1 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
-                    <span className={`flex-1 min-w-0 truncate text-xs opacity-80 ${c.text}`}>{r.name}</span>
-                    <span className={`text-xs tabular-nums opacity-50 ${c.text}`}>
+                    <span className={`flex-1 min-w-0 truncate text-sm ${c.text}`}>{r.name}</span>
+                    <span className={`text-xs tabular-nums opacity-60 ${c.text}`}>
                       {fmtTimeOfDay(minutesOfDay(r.at))}{r.dur != null && ` · ${formatDuration(r.dur)}`}
                     </span>
                     <button
                       onClick={() => deleteEvent(r.id, r.kind, r.idx)}
                       title="Delete entry"
-                      className={`opacity-0 group-hover/row:opacity-50 hover:!opacity-100 hover:text-red-500 ${c.icon}`}
+                      aria-label="Delete entry"
+                      className={`opacity-0 group-hover/row:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 hover:text-red-500 ${iconBtnCls} ${c.icon}`}
                     >
-                      <Trash2 size={11} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 ))
               )}
             </div>
           ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-4">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-3">
               {items.length === 0 ? (
                 <EmptyState c={c}>no items yet</EmptyState>
               ) : (
@@ -744,23 +746,23 @@ export default function RhythmWidget({
                         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                           <span className="flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dot }} />
-                            <span className={`text-xs font-medium truncate ${c.text}`}>{it.name}</span>
+                            <span className={`text-sm font-medium truncate ${c.text}`}>{it.name}</span>
                             {streak >= 2 && (
-                              <span className={`flex items-center gap-0.5 text-[12px] tabular-nums ${c.label} opacity-60`}>
-                                <Flame size={9} />{streak}
+                              <span className={`flex items-center gap-0.5 text-xs tabular-nums ${c.label} opacity-60`}>
+                                <Flame size={12} />{streak}
                               </span>
                             )}
                           </span>
                           {!hasData ? (
-                            <span className={`text-[12px] opacity-50 ${c.text}`}>no taps yet</span>
+                            <span className={`text-xs opacity-60 ${c.text}`}>no taps yet</span>
                           ) : isSession ? (
-                            <span className={`text-[12px] opacity-70 ${c.text} tabular-nums`}>
+                            <span className={`text-xs opacity-80 ${c.text} tabular-nums`}>
                               avg {formatDuration(avgDur)}
                               {bed && wake && <> · {fmtTimeOfDay(bed.mean)} → {fmtTimeOfDay(wake.mean)}</>}
                               <span className="opacity-60"> · {sess.length} in {STATS_DAYS}d</span>
                             </span>
                           ) : (
-                            <span className={`text-[12px] opacity-70 ${c.text} tabular-nums`}>
+                            <span className={`text-xs opacity-80 ${c.text} tabular-nums`}>
                               ≈{perDay.toFixed(1)}×/day
                               {gap != null && <> · every {fmtGap(gap)}</>}
                             </span>
@@ -788,10 +790,10 @@ export default function RhythmWidget({
                                     key={d}
                                     onClick={() => setDetailDate(d)}
                                     title={`${fmtDay(d)}: ${cnt}`}
-                                    className="h-3 rounded-sm transition-transform hover:scale-110"
+                                    className={`h-3 rounded-md transition-transform hover:scale-110 ${FOCUS_RING}`}
                                     style={{ backgroundColor: cnt > 0 ? colorOf(it.id) : undefined, opacity: cnt > 0 ? op : 1 }}
                                   >
-                                    {cnt === 0 && <span className="block w-full h-full rounded-sm bg-black/[0.06] dark:bg-white/[0.07]" />}
+                                    {cnt === 0 && <span className="block w-full h-full rounded-md bg-black/[0.06] dark:bg-white/[0.07]" />}
                                   </button>
                                 );
                               })}
@@ -800,7 +802,7 @@ export default function RhythmWidget({
                         );
                       })}
                     </div>
-                    <div className={`flex justify-between text-[11px] opacity-60 ${c.label} mt-1 pl-2.5`}>
+                    <div className={`flex justify-between text-xs opacity-60 ${c.label} mt-1 pl-2.5`}>
                       <span>{fmtDay(gridDates[0])}</span>
                       <span>{fmtDay(today)}</span>
                     </div>

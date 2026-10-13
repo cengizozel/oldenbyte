@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bookmark, Plus, Minus, GripVertical, LayoutGrid, Grid2x2, LayoutList, AlignJustify, ExternalLink, Eye, EyeOff } from "lucide-react";
+import { Bookmark, Plus, Minus, X, GripVertical, LayoutGrid, Grid2x2, LayoutList, AlignJustify, ExternalLink, Eye, EyeOff } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
-import { SettingsInput } from "./ui/Field";
-import { PencilButton, EmptyState, SaveCancelRow, ScrollFades } from "./ui/WidgetChrome";
+import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
+import { WidgetHeader, PencilButton, EmptyState, SaveCancelRow, ScrollFades, SmallButton } from "./ui/WidgetChrome";
 
 // A bookmarks board. Each link shows its site favicon (with a tidy colored
 // letter tile when the favicon is missing, or a custom emoji/image override),
@@ -135,7 +135,7 @@ function ViewToggle({ c, view, onChange }: { c: ColorClasses; view: View; onChan
     { value: "name", icon: AlignJustify, title: "Names only" },
   ];
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-3">
       {opts.map(o => {
         const Icon = o.icon;
         const active = view === o.value;
@@ -144,9 +144,11 @@ function ViewToggle({ c, view, onChange }: { c: ColorClasses; view: View; onChan
             key={o.value}
             onClick={() => onChange(o.value)}
             title={o.title}
-            className={`p-1 rounded-md transition-colors ${active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.icon} opacity-40 hover:opacity-80`}`}
+            aria-label={o.title}
+            aria-pressed={active}
+            className={`${HIT_AREA} ${FOCUS_RING} transition-colors ${active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.icon} opacity-40 hover:opacity-80`}`}
           >
-            <Icon size={13} />
+            <Icon size={14} />
           </button>
         );
       })}
@@ -267,36 +269,39 @@ export default function BookmarksWidget({
   // ── Front ──────────────────────────────────────────────────────────────────
   const front = (
     <>
-      <div className="flex items-center justify-between mb-3 shrink-0 gap-2">
-        <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-          <span className="opacity-50"><Bookmark size={14} /></span>
-          <span className="text-xs font-medium opacity-60 truncate">{widget.title}</span>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {(view === "icon" || view === "grid") && bookmarks.length > 0 && (
-            <div className="flex items-center gap-0.5">
-              <button
-                onClick={() => changeIconSize(-ICON_STEP)}
-                disabled={iconSize <= ICON_MIN}
-                title="Smaller icons"
-                className={`p-1 rounded-md ${c.icon} opacity-40 hover:opacity-80 disabled:opacity-15 transition-opacity`}
-              >
-                <Minus size={12} />
-              </button>
-              <button
-                onClick={() => changeIconSize(ICON_STEP)}
-                disabled={iconSize >= ICON_MAX}
-                title="Larger icons"
-                className={`p-1 rounded-md ${c.icon} opacity-40 hover:opacity-80 disabled:opacity-15 transition-opacity`}
-              >
-                <Plus size={12} />
-              </button>
-            </div>
-          )}
-          {bookmarks.length > 0 && <ViewToggle c={c} view={view} onChange={changeView} />}
-          <PencilButton c={c} onClick={() => { setDraft(bookmarks); setSettingsOpen(true); }} title="Edit bookmarks" />
-        </div>
-      </div>
+      <WidgetHeader
+        c={c}
+        icon={Bookmark}
+        title={widget.title}
+        right={
+          <>
+            {(view === "icon" || view === "grid") && bookmarks.length > 0 && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => changeIconSize(-ICON_STEP)}
+                  disabled={iconSize <= ICON_MIN}
+                  title="Smaller icons"
+                  aria-label="Smaller icons"
+                  className={`${HIT_AREA} ${FOCUS_RING} ${c.icon} opacity-40 hover:opacity-80 disabled:opacity-15 transition-opacity`}
+                >
+                  <Minus size={12} />
+                </button>
+                <button
+                  onClick={() => changeIconSize(ICON_STEP)}
+                  disabled={iconSize >= ICON_MAX}
+                  title="Larger icons"
+                  aria-label="Larger icons"
+                  className={`${HIT_AREA} ${FOCUS_RING} ${c.icon} opacity-40 hover:opacity-80 disabled:opacity-15 transition-opacity`}
+                >
+                  <Plus size={12} />
+                </button>
+              </div>
+            )}
+            {bookmarks.length > 0 && <ViewToggle c={c} view={view} onChange={changeView} />}
+            <PencilButton c={c} onClick={() => { setDraft(bookmarks); setSettingsOpen(true); }} title="Edit bookmarks" />
+          </>
+        }
+      />
 
       {!loaded ? null : bookmarks.length === 0 ? (
         <EmptyState c={c} action="add bookmarks" />
@@ -316,7 +321,7 @@ export default function BookmarksWidget({
                     target="_blank"
                     rel="noopener noreferrer"
                     title={displayName(bm)}
-                    className="flex items-center justify-center p-1 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                    className="flex items-center justify-center p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   >
                     <Favicon bm={bm} size={iconSize} />
                   </a>
@@ -325,7 +330,7 @@ export default function BookmarksWidget({
             )}
 
             {view === "grid" && (
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(iconSize + 16, 64)}px, 1fr))` }}>
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(iconSize + 16, 64)}px, 1fr))` }}>
                 {shown.map(bm => (
                   <a
                     key={bm.id}
@@ -333,10 +338,10 @@ export default function BookmarksWidget({
                     target="_blank"
                     rel="noopener noreferrer"
                     title={`${displayName(bm)} · ${bm.url}`}
-                    className="flex flex-col items-center gap-1 px-1 py-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                    className="flex flex-col items-center gap-1 px-1 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   >
                     <Favicon bm={bm} size={iconSize} />
-                    <span className={`w-full text-center truncate text-[12px] leading-tight ${c.text} opacity-70`}>{displayName(bm)}</span>
+                    <span className={`w-full text-center truncate text-xs leading-tight ${c.text} opacity-80`}>{displayName(bm)}</span>
                   </a>
                 ))}
               </div>
@@ -354,7 +359,7 @@ export default function BookmarksWidget({
                     className="group/bm flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   >
                     <Favicon bm={bm} size={22} />
-                    <span className={`flex-1 min-w-0 truncate text-sm ${c.text}`}>{displayName(bm)}</span>
+                    <span className={`flex-1 min-w-0 truncate text-sm font-medium ${c.text}`}>{displayName(bm)}</span>
                     <ExternalLink size={12} className={`shrink-0 opacity-0 group-hover/bm:opacity-40 ${c.label}`} />
                   </a>
                 ))}
@@ -370,7 +375,7 @@ export default function BookmarksWidget({
                     target="_blank"
                     rel="noopener noreferrer"
                     title={`${displayName(bm)} · ${bm.url}`}
-                    className={`flex items-center gap-2 px-2 py-1 rounded-md text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${c.text}`}
+                    className={`flex items-center gap-2 px-2 py-1 rounded-lg text-sm font-medium hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${c.text}`}
                   >
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(domainOf(bm.url) || bm.url).dot }} />
                     <span className="truncate">{displayName(bm)}</span>
@@ -389,7 +394,7 @@ export default function BookmarksWidget({
   const back = (
     <>
       <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-        <div className="flex gap-1">
+        <div className="flex items-center gap-2">
           <SettingsInput
             type="text"
             value={urlInput}
@@ -398,17 +403,14 @@ export default function BookmarksWidget({
             placeholder="Paste a link, e.g. github.com"
             className="flex-1"
           />
-          <button
-            onClick={addDraft}
-            className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            title="Add bookmark"
-          >
+          <SmallButton c={c} onClick={addDraft} title="Add bookmark">
             <Plus size={14} />
-          </button>
+            Add
+          </SmallButton>
         </div>
 
         {draft.length > 1 && (
-          <p className={`text-[12px] opacity-60 -mt-1 ${c.text}`}>Drag the handle to reorder.</p>
+          <p className={`text-xs opacity-60 -mt-1 ${c.text}`}>Drag the handle to reorder.</p>
         )}
 
         {draft.length > 0 && (
@@ -442,7 +444,7 @@ export default function BookmarksWidget({
                     title="Drag to reorder"
                     className={`shrink-0 cursor-grab active:cursor-grabbing ${c.label} opacity-30 hover:opacity-70`}
                   >
-                    <GripVertical size={13} />
+                    <GripVertical size={14} />
                   </span>
                   <Favicon bm={bm} size={22} />
                   <input
@@ -453,30 +455,32 @@ export default function BookmarksWidget({
                   />
                   <button
                     onClick={() => setDraft(d => d.map(x => x.id === bm.id ? { ...x, hidden: !x.hidden } : x))}
-                    className={`${bm.hidden ? "opacity-80" : "opacity-40"} hover:opacity-100 ${c.label}`}
+                    className={`${bm.hidden ? "opacity-80" : "opacity-40"} hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
                     title={bm.hidden ? "Hidden: click to show on the widget" : "Shown: click to hide from the widget"}
+                    aria-label={bm.hidden ? "Show on the widget" : "Hide from the widget"}
                   >
-                    {bm.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
+                    {bm.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                   <button
                     onClick={() => setDraft(d => d.filter(x => x.id !== bm.id))}
-                    className={`opacity-50 hover:opacity-100 leading-none ${c.label}`}
+                    className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
                     title="Remove"
+                    aria-label="Remove"
                   >
-                    ×
+                    <X size={14} />
                   </button>
                 </div>
                 <input
                   value={bm.url}
                   onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, url: e.target.value } : x))}
                   placeholder="https://..."
-                  className={`w-full bg-transparent dark:!bg-transparent text-[12px] opacity-60 outline-none ${c.label}`}
+                  className={`w-full bg-transparent dark:!bg-transparent text-xs opacity-60 outline-none ${c.label}`}
                 />
                 <input
                   value={bm.icon ?? ""}
                   onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, icon: e.target.value } : x))}
                   placeholder="icon: emoji or image URL (optional)"
-                  className={`w-full bg-transparent dark:!bg-transparent text-[12px] opacity-60 outline-none ${c.label}`}
+                  className={`w-full bg-transparent dark:!bg-transparent text-xs opacity-60 outline-none ${c.label}`}
                 />
               </div>
             ))}
@@ -484,7 +488,7 @@ export default function BookmarksWidget({
         )}
 
         {draft.length === 0 && (
-          <p className={`text-[12px] leading-relaxed opacity-55 ${c.text}`}>
+          <p className={`text-xs leading-relaxed opacity-60 ${c.text}`}>
             Add the sites you visit most. Each shows its favicon, with a tidy colored tile when one is not available. To override it, set an emoji or an image URL in a bookmark&apos;s icon field.
           </p>
         )}

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Pencil, Check, X, RotateCcw, Loader, RefreshCw } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Loader, RefreshCw, type LucideIcon } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { FOCUS_RING, HIT_AREA } from "./Field";
 
@@ -37,7 +37,7 @@ export function RefreshButton({ c, onClick, busy }: { c: ColorClasses; onClick: 
       data-widget-refresh
       className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 disabled:opacity-40 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
     >
-      <RefreshCw size={13} className={busy ? "animate-spin" : undefined} />
+      <RefreshCw size={14} className={busy ? "animate-spin" : undefined} />
     </button>
   );
 }
@@ -93,7 +93,7 @@ export function SaveCancelRow({
     <div className="flex items-center justify-between mt-auto">
       {onReset ? (
         <button onClick={onReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset">
-          <RotateCcw size={13} />
+          <RotateCcw size={14} />
         </button>
       ) : <span />}
       <div className="flex gap-3">
@@ -105,5 +105,81 @@ export function SaveCancelRow({
         </button>
       </div>
     </div>
+  );
+}
+
+// The one widget header: icon, title, and a right-hand slot for counts and
+// small actions (docs/design.md). `after` renders inline after the title, for
+// a badge such as the arXiv category.
+export function WidgetHeader({
+  c, icon: Icon, title, after, right, className = "",
+}: {
+  c: ColorClasses;
+  icon: LucideIcon;
+  title: string;
+  after?: ReactNode;
+  right?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`flex items-center justify-between gap-2 mb-3 shrink-0 ${className}`}>
+      <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
+        <Icon size={14} className="opacity-50 shrink-0" />
+        <span className="text-xs font-medium truncate">{title}</span>
+        {after}
+      </div>
+      {right && <div className="flex items-center gap-2 shrink-0">{right}</div>}
+    </div>
+  );
+}
+
+// A small toggle for modes and options: the active one has the translucent
+// fill, the rest sit at 60% and brighten on hover.
+export function Chip({
+  c, active = false, onClick, title, children, className = "",
+}: {
+  c: ColorClasses;
+  active?: boolean;
+  onClick: () => void;
+  title?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+      className={`h-6 px-2 rounded-md text-xs leading-none transition-colors ${FOCUS_RING} ${
+        active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-60 hover:opacity-100`
+      } ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// The standard small action button (new game, load models, add).
+export function SmallButton({
+  c, onClick, title, disabled, children, className = "",
+}: {
+  c: ColorClasses;
+  onClick: () => void;
+  title?: string;
+  disabled?: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      disabled={disabled}
+      className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 disabled:opacity-40 transition-colors ${FOCUS_RING} ${c.label} ${className}`}
+    >
+      {children}
+    </button>
   );
 }

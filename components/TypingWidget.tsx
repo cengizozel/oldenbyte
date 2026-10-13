@@ -7,6 +7,8 @@ import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import { TYPING_WORDS } from "@/lib/typingWords";
 import { SIMPLE_WORDS } from "@/lib/simpleWords";
 import * as storage from "@/lib/storage";
+import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
+import { WidgetHeader, Chip, SmallButton } from "@/components/ui/WidgetChrome";
 
 // A Monkeytype-style typing trainer. Input is word-based: you type a word and
 // SPACE commits it and jumps to the next one (letters you skip count as missed,
@@ -719,10 +721,6 @@ export default function TypingWidget({
   const restart = () => { reset(configRef.current); focusField(); };
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  const chipBase = "px-2 py-0.5 rounded-md text-[12px] transition-colors";
-  const chip = (active: boolean) =>
-    `${chipBase} ${active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-50 hover:opacity-90`}`;
-
   const lengthOptions = optionsFor(config.mode);
   const DRILLS: { id: DrillId; label: string }[] = [
     { id: "custom", label: "custom" }, { id: "home", label: "home row" },
@@ -774,53 +772,58 @@ export default function TypingWidget({
     return (
       <>
         {/* Header */}
-        <div className="flex items-center justify-between mb-2 shrink-0 gap-2">
-          <div className={`flex items-center gap-1.5 min-w-0 ${c.label} ${fade}`}>
-            <span className="opacity-50"><Keyboard size={14} /></span>
-            <span className="text-xs font-medium opacity-60 truncate">{widget.title}</span>
-          </div>
-          <div className={`flex items-center gap-2 shrink-0 ${fade}`}>
-            {stats.best > 0 && <span className={`text-[12px] tabular-nums opacity-50 ${c.text}`}>best {stats.best}</span>}
-            <button
-              onClick={restart}
-              title="Restart (Tab)"
-              className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 hover:!opacity-100 ${c.icon}`}
-            >
-              <RotateCcw size={13} />
-            </button>
-            <button
-              onClick={() => setExpanded(v => !v)}
-              title={big ? "Close" : "Expand"}
-              className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 hover:!opacity-100 ${c.icon}`}
-            >
-              {big ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-            </button>
-          </div>
-        </div>
+        <WidgetHeader
+          c={c}
+          icon={Keyboard}
+          title={widget.title}
+          className={fade}
+          right={
+            <>
+              {stats.best > 0 && <span className={`text-xs tabular-nums opacity-60 ${c.text}`}>best {stats.best}</span>}
+              <button
+                onClick={restart}
+                title="Restart (Tab)"
+                aria-label="Restart"
+                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+              >
+                <RotateCcw size={14} />
+              </button>
+              <button
+                onClick={() => setExpanded(v => !v)}
+                title={big ? "Close" : "Expand"}
+                aria-label={big ? "Close" : "Expand"}
+                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+              >
+                {big ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </button>
+            </>
+          }
+        />
 
         {/* Config bar */}
         <div className={`flex items-center flex-wrap gap-x-2 gap-y-1 mb-3 shrink-0 ${fade}`}>
           {(["words", "time", "drill", "metro"] as Mode[]).map(m => (
-            <button key={m} onClick={() => setMode(m)} className={chip(config.mode === m)}>{m}</button>
+            <Chip key={m} c={c} active={config.mode === m} onClick={() => setMode(m)}>{m}</Chip>
           ))}
           {lengthOptions.length > 0 && <span className={`opacity-20 ${c.label}`}>|</span>}
           {lengthOptions.map(n => (
-            <button key={n} onClick={() => applyConfig({ ...config, length: n })} className={chip(config.length === n)}>{n}</button>
+            <Chip key={n} c={c} active={config.length === n} onClick={() => applyConfig({ ...config, length: n })}>{n}</Chip>
           ))}
           {config.mode !== "drill" && <span className={`opacity-20 ${c.label}`}>|</span>}
           {config.mode !== "drill" && (["simple", "varied"] as WordPool[]).map(p => (
-            <button
+            <Chip
               key={p}
+              c={c}
+              active={config.pool === p}
               onClick={() => applyConfig({ ...config, pool: p })}
-              className={chip(config.pool === p)}
               title={p === "simple" ? "The classic 200 most common words" : "The 1000 most common words"}
             >
               {p}
-            </button>
+            </Chip>
           ))}
           {config.mode === "drill" && <span className={`opacity-20 ${c.label}`}>|</span>}
           {config.mode === "drill" && DRILLS.map(d => (
-            <button key={d.id} onClick={() => applyConfig({ ...config, drill: d.id })} className={chip(config.drill === d.id)}>{d.label}</button>
+            <Chip key={d.id} c={c} active={config.drill === d.id} onClick={() => applyConfig({ ...config, drill: d.id })}>{d.label}</Chip>
           ))}
           {config.mode === "drill" && config.drill === "custom" && (
             <>
@@ -829,49 +832,52 @@ export default function TypingWidget({
                 onChange={e => applyConfig({ ...config, custom: e.target.value })}
                 placeholder="letters e.g. zxc"
                 spellCheck={false}
-                className={`w-28 px-2 py-0.5 rounded-md text-[12px] font-mono bg-black/5 dark:bg-white/10 outline-none ${c.text} placeholder:opacity-40`}
+                className={`w-28 h-6 px-2 rounded-md text-xs font-mono bg-black/5 dark:bg-white/10 ${FOCUS_RING} ${c.text} placeholder:opacity-40`}
               />
-              <button
+              <Chip
+                c={c}
+                active={config.customScramble}
                 onClick={() => { if (config.customWords) applyConfig({ ...config, customScramble: !config.customScramble }); }}
-                className={chip(config.customScramble)}
                 title="Random strings of your letters"
               >
                 scramble
-              </button>
-              <button
+              </Chip>
+              <Chip
+                c={c}
+                active={config.customWords}
                 onClick={() => { if (config.customScramble) applyConfig({ ...config, customWords: !config.customWords }); }}
-                className={chip(config.customWords)}
                 title="Real words containing your letters"
               >
                 words
-              </button>
+              </Chip>
             </>
           )}
           {config.mode === "metro" && <span className={`opacity-20 ${c.label}`}>|</span>}
           {config.mode === "metro" && (
             <span className="flex items-center gap-1">
               <Music size={12} className={`${c.label} opacity-60`} />
-              <button onClick={() => applyConfig({ ...config, bpm: Math.max(BPM_MIN, config.bpm - 5) })} className={`${chipBase} ${c.label} opacity-60 hover:opacity-100`}>−</button>
-              <span className={`text-[12px] tabular-nums w-16 text-center ${c.text}`}>{config.bpm} bpm{config.dynamic ? " start" : ""}</span>
-              <button onClick={() => applyConfig({ ...config, bpm: Math.min(BPM_MAX, config.bpm + 5) })} className={`${chipBase} ${c.label} opacity-60 hover:opacity-100`}>+</button>
-              <button onClick={() => applyConfig({ ...config, dynamic: !config.dynamic })} className={chip(config.dynamic)} title="Tempo speeds up on hits, slows on misses">dynamic</button>
-              <button onClick={() => applyConfig({ ...config, endless: !config.endless })} className={chip(config.endless)} title="Never ends on its own, press Enter to stop">endless</button>
+              <Chip c={c} onClick={() => applyConfig({ ...config, bpm: Math.max(BPM_MIN, config.bpm - 5) })} title="Slower">−</Chip>
+              <span className={`text-xs tabular-nums w-16 text-center ${c.text}`}>{config.bpm} bpm{config.dynamic ? " start" : ""}</span>
+              <Chip c={c} onClick={() => applyConfig({ ...config, bpm: Math.min(BPM_MAX, config.bpm + 5) })} title="Faster">+</Chip>
+              <Chip c={c} active={config.dynamic} onClick={() => applyConfig({ ...config, dynamic: !config.dynamic })} title="Tempo speeds up on hits, slows on misses">dynamic</Chip>
+              <Chip c={c} active={config.endless} onClick={() => applyConfig({ ...config, endless: !config.endless })} title="Never ends on its own, press Enter to stop">endless</Chip>
               <button
                 onClick={() => applyConfig({ ...config, sound: !config.sound })}
                 title={config.sound ? "Mute" : "Unmute"}
-                className={`${c.icon} opacity-60 hover:opacity-100`}
+                aria-label={config.sound ? "Mute" : "Unmute"}
+                className={`${HIT_AREA} ${FOCUS_RING} ${c.icon} opacity-60 hover:opacity-100`}
               >
-                {config.sound ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                {config.sound ? <Volume2 size={14} /> : <VolumeX size={14} />}
               </button>
             </span>
           )}
           {/* get-ready countdown */}
           <span className="flex items-center gap-1 ml-auto">
-            <span className={`text-[12px] opacity-60 ${c.label}`} title="Count down before the test starts">countdown</span>
+            <span className={`text-xs opacity-60 ${c.label}`} title="Count down before the test starts">countdown</span>
             {COUNTDOWNS.map(n => (
-              <button key={n} onClick={() => applyConfig({ ...config, countdown: n })} className={chip(config.countdown === n)}>
+              <Chip key={n} c={c} active={config.countdown === n} onClick={() => applyConfig({ ...config, countdown: n })}>
                 {n === 0 ? "off" : `${n}s`}
-              </button>
+              </Chip>
             ))}
           </span>
         </div>
@@ -917,7 +923,7 @@ export default function TypingWidget({
                     {config.dynamic && liveBpm !== null && (
                       <span
                         key={liveBpm}
-                        className={`tw-pop text-[12px] tabular-nums font-medium ${levelDir === "up" ? "text-emerald-600 dark:text-emerald-400" : levelDir === "down" ? "text-red-500 dark:text-red-400" : c.text} `}
+                        className={`tw-pop text-xs tabular-nums font-medium ${levelDir === "up" ? "text-emerald-600 dark:text-emerald-400" : levelDir === "down" ? "text-red-500 dark:text-red-400" : c.text} `}
                         style={{ animationDuration: "0.3s" }}
                       >
                         {levelDir === "up" ? "▲ " : levelDir === "down" ? "▼ " : ""}{liveBpm} bpm
@@ -952,16 +958,11 @@ export default function TypingWidget({
               </div>
 
               {/* footer: start hint, metronome cue, or the endless stop button */}
-              <div className={`h-7 shrink-0 mt-1 flex items-center gap-3 text-[12px] ${c.label}`}>
+              <div className={`h-7 shrink-0 mt-1 flex items-center gap-3 text-xs ${c.label}`}>
                 {idle && focused && config.countdown > 0 && <span className="opacity-60">press space to start</span>}
-                {running && config.mode === "metro" && !autoRefills(config) && <span className="opacity-50">strike a key on each beat</span>}
+                {running && config.mode === "metro" && !autoRefills(config) && <span className="opacity-60">strike a key on each beat</span>}
                 {running && config.mode === "metro" && autoRefills(config) && (
-                  <button
-                    onClick={() => finish()}
-                    className={`px-2 py-0.5 rounded-md bg-black/10 dark:bg-white/15 ${c.text} opacity-80 hover:opacity-100 transition-opacity`}
-                  >
-                    stop (enter)
-                  </button>
+                  <SmallButton c={c} onClick={() => finish()}>stop (enter)</SmallButton>
                 )}
               </div>
             </>
@@ -978,9 +979,7 @@ export default function TypingWidget({
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
             <Keyboard size={22} className={`${c.label} opacity-40`} />
             <p className={`text-xs ${c.label} opacity-60`}>Typing trainer is open in fullscreen</p>
-            <button onClick={() => setExpanded(false)} className={`text-xs px-3 py-1.5 rounded-lg bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}>
-              Close
-            </button>
+            <SmallButton c={c} onClick={() => setExpanded(false)}>Close</SmallButton>
           </div>
         ) : card(false)}
       </div>
@@ -1116,7 +1115,7 @@ function LiveStats({ endsAt, progress, wpm }: { endsAt?: number; progress: strin
   return (
     <>
       <span className="font-semibold">{left !== null ? left : progress}</span>
-      <span className="opacity-50">{wpm()} wpm</span>
+      <span className="opacity-60">{wpm()} wpm</span>
     </>
   );
 }
@@ -1131,13 +1130,13 @@ function Results({
 }) {
   const big = (value: React.ReactNode, label: string, cls = c.text) => (
     <div>
-      <div className={`text-[12px] opacity-60 mb-1 ${c.label}`}>{label}</div>
-      <div className={`text-4xl font-semibold tabular-nums leading-none ${cls}`}>{value}</div>
+      <div className={`text-xs opacity-60 mb-1 ${c.label}`}>{label}</div>
+      <div className={`text-3xl font-semibold tabular-nums leading-none ${cls}`}>{value}</div>
     </div>
   );
   const small = (value: React.ReactNode, label: string, title?: string) => (
     <div title={title}>
-      <div className={`text-[12px] opacity-60 ${c.label}`}>{label}</div>
+      <div className={`text-xs opacity-60 ${c.label}`}>{label}</div>
       <div className={`text-sm tabular-nums ${c.text}`}>{value}</div>
     </div>
   );
@@ -1158,7 +1157,7 @@ function Results({
             <span>{ch.correct}</span><span className="opacity-40">/</span>
             <span className={ch.incorrect ? "text-red-500 dark:text-red-400" : ""}>{ch.incorrect}</span><span className="opacity-40">/</span>
             <span className={ch.extra ? "text-red-800 dark:text-red-400/55" : ""}>{ch.extra}</span><span className="opacity-40">/</span>
-            <span className={ch.missed ? "opacity-50" : ""}>{ch.missed}</span>
+            <span className={ch.missed ? "opacity-60" : ""}>{ch.missed}</span>
           </>,
           "characters",
           "correct / incorrect / extra / missed",
@@ -1168,7 +1167,7 @@ function Results({
         {small(r.test, "test")}
       </div>
 
-      <div className={`text-[12px] leading-relaxed opacity-70 ${c.text}`}>
+      <div className={`text-xs leading-relaxed opacity-80 ${c.text}`}>
         {r.neighbor > 0 && <span>{r.neighbor} neighbour slip{r.neighbor > 1 ? "s" : ""}</span>}
         {r.neighbor > 0 && r.transposition > 0 && <span> · </span>}
         {r.transposition > 0 && <span>{r.transposition} transposition{r.transposition > 1 ? "s" : ""}</span>}
@@ -1177,25 +1176,25 @@ function Results({
 
       {r.weak.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={`text-[12px] opacity-60 ${c.label}`}>missed</span>
+          <span className={`text-xs opacity-60 ${c.label}`}>missed</span>
           {r.weak.map(w => (
-            <span key={w.k} className="px-1.5 py-0.5 rounded-md text-[12px] font-mono bg-red-500/10 text-red-500 dark:text-red-400" title={`${w.miss}/${w.total} wrong`}>
-              {w.k === " " ? "space" : w.k}<span className="opacity-50"> {w.miss}</span>
+            <span key={w.k} className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-red-500/10 text-red-500 dark:text-red-400" title={`${w.miss}/${w.total} wrong`}>
+              {w.k === " " ? "space" : w.k}<span className="opacity-60"> {w.miss}</span>
             </span>
           ))}
         </div>
       )}
 
       <div className="flex items-center gap-2 mt-auto">
-        <button onClick={onRestart} title="Next test (Tab, Enter or Esc)" className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}>
+        <SmallButton c={c} onClick={onRestart} title="Next test (Tab, Enter or Esc)">
           <RotateCcw size={12} /> next test
-        </button>
+        </SmallButton>
         {r.weak.length > 0 && (
-          <button onClick={onPracticeWeak} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs ${c.label} opacity-70 hover:opacity-100 transition-opacity`}>
+          <SmallButton c={c} onClick={onPracticeWeak}>
             <Target size={12} /> practice these
-          </button>
+          </SmallButton>
         )}
-        <span className={`ml-auto text-[12px] opacity-60 ${c.label}`}>tab or enter to restart</span>
+        <span className={`ml-auto text-xs opacity-60 ${c.label}`}>tab or enter to restart</span>
       </div>
     </div>
   );

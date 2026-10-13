@@ -8,8 +8,8 @@ import { formatDate, localDateStr } from "@/lib/format";
 import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import { SettingsSelect } from "@/components/ui/Field";
-import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
+import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, WidgetHeader } from "@/components/ui/WidgetChrome";
 
 const CATEGORY_GROUPS = [
   {
@@ -248,21 +248,22 @@ export default function ArxivWidget({
       className={className}
       front={
         <>
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-              <span className="opacity-50"><BookOpen size={14} /></span>
-              <span className="text-xs font-medium opacity-60">arXiv</span>
-              <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded-md opacity-60 truncate ${c.bg} border ${c.border}`}>
+          <WidgetHeader
+            c={c}
+            icon={BookOpen}
+            title="arXiv"
+            after={
+              <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full opacity-60 truncate ${c.bg} border ${c.border}`}>
                 {config.category}
               </span>
-            </div>
-            {!selected && (
-              <span className="flex items-center gap-2">
+            }
+            right={!selected && (
+              <>
                 <RefreshButton c={c} busy={loading} onClick={() => fetchPapers(config, true)} />
                 <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
-              </span>
+              </>
             )}
-          </div>
+          />
 
           <div className="flex-1 min-h-0 relative overflow-hidden">
             {/* Paper list */}
@@ -277,7 +278,7 @@ export default function ArxivWidget({
                 ) : cache?.papers.length ? (
                   <ul className="flex flex-col">
                     {cache.papers.map((p, i) => (
-                      <li key={i} className={`py-2.5 ${i > 0 ? `border-t border-black/10` : ""}`}>
+                      <li key={i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                         <div className="flex items-start gap-1 group/title">
                           <button
                             onClick={() => setSelected(p)}
@@ -290,9 +291,10 @@ export default function ArxivWidget({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
-                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                            aria-label="Open on arXiv"
+                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
                           >
-                            <ExternalLink size={11} />
+                            <ExternalLink size={14} />
                           </a>
                         </div>
                       </li>
@@ -312,12 +314,12 @@ export default function ArxivWidget({
                 return (
                   <>
                     <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
-                      <button onClick={() => setSelected(null)} className="shrink-0 opacity-60 hover:opacity-100">
+                      <button onClick={() => setSelected(null)} aria-label="Back to list" className={`shrink-0 opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
                         <ChevronLeft size={14} />
                       </button>
                       <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
-                      <a href={selected.link} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80">
-                        <ExternalLink size={11} />
+                      <a href={selected.link} target="_blank" rel="noopener noreferrer" aria-label="Open on arXiv" className={`shrink-0 opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
+                        <ExternalLink size={14} />
                       </a>
                     </div>
                     <div
@@ -327,7 +329,7 @@ export default function ArxivWidget({
                     >
                       <div className="flex flex-col gap-2">
                         {p.authors && (
-                          <p className={`text-xs opacity-55 leading-snug break-words ${c.text}`}>{p.authors}</p>
+                          <p className={`text-xs opacity-60 leading-snug break-words ${c.text}`}>{p.authors}</p>
                         )}
                         {selected.pubDate && (
                           <p className={`text-xs opacity-60 ${c.text}`}>
@@ -337,8 +339,8 @@ export default function ArxivWidget({
                         )}
                         {p.abstract && (
                           <>
-                            <div className="border-t border-black/5" />
-                            <p className={`text-xs leading-relaxed opacity-75 break-words ${c.text}`}>{p.abstract}</p>
+                            <div className="border-t border-black/10 dark:border-white/10" />
+                            <p className={`text-xs leading-relaxed opacity-80 break-words ${c.text}`}>{p.abstract}</p>
                           </>
                         )}
                       </div>
@@ -354,7 +356,7 @@ export default function ArxivWidget({
       back={
         <>
           <div className="flex flex-col gap-1.5">
-            <label className={`text-[12px] font-semibold opacity-50 ${c.label}`}>
+            <label className={`text-xs font-medium opacity-60 ${c.label}`}>
               Field
             </label>
             <SettingsSelect
@@ -370,7 +372,7 @@ export default function ArxivWidget({
             </SettingsSelect>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className={`text-[12px] font-semibold opacity-50 ${c.label}`}>
+            <label className={`text-xs font-medium opacity-60 ${c.label}`}>
               Topic
             </label>
             <SettingsSelect

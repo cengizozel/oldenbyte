@@ -22,7 +22,7 @@ export const FIELD_CLASS =
 export const HIT_AREA = "p-[5px] -m-[5px] rounded-md";
 
 export const FOCUS_RING =
-  "outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-muted)] rounded-md";
+  "outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-muted)]";
 
 export function SettingsInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${FIELD_CLASS} ${className}`} />;

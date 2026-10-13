@@ -122,7 +122,7 @@ export default function WidgetShelf({
             className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors pr-0.5"
             title="Expand the widget picker"
           >
-            Widgets <ChevronUp size={13} />
+            Widgets <ChevronUp size={14} />
           </button>
         ) : (
           <>
@@ -199,7 +199,7 @@ export default function WidgetShelf({
           className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-25"
           title="Undo layout change"
         >
-          <Undo2 size={13} />
+          <Undo2 size={14} />
         </button>
         <button
           onClick={onRedo}
@@ -207,7 +207,7 @@ export default function WidgetShelf({
           className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-25"
           title="Redo layout change"
         >
-          <Redo2 size={13} />
+          <Redo2 size={14} />
         </button>
         <div className="w-px h-4 bg-[var(--surface-border)] mx-0.5" />
         <button
@@ -216,7 +216,7 @@ export default function WidgetShelf({
           className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-25"
           title={backupDisabled ? "Not available in demo mode" : "Export backup"}
         >
-          <Download size={13} />
+          <Download size={14} />
         </button>
         <button
           onClick={() => importRef.current?.click()}
@@ -224,7 +224,7 @@ export default function WidgetShelf({
           className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-25"
           title={backupDisabled ? "Not available in demo mode" : "Import backup"}
         >
-          <Upload size={13} />
+          <Upload size={14} />
         </button>
         <input
           ref={importRef}
@@ -242,7 +242,7 @@ export default function WidgetShelf({
           className="p-2 rounded-xl text-[var(--text-muted)] hover:text-red-500 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           title="Clear the dashboard (undoable)"
         >
-          <Trash2 size={13} />
+          <Trash2 size={14} />
         </button>
       </div>
       </>

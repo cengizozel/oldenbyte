@@ -9,7 +9,7 @@ import { parseJson } from "@/lib/text";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
 import { useScrollFade } from "@/lib/useScrollFade";
-import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type RssItem = { title: string; link: string; pubDate: string };
 type RssConfig = { url: string; limit: number; name?: string };
@@ -118,16 +118,17 @@ export default function RssWidget({
       className={className}
       front={
         <>
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-              <span className="opacity-50 shrink-0"><Rss size={14} /></span>
-              {config.name && <span className="text-xs font-medium opacity-60 truncate">{config.name}</span>}
-            </div>
-            <span className="flex items-center gap-2">
-              <RefreshButton c={c} busy={loading} onClick={() => fetchFeed(config.url, config.limit, `${storageKey}-${today}`, true)} />
-              <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
-            </span>
-          </div>
+          <WidgetHeader
+            c={c}
+            icon={Rss}
+            title={config.name || widget.title}
+            right={
+              <>
+                <RefreshButton c={c} busy={loading} onClick={() => fetchFeed(config.url, config.limit, `${storageKey}-${today}`, true)} />
+                <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
+              </>
+            }
+          />
           <div className="flex-1 min-h-0 relative">
             <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={onScroll}>
               {loading && !items.length ? (
@@ -135,8 +136,8 @@ export default function RssWidget({
               ) : items.length ? (
                 <ul className="flex flex-col">
                   {items.map((item, i) => (
-                    <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                      <a href={item.link} target="_blank" rel="noopener noreferrer" className={`text-sm leading-snug break-words ${c.text} hover:opacity-70 transition-opacity`}>
+                    <li key={i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
+                      <a href={item.link} target="_blank" rel="noopener noreferrer" className={`text-sm font-medium leading-snug break-words ${c.text} hover:opacity-70 transition-opacity`}>
                         {item.title}
                       </a>
                     </li>
@@ -167,19 +168,17 @@ export default function RssWidget({
           />
           <div className="flex flex-col gap-0.5">
             {RSS_EXAMPLES.map(ex => (
-              <button key={ex.url} onClick={() => setDraft(d => ({ ...d, url: ex.url }))}
-                className={`text-left px-2 py-1 rounded-lg text-xs transition-colors ${draft.url === ex.url ? `${c.label} font-medium opacity-100` : `${c.text} opacity-50 hover:opacity-80`}`}>
+              <Chip key={ex.url} c={c} active={draft.url === ex.url} onClick={() => setDraft(d => ({ ...d, url: ex.url }))} className="self-start">
                 {ex.label}
-              </button>
+              </Chip>
             ))}
           </div>
           <div className="flex items-center gap-2">
             <span className={`text-xs opacity-60 ${c.label}`}>Items</span>
             {LIMITS.map(n => (
-              <button key={n} onClick={() => setDraft(d => ({ ...d, limit: n }))}
-                className={`w-7 py-1 rounded-lg text-xs font-medium transition-colors ${draft.limit === n ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}>
+              <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft(d => ({ ...d, limit: n }))}>
                 {n}
-              </button>
+              </Chip>
             ))}
           </div>
           {error && <p className="text-red-400 text-xs">{error}</p>}

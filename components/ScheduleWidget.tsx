@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { CalendarRange, Plus, Pencil, Maximize2, Minimize2, Check, X, Trash2, FileText, Copy } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { SettingsInput, SettingsSelect, SettingsTextarea } from "./ui/Field";
+import { SettingsInput, SettingsSelect, SettingsTextarea, HIT_AREA, FOCUS_RING } from "./ui/Field";
+import { WidgetHeader, Chip, SmallButton, EmptyState } from "./ui/WidgetChrome";
 
 // A fixed weekly schedule: the same seven-day time grid every week (classes,
 // gym, standing calls), as opposed to the Calendar widget's dated events.
@@ -96,7 +97,7 @@ function TimeField({ value, onChange }: { value: string; onChange: (v: string) =
   };
   return (
     <div className="flex items-center rounded-xl border border-[var(--surface-border)] bg-[var(--surface)]">
-      <button onClick={() => shift(-15)} className="px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="15 minutes earlier">−</button>
+      <button onClick={() => shift(-15)} className={`px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] ${FOCUS_RING}`} aria-label="15 minutes earlier">−</button>
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -109,7 +110,7 @@ function TimeField({ value, onChange }: { value: string; onChange: (v: string) =
         placeholder="18:30"
         className="w-12 text-center text-sm font-mono bg-transparent outline-none text-[var(--text-primary)] py-1.5"
       />
-      <button onClick={() => shift(15)} className="px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="15 minutes later">+</button>
+      <button onClick={() => shift(15)} className={`px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] ${FOCUS_RING}`} aria-label="15 minutes later">+</button>
     </div>
   );
 }
@@ -122,15 +123,15 @@ function DurationField({ value, onChange }: { value: string; onChange: (v: strin
   };
   return (
     <div className="flex items-center rounded-xl border border-[var(--surface-border)] bg-[var(--surface)]">
-      <button onClick={() => shift(-15)} className="px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="15 minutes less">−</button>
+      <button onClick={() => shift(-15)} className={`px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] ${FOCUS_RING}`} aria-label="15 minutes less">−</button>
       <input
         value={value}
         onChange={e => onChange(e.target.value.replace(/[^\d]/g, ""))}
         inputMode="numeric"
         className="w-10 text-center text-sm font-mono bg-transparent outline-none text-[var(--text-primary)] py-1.5"
       />
-      <span className="pr-1 text-[12px] text-[var(--text-muted)]">min</span>
-      <button onClick={() => shift(15)} className="px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="15 minutes more">+</button>
+      <span className="pr-1 text-xs text-[var(--text-muted)]">min</span>
+      <button onClick={() => shift(15)} className={`px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] ${FOCUS_RING}`} aria-label="15 minutes more">+</button>
     </div>
   );
 }
@@ -175,7 +176,7 @@ export default function ScheduleWidget({
   const [drag, setDrag] = useState<{ day: number; startMin: number; durMin: number; color: string; grouped: boolean } | null>(null);
   const [splitAsk, setSplitAsk] = useState<{ entryId: string; fromDay: number; toDay: number; toStartMin: number } | null>(null);
 
-  const GUTTER_PX = 40; // the time gutter (w-10)
+  const GUTTER_PX = 44; // the time gutter (w-11)
   const HEADER_PX = 24; // each column's day header (h-6)
 
   // Pointer position → snapped grid slot (day + minutes on the grid axis).
@@ -457,11 +458,11 @@ export default function ScheduleWidget({
       >
         <div className="flex min-w-[520px]" ref={gridInnerRef} data-schedule-grid>
           {/* time gutter */}
-          <div className="w-10 shrink-0 relative" style={{ marginTop: 24, height: hours * HOUR_PX }}>
+          <div className="w-11 shrink-0 relative" style={{ marginTop: 24, height: hours * HOUR_PX }}>
             {Array.from({ length: hours + 1 }, (_, h) => (
               <span
                 key={h}
-                className={`absolute right-1.5 text-[11px] font-mono opacity-60 ${c.label}`}
+                className={`absolute right-1.5 text-xs font-mono opacity-60 ${c.label}`}
                 style={{ top: h * HOUR_PX, transform: h === 0 ? "none" : h === hours ? "translateY(-100%)" : "translateY(-50%)" }}
               >
                 {fmt((startHour + h) * 60)}
@@ -471,7 +472,7 @@ export default function ScheduleWidget({
           {/* day columns */}
           {DAYS.map((_, dayIdx) => (
             <div key={dayIdx} className="flex-1 min-w-0">
-              <div className={`sticky top-0 z-10 h-6 flex items-center px-1.5 text-[12px] font-medium ${c.bg} ${dayIdx === todayIdx ? c.text : `${c.label} opacity-50`}`}>
+              <div className={`sticky top-0 z-10 h-6 flex items-center px-1.5 text-xs font-medium ${c.bg} ${dayIdx === todayIdx ? c.text : `${c.label} opacity-60`}`}>
                 {labels[dayIdx]}
               </div>
               <div
@@ -506,17 +507,17 @@ export default function ScheduleWidget({
                         openEditor(ev);
                       }}
                       title={`${ev.title} (${fmt(ev.start)} to ${fmt(ev.end)})${ev.description ? `\n${ev.description}` : ""}\ndrag to move`}
-                      className="absolute rounded-md px-1.5 py-0.5 text-left overflow-hidden text-[#16181c] hover:brightness-110 transition-[filter] touch-none select-none"
+                      className={`absolute rounded-md px-1.5 py-0.5 text-left overflow-hidden text-[#16181c] hover:brightness-110 transition-[filter] touch-none select-none ${FOCUS_RING}`}
                       style={{
                         top, height: Math.max(16, bottom - top - 2),
                         left: `calc(${lane * w}% + 2px)`, width: `calc(${w}% - 4px)`,
                         background: ev.color,
                       }}
                     >
-                      {big && <span className="block font-mono text-[11px] opacity-70">{fmt(ev.start)}–{fmt(ev.end)}</span>}
-                      <span className={`block font-medium truncate ${big ? "text-[12px]" : "text-[12px]"}`}>{ev.title}</span>
+                      {big && <span className="block font-mono text-xs opacity-80">{fmt(ev.start)}–{fmt(ev.end)}</span>}
+                      <span className="block font-medium truncate text-xs">{ev.title}</span>
                       {big && ev.description && bottom - top > 56 && (
-                        <span className="block text-[11px] opacity-70 overflow-hidden">{ev.description}</span>
+                        <span className="block text-xs opacity-80 overflow-hidden">{ev.description}</span>
                       )}
                     </button>
                   );
@@ -536,8 +537,8 @@ export default function ScheduleWidget({
                       background: drag.color, opacity: 0.75,
                     }}
                   >
-                    <span className="block font-mono text-[11px]">{fmt(drag.startMin % 1440)}</span>
-                    {drag.grouped && <span className="block text-[11px] font-medium">splits from group</span>}
+                    <span className="block font-mono text-xs">{fmt(drag.startMin % 1440)}</span>
+                    {drag.grouped && <span className="block text-xs font-medium">splits from group</span>}
                   </div>
                 )}
               </div>
@@ -545,8 +546,8 @@ export default function ScheduleWidget({
           ))}
         </div>
         {loaded && config.entries.length === 0 && !editor && (
-          <div className={`absolute inset-0 flex items-center justify-center text-xs opacity-60 pointer-events-none ${c.text}`}>
-            click a slot (or +) to plan your week
+          <div className="absolute inset-0 pointer-events-none">
+            <EmptyState c={c}>click a slot (or +) to plan your week</EmptyState>
           </div>
         )}
       </div>
@@ -554,49 +555,50 @@ export default function ScheduleWidget({
   }
 
   // ── Card (shared between the grid tile and the fullscreen overlay) ─────────
-  const actionCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`;
-  const chip = (active: boolean) =>
-    `px-2 py-0.5 rounded-md text-[12px] transition-colors ${active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-50 hover:opacity-90`}`;
+  const actionCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`;
+  const iconBtnCls = `${HIT_AREA} ${FOCUS_RING}`;
 
   function card(big: boolean) {
     return (
       <>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-1 shrink-0 gap-2">
-          <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-            <span className="opacity-50"><CalendarRange size={14} /></span>
-            <span className="text-xs font-medium opacity-60 truncate">{widget.title}</span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => openEditor(null)} title="Add entry" className={actionCls}>
-              <Plus size={14} />
-            </button>
-            <button
-              onClick={() => { setEditor(null); setSettingsOpen(false); setCopied(false); setExportOpen(o => !o); }}
-              title="Export as text"
-              className={actionCls}
-            >
-              <FileText size={13} />
-            </button>
-            <button
-              onClick={() => { setDraftStart(config.startHour); setDraftEnd(config.endHour); setEditor(null); setExportOpen(false); setSettingsOpen(o => !o); }}
-              title="Grid hours"
-              className={actionCls}
-            >
-              <Pencil size={13} />
-            </button>
-            <button onClick={() => setExpanded(v => !v)} title={big ? "Close (Esc)" : "Expand"} className={actionCls}>
-              {big ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-            </button>
-          </div>
-        </div>
+        <WidgetHeader
+          c={c}
+          icon={CalendarRange}
+          title={widget.title}
+          right={
+            <>
+              <button onClick={() => openEditor(null)} title="Add entry" aria-label="Add entry" className={actionCls}>
+                <Plus size={14} />
+              </button>
+              <button
+                onClick={() => { setEditor(null); setSettingsOpen(false); setCopied(false); setExportOpen(o => !o); }}
+                title="Export as text"
+                aria-label="Export as text"
+                className={actionCls}
+              >
+                <FileText size={14} />
+              </button>
+              <button
+                onClick={() => { setDraftStart(config.startHour); setDraftEnd(config.endHour); setEditor(null); setExportOpen(false); setSettingsOpen(o => !o); }}
+                title="Grid hours"
+                aria-label="Grid hours"
+                className={actionCls}
+              >
+                <Pencil size={14} />
+              </button>
+              <button onClick={() => setExpanded(v => !v)} title={big ? "Close (Esc)" : "Expand"} aria-label={big ? "Close" : "Expand"} className={actionCls}>
+                {big ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </button>
+            </>
+          }
+        />
 
         {renderGrid(big)}
 
         {/* Entry editor */}
         {editor && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 overflow-y-auto ${c.bg}`}>
-            <p className={`text-[13px] font-ui opacity-50 ${c.label}`}>
+            <p className={`text-[13px] font-ui opacity-60 ${c.label}`}>
               {editor.id ? "Edit entry" : "New entry"}
             </p>
             <SettingsInput
@@ -620,27 +622,26 @@ export default function ScheduleWidget({
               {DAYS_SHORT.map((d, i) => {
                 const on = editor.days.includes(i);
                 return (
-                  <button
+                  <Chip
                     key={d}
+                    c={c}
+                    active={on}
                     onClick={() => setEditor({
                       ...editor, error: "",
                       days: on ? editor.days.filter(x => x !== i) : [...editor.days, i],
                     })}
-                    className={`px-2 py-1 rounded-lg text-[12px] font-medium transition-colors ${
-                      on ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-45 hover:opacity-80`
-                    }`}
                   >
                     {d}
-                  </button>
+                  </Chip>
                 );
               })}
               <span className={`opacity-20 ${c.label}`}>|</span>
-              <button onClick={() => setEditor({ ...editor, error: "", days: [0, 1, 2, 3, 4] })} className={`text-[12px] ${c.label} opacity-50 hover:opacity-90`}>
+              <Chip c={c} onClick={() => setEditor({ ...editor, error: "", days: [0, 1, 2, 3, 4] })}>
                 weekdays
-              </button>
-              <button onClick={() => setEditor({ ...editor, error: "", days: [0, 1, 2, 3, 4, 5, 6] })} className={`text-[12px] ${c.label} opacity-50 hover:opacity-90`}>
+              </Chip>
+              <Chip c={c} onClick={() => setEditor({ ...editor, error: "", days: [0, 1, 2, 3, 4, 5, 6] })}>
                 every day
-              </button>
+              </Chip>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <TimeField value={editor.start} onChange={v => setEditor({ ...editor, start: v })} />
@@ -651,8 +652,8 @@ export default function ScheduleWidget({
                 <TimeField value={editor.end} onChange={v => setEditor({ ...editor, end: v })} />
               )}
               <span className="flex items-center gap-1">
-                <button onClick={() => setEditor({ ...editor, byDuration: false })} className={chip(!editor.byDuration)}>end time</button>
-                <button onClick={() => setEditor({ ...editor, byDuration: true })} className={chip(editor.byDuration)}>duration</button>
+                <Chip c={c} active={!editor.byDuration} onClick={() => setEditor({ ...editor, byDuration: false })}>end time</Chip>
+                <Chip c={c} active={editor.byDuration} onClick={() => setEditor({ ...editor, byDuration: true })}>duration</Chip>
               </span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -686,18 +687,18 @@ export default function ScheduleWidget({
                 );
               })()}
             </div>
-            {editor.error && <p className="text-red-400 text-[12px]">{editor.error}</p>}
+            {editor.error && <p className="text-red-400 text-xs">{editor.error}</p>}
             <div className="flex items-center gap-3 mt-auto">
               {editor.id && (
-                <button onClick={deleteEntry} title="Delete entry" className="text-red-400/80 hover:text-red-400">
+                <button onClick={deleteEntry} title="Delete entry" aria-label="Delete entry" className={`text-red-400/80 hover:text-red-400 ${iconBtnCls}`}>
                   <Trash2 size={14} />
                 </button>
               )}
               <span className="flex-1" />
-              <button onClick={() => setEditor(null)} title="Cancel" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+              <button onClick={() => setEditor(null)} title="Cancel" aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${iconBtnCls}`}>
                 <X size={14} />
               </button>
-              <button onClick={saveEditor} title="Save" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+              <button onClick={saveEditor} title="Save" aria-label="Save" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${iconBtnCls}`}>
                 <Check size={14} />
               </button>
             </div>
@@ -707,16 +708,16 @@ export default function ScheduleWidget({
         {/* Grid-hours settings */}
         {settingsOpen && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
-            <p className={`text-[13px] font-ui opacity-50 ${c.label}`}>Grid hours</p>
+            <p className={`text-[13px] font-ui opacity-60 ${c.label}`}>Grid hours</p>
             <div className="flex items-center gap-2">
               <div className="flex-1">
-                <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Day starts</p>
+                <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Day starts</p>
                 <SettingsSelect value={draftStart} onChange={e => setDraftStart(+e.target.value)}>
                   {Array.from({ length: 13 }, (_, h) => <option key={h} value={h}>{fmt(h * 60)}</option>)}
                 </SettingsSelect>
               </div>
               <div className="flex-1">
-                <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Day ends</p>
+                <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Day ends</p>
                 <SettingsSelect value={draftEnd} onChange={e => setDraftEnd(+e.target.value)}>
                   {Array.from({ length: 15 }, (_, i) => {
                     const h = i + 12;
@@ -725,16 +726,17 @@ export default function ScheduleWidget({
                 </SettingsSelect>
               </div>
             </div>
-            {draftEnd - draftStart < 6 && <p className="text-red-400 text-[12px]">The grid must span at least 6 hours.</p>}
+            {draftEnd - draftStart < 6 && <p className="text-red-400 text-xs">The grid must span at least 6 hours.</p>}
             <div className="flex items-center justify-end gap-3 mt-auto">
-              <button onClick={() => setSettingsOpen(false)} title="Cancel" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+              <button onClick={() => setSettingsOpen(false)} title="Cancel" aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${iconBtnCls}`}>
                 <X size={14} />
               </button>
               <button
                 onClick={() => { if (draftEnd - draftStart >= 6) { apply({ ...config, startHour: draftStart, endHour: draftEnd }); setSettingsOpen(false); } }}
                 disabled={draftEnd - draftStart < 6}
                 title="Save"
-                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
+                aria-label="Save"
+                className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 ${iconBtnCls}`}
               >
                 <Check size={14} />
               </button>
@@ -746,20 +748,17 @@ export default function ScheduleWidget({
         {exportOpen && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
             <div className="flex items-center justify-between">
-              <p className={`text-[13px] font-ui opacity-50 ${c.label}`}>Export</p>
-              <button
-                onClick={copyExport}
-                className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}
-              >
+              <p className={`text-[13px] font-ui opacity-60 ${c.label}`}>Export</p>
+              <SmallButton c={c} onClick={copyExport}>
                 {copied ? <Check size={12} /> : <Copy size={12} />}
                 {copied ? "copied" : "copy"}
-              </button>
+              </SmallButton>
             </div>
-            <pre className={`flex-1 min-h-0 overflow-auto text-[12px] leading-relaxed font-mono whitespace-pre rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-primary)] p-3`}>
+            <pre className={`flex-1 min-h-0 overflow-auto text-xs leading-relaxed font-mono whitespace-pre rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-primary)] p-3`}>
               {exportText()}
             </pre>
             <div className="flex items-center justify-end">
-              <button onClick={() => setExportOpen(false)} title="Close" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+              <button onClick={() => setExportOpen(false)} title="Close" aria-label="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${iconBtnCls}`}>
                 <X size={14} />
               </button>
             </div>
@@ -773,24 +772,21 @@ export default function ScheduleWidget({
           const groupDays = src.days.map(d => DAYS_SHORT[d]).join(", ");
           return (
             <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
-              <p className={`text-[13px] font-ui opacity-50 ${c.label}`}>Split from group</p>
-              <p className={`text-xs leading-relaxed ${c.text} opacity-80`}>
+              <p className={`text-[13px] font-ui opacity-60 ${c.label}`}>Split from group</p>
+              <p className={`text-sm leading-relaxed ${c.text} opacity-80`}>
                 &ldquo;{src.title}&rdquo; repeats on {groupDays}. Moving this block pulls {DAYS[splitAsk.fromDay]} out of that group:
                 it becomes its own entry at {DAYS[splitAsk.toDay]} {fmt(splitAsk.toStartMin % 1440)}, and the others stay put.
               </p>
               <div className="flex items-center justify-end gap-2 mt-auto">
                 <button
                   onClick={() => setSplitAsk(null)}
-                  className="text-[12px] px-2.5 py-1 rounded-lg border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  className={`h-7 px-2 text-xs ${c.label} opacity-60 hover:opacity-100 transition-opacity ${FOCUS_RING}`}
                 >
                   Cancel
                 </button>
-                <button
-                  onClick={applySplit}
-                  className={`text-[12px] px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}
-                >
+                <SmallButton c={c} onClick={applySplit}>
                   Split and move
-                </button>
+                </SmallButton>
               </div>
             </div>
           );
@@ -801,14 +797,12 @@ export default function ScheduleWidget({
 
   return (
     <>
-      <div className={`rounded-2xl border h-full relative group flex flex-col p-4 ${c.bg} ${c.border} ${c.glow} ${className}`}>
+      <div className={`rounded-2xl border h-full relative group flex flex-col p-5 ${c.bg} ${c.border} ${c.glow} ${className}`}>
         {expanded ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
-            <CalendarRange size={22} className={`${c.label} opacity-40`} />
-            <p className={`text-xs ${c.label} opacity-60`}>Schedule is open in fullscreen</p>
-            <button onClick={() => setExpanded(false)} className={`text-xs px-3 py-1.5 rounded-lg bg-black/10 dark:bg-white/15 ${c.text} hover:bg-black/15 dark:hover:bg-white/20 transition-colors`}>
-              Close
-            </button>
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
+            <CalendarRange size={16} className={`${c.label} opacity-50`} />
+            <p className={`text-xs ${c.text} opacity-60`}>schedule is open in fullscreen</p>
+            <SmallButton c={c} onClick={() => setExpanded(false)}>Close</SmallButton>
           </div>
         ) : card(false)}
       </div>

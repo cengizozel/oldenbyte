@@ -7,6 +7,7 @@ import { Chess, type Square } from "chess.js";
 import { Swords, RotateCcw, Loader } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
+import { WidgetHeader, SmallButton } from "@/components/ui/WidgetChrome";
 
 const ENGINE_PATH = "/stockfish/stockfish-18-lite-single.js";
 const MIN_ELO = 1300;
@@ -228,16 +229,17 @@ export default function ChessWidget({
 
   return (
     <div className={`rounded-2xl border p-5 flex flex-col h-full ${c.bg} ${c.border} ${c.glow} ${className}`}>
-      <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 shrink-0 ${c.label}`}>
-          <span className="opacity-50"><Swords size={14} /></span>
-          <span className="text-xs font-medium opacity-60">Chess</span>
-        </div>
-        <span className={`flex items-center gap-1 text-xs opacity-50 min-w-0 ${c.label}`}>
-          {thinking && <Loader size={11} className="animate-spin shrink-0" />}
-          <span className="truncate">{status}</span>
-        </span>
-      </div>
+      <WidgetHeader
+        c={c}
+        icon={Swords}
+        title="Chess"
+        right={
+          <span className={`flex items-center gap-1 text-xs opacity-60 min-w-0 ${c.label}`}>
+            {thinking && <Loader size={12} className="animate-spin shrink-0" />}
+            <span className="truncate">{status}</span>
+          </span>
+        }
+      />
 
       <div ref={contentRef} className="flex-1 min-h-0 flex items-center justify-center">
         {boardSize > 0 && (
@@ -262,7 +264,7 @@ export default function ChessWidget({
 
       <div className="shrink-0 mt-3 flex flex-col gap-2">
         <label className={`flex items-center gap-2 text-xs ${c.label}`}>
-          <span className="opacity-50 tabular-nums w-14 shrink-0">Elo {elo}</span>
+          <span className="opacity-60 tabular-nums w-14 shrink-0">Elo {elo}</span>
           <input
             type="range"
             min={MIN_ELO}
@@ -274,19 +276,9 @@ export default function ChessWidget({
           />
         </label>
         <div className="flex items-center gap-2">
-          <span className={`text-xs opacity-50 ${c.label}`}>New game:</span>
-          <button
-            onClick={() => newGame("w")}
-            className="px-2 py-0.5 rounded-md text-xs border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
-            as White
-          </button>
-          <button
-            onClick={() => newGame("b")}
-            className="px-2 py-0.5 rounded-md text-xs border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
-            as Black
-          </button>
+          <span className={`text-xs opacity-60 ${c.label}`}>New game:</span>
+          <SmallButton c={c} onClick={() => newGame("w")}>as White</SmallButton>
+          <SmallButton c={c} onClick={() => newGame("b")}>as Black</SmallButton>
           <RotateCcw size={14} className={`opacity-30 ${c.label} ml-auto`} />
         </div>
       </div>

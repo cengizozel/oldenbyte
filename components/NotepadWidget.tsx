@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { NotebookPen, Pencil, Check, X, Bold, Italic, Underline, List, History, Trash2 } from "lucide-react";
+import { NotebookPen, Pencil, Check, X, Bold, Italic, Underline, List, History, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { formatDate, localDateStr } from "@/lib/format";
 import { decodeEntities, parseJson } from "@/lib/text";
+import { FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
+import { WidgetHeader, Chip, EmptyState } from "@/components/ui/WidgetChrome";
 
 const REGISTRY_KEY = "notepad-registry";
 
@@ -148,16 +150,17 @@ function RichTextEditor({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {editable && (
-        <div className="flex items-center gap-0.5 mb-1.5 shrink-0">
+        <div className="flex items-center gap-0.5 mb-2 shrink-0">
           {FORMATS.map(({ cmd, Icon, label }) => (
             <button
               key={cmd}
               title={label}
+              aria-label={label}
               onMouseDown={e => e.preventDefault()}
               onClick={() => applyFormat(cmd)}
-              className={`p-1 rounded opacity-40 hover:opacity-90 hover:bg-white/40 transition-opacity ${labelClass}`}
+              className={`p-[5px] opacity-60 hover:opacity-100 hover:bg-white/40 transition-opacity ${FOCUS_RING} ${labelClass}`}
             >
-              <Icon size={13} />
+              <Icon size={14} />
             </button>
           ))}
         </div>
@@ -491,55 +494,50 @@ export default function NotebookWidget({
                 placeholder="Name this notepad…"
                 className="flex-1 min-w-0 text-xs border border-[var(--surface-border)] rounded-lg px-2 py-1 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
               />
-              <button onClick={() => setRenaming(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0"><X size={13} /></button>
-              <button onClick={saveName} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0"><Check size={13} /></button>
+              <button onClick={() => setRenaming(false)} aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0 ${HIT_AREA} ${FOCUS_RING}`}><X size={14} /></button>
+              <button onClick={saveName} aria-label="Save name" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0 ${HIT_AREA} ${FOCUS_RING}`}><Check size={14} /></button>
             </div>
           ) : (
-            <div className="flex items-center justify-between mb-3 shrink-0">
-              <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-                <span className="opacity-50 shrink-0"><NotebookPen size={14} /></span>
-                {customName && <span className="text-xs font-medium opacity-60 truncate">{customName}</span>}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={openHistory}
-                  title="All notes"
-                  className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-                >
-                  <History size={14} />
-                </button>
-                <button
-                  onClick={() => { setDraftName(customName); setRenaming(true); }}
-                  title="Rename"
-                  className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-                >
-                  <Pencil size={14} />
-                </button>
-              </div>
-            </div>
+            <WidgetHeader
+              c={c}
+              icon={NotebookPen}
+              title={customName || widget.title}
+              right={
+                <>
+                  <button
+                    onClick={openHistory}
+                    title="All notes"
+                    aria-label="All notes"
+                    className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+                  >
+                    <History size={14} />
+                  </button>
+                  <button
+                    onClick={() => { setDraftName(customName); setRenaming(true); }}
+                    title="Rename"
+                    aria-label="Rename"
+                    className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                </>
+              }
+            />
           )}
 
           {!isToday && (
-            <div className="mb-1.5 shrink-0">
-              <p className={`text-xs opacity-50 ${c.label}`}>
+            <div className="mb-2 shrink-0">
+              <p className={`text-xs opacity-60 ${c.label}`}>
                 {fmtDate(viewDate)}
                 {" · "}
-                <button onClick={() => setViewDate(today)} className="underline underline-offset-2">back to today</button>
+                <button onClick={() => setViewDate(today)} className={`underline underline-offset-2 ${FOCUS_RING}`}>back to today</button>
               </p>
               {showTabs && (
-                <div className="flex flex-wrap gap-1 mt-1.5">
+                <div className="flex flex-wrap gap-1 mt-2">
                   {tabs.map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTabId(tab.id)}
-                      className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
-                        tab.id === activeTabId
-                          ? `bg-white/70 ${c.label} opacity-100`
-                          : `${c.label} opacity-40 hover:opacity-70`
-                      }`}
-                    >
+                    <Chip key={tab.id} c={c} active={tab.id === activeTabId} onClick={() => setActiveTabId(tab.id)}>
                       {tab.num}
-                    </button>
+                    </Chip>
                   ))}
                 </div>
               )}
@@ -547,7 +545,7 @@ export default function NotebookWidget({
           )}
 
           {isToday && (loadState === "error" || saveError) && (
-            <p className="mb-1.5 shrink-0 text-red-400 text-xs">
+            <p className="mb-2 shrink-0 text-red-400 text-xs">
               {loadState === "error" ? "Could not load notes. Editing is off until a reload." : saveError}
             </p>
           )}
@@ -564,17 +562,17 @@ export default function NotebookWidget({
         </div>
 
         {/* Calendar */}
-        <div className="w-28 min-w-0 flex flex-col gap-1.5">
+        <div className="w-28 min-w-0 flex flex-col gap-2">
 
           <div className="flex items-center justify-between">
-            <button onClick={prevMonth} className={`text-xs opacity-60 hover:opacity-90 ${c.label}`}>‹</button>
+            <button onClick={prevMonth} aria-label="Previous month" className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><ChevronLeft size={14} /></button>
             <span className={`text-xs font-medium ${c.label} opacity-80`}>{monthLabel}</span>
-            <button onClick={nextMonth} className={`text-xs opacity-60 hover:opacity-90 ${c.label}`}>›</button>
+            <button onClick={nextMonth} aria-label="Next month" className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><ChevronRight size={14} /></button>
           </div>
 
           <div className="grid grid-cols-7 gap-px">
             {["S","M","T","W","T","F","S"].map((d, i) => (
-              <span key={i} className={`text-center text-[12px] font-medium opacity-60 ${c.label}`}>{d}</span>
+              <span key={i} className={`text-center text-xs font-medium opacity-60 ${c.label}`}>{d}</span>
             ))}
           </div>
 
@@ -594,8 +592,8 @@ export default function NotebookWidget({
                   key={day}
                   onClick={() => setViewDate(dateStr)}
                   className={`
-                    relative flex items-center justify-center rounded text-xs aspect-square
-                    ${isSelected ? `${c.label} font-semibold opacity-100` : `${c.text} opacity-70 hover:opacity-100`}
+                    relative flex items-center justify-center rounded-md text-xs aspect-square ${FOCUS_RING}
+                    ${isSelected ? `${c.label} font-medium opacity-100` : `${c.text} opacity-80 hover:opacity-100`}
                     ${isTodayCell ? "underline underline-offset-2" : ""}
                   `}
                 >
@@ -614,33 +612,35 @@ export default function NotebookWidget({
       {/* History overlay: all dated notes across every notepad */}
       {historyOpen && (
         <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 ${c.label}`}>
-              <span className="opacity-50"><History size={14} /></span>
-              <span className="text-xs font-medium opacity-60">All notes</span>
-            </div>
-            <button onClick={() => setHistoryOpen(false)} className={`opacity-50 hover:opacity-90 ${c.label}`} title="Close">
-              <X size={14} />
-            </button>
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-1">
+          <WidgetHeader
+            c={c}
+            icon={History}
+            title="All notes"
+            right={
+              <button onClick={() => setHistoryOpen(false)} className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`} title="Close" aria-label="Close">
+                <X size={14} />
+              </button>
+            }
+          />
+          <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col">
             {history.length === 0 ? (
-              <p className={`text-xs opacity-60 ${c.text}`}>no notes yet</p>
-            ) : history.map(e => (
-              <div key={`${e.id}-${e.date}`} className="flex items-start gap-2 px-2 py-1.5 rounded-lg hover:bg-white/40 transition-colors">
-                <button onClick={() => openDate(e.date)} className="flex-1 min-w-0 text-left">
+              <EmptyState c={c}>no notes yet</EmptyState>
+            ) : history.map((e, i) => (
+              <div key={`${e.id}-${e.date}`} className={`flex items-start gap-2 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
+                <button onClick={() => openDate(e.date)} className={`flex-1 min-w-0 text-left hover:opacity-70 transition-opacity ${FOCUS_RING}`}>
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs font-medium shrink-0 ${c.label}`}>{fmtDate(e.date)}</span>
-                    <span className={`text-[12px] px-1.5 py-0.5 rounded-full bg-white/50 truncate ${c.label} opacity-70`}>{e.name}</span>
+                    <span className={`text-sm font-medium shrink-0 ${c.label}`}>{fmtDate(e.date)}</span>
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full bg-white/50 truncate ${c.label} opacity-80`}>{e.name}</span>
                   </div>
-                  <p className={`text-xs opacity-50 truncate mt-0.5 ${c.text}`}>{e.snippet}</p>
+                  <p className={`text-xs opacity-60 truncate mt-1 ${c.text}`}>{e.snippet}</p>
                 </button>
                 <button
                   onClick={() => deleteEntry(e.id, e.date)}
                   title="Delete note"
-                  className={`shrink-0 mt-0.5 opacity-40 hover:opacity-100 hover:text-red-500 ${c.label}`}
+                  aria-label="Delete note"
+                  className={`shrink-0 mt-0.5 opacity-60 hover:opacity-100 hover:text-red-500 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={14} />
                 </button>
               </div>
             ))}

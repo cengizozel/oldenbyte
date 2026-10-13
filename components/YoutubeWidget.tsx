@@ -9,8 +9,8 @@ import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import { SettingsInput } from "@/components/ui/Field";
-import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
+import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 import { youtubeCacheKey } from "@/lib/cacheKeys";
 
 type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean };
@@ -309,18 +309,17 @@ export default function YoutubeWidget({
       className={className}
       front={
         <>
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 ${c.label}`}>
-              <span className="opacity-50"><PlaySquare size={14} /></span>
-              <span className="text-xs font-medium opacity-60">YouTube</span>
-            </div>
-            {!selected && (
-              <span className="flex items-center gap-2">
+          <WidgetHeader
+            c={c}
+            icon={PlaySquare}
+            title={widget.title}
+            right={!selected && (
+              <>
                 <RefreshButton c={c} busy={loading} onClick={() => fetchVideos(config, cacheKeyFor(config), true)} />
                 <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); setTaStatus({ state: "idle", msg: "" }); }} />
-              </span>
+              </>
             )}
-          </div>
+          />
           <div className="flex-1 min-h-0 relative overflow-hidden">
             {/* Video list */}
             <div className={`absolute inset-0 transition-transform duration-300 ease-in-out ${selected ? "-translate-x-full" : "translate-x-0"}`}>
@@ -329,33 +328,33 @@ export default function YoutubeWidget({
                   <LoadingState c={c} />
                 ) : videos.length ? (
                   config.view === "gallery" ? (
-                    <div className="grid gap-x-2.5 gap-y-3 py-1" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+                    <div className="grid gap-2 py-1" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
                       {videos.map((v, i) => {
                         const sc = tagColor(v.channelName);
                         const thumb = thumbUrl(v.link);
                         return (
                           <div key={i} className="flex flex-col gap-1">
-                            <button onClick={() => openVideo(v)} className="relative block w-full aspect-video rounded-lg overflow-hidden bg-black/10 hover:opacity-80 transition-opacity">
+                            <button onClick={() => openVideo(v)} aria-label="Open video" className={`relative block w-full aspect-video rounded-lg overflow-hidden bg-black/10 hover:opacity-80 transition-opacity ${FOCUS_RING}`}>
                               {thumb && (
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 <img src={thumb} alt="" loading="lazy" onLoad={unpulse} className="absolute inset-0 w-full h-full object-cover bg-black/10 dark:bg-white/10 animate-pulse" />
                               )}
                             </button>
                             <span className="flex items-center gap-1.5 min-w-0">
-                              <span className={`inline-block min-w-0 truncate text-[11px] font-semibold px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>
+                              <span className={`inline-block min-w-0 truncate text-[11px] font-medium px-1 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                                 {v.channelName}
                               </span>
                               {v.published && (
-                                <span className={`shrink-0 text-[11px] opacity-60 ${c.text}`}>{timeAgo(v.published)}</span>
+                                <span className={`shrink-0 text-xs opacity-60 ${c.text}`}>{timeAgo(v.published)}</span>
                               )}
                               {onTa(v) && (
-                                <span className={`shrink-0 text-[11px] font-semibold tracking-widest px-1 py-0.5 rounded bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
+                                <span className={`shrink-0 text-[11px] font-medium tracking-widest px-1 py-0.5 rounded-md bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
                               )}
                             </span>
                             <div className="flex items-start gap-1 group/title">
                               <button
                                 onClick={() => openVideo(v)}
-                                className={`flex-1 min-w-0 break-words text-left text-xs leading-snug line-clamp-2 ${c.text} hover:opacity-70 transition-opacity`}
+                                className={`flex-1 min-w-0 break-words text-left text-sm font-medium leading-snug line-clamp-2 ${c.text} hover:opacity-70 transition-opacity ${FOCUS_RING}`}
                               >
                                 {v.title}
                               </button>
@@ -364,9 +363,10 @@ export default function YoutubeWidget({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={e => e.stopPropagation()}
-                                className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                                aria-label="Open in new tab"
+                                className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
                               >
-                                <ExternalLink size={11} />
+                                <ExternalLink size={12} />
                               </a>
                             </div>
                           </div>
@@ -379,33 +379,33 @@ export default function YoutubeWidget({
                       const sc = tagColor(v.channelName);
                       const thumb = config.view === "thumbs" ? thumbUrl(v.link) : "";
                       return (
-                        <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
-                          <div className="flex gap-2.5">
+                        <li key={i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
+                          <div className="flex gap-2">
                             {thumb && (
-                              <button onClick={() => openVideo(v)} className="shrink-0 self-center hover:opacity-80 transition-opacity">
+                              <button onClick={() => openVideo(v)} aria-label="Open video" className={`shrink-0 self-center hover:opacity-80 transition-opacity rounded-lg ${FOCUS_RING}`}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={thumb} alt="" loading="lazy" onLoad={unpulse} className="w-24 aspect-video object-cover rounded-lg bg-black/10 dark:bg-white/10 animate-pulse" />
                               </button>
                             )}
                             <div className="flex-1 min-w-0">
                           <span className="flex items-center gap-1.5 mb-1 min-w-0">
-                            <span className={`inline-block min-w-0 truncate text-[12px] font-semibold px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                            <span className={`inline-block min-w-0 truncate text-[11px] font-medium px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                               {v.channelName}
                             </span>
                             {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
-                              <span className={`shrink-0 text-[11px] font-semibold px-1 py-0.5 rounded ${sc.bg} ${sc.label}`}>new</span>
+                              <span className={`shrink-0 text-[11px] font-medium px-1 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>new</span>
                             )}
                             {v.published && (
-                              <span className={`shrink-0 text-[12px] opacity-60 ${c.text}`}>{timeAgo(v.published)}</span>
+                              <span className={`shrink-0 text-xs opacity-60 ${c.text}`}>{timeAgo(v.published)}</span>
                             )}
                             {onTa(v) && (
-                              <span className={`shrink-0 text-[11px] font-semibold tracking-widest px-1 py-0.5 rounded bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
+                              <span className={`shrink-0 text-[11px] font-medium tracking-widest px-1 py-0.5 rounded-md bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
                             )}
                           </span>
                           <div className="flex items-start gap-1 group/title">
                             <button
                               onClick={() => openVideo(v)}
-                              className={`flex-1 min-w-0 break-words text-left block text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                              className={`flex-1 min-w-0 break-words text-left block text-sm font-medium leading-snug ${c.text} hover:opacity-70 transition-opacity ${FOCUS_RING}`}
                             >
                               {v.title}
                             </button>
@@ -414,9 +414,10 @@ export default function YoutubeWidget({
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={e => e.stopPropagation()}
-                              className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                              aria-label="Open in new tab"
+                              className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
                             >
-                              <ExternalLink size={11} />
+                              <ExternalLink size={12} />
                             </a>
                           </div>
                             </div>
@@ -437,13 +438,13 @@ export default function YoutubeWidget({
             <div className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${selected ? "translate-x-0" : "translate-x-full"}`}>
               {selected && (
                 <>
-                  <div className={`flex items-center gap-1.5 mb-2 shrink-0 ${c.text}`}>
-                    <button onClick={() => setSelected(null)} className="shrink-0 opacity-60 hover:opacity-100">
+                  <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
+                    <button onClick={() => setSelected(null)} aria-label="Back to list" className={`shrink-0 opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
                       <ChevronLeft size={14} />
                     </button>
                     <span className="flex-1 text-xs font-medium truncate opacity-80">{selected.title}</span>
-                    <a href={hrefFor(selected)} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80" title={onTa(selected) ? "Watch on TubeArchivist" : "Watch on YouTube"}>
-                      <ExternalLink size={11} />
+                    <a href={hrefFor(selected)} target="_blank" rel="noopener noreferrer" className={`shrink-0 opacity-40 hover:opacity-80 ${HIT_AREA} ${FOCUS_RING}`} title={onTa(selected) ? "Watch on TubeArchivist" : "Watch on YouTube"} aria-label={onTa(selected) ? "Watch on TubeArchivist" : "Watch on YouTube"}>
+                      <ExternalLink size={12} />
                     </a>
                   </div>
                   <div className="flex-1 min-h-0 overflow-y-auto pr-3">
@@ -460,7 +461,7 @@ export default function YoutubeWidget({
                     ) : details ? (
                       <div className="flex flex-col gap-2">
                         <p className={`text-sm font-medium leading-snug break-words ${c.text}`}>{details.title || selected.title}</p>
-                        <p className={`text-[12px] opacity-50 ${c.text}`}>
+                        <p className={`text-xs opacity-60 ${c.text}`}>
                           {[
                             details.author,
                             details.viewCount ? `${formatCount(details.viewCount)} views` : "",
@@ -470,7 +471,7 @@ export default function YoutubeWidget({
                         {details.description ? (
                           <>
                             <div className="border-t border-black/5" />
-                            <p className={`text-xs leading-relaxed opacity-75 whitespace-pre-line break-words ${c.text}`}>{details.description}</p>
+                            <p className={`text-sm leading-relaxed opacity-80 whitespace-pre-line break-words ${c.text}`}>{details.description}</p>
                           </>
                         ) : (
                           <p className={`text-xs opacity-60 ${c.text}`}>No description.</p>
@@ -505,13 +506,9 @@ export default function YoutubeWidget({
                   placeholder="API token"
                   className="flex-1 min-w-0"
                 />
-                <button
-                  onClick={testTa}
-                  disabled={taStatus.state === "testing"}
-                  className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
-                >
+                <SmallButton c={c} onClick={testTa} disabled={taStatus.state === "testing"} title="Test connection" className="self-center">
                   {taStatus.state === "testing" ? <Loader size={14} className="animate-spin" /> : "Test"}
-                </button>
+                </SmallButton>
               </div>
               {taStatus.msg && (
                 <p className={`text-xs ${taStatus.state === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-red-400"}`}>{taStatus.msg}</p>
@@ -520,18 +517,14 @@ export default function YoutubeWidget({
                 <div className="flex items-center gap-2">
                   <span className={`text-xs opacity-60 ${c.label}`}>Open on</span>
                   {([["youtube", "YouTube"], ["ta", "TubeArchivist"]] as const).map(([id, label]) => (
-                    <button
-                      key={id}
-                      onClick={() => setDraft(d => ({ ...d, ta: { url: d.ta?.url ?? "", token: d.ta?.token ?? "", open: id } }))}
-                      className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(draft.ta?.open ?? "youtube") === id ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}
-                    >
+                    <Chip key={id} c={c} active={(draft.ta?.open ?? "youtube") === id} onClick={() => setDraft(d => ({ ...d, ta: { url: d.ta?.url ?? "", token: d.ta?.token ?? "", open: id } }))}>
                       {label}
-                    </button>
+                    </Chip>
                   ))}
                 </div>
               )}
               {draft.ta?.open === "ta" && (
-                <p className={`text-[12px] opacity-60 ${c.text}`}>
+                <p className={`text-xs opacity-60 ${c.text}`}>
                   {taActive(config.ta) && videos.length
                     ? `${videos.filter(v => archived.has(videoId(v.link))).length} of ${videos.length} videos here are in your archive and open there (marked TA). The rest open on YouTube.`
                     : "Archived videos open on TubeArchivist (marked TA). The rest open on YouTube."}
@@ -542,10 +535,9 @@ export default function YoutubeWidget({
             <div className="flex items-center gap-2">
               <span className={`text-xs opacity-60 ${c.label}`}>View</span>
               {VIEWS.map(v => (
-                <button key={v.id} onClick={() => setDraft(d => ({ ...d, view: v.id }))}
-                  className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${draft.view === v.id ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}>
+                <Chip key={v.id} c={c} active={draft.view === v.id} onClick={() => setDraft(d => ({ ...d, view: v.id }))}>
                   {v.label}
-                </button>
+                </Chip>
               ))}
             </div>
             <div className="flex gap-1">
@@ -557,13 +549,9 @@ export default function YoutubeWidget({
                 placeholder="@handle or channel URL"
                 className="flex-1 min-w-0"
               />
-              <button
-                onClick={addChannel}
-                disabled={resolving}
-                className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
-              >
+              <SmallButton c={c} onClick={addChannel} disabled={resolving} title="Add channel" className="self-center">
                 {resolving ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-              </button>
+              </SmallButton>
             </div>
             {draft.channels.length > 0 && (
               <div className="flex flex-col gap-1.5">
@@ -581,10 +569,11 @@ export default function YoutubeWidget({
                           onChange={e => setChannelLimit(ch.channelId, Math.max(1, Math.min(15, parseInt(e.target.value) || 1)))}
                           className="w-10 text-center bg-white/60 rounded-md px-1 py-0.5 outline-none border border-current/20 text-xs"
                         />
-                        <span className="opacity-50 font-normal">videos</span>
+                        <span className="opacity-60 font-normal">videos</span>
                         <button
                           onClick={() => setDraft(d => ({ ...d, channels: d.channels.filter(c => c.channelId !== ch.channelId) }))}
-                          className="opacity-60 hover:opacity-100 leading-none ml-1"
+                          aria-label={`Remove ${ch.name}`}
+                          className={`opacity-60 hover:opacity-100 leading-none ml-1 ${HIT_AREA} ${FOCUS_RING}`}
                         >
                           ×
                         </button>
@@ -594,7 +583,7 @@ export default function YoutubeWidget({
                           type="checkbox"
                           checked={!!ch.includeShorts}
                           onChange={e => setDraft(d => ({ ...d, channels: d.channels.map(c => c.channelId === ch.channelId ? { ...c, includeShorts: e.target.checked } : c) }))}
-                          className="w-3 h-3 rounded accent-current"
+                          className="w-3 h-3 rounded-md accent-current"
                         />
                         <span className="opacity-60 font-normal">include Shorts</span>
                       </label>
@@ -604,7 +593,7 @@ export default function YoutubeWidget({
                           type="checkbox"
                           checked={!!ch.filterMembers}
                           onChange={e => setDraft(d => ({ ...d, channels: d.channels.map(c => c.channelId === ch.channelId ? { ...c, filterMembers: e.target.checked } : c) }))}
-                          className="w-3 h-3 rounded accent-current"
+                          className="w-3 h-3 rounded-md accent-current"
                         />
                         <span className="opacity-60 font-normal">filter members-only</span>
                       </label>

@@ -9,8 +9,8 @@ import { decodeEntities, parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import { SettingsInput } from "@/components/ui/Field";
-import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
+import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 import { redditCacheKey } from "@/lib/cacheKeys";
 
 type Period = "day" | "week" | "month" | "year" | "all";
@@ -259,41 +259,42 @@ export default function RedditWidget({
       className={className}
       front={
         <>
-        <div className="flex items-center justify-between mb-3 shrink-0">
-          <div className={`flex items-center gap-1.5 ${c.label}`}>
-            <span className="opacity-50"><Flame size={14} /></span>
-            <span className="text-xs font-medium opacity-60">Reddit</span>
-          </div>
-          <span className="relative flex items-center gap-2">
-            {/* How many subreddits made it; tap for the per-feed breakdown. */}
-            {subStatus.length > 0 && (loading || subStatus.some(s => s.ok === false)) && (
-              <button
-                onClick={() => setStatusOpen(o => !o)}
-                title="Which subreddits loaded"
-                className={`text-[12px] tabular-nums font-medium ${subStatus.some(s => s.ok === false) ? "text-red-500/80" : `${c.label} opacity-50`} hover:opacity-100 transition-opacity`}
-              >
-                {subStatus.filter(s => s.ok).length}/{subStatus.length}
-              </button>
-            )}
-            {statusOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setStatusOpen(false)} />
-                <div className={`absolute right-0 top-5 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2 flex flex-col gap-1`}>
-                  {subStatus.map(s => (
-                    <span key={s.name} className="flex items-center justify-between gap-2 text-[12px]">
-                      <span className={`truncate ${c.text} opacity-80`}>r/{s.name}</span>
-                      <span className={`shrink-0 ${s.ok === true ? "text-emerald-600 dark:text-emerald-400" : s.ok === false ? "text-red-500" : `${c.label} opacity-50`}`}>
-                        {s.ok === true ? "loaded" : s.ok === false ? "failed" : "loading"}
+        <WidgetHeader
+          c={c}
+          icon={Flame}
+          title={widget.title}
+          right={
+            <span className="relative flex items-center gap-2">
+              {/* How many subreddits made it; tap for the per-feed breakdown. */}
+              {subStatus.length > 0 && (loading || subStatus.some(s => s.ok === false)) && (
+                <button
+                  onClick={() => setStatusOpen(o => !o)}
+                  title="Which subreddits loaded"
+                  className={`text-xs tabular-nums font-medium ${subStatus.some(s => s.ok === false) ? "text-red-500/80" : `${c.label} opacity-60`} hover:opacity-100 transition-opacity ${FOCUS_RING}`}
+                >
+                  {subStatus.filter(s => s.ok).length}/{subStatus.length}
+                </button>
+              )}
+              {statusOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setStatusOpen(false)} />
+                  <div className={`absolute right-0 top-5 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2 flex flex-col gap-1`}>
+                    {subStatus.map(s => (
+                      <span key={s.name} className="flex items-center justify-between gap-2 text-xs">
+                        <span className={`truncate ${c.text} opacity-80`}>r/{s.name}</span>
+                        <span className={`shrink-0 ${s.ok === true ? "text-emerald-600 dark:text-emerald-400" : s.ok === false ? "text-red-500" : `${c.label} opacity-60`}`}>
+                          {s.ok === true ? "loaded" : s.ok === false ? "failed" : "loading"}
+                        </span>
                       </span>
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
-            <RefreshButton c={c} busy={loading} onClick={() => fetchPosts(config, cacheKeyFor(config), true)} />
-            <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
-          </span>
-        </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <RefreshButton c={c} busy={loading} onClick={() => fetchPosts(config, cacheKeyFor(config), true)} />
+              <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
+            </span>
+          }
+        />
 
         <div className="flex-1 min-h-0 relative overflow-hidden">
           {/* Post list */}
@@ -306,22 +307,22 @@ export default function RedditWidget({
                   {posts.map((post, i) => {
                     const sc = tagColor(post.subreddit.toLowerCase());
                     return (
-                      <li key={i} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                      <li key={i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                         <span className="flex items-center gap-1.5 mb-1 min-w-0">
-                          <span className={`inline-block min-w-0 truncate text-[12px] font-semibold px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                          <span className={`inline-block min-w-0 truncate text-[11px] font-medium px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
                             r/{post.subreddit}
                           </span>
                           {post.pubDate && (
-                            <span className={`shrink-0 text-[12px] opacity-60 ${c.text}`}>{timeAgo(post.pubDate)}</span>
+                            <span className={`shrink-0 text-xs opacity-60 ${c.text}`}>{timeAgo(post.pubDate)}</span>
                           )}
                           {post.score > 0 && (
-                            <span className={`shrink-0 text-[12px] opacity-60 ${c.text}`}>▲ {formatCount(post.score)}</span>
+                            <span className={`shrink-0 text-xs opacity-60 ${c.text}`}>▲ {formatCount(post.score)}</span>
                           )}
                         </span>
                         <div className="flex items-start gap-1 group/title">
                           <button
                             onClick={() => setSelected(post)}
-                            className={`flex-1 min-w-0 break-words text-left text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}
+                            className={`flex-1 min-w-0 break-words text-left text-sm font-medium leading-snug ${c.text} hover:opacity-70 transition-opacity ${FOCUS_RING}`}
                           >
                             {post.title}
                           </button>
@@ -330,14 +331,15 @@ export default function RedditWidget({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
-                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                            aria-label="Open on Reddit"
+                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
                           >
-                            <ExternalLink size={11} />
+                            <ExternalLink size={12} />
                           </a>
                           {/* Some image posts come without a feed thumbnail; the
                               full image stands in for it then. */}
                           {config.images && (post.thumbnail || post.image) && (
-                            <button onClick={() => setSelected(post)} className="shrink-0 ml-1.5 hover:opacity-80 transition-opacity">
+                            <button onClick={() => setSelected(post)} aria-label="Open post" className={`shrink-0 ml-1.5 hover:opacity-80 transition-opacity rounded-lg ${FOCUS_RING}`}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={post.thumbnail || post.image}
@@ -365,12 +367,12 @@ export default function RedditWidget({
             {selected && (
               <>
                 <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
-                  <button onClick={() => setSelected(null)} className="shrink-0 opacity-60 hover:opacity-100">
+                  <button onClick={() => setSelected(null)} aria-label="Back to list" className={`shrink-0 opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
                     <ChevronLeft size={14} />
                   </button>
                   <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
-                  <a href={selected.link} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80">
-                    <ExternalLink size={11} />
+                  <a href={selected.link} target="_blank" rel="noopener noreferrer" aria-label="Open on Reddit" className={`shrink-0 opacity-40 hover:opacity-80 ${HIT_AREA} ${FOCUS_RING}`}>
+                    <ExternalLink size={12} />
                   </a>
                 </div>
                 <div ref={detail.ref} className="flex-1 min-h-0 overflow-y-auto pr-3" onScroll={detail.onScroll}>
@@ -396,10 +398,10 @@ export default function RedditWidget({
                         [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-2
                         [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-2
                         [&_li]:mb-0.5
-                        [&_hr]:my-3 [&_hr]:border-black/10
-                        [&_a]:underline [&_a]:opacity-70 [&_a:hover]:opacity-100
+                        [&_hr]:my-3 [&_hr]:border-black/10 dark:border-white/10
+                        [&_a]:underline [&_a]:opacity-80 [&_a:hover]:opacity-100
                         [&_blockquote]:pl-3 [&_blockquote]:border-l-2 [&_blockquote]:border-current/30 [&_blockquote]:italic [&_blockquote]:opacity-70
-                        [&_code]:font-mono [&_code]:text-xs [&_code]:bg-black/5 [&_code]:px-1 [&_code]:rounded
+                        [&_code]:font-mono [&_code]:text-xs [&_code]:bg-black/5 [&_code]:px-1 [&_code]:rounded-md
                         [&_pre]:overflow-x-auto [&_pre]:max-w-full
                         [&_strong]:font-semibold [&_em]:italic`}
                       dangerouslySetInnerHTML={{ __html: sanitizeRedditHtml(selected.content) }}
@@ -430,12 +432,9 @@ export default function RedditWidget({
               placeholder="subreddit name"
               className="flex-1"
             />
-            <button
-              onClick={addSub}
-              className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            >
+            <SmallButton c={c} onClick={addSub} title="Add subreddit" className="self-center">
               <Plus size={14} />
-            </button>
+            </SmallButton>
           </div>
 
           {/* Post images (thumbnails in the list, full image in the detail view) */}
@@ -444,9 +443,9 @@ export default function RedditWidget({
               type="checkbox"
               checked={!!draft.images}
               onChange={e => setDraft(d => ({ ...d, images: e.target.checked }))}
-              className="w-3.5 h-3.5 rounded accent-current"
+              className="w-3.5 h-3.5 rounded-md accent-current"
             />
-            <span className="opacity-70">Show post images</span>
+            <span className="opacity-80">Show post images</span>
           </label>
 
           {/* Selected subreddits with per-sub limit and period */}
@@ -466,27 +465,20 @@ export default function RedditWidget({
                         onChange={e => setSubLimit(sub.name, Math.max(1, Math.min(25, parseInt(e.target.value) || 1)))}
                         className="w-10 text-center bg-white/60 rounded-md px-1 py-0.5 outline-none border border-current/20 text-xs"
                       />
-                      <span className="opacity-50 font-normal">posts</span>
+                      <span className="opacity-60 font-normal">posts</span>
                       <button
                         onClick={() => setDraft(d => ({ ...d, subreddits: d.subreddits.filter(s => s.name !== sub.name) }))}
-                        className="opacity-60 hover:opacity-100 leading-none ml-1"
+                        aria-label={`Remove r/${sub.name}`}
+                        className={`opacity-60 hover:opacity-100 leading-none ml-1 ${HIT_AREA} ${FOCUS_RING}`}
                       >
                         ×
                       </button>
                     </div>
                     <div className="flex gap-1 flex-wrap justify-center">
                       {PERIODS.map(p => (
-                        <button
-                          key={p.value}
-                          onClick={() => setSubPeriod(sub.name, p.value)}
-                          className={`px-2 py-0.5 rounded-md text-[12px] font-medium transition-colors ${
-                            sub.period === p.value
-                              ? "bg-white/80 shadow-sm"
-                              : "opacity-60 hover:opacity-70"
-                          }`}
-                        >
+                        <Chip key={p.value} c={{ ...c, label: sc.label, text: sc.label }} active={sub.period === p.value} onClick={() => setSubPeriod(sub.name, p.value)}>
                           {p.label}
-                        </button>
+                        </Chip>
                       ))}
                     </div>
                   </div>

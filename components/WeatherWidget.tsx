@@ -10,7 +10,7 @@ import * as storage from "@/lib/storage";
 import { formatDate } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput } from "./ui/Field";
-import { PencilButton, EmptyState, LoadingState, SaveCancelRow } from "./ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, PencilButton, EmptyState, LoadingState, SaveCancelRow } from "./ui/WidgetChrome";
 
 type WeatherConfig = { name: string; region: string; lat: number; lon: number; unit: "c" | "f" };
 type GeoResult = { name: string; lat: number; lon: number; region: string };
@@ -159,13 +159,12 @@ export default function WeatherWidget({
 
   const front = (
     <>
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-          <span className="opacity-50 shrink-0"><CurrentIcon size={14} /></span>
-          <span className="text-xs font-medium opacity-60 truncate">{config.name || "Weather"}</span>
-        </div>
-        <PencilButton c={c} onClick={() => { setDraft(config); setQuery(""); setResults([]); setSearchError(""); setSettingsOpen(true); }} />
-      </div>
+      <WidgetHeader
+        c={c}
+        icon={CurrentIcon}
+        title={config.name || widget.title}
+        right={<PencilButton c={c} onClick={() => { setDraft(config); setQuery(""); setResults([]); setSearchError(""); setSettingsOpen(true); }} />}
+      />
 
       {!loaded ? null : !configured(config) ? (
         <EmptyState c={c} action="choose a location" />
@@ -182,14 +181,14 @@ export default function WeatherWidget({
               <span className={`text-2xl font-semibold tabular-nums leading-none ${c.text}`}>
                 {Math.round(current.temp)}{unitSuffix}
               </span>
-              <span className={`text-[12px] opacity-50 ${c.label}`}>
+              <span className={`text-xs opacity-60 ${c.label}`}>
                 feels {Math.round(current.feelsLike)}° · {codeInfo(current.code).label}
               </span>
             </div>
           </div>
-          <div className={`shrink-0 flex items-center justify-center gap-4 text-[12px] opacity-50 ${c.label}`}>
-            <span className="flex items-center gap-1"><Droplets size={10} />{current.humidity}%</span>
-            <span className="flex items-center gap-1"><Wind size={10} />{Math.round(current.windKmh)} km/h</span>
+          <div className={`shrink-0 flex items-center justify-center gap-4 text-xs opacity-60 ${c.label}`}>
+            <span className="flex items-center gap-1"><Droplets size={12} />{current.humidity}%</span>
+            <span className="flex items-center gap-1"><Wind size={12} />{Math.round(current.windKmh)} km/h</span>
           </div>
 
           {/* Daily forecast */}
@@ -198,14 +197,14 @@ export default function WeatherWidget({
               {(forecast?.daily ?? []).map((d, i) => {
                 const { Icon } = codeInfo(d.code);
                 return (
-                  <li key={d.date} className={`flex items-center gap-2 py-1.5 ${i > 0 ? "border-t border-black/10" : ""}`} title={formatDate(`${d.date}T12:00:00`)}>
-                    <span className={`w-10 shrink-0 text-xs ${c.text} ${i === 0 ? "font-medium" : "opacity-70"}`}>{dayLabel(d.date, i)}</span>
+                  <li key={d.date} className={`flex items-center gap-2 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`} title={formatDate(`${d.date}T12:00:00`)}>
+                    <span className={`w-10 shrink-0 text-xs ${c.text} ${i === 0 ? "font-medium" : "opacity-80"}`}>{dayLabel(d.date, i)}</span>
                     <Icon size={14} className={`shrink-0 opacity-60 ${c.label}`} />
                     {d.rainPct > 20 ? (
-                      <span className={`text-[12px] tabular-nums opacity-50 ${c.label}`}>{d.rainPct}%</span>
+                      <span className={`text-xs tabular-nums opacity-60 ${c.label}`}>{d.rainPct}%</span>
                     ) : <span />}
                     <span className={`flex-1 text-right text-xs tabular-nums ${c.text}`}>
-                      <span className="opacity-50">{Math.round(d.min)}°</span>
+                      <span className="opacity-60">{Math.round(d.min)}°</span>
                       {" "}
                       <span>{Math.round(d.max)}°</span>
                     </span>
@@ -231,47 +230,37 @@ export default function WeatherWidget({
             placeholder="Search a city or place"
             className="flex-1"
           />
-          <button
-            onClick={searchLocations}
-            disabled={searching || !query.trim()}
-            className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
-          >
+          <SmallButton c={c} onClick={searchLocations} disabled={searching || !query.trim()} title="Search" className="self-center">
             {searching ? <Loader size={14} className="animate-spin" /> : <Search size={14} />}
-          </button>
+          </SmallButton>
         </div>
         {results.length > 0 && (
           <div className="flex flex-col gap-0.5">
             {results.map((r, i) => {
               const picked = draft.lat === r.lat && draft.lon === r.lon;
               return (
-                <button
+                <Chip
                   key={i}
+                  c={c}
+                  active={picked}
                   onClick={() => setDraft(d => ({ ...d, name: r.name, region: r.region, lat: r.lat, lon: r.lon }))}
-                  className={`text-left px-2 py-1 rounded-lg text-xs transition-colors ${picked ? `${c.label} font-medium opacity-100` : `${c.text} opacity-50 hover:opacity-80`}`}
+                  className="self-start max-w-full truncate"
                 >
                   {r.name}{r.region ? `, ${r.region}` : ""}
-                </button>
+                </Chip>
               );
             })}
           </div>
         )}
         {configured(draft) && (
-          <p className={`text-[12px] opacity-50 ${c.label}`}>chosen: {draft.name}{draft.region ? `, ${draft.region}` : ""}</p>
+          <p className={`text-xs opacity-60 ${c.label}`}>chosen: {draft.name}{draft.region ? `, ${draft.region}` : ""}</p>
         )}
         <div className="flex items-center gap-2">
           <span className={`text-xs opacity-60 ${c.label}`}>Unit</span>
           {(["c", "f"] as const).map(u => (
-            <button
-              key={u}
-              onClick={() => setDraft(d => ({ ...d, unit: u }))}
-              className={`w-8 py-1 rounded-lg text-xs font-medium transition-colors ${
-                draft.unit === u
-                  ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm border border-[var(--surface-border)]"
-                  : `${c.text} opacity-50 hover:opacity-80`
-              }`}
-            >
+            <Chip key={u} c={c} active={draft.unit === u} onClick={() => setDraft(d => ({ ...d, unit: u }))}>
               °{u.toUpperCase()}
-            </button>
+            </Chip>
           ))}
         </div>
         {searchError && <p className="text-red-400 text-xs">{searchError}</p>}

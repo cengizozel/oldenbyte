@@ -72,7 +72,7 @@ function afterRender(fn: () => void) {
 
 function Kbd({ children }: { children: string }) {
   return (
-    <kbd className="px-1.5 py-0.5 rounded border border-[var(--surface-border)] text-[12px] text-[var(--text-muted)] whitespace-nowrap">
+    <kbd className="px-1.5 py-0.5 rounded-md border border-[var(--surface-border)] text-xs text-[var(--text-muted)] whitespace-nowrap">
       {children}
     </kbd>
   );
@@ -347,7 +347,7 @@ export default function KeyboardLayer({
           key={b.key}
           aria-hidden
           style={{ top: b.top, left: b.left }}
-          className={`fixed z-[60] pointer-events-none rounded-md shadow-md font-medium tabular-nums bg-[var(--text-primary)] text-[var(--surface)] ${b.tab ? "px-1 text-[11px]" : "px-1.5 py-0.5 text-[13px]"}`}
+          className={`fixed z-[60] pointer-events-none rounded-md shadow-md font-medium tabular-nums bg-[var(--text-primary)] text-[var(--surface)] ${b.tab ? "px-1 text-[11px]" : "px-1.5 py-0.5 text-sm"}`}
         >
           {b.label}
         </span>
@@ -365,7 +365,7 @@ export default function KeyboardLayer({
           onMouseDown={e => { e.preventDefault(); finish(); }}
         >
           <div aria-label="Keyboard shortcuts" className="w-full max-w-sm bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-2xl p-5 flex flex-col gap-3">
-            <span className="text-[12px] text-[var(--text-muted)]">Keyboard shortcuts</span>
+            <span className="text-xs text-[var(--text-muted)]">Keyboard shortcuts</span>
             <ul className="flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
               <li className="flex items-center justify-between gap-3"><span>Focus widget 1 to 10</span><Kbd>{`${L} 1..9, 0`}</Kbd></li>
               <li className="flex items-center justify-between gap-3"><span>Then pick a tab</span><Kbd>1..9 or q w e r t</Kbd></li>
@@ -428,7 +428,7 @@ export function KeyboardSettings() {
 
   return (
     <section className="flex flex-col gap-3">
-      <span className="text-[12px] text-[var(--text-muted)]">Keyboard</span>
+      <span className="text-xs text-[var(--text-muted)]">Keyboard</span>
       <div className="flex items-center justify-between">
         <span className="text-sm text-[var(--text-secondary)]">Keyboard shortcuts</span>
         <Toggle checked={config.enabled} onChange={() => update({ ...config, enabled: !config.enabled })} label="Keyboard shortcuts" />

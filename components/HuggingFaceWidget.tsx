@@ -8,7 +8,8 @@ import { formatCount, formatDate, localDateStr } from "@/lib/format";
 import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import { PencilButton, RefreshButton, ScrollFades, LoadingState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
+import { PencilButton, RefreshButton, ScrollFades, LoadingState, SaveCancelRow, WidgetHeader, Chip } from "@/components/ui/WidgetChrome";
 
 type HFPaper = {
   id: string;
@@ -91,18 +92,17 @@ export default function HuggingFaceWidget({
       className={className}
       front={
         <>
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 ${c.label}`}>
-              <span className="opacity-50"><Sparkles size={14} /></span>
-              <span className="text-xs font-medium opacity-60">HF Daily</span>
-            </div>
-            {!selected && (
-              <span className="flex items-center gap-2">
+          <WidgetHeader
+            c={c}
+            icon={Sparkles}
+            title="HF Daily"
+            right={!selected && (
+              <>
                 <RefreshButton c={c} busy={loading} onClick={() => fetchPapers(config, true)} />
                 <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
-              </span>
+              </>
             )}
-          </div>
+          />
 
           <div className="flex-1 min-h-0 relative overflow-hidden">
             {/* Paper list */}
@@ -117,7 +117,7 @@ export default function HuggingFaceWidget({
                 ) : (
                   <ul className="flex flex-col">
                     {papers.map((p, i) => (
-                      <li key={p.id} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                      <li key={p.id} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                         <div className="flex items-start gap-1 group/title">
                           <button
                             onClick={() => setSelected(p)}
@@ -130,9 +130,10 @@ export default function HuggingFaceWidget({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
-                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                            aria-label="Open on Hugging Face"
+                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
                           >
-                            <ExternalLink size={11} />
+                            <ExternalLink size={14} />
                           </a>
                         </div>
                       </li>
@@ -148,12 +149,12 @@ export default function HuggingFaceWidget({
               {selected && (
                 <>
                   <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
-                    <button onClick={() => setSelected(null)} className="shrink-0 opacity-60 hover:opacity-100">
+                    <button onClick={() => setSelected(null)} aria-label="Back to list" className={`shrink-0 opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
                       <ChevronLeft size={14} />
                     </button>
                     <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
-                    <a href={selected.link} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-40 hover:opacity-80">
-                      <ExternalLink size={11} />
+                    <a href={selected.link} target="_blank" rel="noopener noreferrer" aria-label="Open on Hugging Face" className={`shrink-0 opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
+                      <ExternalLink size={14} />
                     </a>
                   </div>
                   <div
@@ -163,7 +164,7 @@ export default function HuggingFaceWidget({
                   >
                     <div className="flex flex-col gap-2">
                       {selected.authors.length > 0 && (
-                        <p className={`text-xs opacity-55 leading-snug break-words ${c.text}`}>
+                        <p className={`text-xs opacity-60 leading-snug break-words ${c.text}`}>
                           {selected.authors.join(", ")}
                         </p>
                       )}
@@ -180,8 +181,8 @@ export default function HuggingFaceWidget({
                       </div>
                       {selected.abstract && (
                         <>
-                          <div className="border-t border-black/5" />
-                          <p className={`text-xs leading-relaxed opacity-75 break-words ${c.text}`}>{selected.abstract}</p>
+                          <div className="border-t border-black/10 dark:border-white/10" />
+                          <p className={`text-xs leading-relaxed opacity-80 break-words ${c.text}`}>{selected.abstract}</p>
                         </>
                       )}
                     </div>
@@ -196,22 +197,14 @@ export default function HuggingFaceWidget({
       back={
         <>
           <div className="flex flex-col gap-1.5">
-            <label className={`text-[12px] font-semibold opacity-50 ${c.label}`}>
+            <label className={`text-xs font-medium opacity-60 ${c.label}`}>
               Papers to show
             </label>
             <div className="flex gap-2">
               {[10, 25, 50].map(n => (
-                <button
-                  key={n}
-                  onClick={() => setDraft({ limit: n })}
-                  className={`flex-1 text-xs py-1.5 rounded-xl border transition-colors ${
-                    draft.limit === n
-                      ? "border-neutral-300 bg-white text-neutral-700 font-medium"
-                      : "border-neutral-200 text-neutral-400 hover:text-neutral-600"
-                  }`}
-                >
+                <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft({ limit: n })} className="flex-1">
                   {n}
-                </button>
+                </Chip>
               ))}
             </div>
           </div>

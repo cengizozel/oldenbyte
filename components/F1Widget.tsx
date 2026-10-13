@@ -7,7 +7,7 @@ import * as storage from "@/lib/storage";
 import { formatDate, localDateStr } from "@/lib/format";
 import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
-import { LoadingState, ScrollFades } from "@/components/ui/WidgetChrome";
+import { LoadingState, ScrollFades, WidgetHeader, SmallButton } from "@/components/ui/WidgetChrome";
 import { f1CacheKey } from "@/lib/cacheKeys";
 
 type Race = {
@@ -86,11 +86,7 @@ export default function F1Widget({
   return (
     <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
 
-      {/* Header */}
-      <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.label}`}>
-        <span className="opacity-50"><Flag size={14} /></span>
-        <span className="text-xs font-medium opacity-60">Formula 1</span>
-      </div>
+      <WidgetHeader c={c} icon={Flag} title="Formula 1" />
 
       <div className="flex-1 min-h-0 relative">
         <div
@@ -107,12 +103,12 @@ export default function F1Widget({
               {data.race ? (
                 <div className="flex items-start gap-3">
                   <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                    <p className={`text-[12px] font-semibold opacity-50 mb-0.5 ${c.label}`}>
-                      Next Race · Round {data.race.round}
+                    <p className={`text-xs font-medium opacity-60 mb-0.5 ${c.label}`}>
+                      Next race · Round {data.race.round}
                     </p>
                     <p className={`text-sm font-medium leading-snug ${c.text}`}>{data.race.raceName}</p>
                     <p className={`text-xs opacity-60 ${c.text}`}>{data.race.Circuit.circuitName}</p>
-                    <p className={`text-xs opacity-50 ${c.text}`}>
+                    <p className={`text-xs opacity-60 ${c.text}`}>
                       {formatDate(`${data.race.date}T12:00:00Z`, { year: false })} · {countdown(data.race.date, data.race.time)}
                     </p>
                   </div>
@@ -123,26 +119,26 @@ export default function F1Widget({
                   />
                 </div>
               ) : (
-                <p className={`text-xs opacity-50 ${c.text}`}>Season complete</p>
+                <p className={`text-xs opacity-60 ${c.text}`}>Season complete</p>
               )}
 
               {/* Standings */}
               {data.standings.length > 0 && (
                 <>
-                  <div className="border-t border-black/5" />
+                  <div className="border-t border-black/10 dark:border-white/10" />
                   <div className="flex flex-col">
-                    <p className={`text-[12px] font-semibold opacity-50 mb-1.5 ${c.label}`}>
+                    <p className={`text-xs font-medium opacity-60 mb-1 ${c.label}`}>
                       Standings
                     </p>
                     {data.standings.map((s, i) => (
                       <div
                         key={s.position}
-                        className={`flex items-center gap-2 py-1.5 ${i > 0 ? "border-t border-black/10" : ""}`}
+                        className={`flex items-center gap-2 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}
                       >
-                        <span className={`text-xs font-semibold opacity-60 w-4 shrink-0 tabular-nums ${c.label}`}>{s.position}</span>
-                        <span className={`text-xs font-bold w-8 shrink-0 ${c.label}`}>{s.Driver.code}</span>
-                        <span className={`text-xs flex-1 opacity-70 truncate ${c.text}`}>{s.Driver.familyName}</span>
-                        <span className={`text-xs font-medium tabular-nums opacity-80 ${c.text}`}>{s.points}</span>
+                        <span className={`text-xs opacity-60 w-4 shrink-0 tabular-nums ${c.label}`}>{s.position}</span>
+                        <span className={`text-xs font-medium w-8 shrink-0 ${c.label}`}>{s.Driver.code}</span>
+                        <span className={`text-xs flex-1 opacity-80 truncate ${c.text}`}>{s.Driver.familyName}</span>
+                        <span className={`text-xs tabular-nums opacity-80 ${c.text}`}>{s.points}</span>
                       </div>
                     ))}
                   </div>
@@ -152,13 +148,10 @@ export default function F1Widget({
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-2 h-full text-center">
-              <p className={`text-xs opacity-50 ${c.text}`}>Couldn&apos;t load F1 data.</p>
-              <button
-                onClick={load}
-                className={`flex items-center gap-1 text-xs opacity-60 hover:opacity-90 ${c.label}`}
-              >
-                <RotateCcw size={14} /> Retry
-              </button>
+              <p className={`text-xs opacity-60 ${c.text}`}>couldn&apos;t load F1 data</p>
+              <SmallButton c={c} onClick={load}>
+                <RotateCcw size={12} /> Retry
+              </SmallButton>
             </div>
           ) : (
             <LoadingState c={c} />

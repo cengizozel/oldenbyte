@@ -23,7 +23,7 @@ function renderInline(text: string, prefix: string, cites: Cites = {}): ReactNod
     const tok = m[0];
     const key = `${prefix}-${i++}`;
     if (tok.startsWith("`")) {
-      nodes.push(<code key={key} className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono text-[0.85em]">{tok.slice(1, -1)}</code>);
+      nodes.push(<code key={key} className="px-1 py-0.5 rounded-md bg-black/10 dark:bg-white/10 font-mono text-[0.85em]">{tok.slice(1, -1)}</code>);
     } else if (tok.startsWith("**")) {
       nodes.push(<strong key={key} className="font-semibold">{renderInline(tok.slice(2, -2), key, cites)}</strong>);
     } else if (tok.startsWith("*")) {
@@ -34,7 +34,7 @@ function renderInline(text: string, prefix: string, cites: Cites = {}): ReactNod
       if (cite) {
         nodes.push(
           <a key={key} href={cite.url} target="_blank" rel="noopener noreferrer" title={cite.title}
-            className="inline-flex items-center justify-center align-super text-[0.65em] font-semibold min-w-[1.1em] px-1 mx-px rounded bg-black/10 dark:bg-white/15 hover:bg-black/20 dark:hover:bg-white/25 no-underline">
+            className="inline-flex items-center justify-center align-super text-[0.65em] font-semibold min-w-[1.1em] px-1 mx-px rounded-md bg-black/10 dark:bg-white/15 hover:bg-black/20 dark:hover:bg-white/25 no-underline">
             {n}
           </a>
         );
@@ -70,7 +70,7 @@ function parseBlocks(src: string, cites: Cites = {}): ReactNode[] {
       while (i < lines.length && !/^```\s*$/.test(lines[i].trim())) { buf.push(lines[i]); i++; }
       i++; // closing fence
       out.push(
-        <pre key={k++} className="my-1.5 p-2 rounded-lg bg-black/10 dark:bg-white/10 overflow-x-auto text-[12px] font-mono leading-relaxed">
+        <pre key={k++} className="my-1.5 p-2 rounded-lg bg-black/10 dark:bg-white/10 overflow-x-auto text-xs font-mono leading-relaxed">
           <code>{buf.join("\n")}</code>
         </pre>
       );

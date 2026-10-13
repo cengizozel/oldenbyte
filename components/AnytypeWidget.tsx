@@ -7,8 +7,8 @@ import * as storage from "@/lib/storage";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import Markdown from "@/components/Markdown";
-import { SettingsInput, SettingsSelect } from "@/components/ui/Field";
-import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { SettingsInput, SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
+import { WidgetHeader, PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton, Chip } from "@/components/ui/WidgetChrome";
 
 type AnytypeObject = { id: string; name: string; snippet: string; spaceId: string; type: string };
 type Space = { id: string; name: string };
@@ -296,32 +296,33 @@ export default function AnytypeWidget({
       className={className}
       front={
         <>
-          <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-              <span className="opacity-50 shrink-0"><Layers size={14} /></span>
-              <span className="text-xs font-medium opacity-60 truncate">{config.spaceName || "Anytype"}</span>
-            </div>
-            <div className="flex items-center gap-2.5 shrink-0">
-              {(searched || query || activeType || reader) && (
-                <button onClick={goHome} title="Back to start" className={`opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
-                  <Home size={14} />
-                </button>
-              )}
-              <PencilButton c={c} onClick={openSettings} />
-            </div>
-          </div>
+          <WidgetHeader
+            c={c}
+            icon={Layers}
+            title={config.spaceName || "Anytype"}
+            right={
+              <>
+                {(searched || query || activeType || reader) && (
+                  <button onClick={goHome} title="Back to start" aria-label="Back to start" className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
+                    <Home size={14} />
+                  </button>
+                )}
+                <PencilButton c={c} onClick={openSettings} />
+              </>
+            }
+          />
 
           {configured ? (
             <div className="flex-1 min-h-0 flex flex-col">
               <div className="relative shrink-0 mb-3">
-                <Search size={13} className={`absolute left-2.5 top-1/2 -translate-y-1/2 opacity-40 ${c.text}`} />
+                <Search size={14} className={`absolute left-2.5 top-1/2 -translate-y-1/2 opacity-40 ${c.text}`} />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && runSearch()}
                   placeholder="Search your spaces…"
-                  className={`w-full text-sm rounded-xl pl-8 pr-3 py-1.5 outline-none bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/10 dark:focus:border-white/10 ${c.text} placeholder:opacity-40`}
+                  className={`w-full text-sm rounded-xl pl-8 pr-3 py-1.5 outline-none bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/10 dark:border-white/10 dark:focus:border-white/10 ${c.text} placeholder:opacity-40`}
                 />
               </div>
               <div className="flex-1 min-h-0 relative">
@@ -329,12 +330,12 @@ export default function AnytypeWidget({
                   {reader ? (
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
-                        <button onClick={() => { setReader(null); setReaderObj(null); }} title="Back" className={`opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
+                        <button onClick={() => { setReader(null); setReaderObj(null); }} title="Back" aria-label="Back" className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
                           <ChevronLeft size={14} />
                         </button>
                         <span className={`flex-1 min-w-0 text-sm font-medium truncate ${c.text}`}>{readerObj?.name ?? reader.name}</span>
-                        <a href={deepLink(reader)} title="Open in Anytype" className={`shrink-0 opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
-                          <ExternalLink size={12} />
+                        <a href={deepLink(reader)} title="Open in Anytype" aria-label="Open in Anytype" className={`shrink-0 opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
+                          <ExternalLink size={14} />
                         </a>
                       </div>
                       {readerLoading ? (
@@ -342,7 +343,7 @@ export default function AnytypeWidget({
                       ) : error ? (
                         <p className="text-red-400 text-xs break-words">{error}</p>
                       ) : readerObj?.markdown ? (
-                        <Markdown text={readerObj.markdown} className={`text-[13px] ${c.text}`} />
+                        <Markdown text={readerObj.markdown} className={`text-sm ${c.text}`} />
                       ) : (
                         <EmptyState c={c}>{reader.snippet || "no content"}</EmptyState>
                       )}
@@ -355,10 +356,10 @@ export default function AnytypeWidget({
                     types.length ? (
                       <ul className="flex flex-col">
                         {types.map((t, i) => (
-                          <li key={t.id} className={`${i > 0 ? "border-t border-black/10" : ""}`}>
+                          <li key={t.id} className={i > 0 ? `border-t ${c.border}` : ""}>
                             <button
                               onClick={() => openType(t)}
-                              className={`w-full flex items-center gap-1 py-2.5 text-left text-sm font-medium ${c.text} hover:opacity-70 transition-opacity`}
+                              className={`w-full flex items-center gap-1 py-2 text-left text-sm font-medium ${c.text} hover:opacity-80 transition-opacity`}
                             >
                               <span className="flex-1 min-w-0 truncate">{t.name}</span>
                               <ChevronRight size={12} className="shrink-0 opacity-40" />
@@ -373,7 +374,7 @@ export default function AnytypeWidget({
                     <>
                       {activeType && (
                         <div className="flex items-center gap-1.5 mb-1">
-                          <button onClick={goHome} title="Back to types" className={`opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
+                          <button onClick={goHome} title="Back to types" aria-label="Back to types" className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
                             <ChevronLeft size={14} />
                           </button>
                           <span className={`text-xs font-medium opacity-60 ${c.label}`}>{activeType.name}</span>
@@ -382,11 +383,11 @@ export default function AnytypeWidget({
                       {objects.length ? (
                         <ul className="flex flex-col">
                           {objects.map((o, i) => (
-                            <li key={o.id} className={`py-2.5 ${i > 0 ? "border-t border-black/10" : ""}`}>
+                            <li key={o.id} className={`py-2 ${i > 0 ? `border-t ${c.border}` : ""}`}>
                               <div className="flex items-start gap-1 group/title">
                                 <button
                                   onClick={() => openReader(o)}
-                                  className={`flex-1 min-w-0 text-left text-sm leading-snug font-medium break-words ${c.text} hover:opacity-70 transition-opacity`}
+                                  className={`flex-1 min-w-0 text-left text-sm leading-snug font-medium break-words ${c.text} hover:opacity-80 transition-opacity`}
                                   title="Read here"
                                 >
                                   {o.name}
@@ -396,11 +397,11 @@ export default function AnytypeWidget({
                                   className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
                                   title="Open in Anytype"
                                 >
-                                  <ExternalLink size={11} />
+                                  <ExternalLink size={12} />
                                 </a>
                               </div>
-                              {o.snippet && <p className={`text-xs mt-0.5 opacity-50 ${c.text} line-clamp-2 break-words`}>{o.snippet}</p>}
-                              {o.type && !activeType && <span className={`text-[12px] opacity-60 ${c.label}`}>{o.type}</span>}
+                              {o.snippet && <p className={`text-xs mt-0.5 opacity-60 ${c.text} line-clamp-2 break-words`}>{o.snippet}</p>}
+                              {o.type && !activeType && <span className={`text-xs opacity-60 ${c.label}`}>{o.type}</span>}
                             </li>
                           ))}
                         </ul>
@@ -414,9 +415,7 @@ export default function AnytypeWidget({
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center">
-              <EmptyState c={c} action="connect your Anytype app" />
-            </div>
+            <EmptyState c={c} action="connect your Anytype app" />
           )}
         </>
       }
@@ -433,7 +432,7 @@ export default function AnytypeWidget({
           {draft.apiKey ? (
             <div className="flex items-center gap-2">
               {loadingSpaces ? (
-                <span className="flex items-center gap-1.5 text-xs text-neutral-400"><Loader size={12} className="animate-spin" /> loading spaces…</span>
+                <span className={`flex items-center gap-1.5 text-xs opacity-60 ${c.text}`}><Loader size={12} className="animate-spin" /> loading spaces…</span>
               ) : spaces.length > 0 ? (
                 <SettingsSelect
                   value={draft.spaceId}
@@ -446,14 +445,11 @@ export default function AnytypeWidget({
                   {spaces.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </SettingsSelect>
               ) : (
-                <span className="text-xs text-neutral-400 truncate min-w-0">{draft.spaceName || "paired ✓, no spaces loaded"}</span>
+                <span className={`text-xs opacity-60 truncate min-w-0 ${c.text}`}>{draft.spaceName || "paired ✓, no spaces loaded"}</span>
               )}
-              <button
-                onClick={() => loadSpaces(draft.baseUrl, draft.apiKey, draft.spaceId)}
-                className="text-xs px-3 py-1.5 rounded-lg bg-white border border-neutral-200 text-neutral-600 hover:text-neutral-800 shrink-0"
-              >
+              <SmallButton c={c} onClick={() => loadSpaces(draft.baseUrl, draft.apiKey, draft.spaceId)} className="shrink-0">
                 Reload
-              </button>
+              </SmallButton>
             </div>
           ) : pairing === "awaiting-code" ? (
             <div className="flex flex-col gap-1.5">
@@ -468,42 +464,32 @@ export default function AnytypeWidget({
                   placeholder="1234"
                   className="flex-1 min-w-0 tracking-widest"
                 />
-                <button
-                  onClick={confirmCode}
-                  disabled={pairBusy || !code.trim()}
-                  className="text-xs px-3 py-2 rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:text-neutral-900 disabled:opacity-40 shrink-0"
-                >
+                <SmallButton c={c} onClick={confirmCode} disabled={pairBusy || !code.trim()} className="shrink-0">
                   {pairBusy ? <Loader size={12} className="animate-spin" /> : "Confirm"}
-                </button>
+                </SmallButton>
               </div>
             </div>
           ) : (
-            <button
-              onClick={startPairing}
-              disabled={pairBusy || !draft.baseUrl.startsWith("http")}
-              className="text-xs px-3 py-2 rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:text-neutral-900 disabled:opacity-40 self-start"
-            >
-              {pairBusy ? <span className="flex items-center gap-1.5"><Loader size={12} className="animate-spin" /> contacting Anytype…</span> : "Pair with Anytype"}
-            </button>
+            <SmallButton c={c} onClick={startPairing} disabled={pairBusy || !draft.baseUrl.startsWith("http")} className="self-start">
+              {pairBusy ? <><Loader size={12} className="animate-spin" /> contacting Anytype…</> : "Pair with Anytype"}
+            </SmallButton>
           )}
 
           <div className="flex items-center gap-2">
             <span className={`text-xs opacity-60 ${c.label}`}>Home</span>
             {([["recent", "Recent"], ["types", "Types"]] as [HomeView, string][]).map(([v, label]) => (
-              <button key={v} onClick={() => setDraft((d) => ({ ...d, home: v }))}
-                className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${draft.home === v ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}>
+              <Chip key={v} c={c} active={draft.home === v} onClick={() => setDraft((d) => ({ ...d, home: v }))}>
                 {label}
-              </button>
+              </Chip>
             ))}
           </div>
 
           <div className="flex items-center gap-2">
             <span className={`text-xs opacity-60 ${c.label}`}>Results</span>
             {[10, 25, 50, 100].map((n) => (
-              <button key={n} onClick={() => setDraft((d) => ({ ...d, limit: n }))}
-                className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${draft.limit === n ? "bg-white text-neutral-700 shadow-sm border border-neutral-200" : `${c.text} opacity-50 hover:opacity-80`}`}>
+              <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft((d) => ({ ...d, limit: n }))} className="tabular-nums">
                 {n}
-              </button>
+              </Chip>
             ))}
           </div>
 

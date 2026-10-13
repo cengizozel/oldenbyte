@@ -5,8 +5,8 @@ import { Tv, Play, Loader, List, Square } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import FlipCard from "@/components/ui/FlipCard";
-import { SettingsInput } from "@/components/ui/Field";
-import { PencilButton, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { SettingsInput, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
+import { WidgetHeader, PencilButton, EmptyState, SaveCancelRow, SmallButton } from "@/components/ui/WidgetChrome";
 
 type Channel = { name: string; url: string };
 type TvConfig = { playlistUrl: string; channels: Channel[]; channelUrl: string; channelName: string };
@@ -200,29 +200,31 @@ export default function TvWidget({
       className={className}
       front={
         <div ref={rootRef} className="flex flex-col flex-1 min-h-0">
-          <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-              <span className="opacity-50 shrink-0"><Tv size={14} /></span>
-              <span className="text-xs font-medium opacity-60 truncate">{config.channelName || "TV"}</span>
-            </div>
-            <div className="flex items-center gap-2.5 shrink-0">
-              {playing && (
-                <button onClick={stop} title="Stop" className={`opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
-                  <Square size={12} />
-                </button>
-              )}
-              {config.channels.length > 1 && (
-                <button onClick={() => setPickerOpen(o => !o)} title="Channels" className={`opacity-60 hover:opacity-100 transition-opacity ${c.icon}`}>
-                  <List size={14} />
-                </button>
-              )}
-              <PencilButton c={c} onClick={() => { setDraft(config); setError(""); setSettingsOpen(true); }} />
-            </div>
-          </div>
+          <WidgetHeader
+            c={c}
+            icon={Tv}
+            title={config.channelName || "TV"}
+            right={
+              <>
+                {playing && (
+                  <button onClick={stop} title="Stop" aria-label="Stop" className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
+                    <Square size={12} />
+                  </button>
+                )}
+                {config.channels.length > 1 && (
+                  <button onClick={() => setPickerOpen(o => !o)} title="Channels" aria-label="Channels" className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
+                    <List size={14} />
+                  </button>
+                )}
+                <PencilButton c={c} onClick={() => { setDraft(config); setError(""); setSettingsOpen(true); }} />
+              </>
+            }
+          />
 
-          <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden bg-black/90">
-            {config.channelUrl ? (
-              playing ? (
+          {/* The player frame only appears once there is a channel to play. */}
+          {config.channelUrl ? (
+            <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden bg-black/90">
+              {playing ? (
                 <video
                   ref={videoRef}
                   controls
@@ -237,38 +239,36 @@ export default function TvWidget({
                   <Play size={28} />
                   <span className="text-xs">{config.channelName}</span>
                 </button>
-              )
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <EmptyState c={c} action="add a channel" />
-              </div>
-            )}
-            {videoError && (
-              <p className="absolute bottom-2 inset-x-2 text-center text-red-400 text-xs">{videoError}</p>
-            )}
-            {pickerOpen && config.channels.length > 0 && (
-              <div className="absolute inset-0 z-10 overflow-y-auto bg-[var(--surface)]">
-                <ul className="flex flex-col py-1">
-                  {config.channels.map(ch => (
-                    <li key={ch.url}>
-                      <button
-                        onClick={() => pickChannel(ch)}
-                        className={`w-full text-left text-xs py-1.5 px-2 text-[var(--text-primary)] ${ch.url === config.channelUrl ? "font-semibold" : "opacity-70 hover:opacity-100"}`}
-                      >
-                        {ch.name}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+              )}
+              {videoError && (
+                <p className="absolute bottom-2 inset-x-2 text-center text-red-400 text-xs">{videoError}</p>
+              )}
+              {pickerOpen && config.channels.length > 0 && (
+                <div className="absolute inset-0 z-10 overflow-y-auto bg-[var(--surface)]">
+                  <ul className="flex flex-col px-2">
+                    {config.channels.map(ch => (
+                      <li key={ch.url} className="border-b border-[var(--surface-border)] last:border-b-0">
+                        <button
+                          onClick={() => pickChannel(ch)}
+                          className={`w-full text-left text-sm py-2 text-[var(--text-primary)] ${ch.url === config.channelUrl ? "font-medium" : "opacity-80 hover:opacity-100"}`}
+                        >
+                          {ch.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <EmptyState c={c} action="add a channel" />
+          )}
         </div>
       }
       back={
         <>
           <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-            <div className="flex gap-1">
+            <div className="flex items-center gap-2">
               <SettingsInput
                 type="url"
                 value={draft.playlistUrl}
@@ -277,13 +277,9 @@ export default function TvWidget({
                 placeholder="Playlist (.m3u) or stream (.m3u8) URL"
                 className="flex-1 min-w-0"
               />
-              <button
-                onClick={loadChannels}
-                disabled={loadingChannels}
-                className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 text-xs"
-              >
+              <SmallButton c={c} onClick={loadChannels} disabled={loadingChannels}>
                 {loadingChannels ? <Loader size={14} className="animate-spin" /> : "Load"}
-              </button>
+              </SmallButton>
             </div>
             {draft.channels.length > 0 && (
               <div className="flex flex-col gap-1">
@@ -291,10 +287,10 @@ export default function TvWidget({
                   <button
                     key={ch.url}
                     onClick={() => setDraft(d => ({ ...d, channelUrl: ch.url, channelName: ch.name }))}
-                    className={`text-left text-xs px-2 py-1.5 rounded-lg transition-colors ${
+                    className={`text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${
                       draft.channelUrl === ch.url
-                        ? "bg-white text-neutral-700 shadow-sm border border-neutral-200"
-                        : `${c.text} opacity-60 hover:opacity-90`
+                        ? `bg-black/10 dark:bg-white/15 ${c.text}`
+                        : `${c.text} opacity-60 hover:opacity-100`
                     }`}
                   >
                     {ch.name}

@@ -232,10 +232,10 @@ export default function AdminPage() {
 
         {/* Users */}
         <section className={cardClass}>
-          <span className="text-[12px] text-[var(--text-muted)]">Users</span>
+          <span className="text-xs text-[var(--text-muted)]">Users</span>
           {!users ? (
             <div className="flex items-center gap-2 mt-3 text-sm text-[var(--text-muted)]">
-              <Loader size={13} className="animate-spin" /> Loading…
+              <Loader size={14} className="animate-spin" /> Loading…
             </div>
           ) : users.length === 0 ? (
             <p className="mt-3 text-sm text-[var(--text-muted)]">No users.</p>
@@ -247,17 +247,17 @@ export default function AdminPage() {
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm text-[var(--text-primary)] truncate">{u.username}</span>
                       <span
-                        className={`shrink-0 inline-flex items-center gap-1 text-[12px] px-1.5 py-0.5 rounded-md ${
+                        className={`shrink-0 inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md ${
                           u.role === "admin"
                             ? "bg-[var(--w-sky-bg)] border border-[var(--w-sky-border)] text-[var(--w-sky-label)]"
                             : "bg-[var(--w-neutral-bg)] border border-[var(--w-neutral-border)] text-[var(--w-neutral-label)]"
                         }`}
                       >
-                        {u.role === "admin" && <ShieldCheck size={10} />}
+                        {u.role === "admin" && <ShieldCheck size={12} />}
                         {u.role}
                       </span>
                       {u.id === me.id && (
-                        <span className="shrink-0 text-[12px] text-[var(--text-muted)]">you</span>
+                        <span className="shrink-0 text-xs text-[var(--text-muted)]">you</span>
                       )}
                     </div>
                     <span className="shrink-0 text-xs text-[var(--text-muted)]">{fmtDate(u.createdAt)}</span>
@@ -309,10 +309,10 @@ export default function AdminPage() {
 
         {/* Registration */}
         <section className={cardClass}>
-          <span className="text-[12px] text-[var(--text-muted)]">Registration</span>
+          <span className="text-xs text-[var(--text-muted)]">Registration</span>
           {!config ? (
             <div className="flex items-center gap-2 mt-3 text-sm text-[var(--text-muted)]">
-              <Loader size={13} className="animate-spin" /> Loading…
+              <Loader size={14} className="animate-spin" /> Loading…
             </div>
           ) : (
             <div className="mt-3 flex flex-col gap-4">
@@ -348,7 +348,7 @@ export default function AdminPage() {
                     disabled={!invite.trim()}
                     className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl bg-[var(--surface-border)] text-[var(--text-primary)] hover:bg-[var(--surface-border-focus)] disabled:opacity-40 transition-colors"
                   >
-                    <Check size={13} /> Save
+                    <Check size={14} /> Save
                   </button>
                 </div>
                 {configMsg && <p className="text-xs text-[var(--text-muted)]">{configMsg}</p>}

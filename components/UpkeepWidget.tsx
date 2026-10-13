@@ -8,8 +8,8 @@ import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
-import { SettingsInput } from "./ui/Field";
-import { PencilButton, EmptyState, SaveCancelRow } from "./ui/WidgetChrome";
+import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
+import { PencilButton, EmptyState, SaveCancelRow, WidgetHeader, SmallButton } from "./ui/WidgetChrome";
 
 // Upkeep is Tracker and Rhythm's third sibling. Tracker answers "how long?",
 // Rhythm answers "when, and how often?" — Upkeep answers "did I keep up with the
@@ -223,22 +223,24 @@ export default function UpkeepWidget({
   const streak = perfectStreak();
   const perfect = pct === 100;
 
-  const headerIconCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`;
+  const headerIconCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`;
+  const iconBtnCls = `${HIT_AREA} ${FOCUS_RING}`;
 
   const front = (
     <>
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 ${c.label}`}>
-          <span className="opacity-50"><ShieldCheck size={14} /></span>
-          <span className="text-xs font-medium opacity-60">Upkeep</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => { setDetailDate(null); setHistoryOpen(true); }} title="History and insights" className={headerIconCls}>
-            <History size={14} />
-          </button>
-          <PencilButton c={c} onClick={() => { setDraft(items); setSettingsOpen(true); }} title="Edit items" />
-        </div>
-      </div>
+      <WidgetHeader
+        c={c}
+        icon={ShieldCheck}
+        title="Upkeep"
+        right={
+          <>
+            <button onClick={() => { setDetailDate(null); setHistoryOpen(true); }} title="History and insights" aria-label="History and insights" className={headerIconCls}>
+              <History size={14} />
+            </button>
+            <PencilButton c={c} onClick={() => { setDraft(items); setSettingsOpen(true); }} title="Edit items" />
+          </>
+        }
+      />
 
       {!loaded ? null : items.length === 0 ? (
         <EmptyState c={c} action="add daily essentials" />
@@ -253,9 +255,9 @@ export default function UpkeepWidget({
               center={
                 <>
                   <span className={`text-2xl font-semibold tabular-nums leading-none ${perfect ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>
-                    {pct ?? "—"}
+                    {pct ?? "-"}
                   </span>
-                  <span className={`mt-1 text-[12px] opacity-60 ${c.label}`}>
+                  <span className={`mt-1 text-xs opacity-60 ${c.label}`}>
                     {perfect ? "perfect" : "/ 100"}
                   </span>
                 </>
@@ -264,7 +266,7 @@ export default function UpkeepWidget({
           </div>
 
           {streak >= 2 && (
-            <div className={`shrink-0 flex items-center justify-center gap-1 text-[12px] tabular-nums ${c.label} opacity-70`}>
+            <div className={`shrink-0 flex items-center justify-center gap-1 text-xs tabular-nums ${c.label} opacity-60`}>
               <Flame size={12} />
               <span>{streak}-day perfect streak</span>
             </div>
@@ -278,15 +280,15 @@ export default function UpkeepWidget({
                 <li key={it.id}>
                   <button
                     onClick={() => toggle(it.id, today)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors ${FOCUS_RING} ${
                       done ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"
                     }`}
                   >
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: dot, opacity: done ? 1 : 0.4 }} />
-                    <span className={`flex-1 min-w-0 truncate text-sm ${c.text} ${done ? "" : "opacity-70"}`}>{it.name}</span>
-                    <span className={`text-[12px] tabular-nums shrink-0 ${c.label} opacity-60`}>{it.weight}</span>
+                    <span className={`flex-1 min-w-0 truncate text-sm ${c.text} ${done ? "" : "opacity-80"}`}>{it.name}</span>
+                    <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{it.weight}</span>
                     <span className={done ? "text-emerald-600 dark:text-emerald-400" : `opacity-30 ${c.label}`}>
-                      {done ? <CircleCheck size={16} /> : <Circle size={16} />}
+                      {done ? <CircleCheck size={14} /> : <Circle size={14} />}
                     </span>
                   </button>
                 </li>
@@ -313,12 +315,9 @@ export default function UpkeepWidget({
             placeholder="e.g. brushed teeth, took medicine"
             className="flex-1"
           />
-          <button
-            onClick={addItem}
-            className="px-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
+          <SmallButton c={c} onClick={addItem} title="Add item" className="self-center">
             <Plus size={14} />
-          </button>
+          </SmallButton>
         </div>
         {draft.length > 0 && (
           <>
@@ -331,7 +330,7 @@ export default function UpkeepWidget({
                     onChange={e => setDraft(d => d.map(x => x.id === it.id ? { ...x, name: e.target.value } : x))}
                     className={`flex-1 min-w-0 bg-transparent dark:!bg-transparent text-sm outline-none ${c.text}`}
                   />
-                  <label className={`flex items-center gap-1 text-[12px] ${c.label} opacity-70`} title="Points this item is worth">
+                  <label className={`flex items-center gap-1 text-xs ${c.label} opacity-80`} title="Points this item is worth">
                     <input
                       inputMode="numeric"
                       value={it.weight}
@@ -339,26 +338,27 @@ export default function UpkeepWidget({
                         const v = e.target.value.replace(/\D/g, "");
                         setDraft(d => d.map(x => x.id === it.id ? { ...x, weight: v ? parseInt(v, 10) : 0 } : x));
                       }}
-                      className={`w-10 text-center tabular-nums border border-[var(--surface-border)] rounded-lg px-1 py-1 outline-none bg-[var(--surface)] ${c.text}`}
+                      className={`w-10 text-xs text-center tabular-nums border border-[var(--surface-border)] rounded-md px-1 py-1 outline-none bg-[var(--surface)] ${c.text}`}
                     />
                     <span>pts</span>
                   </label>
                   <button
                     onClick={() => setDraft(d => d.filter(x => x.id !== it.id))}
-                    className={`opacity-50 hover:opacity-100 leading-none ${c.label}`}
+                    aria-label={`Remove ${it.name}`}
+                    className={`opacity-60 hover:opacity-100 leading-none ${iconBtnCls} ${c.label}`}
                   >
                     ×
                   </button>
                 </div>
               ))}
             </div>
-            <p className={`text-[12px] leading-relaxed opacity-55 ${c.text}`}>
+            <p className={`text-xs leading-relaxed opacity-60 ${c.text}`}>
               Points add up to <span className="tabular-nums font-medium">{draftTotal}</span>. Checking everything always scores 100, so the weights just set how much each one moves the needle.
             </p>
           </>
         )}
         {draft.length === 0 && (
-          <p className={`text-[12px] leading-relaxed opacity-55 ${c.text}`}>
+          <p className={`text-xs leading-relaxed opacity-60 ${c.text}`}>
             Add the daily essentials you want to stay on top of: brushing teeth, showering, taking medicine, a clean bed. Give each one a point value for how much it matters; checking them all off scores a perfect 100.
           </p>
         )}
@@ -390,24 +390,29 @@ export default function UpkeepWidget({
 
       {historyOpen && (
         <div className={`absolute inset-0 z-40 p-5 flex flex-col rounded-2xl border ${c.bg} ${c.border}`}>
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className={`flex items-center gap-1.5 ${c.label}`}>
-              {detailDate ? (
-                <button onClick={() => setDetailDate(null)} title="Back to insights" className="opacity-60 hover:opacity-100 flex items-center gap-1">
-                  <ChevronLeft size={14} />
-                  <span className="text-xs font-medium">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
-                </button>
-              ) : (
-                <>
-                  <span className="opacity-50"><History size={14} /></span>
-                  <span className="text-xs font-medium opacity-60">Insights</span>
-                </>
-              )}
+          {detailDate ? (
+            /* Day detail header: a back button in place of the title */
+            <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+              <button onClick={() => setDetailDate(null)} title="Back to insights" className={`opacity-60 hover:opacity-100 flex items-center gap-1 min-w-0 ${iconBtnCls} ${c.label}`}>
+                <ChevronLeft size={14} />
+                <span className="text-xs font-medium truncate">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
+              </button>
+              <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`shrink-0 opacity-60 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
+                <X size={14} />
+              </button>
             </div>
-            <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`opacity-50 hover:opacity-90 ${c.label}`} title="Close">
-              <X size={14} />
-            </button>
-          </div>
+          ) : (
+            <WidgetHeader
+              c={c}
+              icon={History}
+              title="Insights"
+              right={
+                <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`opacity-60 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
+                  <X size={14} />
+                </button>
+              }
+            />
+          )}
 
           {detailDate ? (
             <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-3">
@@ -423,8 +428,8 @@ export default function UpkeepWidget({
                       stroke={14}
                       center={
                         <>
-                          <span className={`text-xl font-semibold tabular-nums leading-none ${s.pct === 100 ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>{s.pct ?? "—"}</span>
-                          <span className={`mt-1 text-[11px] opacity-60 ${c.label}`}>{s.pct === 100 ? "perfect" : "/ 100"}</span>
+                          <span className={`text-xl font-semibold tabular-nums leading-none ${s.pct === 100 ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>{s.pct ?? "-"}</span>
+                          <span className={`mt-1 text-xs opacity-60 ${c.label}`}>{s.pct === 100 ? "perfect" : "/ 100"}</span>
                         </>
                       }
                     />
@@ -439,13 +444,13 @@ export default function UpkeepWidget({
                     <button
                       key={r.id}
                       onClick={() => toggle(r.id, detailDate)}
-                      className={`group/row flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                      className={`group/row flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors ${FOCUS_RING} ${
                         r.done ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"
                       }`}
                     >
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color, opacity: r.done ? 1 : 0.4 }} />
-                      <span className={`flex-1 min-w-0 truncate text-xs ${c.text} ${r.done ? "opacity-80" : "opacity-55"}`}>{r.name}</span>
-                      <span className={`text-[12px] tabular-nums shrink-0 ${c.label} opacity-60`}>{r.weight}</span>
+                      <span className={`flex-1 min-w-0 truncate text-sm ${c.text} ${r.done ? "" : "opacity-80"}`}>{r.name}</span>
+                      <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{r.weight}</span>
                       <span className={r.done ? "text-emerald-600 dark:text-emerald-400" : `opacity-30 ${c.label}`}>
                         {r.done ? <CircleCheck size={14} /> : <Circle size={14} />}
                       </span>
@@ -455,7 +460,7 @@ export default function UpkeepWidget({
               )}
             </div>
           ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-4">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-3">
               {items.length === 0 ? (
                 <EmptyState c={c}>no items yet</EmptyState>
               ) : (
@@ -485,20 +490,20 @@ export default function UpkeepWidget({
                         />
                       ))}
                     </svg>
-                    <div className={`flex justify-between text-[11px] opacity-60 ${c.label}`}>
+                    <div className={`flex justify-between text-xs opacity-60 ${c.label}`}>
                       <span>{fmtDay(gridDates[0])}</span>
                       <span>{fmtDay(today)}</span>
                     </div>
                   </div>
 
                   {/* Insights */}
-                  <div className={`shrink-0 flex flex-col gap-1 text-[12px] ${c.text} opacity-75`}>
+                  <div className={`shrink-0 flex flex-col gap-1 text-xs ${c.text} opacity-80`}>
                     {avg7 != null && (
                       <span>last {withScore.length} days: <span className="tabular-nums font-medium">{avg7}</span> average · <span className="tabular-nums font-medium">{perfectDays}</span> perfect</span>
                     )}
                     {streak >= 1 && (
                       <span className="flex items-center gap-1">
-                        <Flame size={11} className={c.label} />
+                        <Flame size={12} className={c.label} />
                         <span className="tabular-nums">{streak}d</span>
                         <span className="opacity-60">current perfect streak</span>
                       </span>
@@ -515,18 +520,18 @@ export default function UpkeepWidget({
                             key={s.date}
                             onClick={() => setDetailDate(s.date)}
                             title={`${fmtDay(s.date)}: ${s.pct == null ? "no items" : s.pct}`}
-                            className="h-5 rounded-sm transition-transform hover:scale-110"
+                            className={`h-5 rounded-md transition-transform hover:scale-110 ${FOCUS_RING}`}
                             style={{
                               backgroundColor: s.pct == null ? undefined : (s.pct === 100 ? "#10b981" : colorOf(widget.id)),
                               opacity: s.pct == null ? 1 : op,
                             }}
                           >
-                            {s.pct == null && <span className="block w-full h-full rounded-sm bg-black/[0.06] dark:bg-white/[0.07]" />}
+                            {s.pct == null && <span className="block w-full h-full rounded-md bg-black/[0.06] dark:bg-white/[0.07]" />}
                           </button>
                         );
                       })}
                     </div>
-                    <div className={`flex justify-between text-[11px] opacity-60 ${c.label} mt-1`}>
+                    <div className={`flex justify-between text-xs opacity-60 ${c.label} mt-1`}>
                       <span>{fmtDay(gridDates[0])}</span>
                       <span>{fmtDay(today)}</span>
                     </div>

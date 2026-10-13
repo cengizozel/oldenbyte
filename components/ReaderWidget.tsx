@@ -8,7 +8,8 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { colorMap, type Widget } from "@/lib/widgets";
 import FlipCard from "@/components/ui/FlipCard";
-import { PencilButton, LoadingState } from "@/components/ui/WidgetChrome";
+import { FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
+import { WidgetHeader, SmallButton, PencilButton, LoadingState, EmptyState } from "@/components/ui/WidgetChrome";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
 
@@ -40,7 +41,7 @@ function TocOverlay({ items, onPick }: { items: TocEntry[]; onPick: (i: number) 
             <button
               onClick={() => onPick(i)}
               style={{ paddingLeft: 8 + it.depth * 14 }}
-              className="w-full text-left text-xs leading-snug py-1.5 pr-2 text-[var(--text-primary)] opacity-75 hover:opacity-100"
+              className={`w-full text-left text-sm leading-snug py-2 pr-2 text-[var(--text-primary)] opacity-80 hover:opacity-100 ${FOCUS_RING}`}
             >
               {it.label}
             </button>
@@ -211,23 +212,25 @@ function PdfViewer({
         <TocOverlay items={toc} onPick={i => { onPageChange(toc[i].page); setTocOpen(false); }} />
       )}
       </div>
-      <div className="flex flex-col gap-1.5 shrink-0">
+      <div className="flex flex-col gap-2 shrink-0">
         <div className="relative flex items-center justify-center gap-4">
           {toc.length > 0 && (
             <button
               onClick={() => setTocOpen(o => !o)}
-              className={`absolute left-0 ${tocOpen ? "text-neutral-700" : "text-neutral-400"} hover:text-neutral-700`}
+              className={`absolute left-0 ${tocOpen ? "text-neutral-700" : "text-neutral-400"} hover:text-neutral-700 ${HIT_AREA} ${FOCUS_RING}`}
               title="Table of contents"
+              aria-label="Table of contents"
             >
-              <List size={fullscreen ? 16 : 13} />
+              <List size={fullscreen ? 16 : 14} />
             </button>
           )}
           <button
             onClick={() => onPageChange(Math.max(1, page - 1))}
             disabled={page <= 1}
-            className="text-neutral-400 hover:text-neutral-700 disabled:opacity-20"
+            aria-label="Previous page"
+            className={`text-neutral-400 hover:text-neutral-700 disabled:opacity-20 ${HIT_AREA} ${FOCUS_RING}`}
           >
-            <ChevronLeft size={fullscreen ? 20 : 16} />
+            <ChevronLeft size={16} />
           </button>
           <span className={`text-neutral-500 tabular-nums ${fullscreen ? "text-sm" : "text-xs"}`}>
             {page} / {numPages || "…"}
@@ -235,40 +238,44 @@ function PdfViewer({
           <button
             onClick={() => onPageChange(Math.min(numPages, page + 1))}
             disabled={numPages > 0 && page >= numPages}
-            className="text-neutral-400 hover:text-neutral-700 disabled:opacity-20"
+            aria-label="Next page"
+            className={`text-neutral-400 hover:text-neutral-700 disabled:opacity-20 ${HIT_AREA} ${FOCUS_RING}`}
           >
-            <ChevronRight size={fullscreen ? 20 : 16} />
+            <ChevronRight size={16} />
           </button>
-          <span className="absolute right-0 flex items-center gap-1.5">
+          <span className="absolute right-0 flex items-center gap-2">
             <button
               onClick={() => setZoom(z => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}
-              className="text-neutral-400 hover:text-neutral-700"
+              className={`text-neutral-400 hover:text-neutral-700 ${HIT_AREA} ${FOCUS_RING}`}
               title="Zoom out"
+              aria-label="Zoom out"
             >
-              <ZoomOut size={fullscreen ? 16 : 13} />
+              <ZoomOut size={fullscreen ? 16 : 14} />
             </button>
             <button
               onClick={() => setZoom(1)}
-              className={`text-neutral-400 hover:text-neutral-700 tabular-nums ${fullscreen ? "text-xs" : "text-[12px]"}`}
+              className={`text-neutral-400 hover:text-neutral-700 tabular-nums text-xs ${FOCUS_RING}`}
               title="Reset zoom"
             >
               {Math.round(zoom * 100)}%
             </button>
             <button
               onClick={() => setZoom(z => Math.min(4, Math.round((z + 0.25) * 100) / 100))}
-              className="text-neutral-400 hover:text-neutral-700"
+              className={`text-neutral-400 hover:text-neutral-700 ${HIT_AREA} ${FOCUS_RING}`}
               title="Zoom in"
+              aria-label="Zoom in"
             >
-              <ZoomIn size={fullscreen ? 16 : 13} />
+              <ZoomIn size={fullscreen ? 16 : 14} />
             </button>
             <a
               href={src}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-neutral-400 hover:text-neutral-700"
+              className={`text-neutral-400 hover:text-neutral-700 ${HIT_AREA} ${FOCUS_RING}`}
               title="Open in new tab"
+              aria-label="Open in new tab"
             >
-              <ExternalLink size={fullscreen ? 15 : 12} />
+              <ExternalLink size={fullscreen ? 16 : 14} />
             </a>
           </span>
         </div>
@@ -467,31 +474,34 @@ function EpubViewer({
           />
         )}
       </div>
-      <div className="flex flex-col gap-1.5 shrink-0">
+      <div className="flex flex-col gap-2 shrink-0">
         <div className="relative flex items-center justify-center gap-4">
           {toc.length > 0 && (
             <button
               onClick={() => setTocOpen(o => !o)}
-              className={`absolute left-0 ${tocOpen ? "text-neutral-700" : "text-neutral-400"} hover:text-neutral-700`}
+              className={`absolute left-0 ${tocOpen ? "text-neutral-700" : "text-neutral-400"} hover:text-neutral-700 ${HIT_AREA} ${FOCUS_RING}`}
               title="Table of contents"
+              aria-label="Table of contents"
             >
-              <List size={fullscreen ? 16 : 13} />
+              <List size={fullscreen ? 16 : 14} />
             </button>
           )}
           <button
             onClick={e => { e.stopPropagation(); renditionRef.current?.prev(); }}
-            className="text-neutral-400 hover:text-neutral-700"
+            aria-label="Previous page"
+            className={`text-neutral-400 hover:text-neutral-700 ${HIT_AREA} ${FOCUS_RING}`}
           >
-            <ChevronLeft size={fullscreen ? 20 : 16} />
+            <ChevronLeft size={16} />
           </button>
           <span className={`text-neutral-500 tabular-nums ${fullscreen ? "text-sm" : "text-xs"}`}>
             {percentage !== null ? `${percentage}%` : "…"}
           </span>
           <button
             onClick={e => { e.stopPropagation(); renditionRef.current?.next(); }}
-            className="text-neutral-400 hover:text-neutral-700"
+            aria-label="Next page"
+            className={`text-neutral-400 hover:text-neutral-700 ${HIT_AREA} ${FOCUS_RING}`}
           >
-            <ChevronRight size={fullscreen ? 20 : 16} />
+            <ChevronRight size={16} />
           </button>
         </div>
         {percentage !== null && (
@@ -541,10 +551,10 @@ function FullscreenOverlay({
         <div className="flex items-center justify-between px-5 py-3 shrink-0 border-b border-[var(--surface-border)]">
           <div className="min-w-0">
             <p className="text-sm font-medium text-[var(--text-primary)] truncate">{config.displayName}</p>
-            <span className="text-xs text-[var(--text-secondary)] opacity-70">{config.fileType}</span>
+            <span className="text-xs text-[var(--text-secondary)] opacity-60">{config.fileType}</span>
           </div>
-          <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-4">
-            <X size={18} />
+          <button onClick={onClose} aria-label="Close" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-4 ${HIT_AREA} ${FOCUS_RING}`}>
+            <X size={16} />
           </button>
         </div>
 
@@ -721,7 +731,7 @@ export default function ReaderWidget({
 
   const uploadZone = (compact = false) => (
     <div
-      className={`flex flex-col items-center justify-center gap-3 flex-1 min-h-0 ${compact ? "" : "border-2 border-dashed rounded-xl"} border-neutral-200`}
+      className={`flex flex-col items-center justify-center gap-3 flex-1 min-h-0 ${compact ? "" : "border-2 border-dashed rounded-xl"} border-black/15 dark:border-white/15`}
       onDragOver={e => e.preventDefault()}
       onDrop={e => {
         e.preventDefault();
@@ -733,13 +743,10 @@ export default function ReaderWidget({
         <LoadingState c={c} />
       ) : (
         <>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--surface-border-focus)]"
-          >
-            <Upload size={13} />
+          <SmallButton c={c} onClick={() => fileInputRef.current?.click()}>
+            <Upload size={14} />
             {compact ? "Upload new file" : "Upload PDF or EPUB"}
-          </button>
+          </SmallButton>
           {!compact && (
             <p className={`text-xs opacity-60 ${c.text}`}>or drag and drop</p>
           )}
@@ -768,26 +775,26 @@ export default function ReaderWidget({
         className={className}
         front={
           <>
-            <div className="flex items-center justify-between mb-3 shrink-0">
-              <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-                <span className="opacity-50 shrink-0"><BookOpen size={14} /></span>
-                {config && (
-                  <span className="text-xs font-medium opacity-60 truncate">{config.displayName}</span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 shrink-0 ml-2">
-                {config && (
-                  <button
-                    onClick={() => setFullscreen(true)}
-                    className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 ${c.icon}`}
-                    title="Open full view"
-                  >
-                    <Maximize2 size={14} />
-                  </button>
-                )}
-                <PencilButton c={c} onClick={() => { setSettingsOpen(true); setError(""); loadDir(dir); }} title="Settings" />
-              </div>
-            </div>
+            <WidgetHeader
+              c={c}
+              icon={BookOpen}
+              title={config?.displayName || widget.title}
+              right={
+                <>
+                  {config && (
+                    <button
+                      onClick={() => setFullscreen(true)}
+                      className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+                      title="Open full view"
+                      aria-label="Open full view"
+                    >
+                      <Maximize2 size={14} />
+                    </button>
+                  )}
+                  <PencilButton c={c} onClick={() => { setSettingsOpen(true); setError(""); loadDir(dir); }} title="Settings" />
+                </>
+              }
+            />
 
             {config ? (
               // Stays mounted while the fullscreen overlay is open, so closing
@@ -821,26 +828,29 @@ export default function ReaderWidget({
                 {dir && (
                   <button
                     onClick={() => loadDir(dir.split("/").slice(0, -1).join("/"))}
-                    className="opacity-60 hover:opacity-100 shrink-0"
+                    className={`opacity-60 hover:opacity-100 shrink-0 ${HIT_AREA} ${FOCUS_RING}`}
                     title="Up one folder"
+                    aria-label="Up one folder"
                   >
-                    <ChevronLeft size={13} />
+                    <ChevronLeft size={14} />
                   </button>
                 )}
                 <span className="flex-1 min-w-0 truncate opacity-60 font-medium">{dir || "Library"}</span>
                 <button
                   onClick={() => setNewFolderOpen(o => !o)}
-                  className="opacity-60 hover:opacity-100 shrink-0"
+                  className={`opacity-60 hover:opacity-100 shrink-0 ${HIT_AREA} ${FOCUS_RING}`}
                   title="New folder"
+                  aria-label="New folder"
                 >
-                  <FolderPlus size={13} />
+                  <FolderPlus size={14} />
                 </button>
                 <button
                   onClick={() => libFileRef.current?.click()}
-                  className="opacity-60 hover:opacity-100 shrink-0"
+                  className={`opacity-60 hover:opacity-100 shrink-0 ${HIT_AREA} ${FOCUS_RING}`}
                   title="Upload into this folder"
+                  aria-label="Upload into this folder"
                 >
-                  {uploading ? <Loader size={13} className="animate-spin" /> : <Upload size={13} />}
+                  {uploading ? <Loader size={14} className="animate-spin" /> : <Upload size={14} />}
                 </button>
               </div>
 
@@ -852,14 +862,11 @@ export default function ReaderWidget({
                     onChange={e => setNewFolder(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && makeFolder()}
                     placeholder="folder name"
-                    className={`flex-1 min-w-0 text-xs rounded-lg px-2 py-1 outline-none bg-black/5 dark:bg-white/10 ${c.text} placeholder:opacity-40`}
+                    className={`flex-1 min-w-0 text-xs rounded-md px-2 py-1 outline-none bg-black/5 dark:bg-white/10 ${c.text} placeholder:opacity-40`}
                   />
-                  <button
-                    onClick={makeFolder}
-                    className="text-xs px-2 py-1 rounded-lg bg-white border border-neutral-200 text-neutral-600 hover:text-neutral-800 shrink-0"
-                  >
+                  <SmallButton c={c} onClick={makeFolder} className="shrink-0">
                     Create
-                  </button>
+                  </SmallButton>
                 </div>
               )}
 
@@ -877,32 +884,32 @@ export default function ReaderWidget({
                   <LoadingState c={c} />
                 ) : entries && (entries.dirs.length || entries.files.length) ? (
                   <ul className="flex flex-col">
-                    {entries.dirs.map(d => (
-                      <li key={`d-${d}`}>
+                    {entries.dirs.map((d, i) => (
+                      <li key={`d-${d}`} className={i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}>
                         <button
                           onClick={() => loadDir(dir ? `${dir}/${d}` : d)}
-                          className={`w-full flex items-center gap-1.5 py-1.5 text-left text-xs ${c.text} hover:opacity-70 transition-opacity`}
+                          className={`w-full flex items-center gap-1.5 py-2 text-left text-sm font-medium ${c.text} hover:opacity-70 transition-opacity ${FOCUS_RING}`}
                         >
-                          <Folder size={12} className="shrink-0 opacity-40" />
-                          <span className="flex-1 min-w-0 truncate font-medium">{d}</span>
-                          <ChevronRight size={11} className="shrink-0 opacity-30" />
+                          <Folder size={14} className="shrink-0 opacity-40" />
+                          <span className="flex-1 min-w-0 truncate">{d}</span>
+                          <ChevronRight size={14} className="shrink-0 opacity-30" />
                         </button>
                       </li>
                     ))}
-                    {entries.files.map(f => (
-                      <li key={`f-${f.name}`}>
+                    {entries.files.map((f, i) => (
+                      <li key={`f-${f.name}`} className={entries.dirs.length + i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}>
                         <button
                           onClick={() => selectFile(f.name)}
-                          className={`w-full flex items-center gap-1.5 py-1.5 text-left text-xs ${c.text} hover:opacity-70 transition-opacity`}
+                          className={`w-full flex items-center gap-1.5 py-2 text-left text-sm font-medium ${c.text} hover:opacity-70 transition-opacity ${FOCUS_RING}`}
                         >
-                          <FileText size={12} className="shrink-0 opacity-40" />
+                          <FileText size={14} className="shrink-0 opacity-40" />
                           <span className="flex-1 min-w-0 truncate">{f.name}</span>
                         </button>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className={`text-xs opacity-60 pt-2 ${c.text}`}>Empty folder. Upload a PDF or EPUB here, or drop one in.</p>
+                  <EmptyState c={c}>empty folder, upload a PDF or EPUB here or drop one in</EmptyState>
                 )}
               </div>
 
@@ -922,13 +929,14 @@ export default function ReaderWidget({
             />
 
             <div className="flex items-center justify-between mt-2 shrink-0">
-              <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Remove file">
-                <RotateCcw size={13} />
+              <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70 ${HIT_AREA} ${FOCUS_RING}`} title="Remove file" aria-label="Remove file">
+                <RotateCcw size={14} />
               </button>
               <button
                 onClick={() => { setSettingsOpen(false); setError(""); }}
-                className="text-neutral-400 hover:text-neutral-600"
+                className={`text-neutral-400 hover:text-neutral-600 ${HIT_AREA} ${FOCUS_RING}`}
                 title="Cancel"
+                aria-label="Cancel"
               >
                 <X size={14} />
               </button>

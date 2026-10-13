@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { X, Check, RefreshCw, Loader, ChevronRight } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { EFFORT_OPTIONS, LENGTH_PRESETS, PRESETS, type ChatConfig, type Length } from "@/lib/chat/types";
-import { SettingsInput, SettingsSelect, SettingsTextarea } from "../ui/Field";
+import { SettingsInput, SettingsSelect, SettingsTextarea, HIT_AREA, FOCUS_RING } from "../ui/Field";
+import { Chip, SmallButton } from "../ui/WidgetChrome";
 
 // Settings panel: Model, Behavior, Data sources. Edits a draft of the config
 // and hands it to onSave; mounting it loads the model list, the Kiwix books
@@ -152,10 +153,10 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
     <div className="flex flex-col gap-3 flex-1 min-h-0 p-4">
       <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
 
-        <p className={`text-[13px] font-ui opacity-50 ${c.label}`}>Model</p>
+        <p className={`text-[13px] font-ui opacity-60 ${c.label}`}>Model</p>
 
         <div>
-          <p className={`text-xs mb-1 opacity-50 ${c.label}`}>API URL</p>
+          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>API URL</p>
           <SettingsInput
             autoFocus
             type="url"
@@ -165,29 +166,20 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
           />
           <div className="flex flex-wrap gap-1 mt-1.5">
             {PRESETS.map(p => (
-              <button
-                key={p.label}
-                onClick={() => setDraft(d => ({ ...d, baseUrl: p.url }))}
-                className="px-2 py-0.5 rounded-full text-[12px] border border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--surface-border-focus)]"
-              >
+              <Chip key={p.label} c={c} active={draft.baseUrl === p.url} onClick={() => setDraft(d => ({ ...d, baseUrl: p.url }))}>
                 {p.label}
-              </button>
+              </Chip>
             ))}
           </div>
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className={`text-xs opacity-50 ${c.label}`}>Model</p>
-            <button
-              onClick={() => fetchModels(draft)}
-              disabled={loadingModels}
-              className="flex items-center gap-1 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:opacity-40"
-              title="Load models from server"
-            >
-              {loadingModels ? <Loader size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+            <p className={`text-xs opacity-60 ${c.label}`}>Model</p>
+            <SmallButton c={c} onClick={() => fetchModels(draft)} disabled={loadingModels} title="Load models from server">
+              {loadingModels ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Load models
-            </button>
+            </SmallButton>
           </div>
           {models.length > 0 ? (
             <SettingsSelect
@@ -208,13 +200,13 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
               placeholder="e.g. llama3.2, or click Load models"
             />
           )}
-          {modelsError && <p className="text-red-400 text-[12px] mt-1">{modelsError}</p>}
+          {modelsError && <p className="text-red-400 text-xs mt-1">{modelsError}</p>}
         </div>
 
-        <p className={`text-[13px] font-ui opacity-50 mt-1 ${c.label}`}>Behavior</p>
+        <p className={`text-[13px] font-ui opacity-60 mt-1 ${c.label}`}>Behavior</p>
 
         <div>
-          <p className={`text-xs mb-1 opacity-50 ${c.label}`}>System prompt <span className="opacity-60">(optional)</span></p>
+          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>System prompt <span className="opacity-60">(optional)</span></p>
           <SettingsTextarea
             value={draft.system}
             onChange={e => setDraft(d => ({ ...d, system: e.target.value }))}
@@ -224,41 +216,35 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
         </div>
 
         <div>
-          <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Response style</p>
+          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Response style</p>
           <div className="flex flex-wrap gap-1">
             {(Object.keys(LENGTH_PRESETS) as Length[]).map(key => (
-              <button
+              <Chip
                 key={key}
+                c={c}
+                active={draft.length === key}
                 onClick={() => setDraft(d => ({ ...d, length: key, maxTokens: LENGTH_PRESETS[key].cap }))}
                 title={LENGTH_PRESETS[key].instruction || "No length instruction; uses the server default."}
-                className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
-                  draft.length === key
-                    ? "border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)]"
-                    : "border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--surface-border-focus)]"
-                }`}
               >
                 {LENGTH_PRESETS[key].label}
-              </button>
+              </Chip>
             ))}
           </div>
         </div>
 
         <div>
-          <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Thinking <span className="opacity-60">(reasoning models)</span></p>
+          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Thinking <span className="opacity-60">(reasoning models)</span></p>
           <div className="flex flex-wrap gap-1">
             {EFFORT_OPTIONS.map(opt => (
-              <button
+              <Chip
                 key={opt.value}
+                c={c}
+                active={draft.effort === opt.value}
                 onClick={() => setDraft(d => ({ ...d, effort: opt.value }))}
                 title={opt.value === "none" ? "Disable the model's chain-of-thought (fastest)" : opt.value === "default" ? "Use the model's default" : `reasoning_effort: ${opt.value}`}
-                className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
-                  draft.effort === opt.value
-                    ? "border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)]"
-                    : "border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--surface-border-focus)]"
-                }`}
               >
                 {opt.label}
-              </button>
+              </Chip>
             ))}
           </div>
         </div>
@@ -266,16 +252,16 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
         <div>
           <button
             onClick={() => setAdvancedOpen(o => !o)}
-            className={`flex items-center gap-1 text-xs opacity-50 hover:opacity-80 ${c.label}`}
+            className={`flex items-center gap-1 text-xs opacity-60 hover:opacity-100 ${FOCUS_RING} ${c.label}`}
           >
-            <ChevronRight size={11} className={`transition-transform ${advancedOpen ? "rotate-90" : ""}`} />
+            <ChevronRight size={12} className={`transition-transform ${advancedOpen ? "rotate-90" : ""}`} />
             Advanced
             <span className="opacity-60">
               (cap: {draft.maxTokens ? `${draft.maxTokens} tokens` : "none"}{draft.maxTokens !== LENGTH_PRESETS[draft.length].cap ? ", custom" : ""})
             </span>
           </button>
           {advancedOpen && (<div className="mt-1.5">
-          <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Max response length <span className="opacity-60">(tokens, 0 = no limit; style presets set this)</span></p>
+          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Max response length <span className="opacity-60">(tokens, 0 = no limit; style presets set this)</span></p>
           <SettingsInput
             type="number"
             min={0}
@@ -286,38 +272,25 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
           />
           <div className="flex flex-wrap gap-1 mt-1.5">
             {[128, 256, 512, 1024].map(n => (
-              <button
-                key={n}
-                onClick={() => setDraft(d => ({ ...d, maxTokens: n }))}
-                className={`px-2 py-0.5 rounded-full text-[12px] border transition-colors ${
-                  draft.maxTokens === n
-                    ? "border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)]"
-                    : "border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--surface-border-focus)]"
-                }`}
-              >
+              <Chip key={n} c={c} active={draft.maxTokens === n} onClick={() => setDraft(d => ({ ...d, maxTokens: n }))} className="tabular-nums">
                 {n}
-              </button>
+              </Chip>
             ))}
           </div>
           </div>)}
         </div>
 
-        <p className={`text-[13px] font-ui opacity-50 mt-1 ${c.label}`}>Data sources</p>
+        <p className={`text-[13px] font-ui opacity-60 mt-1 ${c.label}`}>Data sources</p>
 
-        <p className={`text-[12px] -mt-1 opacity-60 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
+        <p className={`text-xs -mt-1 opacity-60 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className={`text-xs opacity-50 ${c.label}`}>Kiwix library <span className="opacity-60">(all books are searched)</span></p>
-            <button
-              onClick={() => loadKiwixSources(draft.kiwixUrl)}
-              disabled={loadingKiwix || !draft.kiwixUrl.startsWith("http")}
-              className="flex items-center gap-1 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:opacity-40"
-              title="List the books on the server"
-            >
-              {loadingKiwix ? <Loader size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+            <p className={`text-xs opacity-60 ${c.label}`}>Kiwix library <span className="opacity-60">(all books are searched)</span></p>
+            <SmallButton c={c} onClick={() => loadKiwixSources(draft.kiwixUrl)} disabled={loadingKiwix || !draft.kiwixUrl.startsWith("http")} title="List the books on the server">
+              {loadingKiwix ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Check server
-            </button>
+            </SmallButton>
           </div>
           <SettingsInput
             type="url"
@@ -326,16 +299,16 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
             placeholder="Kiwix URL, e.g. http://192.168.1.10:8080"
           />
           {kiwixSources.length > 0 && (
-            <p className="text-[12px] text-[var(--text-muted)] mt-1">
+            <p className="text-xs text-[var(--text-muted)] mt-1">
               {kiwixSources.length} book{kiwixSources.length === 1 ? "" : "s"}: {kiwixSources.map(s => s.title).join(", ")}
             </p>
           )}
-          {kiwixError && <p className="text-red-400 text-[12px] mt-1">{kiwixError}</p>}
-          <p className="text-[12px] text-[var(--text-muted)] mt-1">Adding books to the server widens the search automatically. Turn lookup on with the library icon by the send button.</p>
+          {kiwixError && <p className="text-red-400 text-xs mt-1">{kiwixError}</p>}
+          <p className="text-xs text-[var(--text-muted)] mt-1">Adding books to the server widens the search automatically. Turn lookup on with the library icon by the send button.</p>
         </div>
 
         <div>
-          <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Anytype</p>
+          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Anytype</p>
           <SettingsInput
             type="url"
             value={draft.anytypeUrl}
@@ -355,8 +328,8 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
                 {anytypeSpaces.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </SettingsSelect>
             ) : (
-              <p className="text-[12px] text-[var(--text-muted)] mt-1.5 flex items-center gap-1">
-                {anytypeBusy && <Loader size={10} className="animate-spin" />} paired ✓ {draft.anytypeSpaceName && `· ${draft.anytypeSpaceName}`}
+              <p className="text-xs text-[var(--text-muted)] mt-1.5 flex items-center gap-1">
+                {anytypeBusy && <Loader size={12} className="animate-spin" />} paired ✓ {draft.anytypeSpaceName && `· ${draft.anytypeSpaceName}`}
               </p>
             )
           ) : anytypePairing === "awaiting-code" ? (
@@ -369,31 +342,24 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
                 placeholder="4-digit code from Anytype"
                 className="flex-1 tracking-widest"
               />
-              <button
-                onClick={confirmAnytypeCode}
-                disabled={anytypeBusy || !anytypeCode.trim()}
-                className="text-xs px-3 py-2 rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-primary)] hover:border-[var(--surface-border-focus)] disabled:opacity-40 shrink-0"
-              >
+              <SmallButton c={c} onClick={confirmAnytypeCode} disabled={anytypeBusy || !anytypeCode.trim()} className="shrink-0">
                 {anytypeBusy ? <Loader size={12} className="animate-spin" /> : "Confirm"}
-              </button>
+              </SmallButton>
             </div>
           ) : (
-            <button
-              onClick={startAnytypePairing}
-              disabled={anytypeBusy || !draft.anytypeUrl.startsWith("http")}
-              className="mt-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-primary)] hover:border-[var(--surface-border-focus)] disabled:opacity-40"
-            >
-              {anytypeBusy ? <span className="flex items-center gap-1.5"><Loader size={12} className="animate-spin" /> contacting…</span> : "Pair with Anytype"}
-            </button>
+            <SmallButton c={c} onClick={startAnytypePairing} disabled={anytypeBusy || !draft.anytypeUrl.startsWith("http")} className="mt-1.5">
+              {anytypeBusy ? <><Loader size={12} className="animate-spin" /> contacting…</> : "Pair with Anytype"}
+            </SmallButton>
           )}
-          {anytypeError && <p className="text-red-400 text-[12px] mt-1">{anytypeError}</p>}
-          <p className="text-[12px] text-[var(--text-muted)] mt-1">Pair, pick a space, then turn lookup on with the box icon by the send button.</p>
+          {anytypeError && <p className="text-red-400 text-xs mt-1">{anytypeError}</p>}
+          <p className="text-xs text-[var(--text-muted)] mt-1">Pair, pick a space, then turn lookup on with the box icon by the send button.</p>
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className={`text-xs opacity-50 ${c.label}`}>Anytype write bridge <span className="opacity-60">(optional, enables creating notes)</span></p>
-            <button
+            <p className={`text-xs opacity-60 ${c.label}`}>Anytype write bridge <span className="opacity-60">(optional, enables creating notes)</span></p>
+            <SmallButton
+              c={c}
               onClick={async () => {
                 setBridgeStatus("checking");
                 try {
@@ -407,12 +373,11 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
                 } catch { setBridgeStatus("fail"); }
               }}
               disabled={bridgeStatus === "checking" || !draft.anytypeBridgeUrl.startsWith("http")}
-              className="flex items-center gap-1 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:opacity-40"
               title="Check the bridge"
             >
-              {bridgeStatus === "checking" ? <Loader size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+              {bridgeStatus === "checking" ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Test
-            </button>
+            </SmallButton>
           </div>
           <SettingsInput
             type="url"
@@ -427,37 +392,29 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
             placeholder="Bridge token"
             className="mt-1.5"
           />
-          {bridgeStatus === "ok" && <p className="text-[12px] text-emerald-600 dark:text-emerald-400 mt-1">bridge reachable ✓</p>}
-          {bridgeStatus === "fail" && <p className="text-red-400 text-[12px] mt-1">bridge not reachable</p>}
-          <p className="text-[12px] text-[var(--text-muted)] mt-1">Runs next to the Anytype app (tools/anytype-bridge in the repo). Without it, Anytype stays read-only.</p>
+          {bridgeStatus === "ok" && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">bridge reachable ✓</p>}
+          {bridgeStatus === "fail" && <p className="text-red-400 text-xs mt-1">bridge not reachable</p>}
+          <p className="text-xs text-[var(--text-muted)] mt-1">Runs next to the Anytype app (tools/anytype-bridge in the repo). Without it, Anytype stays read-only.</p>
         </div>
 
         <div>
-          <p className={`text-xs mb-1 opacity-50 ${c.label}`}>Assistant writes</p>
+          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Assistant writes</p>
           {([
             ["calendarWriteMode", "Calendar"],
             ["anytypeWriteMode", "Anytype"],
           ] as const).map(([key, label]) => (
             <div key={key} className="flex items-center justify-between py-0.5">
-              <span className="text-[12px] text-[var(--text-secondary)]">{label}</span>
+              <span className="text-sm text-[var(--text-secondary)]">{label}</span>
               <span className="flex items-center gap-1">
                 {(["confirm", "auto"] as const).map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => setDraft(d => ({ ...d, [key]: mode }))}
-                    className={`text-[12px] px-2 py-0.5 rounded-md border transition-colors ${
-                      draft[key] === mode
-                        ? "border-[var(--surface-border-focus)] bg-black/5 dark:bg-white/10 text-[var(--text-primary)]"
-                        : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                    }`}
-                  >
+                  <Chip key={mode} c={c} active={draft[key] === mode} onClick={() => setDraft(d => ({ ...d, [key]: mode }))}>
                     {mode === "confirm" ? "ask first" : "auto"}
-                  </button>
+                  </Chip>
                 ))}
               </span>
             </div>
           ))}
-          <p className="text-[12px] text-[var(--text-muted)] mt-1">ask first = the model proposes and you approve a card. auto = it writes immediately and reports what it did.</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">ask first = the model proposes and you approve a card. auto = it writes immediately and reports what it did.</p>
         </div>
 
       </div>
@@ -466,16 +423,18 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
       <div className="flex items-center justify-end gap-3 shrink-0">
         <button
           onClick={onCancel}
-          className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${HIT_AREA} ${FOCUS_RING}`}
           title="Cancel"
+          aria-label="Cancel"
         >
           <X size={14} />
         </button>
         <button
           onClick={() => onSave(draft)}
           disabled={!draft.baseUrl.trim() || !draft.model.trim()}
-          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
+          className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 ${HIT_AREA} ${FOCUS_RING}`}
           title="Save"
+          aria-label="Save"
         >
           <Check size={14} />
         </button>

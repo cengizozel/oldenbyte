@@ -822,7 +822,7 @@ export default function WidgetGrid({
                         className="absolute inset-0 z-20 rounded-2xl bg-black/15 flex items-center justify-center cursor-pointer hover:bg-black/25 transition-colors"
                       >
                         <div className="bg-white rounded-xl px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm flex items-center gap-1.5 pointer-events-none">
-                          <Layers size={11} />
+                          <Layers size={12} />
                           Add as tab
                         </div>
                       </div>
@@ -840,7 +840,7 @@ export default function WidgetGrid({
                           : "bg-white border-neutral-200 text-neutral-400 hover:text-neutral-600"
                       }`}
                     >
-                      <Layers size={10} />
+                      <Layers size={12} />
                     </button>
                     {/* Remove button */}
                     <button

@@ -12,7 +12,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, SettingsSelect } from "./ui/Field";
-import { PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "./ui/WidgetChrome";
+import { WidgetHeader, PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton } from "./ui/WidgetChrome";
 
 type BankConfig = Record<string, string | number>;
 
@@ -130,7 +130,7 @@ export default function BankWidget({
       case "label": {
         const text = resolveText(p.value, data);
         if (!text) return null;
-        const size = p.size === "lg" ? "text-lg font-medium" : p.size === "xs" ? "text-[12px]" : "text-sm";
+        const size = p.size === "lg" ? "text-lg font-medium" : p.size === "xs" ? "text-xs" : "text-sm";
         return <p key={i} className={`${size} ${p.muted ? `opacity-60 ${c.label}` : c.text}`}>{text}</p>;
       }
       case "list": {
@@ -146,15 +146,15 @@ export default function BankWidget({
               const subtitle = p.subtitle ? resolveText(p.subtitle, item) : "";
               const meta = p.meta ? resolveText(p.meta, item) : "";
               const head = link ? (
-                <a href={link} target="_blank" rel="noopener noreferrer" className={`text-sm leading-snug ${c.text} hover:opacity-70 transition-opacity`}>{title}</a>
+                <a href={link} target="_blank" rel="noopener noreferrer" className={`text-sm font-medium leading-snug ${c.text} hover:opacity-80 transition-opacity`}>{title}</a>
               ) : (
-                <span className={`text-sm leading-snug ${c.text}`}>{title}</span>
+                <span className={`text-sm font-medium leading-snug ${c.text}`}>{title}</span>
               );
               return (
-                <li key={j} className={`py-2.5 ${j > 0 ? "border-t border-black/10" : ""}`}>
+                <li key={j} className={`py-2 ${j > 0 ? `border-t ${c.border}` : ""}`}>
                   <div className="flex items-baseline gap-2">
                     <div className="flex-1 min-w-0">{head}</div>
-                    {meta && <span className={`shrink-0 text-[12px] tabular-nums opacity-50 ${c.label}`}>{meta}</span>}
+                    {meta && <span className={`shrink-0 text-xs tabular-nums opacity-60 ${c.label}`}>{meta}</span>}
                   </div>
                   {subtitle && <p className={`mt-0.5 text-xs leading-snug opacity-60 line-clamp-2 ${c.text}`}>{subtitle}</p>}
                 </li>
@@ -170,7 +170,7 @@ export default function BankWidget({
           <div key={i} className="flex flex-col gap-1">
             {items.map((s, j) => (
               <div key={j} className="flex items-baseline justify-between gap-2">
-                <span className={`text-xs opacity-50 ${c.label}`}>{s.label}</span>
+                <span className={`text-xs opacity-60 ${c.label}`}>{s.label}</span>
                 <span className={`text-sm tabular-nums ${c.text}`}>{s.value}</span>
               </div>
             ))}
@@ -198,7 +198,7 @@ export default function BankWidget({
               if (!text) return null;
               const tc = tagColor(text.toLowerCase());
               return (
-                <span key={j} className={`px-1.5 py-0.5 rounded-md text-[12px] font-medium ${tc.bg} ${tc.label}`}>
+                <span key={j} className={`px-1.5 py-0.5 rounded-full text-[11px] font-medium ${tc.bg} ${tc.label}`}>
                   {text}
                 </span>
               );
@@ -215,8 +215,8 @@ export default function BankWidget({
           // so a tall comic scales down instead of forcing the card to scroll.
           <figure key={i} className="flex-1 min-h-0 flex flex-col items-center gap-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt={caption || resolveText(p.src, data)} className="w-full flex-1 min-h-0 object-contain rounded-lg" />
-            {caption && <ExpandableCaption text={caption} className={`shrink-0 text-[12px] text-center opacity-50 ${c.text}`} />}
+            <img src={src} alt={caption || resolveText(p.src, data)} className="w-full flex-1 min-h-0 object-contain rounded-xl" />
+            {caption && <ExpandableCaption text={caption} className={`shrink-0 text-xs text-center opacity-60 ${c.text}`} />}
           </figure>
         );
       }
@@ -246,13 +246,12 @@ export default function BankWidget({
 
   const front = (
     <>
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className={`flex items-center gap-1.5 ${c.label}`}>
-          <span className="opacity-50"><Puzzle size={14} /></span>
-          <span className="text-xs font-medium opacity-60">{widget.title}</span>
-        </div>
-        <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
-      </div>
+      <WidgetHeader
+        c={c}
+        icon={Puzzle}
+        title={widget.title}
+        right={<PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />}
+      />
       <div className="flex-1 min-h-0 relative">
         <div ref={ref} onScroll={onScroll} className="absolute inset-0 overflow-y-auto pr-3 flex flex-col gap-3">
           {loading && !hasContent ? (
@@ -275,7 +274,7 @@ export default function BankWidget({
       <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
         {(def.config ?? []).map(f => (
           <div key={f.key}>
-            <p className={`text-xs mb-1 opacity-50 ${c.label}`}>{f.label}</p>
+            <p className={`text-xs mb-1 opacity-60 ${c.label}`}>{f.label}</p>
             {f.type === "select" ? (
               <SettingsSelect
                 value={String(draft[f.key] ?? "")}
@@ -296,18 +295,14 @@ export default function BankWidget({
         {(def.config ?? []).length === 0 && (
           <p className={`text-xs opacity-60 ${c.text}`}>This widget has no settings.</p>
         )}
-        <div className={`text-[12px] leading-relaxed opacity-50 ${c.label}`}>
+        <div className={`text-xs leading-relaxed opacity-60 ${c.label}`}>
           <p>{def.description}</p>
           <p className="mt-1 break-all">source: {def.fetch.url.split("?")[0]}</p>
         </div>
-        <button
-          onClick={() => fetchData(config, true)}
-          disabled={loading}
-          className={`self-start flex items-center gap-1 text-[12px] opacity-60 hover:opacity-100 disabled:opacity-30 ${c.label}`}
-        >
-          <RefreshCw size={11} className={loading ? "animate-spin" : ""} />
+        <SmallButton c={c} onClick={() => fetchData(config, true)} disabled={loading} className="self-start">
+          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
           Refresh now
-        </button>
+        </SmallButton>
         {error && <p className="text-red-400 text-xs">{error}</p>}
       </div>
       <SaveCancelRow

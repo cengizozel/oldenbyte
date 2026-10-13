@@ -174,7 +174,7 @@ function EditableField({
               className="text-neutral-300 hover:text-neutral-500"
               title="Reset to default"
             >
-              <RotateCcw size={13} />
+              <RotateCcw size={14} />
             </button>
             <div className="flex gap-3">
               <button onClick={() => { setOpen(false); setError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Cancel">
@@ -369,7 +369,7 @@ function DateDisplay({ timezone }: { timezone: string }) {
 
           <div className="flex items-center justify-between mt-3 pt-2 border-t border-neutral-100">
             <button onClick={handleReset} className="text-neutral-300 hover:text-neutral-500" title="Reset">
-              <RotateCcw size={13} />
+              <RotateCcw size={14} />
             </button>
             <div className="flex gap-3">
               <button onClick={() => setOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Cancel">
@@ -420,7 +420,7 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: str
         title="Change timezone"
       >
         <span className="truncate">{value || "Automatic"}</span>
-        <ChevronDown size={11} className="shrink-0" />
+        <ChevronDown size={12} className="shrink-0" />
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-[var(--surface)] border border-[var(--surface-border)] rounded-xl shadow-lg p-1">
@@ -534,7 +534,7 @@ function AccountSection({ open }: { open: boolean }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <span className="text-[12px] text-[var(--text-muted)]">Account</span>
+      <span className="text-xs text-[var(--text-muted)]">Account</span>
 
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-[var(--text-secondary)] truncate" title={me.username}>{me.username}</span>
@@ -570,7 +570,7 @@ function AccountSection({ open }: { open: boolean }) {
           className="flex items-center justify-between text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         >
           <span>Change password</span>
-          <ChevronDown size={13} className={`transition-transform ${pwOpen ? "rotate-180" : ""}`} />
+          <ChevronDown size={14} className={`transition-transform ${pwOpen ? "rotate-180" : ""}`} />
         </button>
 
         {pwOpen && (
@@ -601,7 +601,7 @@ function AccountSection({ open }: { open: boolean }) {
               disabled={saving}
               className="self-end flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 transition-colors"
             >
-              {saving ? <Loader size={13} className="animate-spin" /> : <Check size={13} />}
+              {saving ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
               Save
             </button>
           </div>
@@ -685,18 +685,18 @@ function SettingsPanel({
           <AccountSection open={open} />
 
           <section className="flex flex-col gap-3">
-            <span className="text-[12px] text-[var(--text-muted)]">Appearance</span>
+            <span className="text-xs text-[var(--text-muted)]">Appearance</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">
                 Dark mode
-                <kbd className="ml-2 px-1.5 py-0.5 rounded border border-[var(--surface-border)] text-[12px] text-[var(--text-muted)] align-middle">⇧D</kbd>
+                <kbd className="ml-2 px-1.5 py-0.5 rounded-md border border-[var(--surface-border)] text-xs text-[var(--text-muted)] align-middle">⇧D</kbd>
               </span>
               <Toggle checked={dark} onChange={onToggleDark} label="Dark mode" title="Toggle dark mode (Shift+D)" />
             </div>
           </section>
 
           <section className="flex flex-col gap-2">
-            <span className="text-[12px] text-[var(--text-muted)]">Time</span>
+            <span className="text-xs text-[var(--text-muted)]">Time</span>
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-[var(--text-secondary)] shrink-0">Timezone</span>
               <TimezoneSelect value={timezone} onChange={onChangeTimezone} />
@@ -704,7 +704,7 @@ function SettingsPanel({
           </section>
 
           <section className="flex flex-col gap-3">
-            <span className="text-[12px] text-[var(--text-muted)]">Performance</span>
+            <span className="text-xs text-[var(--text-muted)]">Performance</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">Preload dashboards</span>
               <Toggle
@@ -722,7 +722,7 @@ function SettingsPanel({
           <KeyboardSettings />
 
           <section className="flex flex-col gap-3">
-            <span className="text-[12px] text-[var(--text-muted)]">Preview</span>
+            <span className="text-xs text-[var(--text-muted)]">Preview</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">Demo mode</span>
               <Toggle checked={demo} onChange={onToggleDemo} label="Demo mode" title={demo ? "Exit demo mode" : "Enter demo mode"} />
@@ -734,7 +734,7 @@ function SettingsPanel({
         </div>
 
         <div className="shrink-0 px-5 py-3 border-t border-[var(--surface-border)]">
-          <p className="text-[12px] text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--text-muted)]">
             oldenbyte © 2026{" "}
             <a
               href="https://github.com/cengizozel/oldenbyte"
@@ -889,7 +889,7 @@ function DashboardSwitcher({
                 title="Drag to reorder"
                 className="shrink-0 pl-1 cursor-grab active:cursor-grabbing text-[var(--text-secondary)] opacity-0 group-hover/dash:opacity-40 hover:!opacity-80"
               >
-                <GripVertical size={11} />
+                <GripVertical size={12} />
               </span>
               {renamingId === d.id ? (
                 <input
@@ -921,7 +921,7 @@ function DashboardSwitcher({
                 title="Rename"
                 aria-label={`Rename ${d.name}`}
               >
-                <Pencil size={11} />
+                <Pencil size={12} />
               </button>
               {dashboards.list.length > 1 && (
                 <button
@@ -930,7 +930,7 @@ function DashboardSwitcher({
                   title="Delete dashboard"
                   aria-label={`Delete ${d.name}`}
                 >
-                  <X size={11} />
+                  <X size={12} />
                 </button>
               )}
             </div>
@@ -964,7 +964,7 @@ function DashboardSwitcher({
                 onClick={() => setCreating(true)}
                 className="w-full flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5"
               >
-                <Plus size={11} />
+                <Plus size={12} />
                 New dashboard
               </button>
             )}
@@ -1066,7 +1066,7 @@ export default function TopBar({
               title="Exit demo mode"
             >
               demo
-              <X size={9} />
+              <X size={12} />
             </button>
           )}
           {editing && onCancelEdit && (
