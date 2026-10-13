@@ -853,11 +853,11 @@ function DashboardSwitcher({
     <div ref={wrapRef} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 text-xs font-ui text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+        className="flex items-center gap-1 text-sm md:text-base font-ui text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         title="Switch dashboard"
       >
         {active.name}
-        <ChevronDown size={10} />
+        <ChevronDown size={14} />
       </button>
       {open && (
         <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 w-48 bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-xl shadow-lg p-1">
@@ -1062,7 +1062,7 @@ export default function TopBar({
           {demo && (
             <button
               onClick={exitDemoMode}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[12px] font-ui text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[13px] font-ui text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
               title="Exit demo mode"
             >
               demo
@@ -1072,40 +1072,40 @@ export default function TopBar({
           {editing && onCancelEdit && (
             <button
               onClick={onCancelEdit}
-              className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)] p-[5px] -m-[5px] rounded-md"
+              className="transition-opacity text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-[5px] -m-[5px] rounded-md"
               title="Cancel layout changes"
             >
-              <X size={14} />
+              <X size={16} />
             </button>
           )}
           <button
             onClick={onToggleEdit}
-            className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)] p-[5px] -m-[5px] rounded-md"
+            className="transition-opacity text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-[5px] -m-[5px] rounded-md"
             title={editing ? "Done editing" : "Edit layout"}
           >
-            {editing ? <Check size={14} /> : <LayoutGrid size={14} />}
+            {editing ? <Check size={16} /> : <LayoutGrid size={16} />}
           </button>
           {/* The digest page reads real data and keeps its own settings outside
               the demo sandbox, so it stays out of reach while demoing. */}
           {!demo && (
             <a
               href="/digest"
-              className="transition-opacity text-[var(--text-muted)] hover:text-[var(--text-secondary)] p-[5px] -m-[5px] rounded-md"
+              className="transition-opacity text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-[5px] -m-[5px] rounded-md"
               title="Morning digest"
             >
-              <Newspaper size={14} />
+              <Newspaper size={16} />
             </a>
           )}
           <button
             ref={settingsButtonRef}
             onClick={() => setSettingsOpen(o => !o)}
-            className="transition-colors text-[var(--text-muted)] hover:text-[var(--text-secondary)] p-[5px] -m-[5px] rounded-md"
+            className="transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-[5px] -m-[5px] rounded-md"
             title="Settings"
             aria-label="Settings"
             aria-expanded={settingsOpen}
             aria-haspopup="dialog"
           >
-            <Settings size={14} />
+            <Settings size={16} />
           </button>
         </div>
       </div>

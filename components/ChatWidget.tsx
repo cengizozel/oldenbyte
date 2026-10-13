@@ -937,7 +937,7 @@ export default function ChatWidget({
                   {/* click-away backdrop */}
                   <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                   <div className={`absolute right-0 top-6 z-50 w-60 rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
-                    <p className={`px-2.5 pt-1.5 pb-1 text-[12px] font-ui opacity-60 ${c.label}`}>Data access</p>
+                    <p className={`px-2.5 pt-1.5 pb-1 text-[13px] font-ui opacity-60 ${c.label}`}>Data access</p>
                     {/* One row per data-bearing widget on the dashboard; no master
                         switch. A calendar widget's row also grants its tools. */}
                     {roster.length === 0 && (
@@ -963,7 +963,7 @@ export default function ChatWidget({
                         </button>
                       );
                     })}
-                    <p className={`px-2.5 pt-2 pb-1 text-[12px] font-ui opacity-60 border-t ${c.border} mt-1 ${c.label}`}>Connections</p>
+                    <p className={`px-2.5 pt-2 pb-1 text-[13px] font-ui opacity-60 border-t ${c.border} mt-1 ${c.label}`}>Connections</p>
                     {([
                       { icon: Library, label: "Kiwix library", caption: "all books", on: config.useKiwix, ready: !!config.kiwixUrl, toggle: toggleKiwix, hint: "set up in settings" },
                       { icon: Layers, label: "Anytype", caption: config.anytypeSpaceName || "", on: config.useAnytype, ready: !!(config.anytypeApiKey && config.anytypeSpaceId), toggle: toggleAnytype, hint: "pair in settings" },
@@ -1085,13 +1085,13 @@ export default function ChatWidget({
                       if (e.key === "Escape") setEditingTitle(false);
                     }}
                     placeholder={titleFrom(messages)}
-                    className={`px-2 py-0.5 rounded-full text-[12px] text-center font-ui bg-transparent border border-[var(--surface-border)] outline-none w-44 ${c.label}`}
+                    className={`px-2 py-0.5 rounded-full text-[13px] text-center font-ui bg-transparent border border-[var(--surface-border)] outline-none w-44 ${c.label}`}
                   />
                 ) : (
                   <button
                     onClick={() => { setTitleDraft(activeConv?.renamed ? activeConv.title : ""); setEditingTitle(true); }}
                     title="Rename this chat"
-                    className={`px-2 py-0.5 rounded-full text-[12px] font-ui opacity-60 hover:opacity-70 transition-opacity ${c.label}`}
+                    className={`px-2 py-0.5 rounded-full text-[13px] font-ui opacity-60 hover:opacity-70 transition-opacity ${c.label}`}
                   >
                     {chatTitle}
                   </button>

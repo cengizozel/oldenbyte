@@ -152,7 +152,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
     <div className="flex flex-col gap-3 flex-1 min-h-0 p-4">
       <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
 
-        <p className={`text-[12px] font-ui opacity-50 ${c.label}`}>Model</p>
+        <p className={`text-[13px] font-ui opacity-50 ${c.label}`}>Model</p>
 
         <div>
           <p className={`text-xs mb-1 opacity-50 ${c.label}`}>API URL</p>
@@ -211,7 +211,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
           {modelsError && <p className="text-red-400 text-[12px] mt-1">{modelsError}</p>}
         </div>
 
-        <p className={`text-[12px] font-ui opacity-50 mt-1 ${c.label}`}>Behavior</p>
+        <p className={`text-[13px] font-ui opacity-50 mt-1 ${c.label}`}>Behavior</p>
 
         <div>
           <p className={`text-xs mb-1 opacity-50 ${c.label}`}>System prompt <span className="opacity-60">(optional)</span></p>
@@ -302,7 +302,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
           </div>)}
         </div>
 
-        <p className={`text-[12px] font-ui opacity-50 mt-1 ${c.label}`}>Data sources</p>
+        <p className={`text-[13px] font-ui opacity-50 mt-1 ${c.label}`}>Data sources</p>
 
         <p className={`text-[12px] -mt-1 opacity-60 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
 

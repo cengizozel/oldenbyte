@@ -137,7 +137,7 @@ export default function LoginPage() {
           <span className="text-2xl leading-none text-[var(--text-primary)] font-[family-name:var(--font-playfair)]">
             oldenbyte
           </span>
-          <span className="text-[12px] tracking-[0.2em] text-[var(--text-muted)] font-ui">
+          <span className="text-[13px] tracking-[0.2em] text-[var(--text-muted)] font-ui">
             {subtitle}
           </span>
         </div>

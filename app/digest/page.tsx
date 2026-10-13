@@ -713,11 +713,11 @@ export default function DigestPage() {
           <div className="flex items-baseline justify-between mb-3">
             <Link
               href="/"
-              className="font-ui text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+              className="font-ui text-[13px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
             >
               ← back
             </Link>
-            <span suppressHydrationWarning className="font-ui text-[12px] text-[var(--text-muted)]">
+            <span suppressHydrationWarning className="font-ui text-[13px] text-[var(--text-muted)]">
               {dateLabel}
             </span>
           </div>
@@ -727,13 +727,13 @@ export default function DigestPage() {
             </h1>
           </div>
           <div className="border-t border-b border-[var(--text-primary)] py-1.5 flex items-center justify-between">
-            <span className="font-ui text-[12px] text-[var(--text-muted)]">
+            <span className="font-ui text-[13px] text-[var(--text-muted)]">
               morning briefing
             </span>
             <div className="flex items-center gap-4">
-              <button onClick={() => (showSettings ? setShowSettings(false) : openSettings())} className="font-ui text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">{showSettings ? "close" : "model"}</button>
+              <button onClick={() => (showSettings ? setShowSettings(false) : openSettings())} className="font-ui text-[13px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">{showSettings ? "close" : "model"}</button>
               {configured && !aiLoading && !generating && (
-                <button onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; storage.removeItem(`digest-ai-sections-${today}`); generateSummary(); }} className="font-ui text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">regenerate</button>
+                <button onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; storage.removeItem(`digest-ai-sections-${today}`); generateSummary(); }} className="font-ui text-[13px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">regenerate</button>
               )}
               <button
                 onClick={() => {
@@ -753,7 +753,7 @@ export default function DigestPage() {
           {(showSettings || !configured) && (
             <div className="border-b border-[var(--surface-border)] py-3 flex flex-col gap-2.5 text-[var(--text-primary)]">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-ui text-[12px] text-[var(--text-muted)] w-20 shrink-0">endpoint</span>
+                <span className="font-ui text-[13px] text-[var(--text-muted)] w-20 shrink-0">endpoint</span>
                 <input
                   value={draft.baseUrl}
                   onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, baseUrl: v })); setModels(defaultModelsFor(v)); }}
@@ -761,13 +761,13 @@ export default function DigestPage() {
                   className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono"
                 />
                 {PRESETS.map(p => (
-                  <button key={p.label} onClick={() => setEndpoint(p.url)} className="text-[12px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">{p.label}</button>
+                  <button key={p.label} onClick={() => setEndpoint(p.url)} className="text-[13px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">{p.label}</button>
                 ))}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-ui text-[12px] text-[var(--text-muted)] w-20 shrink-0">model</span>
+                <span className="font-ui text-[13px] text-[var(--text-muted)] w-20 shrink-0">model</span>
                 {loadingModels ? (
-                  <span className="flex-1 min-w-[12rem] text-[12px] italic text-[var(--text-muted)] py-0.5 font-ui animate-pulse">searching models…</span>
+                  <span className="flex-1 min-w-[12rem] text-[13px] italic text-[var(--text-muted)] py-0.5 font-ui animate-pulse">searching models…</span>
                 ) : models.length > 0 ? (
                   <select value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 font-mono">
                     <option value="" disabled>select a model…</option>
@@ -778,13 +778,13 @@ export default function DigestPage() {
                   <input value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} placeholder="e.g. gpt-4o-mini or llama3.2" className="flex-1 min-w-[12rem] text-[12px] bg-transparent border-b border-[var(--surface-border)] focus:border-[var(--text-muted)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono" />
                 )}
                 {!loadingModels && (
-                  <button onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey, draft.model || model)} className="text-[12px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">load models</button>
+                  <button onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey, draft.model || model)} className="text-[13px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">load models</button>
                 )}
               </div>
               {/* API key — only for hosted providers that need one */}
               {NEEDS_KEY.test(draft.baseUrl) && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-ui text-[12px] text-[var(--text-muted)] w-20 shrink-0">api key</span>
+                  <span className="font-ui text-[13px] text-[var(--text-muted)] w-20 shrink-0">api key</span>
                   <input
                     type="password"
                     value={draft.apiKey}
@@ -797,9 +797,9 @@ export default function DigestPage() {
               )}
               <div className="flex justify-end gap-4">
                 {Boolean(draft.baseUrl && draft.model && (draft.apiKey || !NEEDS_KEY.test(draft.baseUrl))) && (
-                  <button onClick={() => saveSettings(true)} className="text-[12px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">save &amp; recompose</button>
+                  <button onClick={() => saveSettings(true)} className="text-[13px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">save &amp; recompose</button>
                 )}
-                <button onClick={() => saveSettings(false)} className="text-[12px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">save</button>
+                <button onClick={() => saveSettings(false)} className="text-[13px] font-ui text-[var(--text-muted)] hover:text-[var(--text-primary)]">save</button>
               </div>
             </div>
           )}
@@ -812,7 +812,7 @@ export default function DigestPage() {
               Set a model above to generate today&apos;s briefing, with a local one (Ollama, LM Studio) or a hosted provider with an API key.
             </p>
           ) : aiLoading ? (
-            <p className="font-ui text-[12px] text-[var(--text-muted)] text-center mt-16 animate-pulse">
+            <p className="font-ui text-[13px] text-[var(--text-muted)] text-center mt-16 animate-pulse">
               composing briefing…
             </p>
           ) : aiError ? (
@@ -826,7 +826,7 @@ export default function DigestPage() {
                     onClick={() => setCollapsed(c => ({ ...c, [s.label]: !c[s.label] }))}
                     className="w-full flex items-center gap-3 mb-4 group"
                   >
-                    <span className="font-ui text-[12px] tracking-[0.2em] text-[var(--page-bg)] bg-[var(--text-primary)] px-2 py-0.5">
+                    <span className="font-ui text-[13px] tracking-[0.2em] text-[var(--page-bg)] bg-[var(--text-primary)] px-2 py-0.5">
                       {s.label}
                     </span>
                     <div className="flex-1 h-px bg-[var(--surface-border)]" />
@@ -838,7 +838,7 @@ export default function DigestPage() {
                       {s.prose
                         ? renderProse(s.prose, s.refs)
                         : generating
-                          ? <p className="font-ui text-[12px] text-[var(--text-muted)] animate-pulse">composing…</p>
+                          ? <p className="font-ui text-[13px] text-[var(--text-muted)] animate-pulse">composing…</p>
                           : <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-muted)]">no content.</p>}
                     </div>
                   )}
