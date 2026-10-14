@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyPassword, hashPassword } from "@/lib/password";
+import { verifyPassword, hashPassword, needsRehash } from "@/lib/password";
 import { createSession, destroySession } from "@/lib/session";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { rateLimit, clientIp, isKnownLogin, rememberLogin } from "@/lib/ratelimit";
@@ -54,6 +54,10 @@ export async function POST(request: NextRequest) {
   if (!(await verifyPassword(password, user.passwordHash))) return fail();
 
   rememberLogin(name, ip);
+  // Upgrade hashes made with older, weaker scrypt parameters.
+  if (needsRehash(user.passwordHash)) {
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password) } });
+  }
   const { token, cookie } = await createSession(user.id);
   const res = json({ ok: true, mustChangePassword: user.mustChangePassword });
   res.cookies.set(SESSION_COOKIE, token, cookie);

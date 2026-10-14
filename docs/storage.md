@@ -131,3 +131,5 @@ It is used by:
 `GET /api/settings/export` returns all of the signed-in user's non-cache keys as a flat JSON object. The edit shelf's export button downloads it as `oldenbyte-backup-<date>.json`.
 
 `POST /api/settings/import` bulk-upserts the key-value pairs (up to 2000 entries, body up to 25 MB) in a Prisma transaction for the signed-in user, then the client reloads the page.
+
+Non-admin accounts are capped at 2000 settings keys and 50 MB of settings in total across `/api/settings`, `/api/settings/import` and `/api/config` (`lib/quota.ts`, `413` past the cap), and at a file quota for uploads plus library (2 GB by default, `USER_STORAGE_QUOTA_MB`). Admin accounts are unlimited.

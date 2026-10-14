@@ -14,8 +14,8 @@ The dashboard has per-user accounts stored in the database. Passwords are hashed
 ## Flow
 
 1. The user submits username and password to `POST /api/auth`.
-2. The server looks up the user and verifies the password hash (scrypt, constant-time compare).
-3. On match it inserts a Session row and sets an httpOnly session cookie.
+2. The server looks up the user and verifies the password hash (scrypt N=2^16, r=8, p=1, constant-time compare). A hash made with older, weaker parameters is upgraded in place on that login.
+3. On match it inserts a Session row and sets an httpOnly session cookie, named `__Host-session` in production (Secure, Path=/, no Domain, so no other subdomain can set it) and `session` in development.
 4. The middleware checks the cookie signature on every request; route handlers look the session up in the database.
 5. An invalid, missing or expired session redirects to `/login` (API routes: 401).
 6. `DELETE /api/auth` logs out: it deletes the session row and clears the cookie. Changing your password, an admin reset, or deleting the account ends all of that account's sessions.

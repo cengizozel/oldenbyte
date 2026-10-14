@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser, bodyTooLarge } from "@/lib/http";
+import { requireUser, bodyTooLarge, errorResponse } from "@/lib/http";
+import { assertSettingsRoom } from "@/lib/quota";
 import { isCacheKey } from "@/lib/settingKeys";
 
 // A whole dashboard config is well under 1 MB; this only stops abuse.
@@ -93,6 +94,12 @@ async function applyConfig(request: NextRequest) {
         .map(e => e.key)
         .filter(k => !isCacheKey(k) && !keep.has(k))
     : [];
+
+  try {
+    await assertSettingsRoom(user, entries);
+  } catch (err) {
+    return errorResponse(err, "config");
+  }
 
   const ops = [
     ...(toDelete.length ? [prisma.setting.deleteMany({ where: { userId: user.id, key: { in: toDelete } } })] : []),

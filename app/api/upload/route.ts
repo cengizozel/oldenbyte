@@ -6,6 +6,7 @@ import { randomUUID } from "crypto";
 import busboy from "busboy";
 import { Readable } from "stream";
 import { requireUser, ClientError, errorResponse } from "@/lib/http";
+import { fileRoomLeft } from "@/lib/quota";
 
 const uploadsDir = process.env.UPLOADS_DIR ?? path.join(process.cwd(), "data", "uploads");
 
@@ -19,9 +20,10 @@ export async function POST(request: NextRequest) {
 
     const contentType = request.headers.get("content-type") ?? "";
     if (!contentType.startsWith("multipart/form-data")) throw new ClientError("Expected a multipart upload.");
+    const room = await fileRoomLeft(user);
     const bb = busboy({
       headers: { "content-type": contentType },
-      limits: { fileSize: 50 * 1024 * 1024, files: 1 },
+      limits: { fileSize: Math.min(50 * 1024 * 1024, room), files: 1 },
     });
 
     const result = await new Promise<{ filename: string }>((resolve, reject) => {
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
         stream.on("limit", () => {
           dest.destroy();
           unlink(filePath).catch(() => {});
-          reject(new ClientError("File too large (max 50MB)", 413));
+          reject(new ClientError(room < 50 * 1024 * 1024 ? "Not enough storage quota left for this file." : "File too large (max 50MB)", 413));
         });
         dest.on("finish", () => {
           if (!resolved) { resolved = true; resolve({ filename }); }

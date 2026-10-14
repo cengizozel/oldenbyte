@@ -2,8 +2,10 @@
 // host and rejects any private / loopback / link-local / metadata / CGNAT
 // address so an authenticated user cannot reach the LAN or cloud metadata.
 // Node runtime only.
+import dns from "dns";
 import { lookup } from "dns/promises";
 import net from "net";
+import { Agent, fetch as undiciFetch, type RequestInit as UndiciInit } from "undici";
 
 function isPrivateV4(ip: string): boolean {
   const o = ip.split(".").map(Number);
@@ -15,6 +17,8 @@ function isPrivateV4(ip: string): boolean {
   if (a === 169 && b === 254) return true; // link-local + cloud metadata (169.254.169.254)
   if (a === 172 && b >= 16 && b <= 31) return true; // private
   if (a === 192 && b === 168) return true; // private
+  if (a === 192 && b === 0 && o[2] === 0) return true; // IETF protocol assignments
+  if (a === 198 && (b === 18 || b === 19)) return true; // benchmarking
   if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT (incl. Tailscale)
   if (a >= 224) return true; // multicast + reserved
   return false;
@@ -26,6 +30,8 @@ function isPrivateV6(ip: string): boolean {
   if (x.startsWith("fe80")) return true; // link-local
   if (x.startsWith("fc") || x.startsWith("fd")) return true; // unique local
   if (x.startsWith("::ffff:")) return isPrivateV4(x.slice("::ffff:".length)); // v4-mapped
+  if (x.startsWith("64:ff9b:")) return true; // NAT64: can embed any v4 address
+  if (x.startsWith("2002:")) return true; // 6to4: embeds a v4 address
   return false;
 }
 
@@ -34,10 +40,34 @@ export function isBlocked(ip: string): boolean {
   return net.isIPv6(ip) ? isPrivateV6(ip) : isPrivateV4(ip);
 }
 
+// Connect-time guard: every address a socket is actually opened to is checked
+// again here, so a hostname that re-resolves to a private address between
+// assertPublicUrl and the fetch (DNS rebinding) is still refused.
+const publicOnly = new Agent({
+  connect: {
+    lookup(hostname, options, callback) {
+      dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
+        const list = (addresses ?? []) as dns.LookupAddress[];
+        if (!err && (list.length === 0 || list.some((a) => isBlocked(a.address)))) {
+          err = Object.assign(new Error("URL resolves to a private address"), { code: "EBLOCKED" });
+        }
+        if (err) return callback(err, "", 0);
+        if (options.all) return (callback as unknown as (e: null, a: dns.LookupAddress[]) => void)(null, list);
+        callback(null, list[0].address, list[0].family);
+      });
+    },
+  },
+});
+
+// fetch pinned to public addresses (see publicOnly). Same shape as fetch.
+function publicFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  return undiciFetch(url, { ...(init as UndiciInit), dispatcher: publicOnly }) as unknown as Promise<Response>;
+}
+
 // Validates the URL and that every resolved address is public. Returns the
-// parsed URL on success, throws on any failure. Note: there is a small DNS
-// rebinding TOCTOU window between this check and the actual fetch; acceptable
-// for this deployment's threat model.
+// parsed URL on success, throws on any failure. The fetchers below also pin
+// the connection itself to public addresses (publicOnly), so DNS rebinding
+// between this check and the fetch cannot reach a private address.
 export async function assertPublicUrl(raw: string): Promise<URL> {
   let url: URL;
   try {
@@ -75,7 +105,7 @@ export async function safeFetch(
   const signal = AbortSignal.timeout(timeoutMs);
   let url = await assertPublicUrl(rawUrl);
   for (let i = 0; i <= maxRedirects; i++) {
-    const res = await fetch(url.toString(), { headers, redirect: "manual", signal });
+    const res = await publicFetch(url.toString(), { headers, redirect: "manual", signal });
     const loc = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
     if (loc) {
       url = await assertPublicUrl(new URL(loc, url).toString());
@@ -103,7 +133,7 @@ export async function fetchForUser(
   if (user.role === "admin") return fetch(rawUrl, init);
   let url = await assertPublicUrl(rawUrl);
   for (let i = 0; i <= maxRedirects; i++) {
-    const res = await fetch(url.toString(), { ...init, redirect: "manual" });
+    const res = await publicFetch(url.toString(), { ...init, redirect: "manual" });
     const loc = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
     if (loc) {
       url = await assertPublicUrl(new URL(loc, url).toString());

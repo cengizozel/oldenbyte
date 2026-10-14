@@ -28,14 +28,28 @@ async function limited<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-const N = 16384; // CPU/memory cost (2^14)
+const N = 65536; // CPU/memory cost (2^16), about 64MB per hash
 const R = 8;
 const P = 1;
 const KEYLEN = 64;
 
+// scrypt needs about 128 * N * r bytes; Node refuses above 32MB unless told.
+function scryptMem(n: number, r: number): number {
+  return 128 * n * r * 2;
+}
+
+// True for hashes made with weaker parameters than the current ones, so login
+// can upgrade them in place once the password is known to be correct.
+export function needsRehash(stored: string): boolean {
+  const parts = stored.split("$");
+  return parts[0] !== "scrypt" || Number(parts[1]) < N || Number(parts[2]) < R || Number(parts[3]) < P;
+}
+
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
-  const derived = (await limited(() => scrypt(password, salt, KEYLEN, { N, r: R, p: P }))) as Buffer;
+  const derived = (await limited(() =>
+    scrypt(password, salt, KEYLEN, { N, r: R, p: P, maxmem: scryptMem(N, R) })
+  )) as Buffer;
   return `scrypt$${N}$${R}$${P}$${salt.toString("hex")}$${derived.toString("hex")}`;
 }
 
@@ -49,7 +63,9 @@ export async function verifyPassword(password: string, stored: string): Promise<
     const salt = Buffer.from(parts[4], "hex");
     const expected = Buffer.from(parts[5], "hex");
     if (!n || !r || !p || salt.length === 0 || expected.length === 0) return false;
-    const derived = (await limited(() => scrypt(password, salt, expected.length, { N: n, r, p }))) as Buffer;
+    const derived = (await limited(() =>
+      scrypt(password, salt, expected.length, { N: n, r, p, maxmem: scryptMem(n, r) })
+    )) as Buffer;
     return derived.length === expected.length && timingSafeEqual(derived, expected);
   } catch {
     return false;

@@ -3,7 +3,10 @@
 // use this. The token is a stateless, signed bearer of a random session id; the
 // authoritative existence/revocation check happens in lib/session.ts (Node).
 
-const SESSION_COOKIE = "session";
+// __Host- prefix in production: the browser then only accepts the cookie if it
+// is Secure, has Path=/ and no Domain, so no other *.esqdrive.com host can set
+// or overwrite it. Plain name in development, where the app runs over http.
+const SESSION_COOKIE = process.env.NODE_ENV === "production" ? "__Host-session" : "session";
 const ALGO = "SHA-256";
 
 // The signing secret MUST be a strong value in production (it signs the auth

@@ -5,6 +5,7 @@ import path from "path";
 import busboy from "busboy";
 import { Readable } from "stream";
 import { requireUser, ClientError, errorResponse, readJsonBody } from "@/lib/http";
+import { fileRoomLeft } from "@/lib/quota";
 
 // Per-user reader library: a real folder of PDFs and EPUBs (with subfolders)
 // that the reader widget browses, uploads into, and reads from. Files keep
@@ -106,9 +107,10 @@ export async function POST(request: NextRequest) {
   // multipart upload: file + dir (the subfolder it goes to)
   try {
     if (!contentType.startsWith("multipart/form-data")) throw new ClientError("Expected a multipart upload.");
+    const room = await fileRoomLeft(user);
     const bb = busboy({
       headers: { "content-type": contentType },
-      limits: { fileSize: 100 * 1024 * 1024, files: 1 },
+      limits: { fileSize: Math.min(100 * 1024 * 1024, room), files: 1 },
     });
 
     const result = await new Promise<{ name: string; path: string }>((resolve, reject) => {
@@ -137,7 +139,7 @@ export async function POST(request: NextRequest) {
           stream.on("limit", () => {
             dest.destroy();
             unlink(filePath).catch(() => {});
-            reject(new ClientError("File too large (max 100MB)", 413));
+            reject(new ClientError(room < 100 * 1024 * 1024 ? "Not enough storage quota left for this file." : "File too large (max 100MB)", 413));
           });
           dest.on("finish", () => {
             if (!resolved) { resolved = true; resolve({ name, path: dir ? `${dir}/${name}` : name }); }

@@ -546,7 +546,7 @@ Accepts a `multipart/form-data` request with one file. Saves it to the user's ow
 ```json
 { "filename": "<uuid>.<ext>" }
 ```
-Accepted types: `.pdf`, `.epub`, up to 50 MB. The Reader widget now uploads through `/api/library`; this route and `/api/files` remain for files uploaded before the library existed. Client errors return a JSON `error` with `400` (not multipart, no file part), `413` (too large) or `415` (unsupported type); anything else is a `500` with a generic message.
+Accepted types: `.pdf`, `.epub`, up to 50 MB, and for non-admin accounts within the storage quota (uploads plus library, 2 GB by default, `USER_STORAGE_QUOTA_MB`; `413` when it would be exceeded). The Reader widget now uploads through `/api/library`; this route and `/api/files` remain for files uploaded before the library existed. Client errors return a JSON `error` with `400` (not multipart, no file part), `413` (too large) or `415` (unsupported type); anything else is a `500` with a generic message.
 
 ### `GET /api/files/<filename>`
 Serves one of the user's uploaded files (`<uuid>.pdf` or `<uuid>.epub`) from `UPLOADS_DIR/<userId>/`. Any other name, or another user's file, returns `404`.
@@ -557,4 +557,4 @@ A per-user reader library: a real folder tree of PDFs and EPUBs under `LIBRARY_D
 - `GET ?op=list&path=<dir>` returns `{ "dirs": ["..."], "files": [{ "name", "size" }] }` (hidden entries skipped). A user with no folder yet gets an empty list.
 - `GET ?op=file&path=<file>` returns the file with its content type.
 - `POST` JSON `{ "op": "mkdir", "path": "<parent>", "name": "<folder>" }` creates a subfolder.
-- `POST` multipart with a `file` and an optional `dir` field uploads into that folder (`.pdf` or `.epub`, up to 100 MB), returning `{ "name", "path" }`. Client errors return `400`, `413` or `415` like `/api/upload`.
+- `POST` multipart with a `file` and an optional `dir` field uploads into that folder (`.pdf` or `.epub`, up to 100 MB, and for non-admin accounts within the storage quota shared with `/api/upload`), returning `{ "name", "path" }`. Client errors return `400`, `413` or `415` like `/api/upload`.

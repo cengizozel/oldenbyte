@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { json, badRequest, requireUser } from "@/lib/http";
+import { json, badRequest, requireUser, errorResponse } from "@/lib/http";
+import { assertSettingsRoom } from "@/lib/quota";
 
 export async function GET(request: NextRequest) {
   const user = await requireUser(request);
@@ -28,6 +29,11 @@ export async function POST(request: NextRequest) {
   const { key, value } = (body ?? {}) as { key?: unknown; value?: unknown };
   if (typeof key !== "string" || key.length === 0 || key.length > 256) return badRequest("Invalid key");
   if (typeof value !== "string" || value.length > 1_000_000) return badRequest("Invalid value");
+  try {
+    await assertSettingsRoom(user, [[key, value]]);
+  } catch (err) {
+    return errorResponse(err, "settings");
+  }
 
   await prisma.setting.upsert({
     where: { userId_key: { userId: user.id, key } },
