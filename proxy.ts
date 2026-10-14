@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken, apiKeyValid, SESSION_COOKIE } from "@/lib/auth";
+import { verifySessionToken, apiKeyValid, bearerAllowed, SESSION_COOKIE } from "@/lib/auth";
 
 // Paths reachable without a session: the login page and the unauthenticated
 // auth endpoints (state probe, login, logout, first-run setup, registration).
@@ -14,16 +14,42 @@ function isPublic(pathname: string): boolean {
 // authoritative session/user check (revocation, role) happens in the route
 // handlers via lib/session. Headless callers may instead present
 // Authorization: Bearer <API_KEY>.
+// CSRF guard for state-changing API calls. SameSite=Lax cookies already stop
+// cross-site requests, but not same-site ones (another *.esqdrive.com host), so
+// browsers' Origin and Sec-Fetch-Site headers must point at this exact host.
+// Clients that send neither (scripts) carry no browser cookie to abuse.
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+function crossOrigin(request: NextRequest): boolean {
+  if (SAFE_METHODS.has(request.method)) return false;
+  const site = request.headers.get("sec-fetch-site");
+  if (site && site !== "same-origin" && site !== "none") return true;
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  try {
+    return new URL(origin).host !== host;
+  } catch {
+    return true;
+  }
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (isPublic(pathname)) {
-    return NextResponse.next();
+  // Bearer token for scripts/automation (only when API_KEY is configured, and
+  // only on /api/config).
+  const authHeader = request.headers.get("authorization");
+  const bearer =
+    bearerAllowed(pathname) &&
+    !!authHeader?.startsWith("Bearer ") &&
+    apiKeyValid(authHeader.slice(7).trim());
+
+  if (pathname.startsWith("/api/") && !bearer && crossOrigin(request)) {
+    return NextResponse.json({ error: "Cross-origin request refused" }, { status: 403 });
   }
 
-  // Bearer token for scripts/automation (only when API_KEY is configured).
-  const authHeader = request.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ") && apiKeyValid(authHeader.slice(7).trim())) {
+  if (isPublic(pathname) || bearer) {
     return NextResponse.next();
   }
 

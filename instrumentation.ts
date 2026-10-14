@@ -10,6 +10,12 @@ export async function register() {
     );
   }
 
+  // A short API_KEY is ignored (see lib/auth.apiKeyValid); say so at boot.
+  const apiKey = process.env.API_KEY;
+  if (apiKey && apiKey.length < 32) {
+    console.warn("API_KEY is shorter than 32 characters and is ignored; bearer auth is disabled.");
+  }
+
   // Slow IPv4 hosts with an IPv6 address too (see lib/network.ts).
   (await import("./lib/network")).widenHappyEyeballs();
 

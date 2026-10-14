@@ -20,7 +20,7 @@ The dashboard has per-user accounts stored in the database. Passwords are hashed
 5. An invalid, missing or expired session redirects to `/login` (API routes: 401).
 6. `DELETE /api/auth` logs out: it deletes the session row and clears the cookie. Changing your password, an admin reset, or deleting the account ends all of that account's sessions.
 
-Login is rate limited per client IP plus username and per username alone; registration, setup and password changes are rate limited too (`lib/ratelimit.ts`, in memory).
+Login takes usernames up to 64 and passwords up to 200 characters, and is rate limited per client IP plus username, per client IP, per username, and globally (60 attempts a minute across everyone). An address that has already logged in as a user skips the per-username and global limits for that user, so someone hammering them cannot lock the owner out. At most two scrypt hashes run at once (`lib/password.ts`). Registration, setup and password changes are rate limited too (`lib/ratelimit.ts`, all in memory, reset on restart).
 
 ## Session Token
 
@@ -60,7 +60,9 @@ matcher: [
 
 The middleware only checks the cookie signature (it runs on the edge runtime). The authoritative check, including revoked sessions and roles, happens in each route handler through `requireUser` / `requireAdmin` (`lib/http.ts`, `lib/session.ts`).
 
-A request is allowed through if it carries a valid session cookie **or** a valid bearer token (see below). Otherwise API routes return `401 {"error":"Unauthorized"}` and page requests redirect to `/login`.
+A request is allowed through if it carries a valid session cookie **or** a valid bearer token on `/api/config` (see below). Otherwise API routes return `401 {"error":"Unauthorized"}` and page requests redirect to `/login`.
+
+State-changing API requests (anything but GET, HEAD, OPTIONS) from a browser must come from this exact host: if `Sec-Fetch-Site` is present it must be `same-origin` or `none`, and if `Origin` is present its host must match the request host. Otherwise the middleware returns `403`. This blocks cross-site and same-site (other subdomain) request forgery on top of the `SameSite=Lax` cookie. Bearer requests skip this check.
 
 ## Headless / Bearer token
 
@@ -70,14 +72,14 @@ For scripts and automation (e.g. configuring the dashboard via `/api/config`), s
 Authorization: Bearer <API_KEY>
 ```
 
-The middleware accepts this on any route. Requests authenticated this way act as the first admin account, so scripts operate on the admin's data. The token path is **disabled** unless `API_KEY` is set. The key is compared in constant time (`lib/auth.ts`, `apiKeyValid`).
+The token is accepted on `/api/config` only; every other route needs a session. Requests authenticated this way act as the first admin account, so scripts operate on the admin's data. The token path is **disabled** unless `API_KEY` is set to at least 32 characters (a shorter key is ignored, with a warning at startup). The key is compared in constant time (`lib/auth.ts`, `apiKeyValid`, `bearerAllowed`).
 
 ## Environment Variables
 
 | Variable | Description |
 |---|---|
 | `SESSION_SECRET` | Signs session cookies. Generate with `openssl rand -hex 32`. **Required in production** |
-| `API_KEY` | Optional bearer token for headless access. Unset = token auth disabled |
+| `API_KEY` | Optional bearer token for headless access to `/api/config`, at least 32 characters. Unset or shorter = token auth disabled |
 
 There is no password environment variable: the admin account is created in the browser on first run and all credentials live in the database.
 

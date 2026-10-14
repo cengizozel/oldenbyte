@@ -73,7 +73,7 @@ Bulk-upserts the key-value pairs from a JSON object in one transaction. Intended
 { "username": "...", "password": "..." }
 ```
 On success: sets an `httpOnly` session cookie and returns `{ "ok": true, "mustChangePassword": false }`.
-On failure: returns `401 {"error":"Invalid username or password"}`. Rate limited per client IP plus username and per username (`429` with `Retry-After`).
+On failure: returns `401 {"error":"Invalid username or password"}`. A username over 64 or password over 200 characters returns `400`. Rate limited per client IP plus username, per client IP, per username and globally (`429` with `Retry-After`); see [auth.md](auth.md).
 
 ### `DELETE /api/auth`
 Deletes the session row and clears the cookie (logout).

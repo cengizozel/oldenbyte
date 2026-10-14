@@ -63,13 +63,22 @@ export async function verifySessionToken(token: string): Promise<SessionTokenPay
 }
 
 // Headless/automation auth: a request may present `Authorization: Bearer <key>`
-// matching the API_KEY env var. Disabled (always false) when API_KEY is unset,
-// so the token path can't be used unless the operator opts in. Bearer requests
-// are resolved to the admin account by lib/session.getUserFromRequest.
+// matching the API_KEY env var. Disabled (always false) when API_KEY is unset
+// or shorter than API_KEY_MIN, so the token path can't be used unless the
+// operator opts in with a strong key. Bearer requests are resolved to the admin
+// account by lib/session.getUserFromRequest.
+export const API_KEY_MIN = 32;
+
 export function apiKeyValid(provided: string | null | undefined): boolean {
   const key = process.env.API_KEY;
-  if (!key || !provided) return false;
+  if (!key || key.length < API_KEY_MIN || !provided) return false;
   return timingSafeEqual(provided, key);
+}
+
+// The bearer key only opens the headless config endpoint; every other route
+// needs a real session.
+export function bearerAllowed(pathname: string): boolean {
+  return pathname === "/api/config";
 }
 
 export { SESSION_COOKIE };

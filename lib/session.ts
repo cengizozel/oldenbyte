@@ -5,7 +5,7 @@
 import { createHash, randomBytes } from "crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "./prisma";
-import { SESSION_COOKIE, signSessionToken, verifySessionToken, apiKeyValid } from "./auth";
+import { SESSION_COOKIE, signSessionToken, verifySessionToken, apiKeyValid, bearerAllowed } from "./auth";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
@@ -49,10 +49,14 @@ export async function createSession(userId: string): Promise<NewSession> {
 }
 
 export async function getUserFromRequest(request: NextRequest): Promise<SessionUser | null> {
-  // Headless automation: a valid Bearer API_KEY acts as the first admin account,
-  // so scripts (and the /api/config headless endpoint) operate on the admin's data.
+  // Headless automation: on /api/config only, a valid Bearer API_KEY acts as the
+  // first admin account, so scripts operate on the admin's data.
   const authHeader = request.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ") && apiKeyValid(authHeader.slice(7).trim())) {
+  if (
+    bearerAllowed(request.nextUrl.pathname) &&
+    authHeader?.startsWith("Bearer ") &&
+    apiKeyValid(authHeader.slice(7).trim())
+  ) {
     const admin = await prisma.user.findFirst({
       where: { role: "admin" },
       orderBy: { createdAt: "asc" },

@@ -4,6 +4,8 @@
 // regular Anytype local HTTP API (lib/anytype.ts); the bridge only adds what
 // that API cannot do: styled block writes and the space style profile.
 
+import { userFetch } from "@/lib/requestUser";
+
 export type BridgeConfig = { url: string; token: string };
 
 export async function bridgeRpc<T = Record<string, unknown>>(
@@ -12,7 +14,8 @@ export async function bridgeRpc<T = Record<string, unknown>>(
   params: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetch(`${bridge.url.trim().replace(/\/+$/, "")}/rpc`, {
+  // userFetch: the bridge URL is user config, so non-admins stay on public hosts.
+  const res = await userFetch(`${bridge.url.trim().replace(/\/+$/, "")}/rpc`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

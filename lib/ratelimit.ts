@@ -39,3 +39,23 @@ export function clientIp(request: Request): string {
     "unknown";
   return ip.trim();
 }
+
+// Addresses that have logged in successfully, per username. In-memory like the
+// buckets, so it resets on restart; capped so it cannot grow unbounded.
+const knownLogins = new Map<string, Set<string>>();
+
+export function rememberLogin(username: string, ip: string): void {
+  if (ip === "unknown") return;
+  let ips = knownLogins.get(username);
+  if (!ips) {
+    if (knownLogins.size >= 1000) return;
+    ips = new Set();
+    knownLogins.set(username, ips);
+  }
+  if (ips.size >= 20) ips.delete(ips.values().next().value as string);
+  ips.add(ip);
+}
+
+export function isKnownLogin(username: string, ip: string): boolean {
+  return knownLogins.get(username)?.has(ip) ?? false;
+}
