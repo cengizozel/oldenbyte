@@ -121,6 +121,15 @@
 
 /* ── Base ─────────────────────────────────────────────────────────────────── */
 
+/* The closed settings drawer waits just past the right edge. iOS browsers
+   count such off-screen fixed content as page width, so the page opened
+   slightly zoomed in with room to pinch out. Nothing should ever scroll
+   sideways, so clip at the root. */
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   font-family: Arial, Helvetica, sans-serif;
   background-color: var(--page-bg);
@@ -195,4 +204,15 @@ body {
   outline: 2px solid var(--text-muted);
   outline-offset: 3px;
   border-radius: 1rem;
+}
+
+/* iOS browsers zoom the page in when a text field with text under 16px gets
+   focus, and leave it zoomed. On touch screens give every text field 16px. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
 }

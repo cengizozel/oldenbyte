@@ -79,6 +79,13 @@ export default function RedditWidget({
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The settings face is always mounted on the back of the FlipCard, so
+  // `autoFocus` there would grab focus at page load (and on iOS zoom the page
+  // in on it). Focus the field when the card flips to settings instead.
+  const subInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (settingsOpen) subInputRef.current?.focus();
+  }, [settingsOpen]);
   const [draft, setDraft]               = useState<RedditConfig>(DEFAULT);
   const [subInput, setSubInput]         = useState("");
   const [selected, setSelected]         = useState<Post | null>(null);
@@ -424,7 +431,7 @@ export default function RedditWidget({
           {/* Subreddit input */}
           <div className="flex gap-1">
             <SettingsInput
-              autoFocus
+              ref={subInputRef}
               type="text"
               value={subInput}
               onChange={e => setSubInput(e.target.value)}

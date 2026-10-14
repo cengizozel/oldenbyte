@@ -672,7 +672,7 @@ function SettingsPanel({
         aria-hidden={!open}
         inert={!open}
         tabIndex={-1}
-        className={`fixed top-0 right-0 h-full w-72 z-50 bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl flex flex-col outline-none transition-transform duration-300 ease-in-out ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`fixed top-0 right-0 h-full w-72 z-50 bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl flex flex-col outline-none duration-300 ease-in-out ${open ? "translate-x-0 visible transition-transform" : "translate-x-full invisible transition-[transform,visibility]"}`}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[var(--surface-border)]">
           <span className="text-sm font-medium text-[var(--text-primary)]">Settings</span>
