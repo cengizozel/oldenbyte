@@ -383,7 +383,7 @@ Top posts of one subreddit from Reddit's RSS feed (`/r/<name>/top.rss?t=<period>
 [{ "title": "...", "link": "...", "pubDate": "...", "score": 0, "subreddit": "programming", "content": "<html>", "thumbnail": "...", "image": "..." }]
 ```
 
-RSS carries no vote counts, so `score` is always `0`. Reddit rate-limits unauthenticated requests hard, so every upstream fetch goes through one queue spaced 15 seconds apart, a `429` is retried at the back of the queue (up to 3 attempts), and results are cached in memory with the admin feed TTL. A stale entry (up to 24 hours) is served immediately while it refreshes. `refresh=1` skips the cache but still waits its turn in the queue. Failures return `503`, unless an entry from the last 24 hours exists.
+RSS carries no vote counts, so `score` is always `0`. Reddit rate-limits unauthenticated requests hard, so every upstream fetch goes through one queue that follows Reddit's `x-ratelimit-remaining` / `x-ratelimit-reset` headers (about one request a minute per IP as of October 2026). A `429` goes back into the queue and is retried for up to 30 minutes. Results are cached with the admin feed TTL, in memory and in `data/cache/reddit.json` so they survive restarts. A stale entry (up to 24 hours) is served immediately while it refreshes. `refresh=1` skips the cache but still waits its turn. A request with nothing cached waits up to 20 seconds, then answers `503 { "error": "queued", "retryAfter": 60 }` while the fetch continues in the background; other failures return `503` with the error, unless an entry from the last 24 hours exists.
 
 ---
 

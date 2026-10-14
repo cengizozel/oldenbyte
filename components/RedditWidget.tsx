@@ -54,6 +54,10 @@ function sanitizeRedditHtml(raw: string | undefined): string {
   } catch { return ""; }
 }
 
+// How many one-minute retries a partly loaded widget makes; matches the
+// server keeping a rate-limited subreddit queued for 30 minutes.
+const RETRY_MINUTES = 30;
+
 const DEFAULT: RedditConfig = { subreddits: [] };
 const PERIODS: { value: Period; label: string }[] = [
   { value: "day",   label: "Today" },
@@ -93,7 +97,7 @@ export default function RedditWidget({
   const detail = useScrollFade<HTMLDivElement>([selected]);
   // Self-heal: when some subreddits fail (rate-limited upstream), retry them
   // after a pause instead of waiting for the next page load. Bounded budget.
-  const retryRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; left: number }>({ timer: null, left: 3 });
+  const retryRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; left: number }>({ timer: null, left: RETRY_MINUTES });
   useEffect(() => () => { if (retryRef.current.timer) clearTimeout(retryRef.current.timer); }, []);
   // Per-subreddit load state for the header counter (null = still loading).
   const [subStatus, setSubStatus] = useState<{ name: string; ok: boolean | null }[]>([]);
@@ -164,7 +168,7 @@ export default function RedditWidget({
         all.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
         return all;
       };
-      const mark = (name: string, ok: boolean) =>
+      const mark = (name: string, ok: boolean | null) =>
         setSubStatus(prev => prev.map(s => (s.name === name ? { ...s, ok } : s)));
       // The counter reflects which feeds HAVE posts: a rescan starts from the
       // feeds already showing (5/8 stays 5/8) and only the missing ones load.
@@ -180,6 +184,11 @@ export default function RedditWidget({
             const params = new URLSearchParams({ subreddit: sub.name, period: sub.period, limit: String(sub.limit) });
             if (force) params.set("refresh", "1");
             const res = await fetch(`/api/reddit?${params}`, { signal: ctrl.signal });
+            if (res.status === 503 && (await res.clone().json().catch(() => ({}))).error === "queued") {
+              // Still waiting its turn behind Reddit's rate limit: pending, not failed.
+              if (!ctrl.signal.aborted) mark(sub.name, received.has(keyOf(sub)) ? true : null);
+              return null;
+            }
             if (!res.ok) throw new Error();
             const items: Post[] = await res.json();
             if (ctrl.signal.aborted) return null;
@@ -199,17 +208,18 @@ export default function RedditWidget({
       );
       if (ctrl.signal.aborted) return false;
       const all = combined();
+      const partial = results.some(r => r === null);
+      if (partial && retryRef.current.left > 0) {
+        // Missing feeds are usually still queued on the server behind
+        // Reddit's rate limit (about one fetch a minute), so ask again every
+        // minute until they arrive; loaded ones come back from the cache.
+        retryRef.current.left--;
+        if (retryRef.current.timer) clearTimeout(retryRef.current.timer);
+        retryRef.current.timer = setTimeout(() => fetchPosts(cfg, cacheKey), 60000);
+      }
       if (!all.length) throw new Error();
-      if (results.some(r => r === null)) {
-        // Partial: never day-cache it, and quietly retry the missing feeds
-        // in a minute (the server keeps pacing against the rate limit).
-        if (retryRef.current.left > 0) {
-          retryRef.current.left--;
-          if (retryRef.current.timer) clearTimeout(retryRef.current.timer);
-          retryRef.current.timer = setTimeout(() => fetchPosts(cfg, cacheKey), 60000);
-        }
-      } else {
-        retryRef.current.left = 3;
+      if (!partial) {
+        retryRef.current.left = RETRY_MINUTES;
         await storage.setItem(cacheKey, JSON.stringify(all));
       }
       return true;
@@ -273,7 +283,7 @@ export default function RedditWidget({
           right={
             <span className="relative flex items-center gap-2">
               {/* How many subreddits made it; tap for the per-feed breakdown. */}
-              {subStatus.length > 0 && (loading || subStatus.some(s => s.ok === false)) && (
+              {subStatus.length > 0 && (loading || subStatus.some(s => s.ok !== true)) && (
                 <button
                   onClick={() => setStatusOpen(o => !o)}
                   title="Which subreddits loaded"
@@ -290,7 +300,7 @@ export default function RedditWidget({
                       <span key={s.name} className="flex items-center justify-between gap-2 text-xs">
                         <span className={`truncate ${c.text} opacity-80`}>r/{s.name}</span>
                         <span className={`shrink-0 ${s.ok === true ? "text-emerald-600 dark:text-emerald-400" : s.ok === false ? "text-red-500" : `${c.label} opacity-60`}`}>
-                          {s.ok === true ? "loaded" : s.ok === false ? "failed" : "loading"}
+                          {s.ok === true ? "loaded" : s.ok === false ? "failed" : "waiting"}
                         </span>
                       </span>
                     ))}

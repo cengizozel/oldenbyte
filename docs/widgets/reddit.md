@@ -21,7 +21,7 @@ Posts come from `GET /api/reddit?subreddit=…&period=…&limit=…`, which read
 https://www.reddit.com/r/{name}/top.rss?t={period}&limit={limit}
 ```
 
-Reddit rate-limits unauthenticated clients hard, so the server queues every upstream fetch 15 seconds apart, requeues `429`s, and keeps results in memory for the admin feed cache TTL (serving stale results while it refreshes). See [api.md](../api.md#reddit).
+Reddit rate-limits logged-out clients hard (about one request a minute per IP as of October 2026), so the server sends every upstream fetch through one queue that waits for Reddit's own budget headers, keeps a rate-limited subreddit queued for up to 30 minutes, and caches results for the admin feed cache TTL, in memory and in `data/cache/reddit.json` so restarts keep them. The widget retries missing subreddits every minute for up to 30 minutes; the counter shows them as "waiting" rather than failed. See [api.md](../api.md#reddit).
 
 The widget fires one request per subreddit at once, feeds with nothing shown yet going first. Each subreddit paints as it arrives instead of the whole widget waiting for the slowest one. The combined list is sorted newest first by publish date. While loading, or when a feed failed, a counter in the header shows how many subreddits have loaded; tap it for the per-feed breakdown. The refresh button refetches with `refresh=1`.
 

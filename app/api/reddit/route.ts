@@ -2,37 +2,80 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
 import { feedTtlMs } from "@/lib/feedCache";
 import { decodeEntities } from "@/lib/text";
+import { mkdir, readFile, writeFile, rename } from "fs/promises";
+import path from "path";
 
 // Reddit blocks its JSON endpoints for non-browser clients (403), but the RSS
 // feeds still serve with a browser User-Agent. RSS carries no vote counts;
 // `score` stays 0 and the widget hides it.
 //
-// The real constraint is the rate limit: unauthenticated requests get blanket
-// 429s beyond roughly one every ten seconds per IP, so a widget with many
-// subreddits firing at once used to render only whichever feed won the race.
-// All upstream fetches therefore go through ONE queue with generous spacing,
-// results are cached in memory, and a rate-limited refresh serves the last
-// good result instead of nothing (stale-while-revalidate).
+// The real constraint is the rate limit: logged-out requests get a small
+// per-IP budget (about one request a minute as of October 2026), so all
+// upstream fetches go through ONE queue that follows Reddit's own budget
+// headers. Results are cached (in memory and on disk, see CACHE_FILE), and a
+// rate-limited refresh serves the last good result instead of nothing
+// (stale-while-revalidate).
 const UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0";
 
 type Post = { title: string; link: string; pubDate: string; score: number; subreddit: string; content: string; thumbnail: string; image: string };
 
 const STALE_MS = 24 * 60 * 60 * 1000; // still better than an empty feed
-const SPACING_MS = 15 * 1000;         // gap between upstream fetches
-const ATTEMPTS = 3;                   // 429s requeue for another spaced try
+const MIN_SPACING_MS = 2000;          // floor between upstream fetches
+const RETRY_FOR_MS = 30 * 60 * 1000;  // keep a rate-limited subreddit queued this long
+const WAIT_FOR_MS = 20 * 1000;        // longest a request waits before answering "queued"
 
 const cache = new Map<string, { at: number; posts: Post[] }>();
 const inflight = new Map<string, Promise<Post[]>>();
 
-// One-at-a-time upstream queue: every reddit fetch waits its turn and keeps
-// SPACING_MS distance from the previous one, whatever endpoint asked for it.
+// The cache is written to the data volume so a restart or deploy does not
+// empty it: refilling every subreddit at Reddit's pace takes many minutes.
+const CACHE_FILE = path.join(process.env.DATA_DIR ?? path.join(process.cwd(), "data"), "cache", "reddit.json");
+let loaded: Promise<void> | null = null;
+function loadCache(): Promise<void> {
+  loaded ??= readFile(CACHE_FILE, "utf8")
+    .then(raw => {
+      for (const [k, v] of Object.entries(JSON.parse(raw) as Record<string, { at: number; posts: Post[] }>)) {
+        if (Date.now() - v.at < STALE_MS) cache.set(k, v);
+      }
+    })
+    .catch(() => {});
+  return loaded;
+}
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+function saveCacheSoon() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(async () => {
+    saveTimer = null;
+    try {
+      await mkdir(path.dirname(CACHE_FILE), { recursive: true });
+      await writeFile(CACHE_FILE + ".tmp", JSON.stringify(Object.fromEntries(cache)));
+      await rename(CACHE_FILE + ".tmp", CACHE_FILE);
+    } catch (err) {
+      console.error("[reddit] cache save", err);
+    }
+  }, 5000);
+}
+
+// One-at-a-time upstream queue. Reddit reports its budget on every response
+// (x-ratelimit-remaining / x-ratelimit-reset, in seconds); when it is used up
+// the next fetch waits until the window resets instead of guessing a spacing.
+// Logged-out feed requests currently get about one per minute per IP.
 let queueTail: Promise<unknown> = Promise.resolve();
-let lastFetchAt = 0;
+let nextAllowedAt = 0;
+function noteBudget(res: Response) {
+  const remaining = Number(res.headers.get("x-ratelimit-remaining"));
+  const reset = Number(res.headers.get("x-ratelimit-reset") ?? res.headers.get("retry-after"));
+  const waitMs = Number.isFinite(reset) && reset > 0 ? reset * 1000 + 500 : 60_000;
+  if (res.status === 429 || (Number.isFinite(remaining) && remaining < 1)) {
+    nextAllowedAt = Math.max(nextAllowedAt, Date.now() + waitMs);
+  } else {
+    nextAllowedAt = Math.max(nextAllowedAt, Date.now() + MIN_SPACING_MS);
+  }
+}
 function throttled<T>(fn: () => Promise<T>): Promise<T> {
   const run = queueTail.then(async () => {
-    const wait = lastFetchAt + SPACING_MS - Date.now();
+    const wait = nextAllowedAt - Date.now();
     if (wait > 0) await new Promise(r => setTimeout(r, wait));
-    lastFetchAt = Date.now();
     return fn();
   });
   queueTail = run.catch(() => {});
@@ -51,6 +94,7 @@ async function fetchSubreddit(subreddit: string, period: string, limit: number):
   // fetch has waited out the queue, its result should land in the cache even
   // if the widget that asked navigated away.
   const res = await fetch(url, { headers: { "User-Agent": UA }, cache: "no-store" });
+  noteBudget(res);
   if (!res.ok) throw new Error(`Reddit ${res.status}`);
 
   const xml = await res.text();
@@ -84,25 +128,23 @@ async function fetchSubreddit(subreddit: string, period: string, limit: number):
 }
 
 // Queued fetch shared by identical concurrent requests, cached on success.
-// A 429 sends the subreddit to the BACK of the queue for another spaced try:
-// that lets other feeds use whatever budget exists instead of stalling the
-// line, and each retry arrives with at least a full spacing of cool-down.
+// A 429 goes back into the queue (which now waits for Reddit's reset) and is
+// retried until RETRY_FOR_MS has passed; other errors (403, 404) fail at once.
 function refresh(key: string, subreddit: string, period: string, limit: number): Promise<Post[]> {
   const running = inflight.get(key);
   if (running) return running;
   const p = (async () => {
-    let lastErr: unknown;
-    for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    const deadline = Date.now() + RETRY_FOR_MS;
+    for (;;) {
       try {
         const posts = await throttled(() => fetchSubreddit(subreddit, period, limit));
         cache.set(key, { at: Date.now(), posts });
+        saveCacheSoon();
         return posts;
       } catch (err) {
-        lastErr = err;
-        if (!String(err).includes("429")) break; // 403/404 etc: retrying won't help
+        if (!String(err).includes("429") || Date.now() > deadline) throw err;
       }
     }
-    throw lastErr;
   })().finally(() => inflight.delete(key));
   inflight.set(key, p);
   return p;
@@ -121,6 +163,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing or invalid subreddit" }, { status: 400 });
   }
 
+  await loadCache();
   const force = request.nextUrl.searchParams.get("refresh") === "1";
   const key = `${subreddit.toLowerCase()}|${period}|${limit}`;
   const hit = cache.get(key);
@@ -137,8 +180,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(hit.posts);
   }
 
+  // Nothing usable cached: wait a little for the queue, then answer "queued"
+  // (the fetch keeps going in the background and fills the cache) so the
+  // widget can retry instead of a request hanging for many minutes.
+  const job = refresh(key, subreddit, period, limit);
+  job.catch(() => {});
   try {
-    return NextResponse.json(await refresh(key, subreddit, period, limit));
+    const posts = await Promise.race([
+      job,
+      new Promise<null>(r => setTimeout(() => r(null), WAIT_FOR_MS)),
+    ]);
+    if (posts) return NextResponse.json(posts);
+    if (hit && Date.now() - hit.at < STALE_MS) return NextResponse.json(hit.posts);
+    return NextResponse.json({ error: "queued", retryAfter: 60 }, { status: 503 });
   } catch (err) {
     // Even a forced refresh prefers yesterday's posts over an empty panel.
     if (hit && Date.now() - hit.at < STALE_MS) return NextResponse.json(hit.posts);
