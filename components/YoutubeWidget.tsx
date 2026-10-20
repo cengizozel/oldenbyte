@@ -10,7 +10,8 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
-import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip } from "@/components/ui/WidgetChrome";
+import { useFeedFilter } from "@/lib/useFeedFilter";
 import { youtubeCacheKey } from "@/lib/cacheKeys";
 
 type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean };
@@ -67,7 +68,11 @@ export default function YoutubeWidget({
 
   const [config, setConfig]             = useState<YoutubeConfig>(DEFAULT);
   const [videos, setVideos]             = useState<Video[]>([]);
-  const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([videos]);
+  // Clicking a channel name shows only that channel (lib/useFeedFilter).
+  const [filter, setFilter, toggleFilter] = useFeedFilter();
+  const shown = filter ? videos.filter(v => v.channelId === filter) : videos;
+  const filterName = filter ? videos.find(v => v.channelId === filter)?.channelName ?? "" : "";
+  const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([videos, filter]);
   const [loading, setLoading]           = useState(false);
   const [resolving, setResolving]       = useState(false);
   const [error, setError]               = useState("");
@@ -313,6 +318,7 @@ export default function YoutubeWidget({
             c={c}
             icon={PlaySquare}
             title={widget.title}
+            after={filter && filterName ? <FilterChip c={c} label={filterName} onClear={() => setFilter(null)} /> : undefined}
             right={!selected && (
               <>
                 <RefreshButton c={c} busy={loading} onClick={() => fetchVideos(config, cacheKeyFor(config), true)} />
@@ -326,10 +332,10 @@ export default function YoutubeWidget({
               <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={onScroll}>
                 {loading && !videos.length ? (
                   <LoadingState c={c} />
-                ) : videos.length ? (
+                ) : shown.length ? (
                   config.view === "gallery" ? (
                     <div className="grid gap-2 py-1" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
-                      {videos.map((v, i) => {
+                      {shown.map((v, i) => {
                         const sc = tagColor(v.channelName);
                         const thumb = thumbUrl(v.link);
                         return (
@@ -341,9 +347,14 @@ export default function YoutubeWidget({
                               )}
                             </button>
                             <span className="flex items-center gap-1.5 min-w-0">
-                              <span className={`inline-block min-w-0 truncate text-[11px] font-medium px-1 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                              <button
+                                type="button"
+                                onClick={() => toggleFilter(v.channelId)}
+                                title={filter ? "Show everything" : `Show only ${v.channelName}`}
+                                className={`inline-block min-w-0 truncate text-[11px] font-medium px-1 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
+                              >
                                 {v.channelName}
-                              </span>
+                              </button>
                               {v.published && (
                                 <span className={`shrink-0 text-xs opacity-60 ${c.text}`}>{timeAgo(v.published)}</span>
                               )}
@@ -375,7 +386,7 @@ export default function YoutubeWidget({
                     </div>
                   ) : (
                   <ul className="flex flex-col">
-                    {videos.map((v, i) => {
+                    {shown.map((v, i) => {
                       const sc = tagColor(v.channelName);
                       const thumb = config.view === "thumbs" ? thumbUrl(v.link) : "";
                       return (
@@ -389,9 +400,14 @@ export default function YoutubeWidget({
                             )}
                             <div className="flex-1 min-w-0">
                           <span className="flex items-center gap-1.5 mb-1 min-w-0">
-                            <span className={`inline-block min-w-0 truncate text-[11px] font-medium px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                            <button
+                              type="button"
+                              onClick={() => toggleFilter(v.channelId)}
+                              title={filter ? "Show everything" : `Show only ${v.channelName}`}
+                              className={`inline-block min-w-0 truncate text-[11px] font-medium px-1.5 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
+                            >
                               {v.channelName}
-                            </span>
+                            </button>
                             {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
                               <span className={`shrink-0 text-[11px] font-medium px-1 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>new</span>
                             )}
@@ -427,6 +443,8 @@ export default function YoutubeWidget({
                     })}
                   </ul>
                   )
+                ) : videos.length ? (
+                  <EmptyState c={c}>nothing from {filterName || "this channel"} right now</EmptyState>
                 ) : (
                   <EmptyState c={c} action="add YouTube channels" />
                 )}

@@ -64,3 +64,7 @@ Thumbnails come straight from `i.ytimg.com` by video ID, with no extra fetch. Ea
 ## Scroll Fades
 
 Top and bottom gradient fades are toggled via `ResizeObserver` and scroll events, matching the pattern used by other list widgets.
+
+## Filtering by channel
+
+Clicking a channel name shows only that channel's videos from the feed; clicking it again, the chip's x in the header, or Escape shows everything again (`lib/useFeedFilter.ts`).

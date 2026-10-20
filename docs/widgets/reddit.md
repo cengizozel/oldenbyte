@@ -60,3 +60,9 @@ On load, the saved config is migrated from two older formats:
 ## Scroll Fades
 
 Both the list panel and the detail panel have independent top/bottom fade overlays tracked via `ResizeObserver` and scroll event listeners.
+
+## Order and filtering
+
+Posts are listed by when they first showed up in the widget ("newest in feed", the default), not by post date: each subreddit's feed is its top posts of the period, so a post that climbs into that list days after it was posted lands on top the day it appears. Its time label still shows its real age. Posts that arrived since your previous visit carry a "new" badge. First-seen times are stored per widget in `reddit-<id>-seen` (the newest 1500) and the previous visit in `reddit-<id>-visit` (`lib/useFirstSeen.ts`); on the very first load each post's own date is used, so the list starts in date order. Settings can switch the order back to post date (`order: "date"`).
+
+Clicking a subreddit name shows only that subreddit; clicking it again, the chip's x in the header, or Escape shows everything again (`lib/useFeedFilter.ts`).

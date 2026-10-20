@@ -183,3 +183,15 @@ export function SmallButton({
     </button>
   );
 }
+
+// Shows the active "only this source" filter in a widget header; the x clears it.
+export function FilterChip({ c, label, onClear }: { c: ColorClasses; label: string; onClear: () => void }) {
+  return (
+    <span className={`inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-full text-xs bg-black/10 dark:bg-white/15 ${c.text} min-w-0`}>
+      <span className="truncate">{label}</span>
+      <button type="button" onClick={onClear} aria-label="Clear filter" title="Show everything (Esc)" className={`shrink-0 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/15 ${FOCUS_RING}`}>
+        <X size={12} />
+      </button>
+    </span>
+  );
+}

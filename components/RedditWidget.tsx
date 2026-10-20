@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Plus, ChevronLeft, ExternalLink, Flame } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -10,12 +10,17 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
-import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip } from "@/components/ui/WidgetChrome";
+import { useFeedFilter } from "@/lib/useFeedFilter";
+import { useFirstSeen } from "@/lib/useFirstSeen";
 import { redditCacheKey } from "@/lib/cacheKeys";
 
 type Period = "day" | "week" | "month" | "year" | "all";
 type SubEntry = { name: string; limit: number; period: Period };
-type RedditConfig = { subreddits: SubEntry[]; images?: boolean };
+// order: "arrival" (default) lists posts by when they first showed up in this
+// widget, so one that climbs into a top list days after posting lands on top;
+// "date" lists them by post date.
+type RedditConfig = { subreddits: SubEntry[]; images?: boolean; order?: "arrival" | "date" };
 type Post = { title: string; link: string; subreddit: string; pubDate: string; content: string; score: number; thumbnail?: string; image?: string };
 
 function sanitizeRedditHtml(raw: string | undefined): string {
@@ -93,7 +98,18 @@ export default function RedditWidget({
   const [draft, setDraft]               = useState<RedditConfig>(DEFAULT);
   const [subInput, setSubInput]         = useState("");
   const [selected, setSelected]         = useState<Post | null>(null);
-  const list   = useScrollFade<HTMLDivElement>([posts]);
+  const [filter, setFilter, toggleFilter] = useFeedFilter();
+  const { firstSeen, lastVisit } = useFirstSeen(
+    `reddit-${widget.id}`, posts, p => p.link, p => new Date(p.pubDate).getTime() || 0,
+  );
+  const shown = useMemo(() => {
+    const ts = (p: Post) => new Date(p.pubDate).getTime() || 0;
+    const ordered = config.order === "date"
+      ? [...posts].sort((a, b) => ts(b) - ts(a))
+      : [...posts].sort((a, b) => (firstSeen[b.link] ?? ts(b)) - (firstSeen[a.link] ?? ts(a)) || ts(b) - ts(a));
+    return filter ? ordered.filter(p => p.subreddit.toLowerCase() === filter) : ordered;
+  }, [posts, firstSeen, config.order, filter]);
+  const list   = useScrollFade<HTMLDivElement>([posts, filter]);
   const detail = useScrollFade<HTMLDivElement>([selected]);
   // Self-heal: when some subreddits fail (rate-limited upstream), retry them
   // after a pause instead of waiting for the next page load. Bounded budget.
@@ -280,6 +296,7 @@ export default function RedditWidget({
           c={c}
           icon={Flame}
           title={widget.title}
+          after={filter ? <FilterChip c={c} label={`r/${filter}`} onClear={() => setFilter(null)} /> : undefined}
           right={
             <span className="relative flex items-center gap-2">
               {/* How many subreddits made it; tap for the per-feed breakdown. */}
@@ -319,16 +336,25 @@ export default function RedditWidget({
             <div ref={list.ref} className="absolute inset-0 overflow-y-auto pr-3" onScroll={list.onScroll}>
               {loading && !posts.length ? (
                 <LoadingState c={c} />
-              ) : posts.length ? (
+              ) : shown.length ? (
                 <ul className="flex flex-col">
-                  {posts.map((post, i) => {
+                  {shown.map((post, i) => {
                     const sc = tagColor(post.subreddit.toLowerCase());
+                    const isNew = lastVisit > 0 && (firstSeen[post.link] ?? 0) > lastVisit;
                     return (
-                      <li key={i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
+                      <li key={post.link || i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                         <span className="flex items-center gap-1.5 mb-1 min-w-0">
-                          <span className={`inline-block min-w-0 truncate text-[11px] font-medium px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>
+                          <button
+                            type="button"
+                            onClick={() => toggleFilter(post.subreddit.toLowerCase())}
+                            title={filter ? "Show everything" : `Show only r/${post.subreddit}`}
+                            className={`inline-block min-w-0 truncate text-[11px] font-medium px-1.5 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
+                          >
                             r/{post.subreddit}
-                          </span>
+                          </button>
+                          {isNew && (
+                            <span title="New since your last visit" className={`shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/15 ${c.text}`}>new</span>
+                          )}
                           {post.pubDate && (
                             <span className={`shrink-0 text-xs opacity-60 ${c.text}`}>{timeAgo(post.pubDate)}</span>
                           )}
@@ -372,6 +398,8 @@ export default function RedditWidget({
                     );
                   })}
                 </ul>
+              ) : posts.length ? (
+                <EmptyState c={c}>nothing from r/{filter} right now</EmptyState>
               ) : (
                 <EmptyState c={c} action="add subreddits" />
               )}
@@ -464,6 +492,12 @@ export default function RedditWidget({
             />
             <span className="opacity-80">Show post images</span>
           </label>
+
+          <div className="flex items-center gap-2">
+            <span className={`text-xs opacity-60 ${c.label}`}>Order</span>
+            <Chip c={c} active={(draft.order ?? "arrival") === "arrival"} onClick={() => setDraft(d => ({ ...d, order: "arrival" }))} title="Posts that newly made a top list go first">newest in feed</Chip>
+            <Chip c={c} active={draft.order === "date"} onClick={() => setDraft(d => ({ ...d, order: "date" }))} title="By when the post was made">post date</Chip>
+          </div>
 
           {/* Selected subreddits with per-sub limit and period */}
           {draft.subreddits.length > 0 && (
