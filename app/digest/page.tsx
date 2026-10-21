@@ -599,7 +599,7 @@ export default function DigestPage() {
       entries = videos.map(v => ({
         title: v.title,
         link: v.link,
-        meta: `${v.channelName} · ${timeAgo(v.published)}`,
+        meta: `${decodeEntities(v.channelName)} · ${timeAgo(v.published)}`,
       }));
     } else {
       const results = await Promise.allSettled(
@@ -610,7 +610,7 @@ export default function DigestPage() {
           return (data.videos ?? []).map((v: { title: string; link: string; publishedAt: string }) => ({
             title: v.title,
             link: v.link,
-            meta: `${ch.name} · ${timeAgo(v.publishedAt)}`,
+            meta: `${decodeEntities(ch.name)} · ${timeAgo(v.publishedAt)}`,
           })) as Entry[];
         })
       );

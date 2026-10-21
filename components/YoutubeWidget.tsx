@@ -5,7 +5,7 @@ import { Loader, Plus, PlaySquare, ExternalLink, ChevronLeft } from "lucide-reac
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { timeAgo, formatCount, formatClock, localDateStr } from "@/lib/format";
-import { parseJson } from "@/lib/text";
+import { decodeEntities, parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
@@ -176,9 +176,12 @@ export default function YoutubeWidget({
         const parsed: YoutubeConfig = { ...DEFAULT, ...JSON.parse(saved) };
         // migrate old format: channels had no per-channel limit (used top-level limit)
         const oldLimit = (parsed as unknown as { limit?: number }).limit ?? 5;
-        parsed.channels = parsed.channels.map(ch =>
-          ch.limit == null ? { ...ch, limit: oldLimit } : ch
-        );
+        // Names saved before the API decoded them can hold entities ("&#39;").
+        parsed.channels = parsed.channels.map(ch => ({
+          ...ch,
+          name: decodeEntities(ch.name ?? ""),
+          limit: ch.limit ?? oldLimit,
+        }));
         // A connection saved on this widget before it became shared seeds the
         // shared one.
         if (!shared && parsed.ta?.url && parsed.ta.token) {

@@ -318,7 +318,7 @@ async function readYoutube(userId: string, id: string, title: string): Promise<s
   if (!config?.channels?.length) return "The YouTube widget has no channels configured.";
   const settled = await Promise.allSettled(config.channels.map(async ch => {
     const items = await fetchFeed(`https://www.youtube.com/feeds/videos.xml?channel_id=${ch.channelId}`, ch.limit || 5);
-    return items.map(it => ({ title: it.title, link: it.link, meta: `${ch.name}${it.pubDate ? ` · ${it.pubDate.slice(0, 10)}` : ""}` }));
+    return items.map(it => ({ title: it.title, link: it.link, meta: `${decodeEntities(ch.name)}${it.pubDate ? ` · ${it.pubDate.slice(0, 10)}` : ""}` }));
   }));
   const items = settled.flatMap(r => (r.status === "fulfilled" ? r.value : []));
   return items.length ? `## ${title} (YouTube)\n${formatItems(items)}` : "No videos found.";

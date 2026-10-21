@@ -82,7 +82,7 @@ async function fetchViaRss(feedQuery: string, limit: number): Promise<{ name: st
   if (!res.ok) throw new Error(`RSS ${res.status}`);
 
   const xml = await res.text();
-  const name = xml.match(/<author>\s*<name>([^<]+)<\/name>/)?.[1]?.trim() ?? (feedQuery.split("=")[1] ?? "");
+  const name = decodeEntities(xml.match(/<author>\s*<name>([^<]+)<\/name>/)?.[1]?.trim() ?? (feedQuery.split("=")[1] ?? ""));
 
   const videos: Video[] = [];
   const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
@@ -292,7 +292,7 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; nam
     html.match(/\/channel\/(UC[\w-]{22})/);
   if (!idMatch) throw new Error("Could not find channel ID on page");
 
-  const name = html.match(/<title>([^<]+)<\/title>/)?.[1]?.replace(/ - YouTube$/i, "").trim() ?? "Unknown";
+  const name = decodeEntities(html.match(/<title>([^<]+)<\/title>/)?.[1]?.replace(/ - YouTube$/i, "").trim() ?? "Unknown");
   return { channelId: idMatch[1], name };
 }
 
