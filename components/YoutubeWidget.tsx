@@ -12,6 +12,7 @@ import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
 import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
+import { useWidgetActive } from "@/lib/activeDashboard";
 import { youtubeCacheKey } from "@/lib/cacheKeys";
 
 type YoutubeChannel = { channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean };
@@ -98,6 +99,18 @@ export default function YoutubeWidget({
   }
   const onTa = (v: Video) => taActive(config.ta) && archived.has(videoId(v.link));
 
+  // TubeArchivist downloads hourly, so a video that was not archived when the
+  // list loaded may be by now. Re-check every 10 minutes while this widget is
+  // on screen, and right away when it becomes visible again.
+  const active = useWidgetActive();
+  const [taTick, setTaTick] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    setTaTick(t => t + 1);
+    const id = setInterval(() => setTaTick(t => t + 1), 10 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [active]);
+
   useEffect(() => {
     const ta = config.ta;
     if (!taActive(ta) || !videos.length) { setArchived(new Set()); return; }
@@ -113,7 +126,7 @@ export default function YoutubeWidget({
       .then(d => { forceTaRef.current = false; setArchived(new Set(d.archived ?? [])); })
       .catch(() => {});
     return () => ctrl.abort();
-  }, [videos, config.ta]);
+  }, [videos, config.ta, taTick]);
 
   async function testTa() {
     const ta = draft.ta;
