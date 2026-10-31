@@ -19,7 +19,12 @@ type YoutubeChannel = { channelId: string; name: string; limit: number; filterMe
 type YtView         = "list" | "thumbs" | "gallery";
 // TubeArchivist link-out: `open` picks where video links go; archived videos
 // open there, anything not in the archive still falls back to YouTube.
-type TaConfig       = { url: string; token: string; open: "youtube" | "ta" };
+// url: where the browser opens archived videos. serverUrl (optional): where
+// the dashboard server reaches TubeArchivist, when the browser address is
+// not reachable from inside the server's container (a tailscale HTTPS name).
+type TaConfig       = { url: string; token: string; open: "youtube" | "ta"; serverUrl?: string };
+const taServer = (ta: TaConfig) => (ta.serverUrl?.trim() || ta.url).trim();
+const blankTa: TaConfig = { url: "", token: "", open: "youtube" };
 type YoutubeConfig  = { channels: YoutubeChannel[]; view: YtView; ta?: TaConfig };
 type Video          = { title: string; link: string; published: string; channelId: string; channelName: string };
 type VideoDetails   = { title: string; author: string; description: string; lengthSeconds: number; viewCount: number };
@@ -119,7 +124,7 @@ export default function YoutubeWidget({
     fetch("/api/tubearchivist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ op: "check", url: ta.url, token: ta.token, ids, force: forceTaRef.current }),
+      body: JSON.stringify({ op: "check", url: taServer(ta), token: ta.token, ids, force: forceTaRef.current }),
       signal: ctrl.signal,
     })
       .then(r => r.json())
@@ -139,7 +144,7 @@ export default function YoutubeWidget({
       const res = await fetch("/api/tubearchivist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "ping", url: ta.url.trim(), token: ta.token.trim() }),
+        body: JSON.stringify({ op: "ping", url: taServer(ta), token: ta.token.trim() }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "No response from TubeArchivist");
@@ -294,7 +299,7 @@ export default function YoutubeWidget({
     setError("");
     if (!draft.channels.length) { setError("Add at least one channel."); return; }
     const ta = draft.ta && draft.ta.url.trim() && draft.ta.token.trim()
-      ? { url: draft.ta.url.trim(), token: draft.ta.token.trim(), open: draft.ta.open }
+      ? { url: draft.ta.url.trim(), token: draft.ta.token.trim(), open: draft.ta.open, ...(draft.ta.serverUrl?.trim() ? { serverUrl: draft.ta.serverUrl.trim() } : {}) }
       : undefined;
     const next: YoutubeConfig = { ...draft, ta };
     const cacheKey = cacheKeyFor(next);
@@ -528,15 +533,22 @@ export default function YoutubeWidget({
               <SettingsInput
                 type="url"
                 value={draft.ta?.url ?? ""}
-                onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { url: e.target.value, token: d.ta?.token ?? "", open: d.ta?.open ?? "youtube" } })); }}
+                onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), url: e.target.value } })); }}
                 placeholder="http://server:8000"
+              />
+              <SettingsInput
+                type="url"
+                value={draft.ta?.serverUrl ?? ""}
+                onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), serverUrl: e.target.value } })); }}
+                placeholder="Server address (optional)"
+                title="Only if the address above is not reachable from the dashboard server, for example a tailscale HTTPS name: the LAN address, such as http://192.168.1.10:8000"
               />
               <div className="flex gap-1">
                 <SettingsInput
                   type="password"
                   autoComplete="off"
                   value={draft.ta?.token ?? ""}
-                  onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { url: d.ta?.url ?? "", token: e.target.value, open: d.ta?.open ?? "youtube" } })); }}
+                  onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), token: e.target.value } })); }}
                   placeholder="API token"
                   className="flex-1 min-w-0"
                 />
@@ -551,7 +563,7 @@ export default function YoutubeWidget({
                 <div className="flex items-center gap-2">
                   <span className={`text-xs opacity-60 ${c.label}`}>Open on</span>
                   {([["youtube", "YouTube"], ["ta", "TubeArchivist"]] as const).map(([id, label]) => (
-                    <Chip key={id} c={c} active={(draft.ta?.open ?? "youtube") === id} onClick={() => setDraft(d => ({ ...d, ta: { url: d.ta?.url ?? "", token: d.ta?.token ?? "", open: id } }))}>
+                    <Chip key={id} c={c} active={(draft.ta?.open ?? "youtube") === id} onClick={() => setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), open: id } }))}>
                       {label}
                     </Chip>
                   ))}

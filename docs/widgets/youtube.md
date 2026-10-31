@@ -8,7 +8,7 @@ Displays recent videos from one or more YouTube channels. Channels are added by 
 |---|---|
 | `youtube-widget-{id}` | JSON: `{ channels: YoutubeChannel[]; view: "list" \| "thumbs" \| "gallery" }` |
 | `youtube-widget-{id}-{YYYY-MM-DD}-{hash}` | Daily cache of the combined video list |
-| `youtube-tubearchivist` | JSON: `{ url, token, open: "youtube" \| "ta" }`, one TubeArchivist connection shared by every YouTube widget |
+| `youtube-tubearchivist` | JSON: `{ url, token, open: "youtube" \| "ta", serverUrl? }`, one TubeArchivist connection shared by every YouTube widget. `url` is what the browser opens; `serverUrl`, when set, is what the dashboard server uses for the archive check (needed when `url` is a tailscale HTTPS name, which a Docker container cannot reach) |
 
 `YoutubeChannel` is `{ channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean }`.
 
@@ -68,3 +68,5 @@ Top and bottom gradient fades are toggled via `ResizeObserver` and scroll events
 ## Filtering by channel
 
 Clicking a channel name shows only that channel's videos from the feed; clicking it again, the chip's x in the header, or Escape shows everything again (`lib/useFeedFilter.ts`).
+
+The archive check (TA badges) re-runs every 10 minutes while the widget is on screen, and when it becomes visible again, so videos TubeArchivist downloads after the list loaded get their badge without a reload.

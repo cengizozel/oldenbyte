@@ -91,6 +91,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });
   } catch (err) {
-    return NextResponse.json({ error: String(err instanceof Error ? err.message : err) }, { status: 503 });
+    const msg = String(err instanceof Error ? err.message : err);
+    // The usual cause: a tailscale HTTPS address works in the browser but not
+    // from inside the server's container.
+    const friendly = msg === "fetch failed"
+      ? `Can't reach TubeArchivist at ${root(url)} from the dashboard server. If that is a tailscale HTTPS address, set the server address to its LAN address.`
+      : msg;
+    return NextResponse.json({ error: friendly }, { status: 503 });
   }
 }
