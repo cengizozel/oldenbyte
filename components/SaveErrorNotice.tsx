@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
-import { SAVE_FAILED_EVENT } from "@/lib/storage";
+import { Loader, X } from "lucide-react";
+import { SAVE_FAILED_EVENT, SAVE_STATE_EVENT, pendingSaves } from "@/lib/storage";
 
-// Shows a small notice when a write to the server fails (lib/storage raises
-// SAVE_FAILED_EVENT), so an edit that never saved does not look saved.
-// Mounted once in the root layout.
+// Save feedback for the whole page, mounted once in the root layout:
+// - "Saving..." while writes are waiting on the server (shown only when that
+//   takes more than a moment, so quick saves do not flicker), and a browser
+//   "leave page?" prompt if a reload would throw an unsaved write away;
+// - a notice when a write fails (lib/storage raises SAVE_FAILED_EVENT), so an
+//   edit that never saved does not look saved.
 export default function SaveErrorNotice() {
   const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -25,16 +29,47 @@ export default function SaveErrorNotice() {
     };
   }, []);
 
-  if (!reason) return null;
+  useEffect(() => {
+    let show: ReturnType<typeof setTimeout> | undefined;
+    const onState = (e: Event) => {
+      const n = (e as CustomEvent<{ pending: number }>).detail?.pending ?? 0;
+      clearTimeout(show);
+      if (n > 0) show = setTimeout(() => setSaving(true), 400);
+      else setSaving(false);
+    };
+    const onLeave = (e: BeforeUnloadEvent) => {
+      if (pendingSaves() > 0) e.preventDefault();
+    };
+    window.addEventListener(SAVE_STATE_EVENT, onState);
+    window.addEventListener("beforeunload", onLeave);
+    return () => {
+      window.removeEventListener(SAVE_STATE_EVENT, onState);
+      window.removeEventListener("beforeunload", onLeave);
+      clearTimeout(show);
+    };
+  }, []);
+
+  if (reason) {
+    return (
+      <div
+        role="alert"
+        className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 rounded-xl shadow-lg text-sm bg-red-600 text-white"
+      >
+        <span>Couldn&apos;t save your last change ({reason}).</span>
+        <button onClick={() => setReason("")} aria-label="Dismiss" className="opacity-80 hover:opacity-100">
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+  if (!saving) return null;
   return (
     <div
-      role="alert"
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 rounded-xl shadow-lg text-sm bg-red-600 text-white"
+      role="status"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full shadow-md text-xs bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--surface-border)]"
     >
-      <span>Couldn&apos;t save your last change ({reason}).</span>
-      <button onClick={() => setReason("")} aria-label="Dismiss" className="opacity-80 hover:opacity-100">
-        <X size={14} />
-      </button>
+      <Loader size={12} className="animate-spin" />
+      Saving...
     </div>
   );
 }

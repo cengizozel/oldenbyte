@@ -57,6 +57,7 @@ removeItem(key)            // DELETE /api/settings?key=...; resolves Promise<boo
 
 - Use `getItemResult` wherever a null read would otherwise be followed by writing a default: a transient failure (server restarting mid-deploy, network blip) must not overwrite real data.
 - `setItem` resolves `true` when the server stored the value. On a rejection (too large, server down, network error) it resolves `false` and dispatches a `savefailed` window event with `{ key, reason }`. `components/SaveErrorNotice.tsx`, mounted once in the root layout, shows a short "Couldn't save your last change" notice for it. Callers that must not continue after a failed write (migrations, moves) check the result.
+- Writes to the same key go out one at a time and the newest value wins: while one is in flight, only the latest waiting value is kept and sent next, and every caller in between resolves with that write's result. (Rapid layout drags used to fire overlapping saves that could land out of order.) Small writes use `keepalive`, so they can finish during a reload. The number of unconfirmed writes is broadcast as a `savestate` window event; `SaveErrorNotice` shows "Saving..." when it stays above zero for a moment, and the browser asks before leaving the page while it is.
 - A `401` from the API sends the browser to `/login`.
 - In demo mode every call is redirected to an in-memory copy of the first-run seed (`lib/demo.ts`), so nothing reaches the server.
 
