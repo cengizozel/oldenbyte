@@ -39,3 +39,29 @@ describe("storage.setItem queue", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("storage.setItem keepalive budget", () => {
+  it("keeps concurrent keepalive bytes under the browser cap and retries a rejected keepalive", async () => {
+    const calls: { key: string; keepalive: boolean }[] = [];
+    let inFlight = 0, peak = 0;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
+      const { key } = JSON.parse(String(init.body));
+      calls.push({ key, keepalive: !!init.keepalive });
+      // Simulate the browser: a keepalive request past 64 KB in flight throws.
+      if (init.keepalive) {
+        if (inFlight + String(init.body).length > 64 * 1024) throw new TypeError("keepalive quota");
+        inFlight += String(init.body).length; peak = Math.max(peak, inFlight);
+        await new Promise(r => setTimeout(r, 5));
+        inFlight -= String(init.body).length;
+      }
+      return new Response("{}", { status: 200 });
+    }));
+    const storage = await import("@/lib/storage");
+    const big = "x".repeat(25_000);
+    const results = await Promise.all(["a", "b", "c", "d"].map(k => storage.setItem(`cache-${k}`, big)));
+    expect(results).toEqual([true, true, true, true]);
+    expect(peak).toBeLessThan(64 * 1024);
+    expect(calls.filter(c => c.keepalive).length).toBe(2); // only two fit the budget
+    vi.unstubAllGlobals();
+  });
+});

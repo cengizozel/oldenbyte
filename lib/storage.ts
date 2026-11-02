@@ -70,19 +70,38 @@ export function pendingSaves(): number {
   return pending;
 }
 
+// Browsers cap the bytes of all keepalive requests in flight at 64 KB and
+// reject any request past that outright, so keepalive is only used while the
+// running total stays under the cap (a page load writes several keys at once).
+const KEEPALIVE_BUDGET = 60_000;
+let keepaliveInFlight = 0;
+
+async function post(body: string, keepalive: boolean): Promise<Response> {
+  return check401(
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive,
+    })
+  );
+}
+
 async function send(key: string, value: string): Promise<boolean> {
   const body = JSON.stringify({ key, value });
+  // Small writes may finish even if the page is reloaded or closed meanwhile.
+  const keepalive = keepaliveInFlight + body.length < KEEPALIVE_BUDGET;
+  if (keepalive) keepaliveInFlight += body.length;
   try {
-    const res = check401(
-      await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-        // Small writes may finish even if the page is reloaded or closed
-        // meanwhile (browsers cap keepalive bodies at 64 KB).
-        keepalive: body.length < 60_000,
-      })
-    );
+    let res: Response;
+    try {
+      res = await post(body, keepalive);
+    } catch (err) {
+      // A keepalive rejection is the browser's quota, not the network: retry
+      // once as a normal request before calling it a failure.
+      if (!keepalive) throw err;
+      res = await post(body, false);
+    }
     if (res.ok) return true;
     const data = await res.json().catch(() => ({}));
     reportSaveFailure(key, typeof data.error === "string" ? data.error : `HTTP ${res.status}`);
@@ -90,6 +109,8 @@ async function send(key: string, value: string): Promise<boolean> {
   } catch {
     reportSaveFailure(key, "network error");
     return false;
+  } finally {
+    if (keepalive) keepaliveInFlight -= body.length;
   }
 }
 
