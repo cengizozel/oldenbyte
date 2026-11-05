@@ -15,6 +15,7 @@ import { summarizeForecast } from "@/lib/weather";
 import { userFetch } from "@/lib/requestUser";
 import { todayIn } from "@/lib/timezone";
 import { decodeEntities } from "@/lib/text";
+import { coverageOn, itemEvery, normalizeItem, scoreDay, type UpkeepDays, type UpkeepItem } from "@/lib/upkeep";
 
 async function read(userId: string, key: string): Promise<string | null> {
   const row = await prisma.setting.findUnique({ where: { userId_key: { userId, key } } });
@@ -237,29 +238,26 @@ async function readRhythm(userId: string, id: string, title: string, opts?: Read
 }
 
 async function readUpkeep(userId: string, id: string, title: string, opts?: ReadOpts): Promise<string> {
-  type Item = { id: string; name: string; weight: number };
   const [config, daysMap] = await Promise.all([
-    readJSON<{ items: Item[] }>(userId, `upkeep-config-${id}`),
-    readJSON<Record<string, string[]>>(userId, `upkeep-days-${id}`),
+    readJSON<{ items: UpkeepItem[] }>(userId, `upkeep-config-${id}`),
+    readJSON<UpkeepDays>(userId, `upkeep-days-${id}`),
   ]);
   if (!config?.items?.length) return "The upkeep widget has no items yet.";
-  const items = config.items.map(i => ({ ...i, weight: i.weight > 0 ? i.weight : 1 }));
+  const items = config.items.map(normalizeItem);
   const days = daysMap ?? {};
-  const createdDay = (iid: string) => {
-    const ms = parseInt(iid.split("-")[0], 10);
-    return Number.isFinite(ms) ? new Date(ms).toISOString().split("T")[0] : "1970-01-01";
-  };
-  const score = (date: string): number | null => {
-    const active = items.filter(it => createdDay(it.id) <= date);
-    const total = active.reduce((a, it) => a + it.weight, 0);
-    if (total <= 0) return null;
-    const checked = new Set(days[date] ?? []);
-    const done = active.filter(it => checked.has(it.id)).reduce((a, it) => a + it.weight, 0);
-    return Math.round((done / total) * 100);
-  };
+  // An item's creation day comes from its id's timestamp, read as a UTC date here.
+  const dayOf = (ms: number) => new Date(ms).toISOString().split("T")[0];
+  const score = (date: string) => scoreDay(items, days, date, dayOf).pct;
   const t = userToday(opts);
-  const checkedToday = new Set(days[t] ?? []);
-  const todayLines = items.map(it => `  ${it.name} (${it.weight}pts): ${checkedToday.has(it.id) ? "done" : "not yet"}`);
+  const todayLines = items.map(it => {
+    const every = itemEvery(it);
+    const span = every > 1 ? `, lasts ${every} days` : "";
+    const cov = coverageOn(it, days, t);
+    const state = cov.done ? "done"
+      : cov.carried ? `covered by an earlier check, ${cov.left >= 1 ? `${cov.left} more day${cov.left === 1 ? "" : "s"}` : "last day"}`
+      : "not yet";
+    return `  ${it.name} (${it.weight}pts${span}): ${state}`;
+  });
   const recent = Object.keys(days).filter(d => d < t).sort((a, b) => b.localeCompare(a)).slice(0, 6)
     .map(d => `  ${d}: ${score(d) ?? "—"}/100`);
   const recentBlock = recent.length ? `\n### Recent days\n${recent.join("\n")}` : "";

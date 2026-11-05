@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldCheck, Plus, History, X, Flame, ChevronLeft, Circle, CircleCheck } from "lucide-react";
+import { ShieldCheck, Plus, History, X, Flame, ChevronLeft, Circle, CircleCheck, CircleDashed } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { formatDate, localDateStr } from "@/lib/format";
+import {
+  type UpkeepItem as Item, type UpkeepDays as Days,
+  MAX_EVERY, coverageOn, itemCreatedDay, normalizeItem, scoreDay, shiftDay,
+} from "@/lib/upkeep";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
 import { PencilButton, EmptyState, SaveCancelRow, WidgetHeader, SmallButton } from "./ui/WidgetChrome";
@@ -17,32 +21,11 @@ import { PencilButton, EmptyState, SaveCancelRow, WidgetHeader, SmallButton } fr
 // take medicine), worth some points; the points you check off divide by the
 // points possible to make a score out of 100. The goal is to start each day at
 // zero and end it at 100, and to string perfect days together as long as you can.
-
-type Item = { id: string; name: string; weight: number };
-// Per local day: the ids that were checked off that day. The score is derived,
-// never stored, so it always reflects the current items and weights.
-type Days = Record<string, string[]>;
+// An item can also be set to last several days (shaving, laundry): one check
+// keeps it covered, and scoring, for that many days. Scoring lives in lib/upkeep.
 
 function newId() {
   return `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-}
-
-// Local-calendar day helpers — the day boundary is the user's midnight, matching
-// Tracker and Rhythm, so a late-night check-off belongs to the day they lived.
-function shiftDay(date: string, delta: number): string {
-  const t = new Date(`${date}T12:00:00`);
-  t.setDate(t.getDate() + delta);
-  return localDateStr(t);
-}
-
-// Ids carry their creation time as a prefix (see newId), so a day only counts an
-// item toward its score if the item already existed then. This keeps a fresh
-// habit from retroactively breaking past perfect days — and the streak with it.
-// Items from before this scheme (or a seed) have no numeric prefix and count
-// from the beginning of time.
-function itemCreatedDay(id: string): string {
-  const ms = parseInt(id.split("-")[0], 10);
-  return Number.isFinite(ms) ? localDateStr(new Date(ms)) : "1970-01-01";
 }
 
 const GRID_DAYS = 14;  // heatmap width and score-line span
@@ -50,12 +33,12 @@ const fmtDay = (date: string) => formatDate(`${date}T12:00:00`, { year: false })
 const colorOf = (id: string) => tagColor(id).dot;
 
 // Completion ring: the full circle is the day's possible points; each checked
-// item fills its slice (sized by weight, colored like its dot), the rest stays a
-// faint track. Mirrors Tracker's donut so the three siblings read as a family.
+// item fills its slice (sized by weight, colored like its dot), an item carried
+// over from an earlier check fills it fainter, the rest stays a faint track. Mirrors Tracker's donut so the three siblings read as a family.
 function ScoreRing({
   rows, total, size, stroke, center,
 }: {
-  rows: { id: string; color: string; weight: number; done: boolean }[];
+  rows: { id: string; color: string; weight: number; done: boolean; carried?: boolean }[];
   total: number;
   size: number;
   stroke: number;
@@ -70,13 +53,14 @@ function ScoreRing({
         <circle cx={50} cy={50} r={R} fill="none" strokeWidth={stroke} className="stroke-black/[0.07] dark:stroke-white/10" />
         {total > 0 && rows.map(r => {
           const len = (r.weight / total) * CIRC;
-          const seg = r.done ? (
+          const seg = r.done || r.carried ? (
             <circle
               key={r.id}
               cx={50} cy={50} r={R}
               fill="none"
               stroke={r.color}
               strokeWidth={stroke}
+              opacity={r.done ? 1 : 0.5}
               strokeDasharray={`${Math.max(0, len - 0.6)} ${CIRC - Math.max(0, len - 0.6)}`}
               strokeDashoffset={-acc}
               strokeLinecap="butt"
@@ -93,6 +77,19 @@ function ScoreRing({
       )}
     </div>
   );
+}
+
+// The check at the end of a row: solid when checked that day, dashed when carried
+// over from an earlier day's check, hollow when due.
+function StatusIcon({ done, carried, label }: { done: boolean; carried: boolean; label: string }) {
+  if (done) return <span className="text-emerald-600 dark:text-emerald-400"><CircleCheck size={14} /></span>;
+  if (carried) return <span className="text-emerald-600 dark:text-emerald-400 opacity-70"><CircleDashed size={14} /></span>;
+  return <span className={`opacity-30 ${label}`}><Circle size={14} /></span>;
+}
+
+// "2d left" for a carried item, "last day" on the final day a check still covers.
+function leftLabel(left: number): string {
+  return left >= 1 ? `${left}d left` : "last day";
 }
 
 export default function UpkeepWidget({
@@ -129,7 +126,7 @@ export default function UpkeepWidget({
       try {
         if (cfgRaw) {
           const cfg = parseJson<{ items?: Item[] }>(cfgRaw, {});
-          const its = (cfg.items ?? []).map(i => ({ ...i, weight: i.weight > 0 ? i.weight : 1 }));
+          const its = (cfg.items ?? []).map(normalizeItem);
           setItems(its);
           setDraft(its);
         }
@@ -173,7 +170,7 @@ export default function UpkeepWidget({
   }
 
   function handleSave() {
-    const cleaned = draft.map(it => ({ ...it, name: it.name.trim(), weight: it.weight > 0 ? it.weight : 1 }))
+    const cleaned = draft.map(it => normalizeItem({ ...it, name: it.name.trim() }))
       .filter(it => it.name);
     const validIds = new Set(cleaned.map(i => i.id));
     // Removing an item drops it from every day's checked list — without the item
@@ -191,16 +188,18 @@ export default function UpkeepWidget({
   }
 
   // ── Scoring ────────────────────────────────────────────────────────────────
-  // A day's score is the checked points over the points that were possible that
-  // day, ×100. "Possible" counts only items that existed on the day, so all
-  // boxes checked is always exactly 100. Days before any item exists score null.
-  function dayScore(date: string): { done: number; total: number; pct: number | null } {
-    const active = items.filter(it => itemCreatedDay(it.id) <= date);
-    const total = active.reduce((a, it) => a + it.weight, 0);
-    if (total <= 0) return { done: 0, total: 0, pct: null };
-    const checked = new Set(days[date] ?? []);
-    const done = active.filter(it => checked.has(it.id)).reduce((a, it) => a + it.weight, 0);
-    return { done, total, pct: Math.round((done / total) * 100) };
+  // A day's score is the covered points over the points that were possible that
+  // day, ×100 (see lib/upkeep): checked that day, or carried by a check within
+  // the item's span. Days before any item exists score null.
+  const dayScore = (date: string) => scoreDay(items, days, date);
+
+  // The checklist as it stands for one day: each item with its coverage that day.
+  // Rows are toggleable (today on the front, past days in the history detail) so
+  // a forgotten check can be backfilled.
+  function dayRows(date: string) {
+    return items
+      .filter(it => itemCreatedDay(it.id) <= date)
+      .map(it => ({ ...it, color: colorOf(it.id), ...coverageOn(it, days, date) }));
   }
 
   // Consecutive perfect (100) days ending today — or yesterday if today is not
@@ -217,8 +216,8 @@ export default function UpkeepWidget({
   }
 
   // ── Derived (front) ──────────────────────────────────────────────────────
-  const checkedToday = new Set(days[today] ?? []);
-  const ringRows = items.map(it => ({ id: it.id, color: colorOf(it.id), weight: it.weight, done: checkedToday.has(it.id) }));
+  const todayRows = dayRows(today);
+  const ringRows = todayRows.map(r => ({ id: r.id, color: r.color, weight: r.weight, done: r.done, carried: r.carried }));
   const { pct } = dayScore(today);
   const streak = perfectStreak();
   const perfect = pct === 100;
@@ -273,27 +272,23 @@ export default function UpkeepWidget({
           )}
 
           <ul className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-1">
-            {items.map(it => {
-              const done = checkedToday.has(it.id);
-              const dot = colorOf(it.id);
-              return (
-                <li key={it.id}>
-                  <button
-                    onClick={() => toggle(it.id, today)}
-                    className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors ${FOCUS_RING} ${
-                      done ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"
-                    }`}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: dot, opacity: done ? 1 : 0.4 }} />
-                    <span className={`flex-1 min-w-0 truncate text-sm ${c.text} ${done ? "" : "opacity-80"}`}>{it.name}</span>
-                    <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{it.weight}</span>
-                    <span className={done ? "text-emerald-600 dark:text-emerald-400" : `opacity-30 ${c.label}`}>
-                      {done ? <CircleCheck size={14} /> : <Circle size={14} />}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
+            {todayRows.map(r => (
+              <li key={r.id}>
+                <button
+                  onClick={() => toggle(r.id, today)}
+                  title={r.carried ? `Covered by an earlier check, ${leftLabel(r.left)}. Tap to check it off again today.` : undefined}
+                  className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors ${FOCUS_RING} ${
+                    r.done ? "bg-black/10 dark:bg-white/15" : r.carried ? "bg-black/5 dark:bg-white/[0.08]" : "hover:bg-black/5 dark:hover:bg-white/10"
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color, opacity: r.done ? 1 : r.carried ? 0.7 : 0.4 }} />
+                  <span className={`flex-1 min-w-0 truncate text-sm ${c.text} ${r.done ? "" : "opacity-80"}`}>{r.name}</span>
+                  {r.carried && <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{leftLabel(r.left)}</span>}
+                  <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{r.weight}</span>
+                  <StatusIcon done={r.done} carried={r.carried} label={c.label} />
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
       )}
@@ -342,6 +337,18 @@ export default function UpkeepWidget({
                     />
                     <span>pts</span>
                   </label>
+                  <label className={`flex items-center gap-1 text-xs ${c.label} opacity-80`} title="Days one check lasts: 1 is daily, 3 keeps it covered for three days">
+                    <input
+                      inputMode="numeric"
+                      value={it.every ?? 1}
+                      onChange={e => {
+                        const v = e.target.value.replace(/\D/g, "");
+                        setDraft(d => d.map(x => x.id === it.id ? { ...x, every: v ? Math.min(parseInt(v, 10), MAX_EVERY) : 0 } : x));
+                      }}
+                      className={`w-8 text-xs text-center tabular-nums border border-[var(--surface-border)] rounded-md px-1 py-1 outline-none bg-[var(--surface)] ${c.text}`}
+                    />
+                    <span>d</span>
+                  </label>
                   <button
                     onClick={() => setDraft(d => d.filter(x => x.id !== it.id))}
                     aria-label={`Remove ${it.name}`}
@@ -353,13 +360,13 @@ export default function UpkeepWidget({
               ))}
             </div>
             <p className={`text-xs leading-relaxed opacity-60 ${c.text}`}>
-              Points add up to <span className="tabular-nums font-medium">{draftTotal}</span>. Checking everything always scores 100, so the weights just set how much each one moves the needle.
+              Points add up to <span className="tabular-nums font-medium">{draftTotal}</span>. Checking everything always scores 100, so the weights just set how much each one moves the needle. Days is how long one check lasts: 1 is daily, 3 keeps an item covered for three days.
             </p>
           </>
         )}
         {draft.length === 0 && (
           <p className={`text-xs leading-relaxed opacity-60 ${c.text}`}>
-            Add the daily essentials you want to stay on top of: brushing teeth, showering, taking medicine, a clean bed. Give each one a point value for how much it matters; checking them all off scores a perfect 100.
+            Add the essentials you want to stay on top of: brushing teeth, showering, taking medicine, a clean bed. Give each one a point value for how much it matters; checking them all off scores a perfect 100. Things like shaving or laundry can be set to last several days per check.
           </p>
         )}
       </div>
@@ -374,15 +381,6 @@ export default function UpkeepWidget({
   const avg7 = withScore.length ? Math.round(withScore.reduce((a, s) => a + (s.pct ?? 0), 0) / withScore.length) : null;
   const perfectDays = withScore.filter(s => s.pct === 100).length;
   const chartMax = 100;
-
-  // The checklist as it stands for one day (used in the day detail), each row
-  // toggleable so a forgotten check can be backfilled.
-  function dayRows(date: string) {
-    const checked = new Set(days[date] ?? []);
-    return items
-      .filter(it => itemCreatedDay(it.id) <= date)
-      .map(it => ({ ...it, color: colorOf(it.id), done: checked.has(it.id) }));
-  }
 
   return (
     <div className="relative h-full">
@@ -419,7 +417,7 @@ export default function UpkeepWidget({
               <div className="shrink-0 flex justify-center">
                 {(() => {
                   const s = dayScore(detailDate);
-                  const rows = dayRows(detailDate).map(r => ({ id: r.id, color: r.color, weight: r.weight, done: r.done }));
+                  const rows = dayRows(detailDate).map(r => ({ id: r.id, color: r.color, weight: r.weight, done: r.done, carried: r.carried }));
                   return (
                     <ScoreRing
                       rows={rows}
@@ -445,15 +443,14 @@ export default function UpkeepWidget({
                       key={r.id}
                       onClick={() => toggle(r.id, detailDate)}
                       className={`group/row flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors ${FOCUS_RING} ${
-                        r.done ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"
+                        r.done ? "bg-black/10 dark:bg-white/15" : r.carried ? "bg-black/5 dark:bg-white/[0.08]" : "hover:bg-black/5 dark:hover:bg-white/10"
                       }`}
                     >
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color, opacity: r.done ? 1 : 0.4 }} />
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color, opacity: r.done ? 1 : r.carried ? 0.7 : 0.4 }} />
                       <span className={`flex-1 min-w-0 truncate text-sm ${c.text} ${r.done ? "" : "opacity-80"}`}>{r.name}</span>
+                      {r.carried && <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{leftLabel(r.left)}</span>}
                       <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{r.weight}</span>
-                      <span className={r.done ? "text-emerald-600 dark:text-emerald-400" : `opacity-30 ${c.label}`}>
-                        {r.done ? <CircleCheck size={14} /> : <Circle size={14} />}
-                      </span>
+                      <StatusIcon done={r.done} carried={r.carried} label={c.label} />
                     </button>
                   ))}
                 </div>
