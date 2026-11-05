@@ -161,3 +161,21 @@ describe("unstopCheck", () => {
     expect(unstopCheck({}, "teeth", T0)).toEqual({});
   });
 });
+
+describe("orderRows", () => {
+  const rows = [
+    { name: "a", weight: 10, on: true, left: 5 * HOUR },
+    { name: "b", weight: 5, on: false, left: 0 },
+    { name: "c", weight: 20, on: false, left: 0 },
+    { name: "d", weight: 10, on: true, left: HOUR },
+    { name: "e", weight: 5, on: false, left: 0 },
+  ];
+  it("keeps the custom order as is", async () => {
+    const { orderRows } = await import("@/lib/upkeep");
+    expect(orderRows(rows, "custom").map(r => r.name)).toEqual(["a", "b", "c", "d", "e"]);
+  });
+  it("by need: off items heaviest first (ties in custom order), then running items soonest to end first", async () => {
+    const { orderRows } = await import("@/lib/upkeep");
+    expect(orderRows(rows, "need").map(r => r.name)).toEqual(["c", "b", "e", "d", "a"]);
+  });
+});

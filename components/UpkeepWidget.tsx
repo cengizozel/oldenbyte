@@ -8,9 +8,9 @@ import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { formatDate, localDateStr } from "@/lib/format";
 import {
-  type UpkeepItem as Item, type UpkeepLog as Log,
+  type UpkeepItem as Item, type UpkeepLog as Log, type UpkeepOrder as Order,
   HOUR, DAY, MAX_HOURS, DEFAULT_HOURS, UNDO_WINDOW,
-  addCheck, removeCheck, stopCheck, unstopCheck, normalizeItem, shiftDay,
+  addCheck, removeCheck, stopCheck, unstopCheck, normalizeItem, orderRows, shiftDay,
   stateAt, scoreAt, perfectSince, nextExpiry, sampleScores, summarize, dayChecks, formatSpan,
 } from "@/lib/upkeep";
 import FlipCard from "./ui/FlipCard";
@@ -102,6 +102,7 @@ export default function UpkeepWidget({
   const logKey = `upkeep-log-${widget.id}`;
 
   const [items, setItems] = useState<Item[]>([]);
+  const [order, setOrder] = useState<Order>("custom");
   const [log, setLog] = useState<Log>({});
   // The clock the whole view is drawn at; ticks every 30s so countdowns move.
   const [now, setNow] = useState(0);
@@ -170,8 +171,9 @@ export default function UpkeepWidget({
         const at = Date.now();
         let its: Item[] = [];
         if (cfgRaw) {
-          const cfg = parseJson<{ items?: Partial<Item>[] }>(cfgRaw, {});
+          const cfg = parseJson<{ items?: Partial<Item>[]; order?: string }>(cfgRaw, {});
           its = (cfg.items ?? []).filter((i): i is Item => !!i.id && !!i.name).map(normalizeItem);
+          if (cfg.order === "need") setOrder("need");
         }
         setItems(its);
         setDraft(its);
@@ -190,8 +192,12 @@ export default function UpkeepWidget({
     return () => clearInterval(t);
   }, []);
 
-  function persistConfig(nextItems: Item[]) {
-    storage.setItem(configKey, JSON.stringify({ items: nextItems }));
+  function persistConfig(nextItems: Item[], nextOrder: Order = order) {
+    storage.setItem(configKey, JSON.stringify({ items: nextItems, order: nextOrder }));
+  }
+  function changeOrder(next: Order) {
+    setOrder(next);
+    persistConfig(items, next);
   }
   function persistLog(next: Log) {
     setLog(next);
@@ -267,7 +273,7 @@ export default function UpkeepWidget({
   // ── Derived (front) ──────────────────────────────────────────────────────
   const at = now || Date.now();
   const today = localDateStr(new Date(at));
-  const rows = items.map(it => ({ ...it, color: colorOf(it.id), ...stateAt(it, log, at) }));
+  const rows = orderRows(items.map(it => ({ ...it, color: colorOf(it.id), ...stateAt(it, log, at) })), order);
   const ringRows = rows.map(r => ({ id: r.id, color: r.color, weight: r.weight, done: r.on }));
   const { pct } = scoreAt(items, log, at);
   const perfect = pct === 100;
@@ -392,7 +398,20 @@ export default function UpkeepWidget({
             <Plus size={14} />
           </SmallButton>
         </div>
-        {draft.length > 1 && (
+        <div className={`flex items-center gap-2 text-xs ${c.label}`}>
+          <span className="opacity-60">Order</span>
+          {([["custom", "as arranged"], ["need", "by need"]] as [Order, string][]).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => changeOrder(key)}
+              title={key === "need" ? "Off items first, heaviest first, then running items soonest to run out first" : "The order below, drag the dots to arrange"}
+              className={`px-1.5 py-0.5 rounded-md ${FOCUS_RING} ${order === key ? `bg-black/10 dark:bg-white/15 ${c.text}` : "opacity-60 hover:opacity-100"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {draft.length > 1 && order === "custom" && (
           <p className={`text-xs opacity-60 -mt-1 ${c.text}`}>Drag the dot to reorder.</p>
         )}
         {draft.length > 0 && (

@@ -123,6 +123,21 @@ export function stateAt(it: UpkeepItem, log: UpkeepLog, at: number): ItemState {
   return end > at ? { on: true, left: end - at, since, end } : { on: false, left: 0, since, end };
 }
 
+// How the front list is ordered: as arranged in settings, or by need, which
+// puts the off items first (heaviest first, so the biggest gain is on top)
+// and then the running ones soonest to run out first.
+export type UpkeepOrder = "custom" | "need";
+
+export function orderRows<T extends { weight: number; on: boolean; left: number }>(rows: T[], order: UpkeepOrder): T[] {
+  if (order !== "need") return rows;
+  const idx = new Map(rows.map((r, i) => [r, i]));
+  return [...rows].sort((a, b) => {
+    if (a.on !== b.on) return a.on ? 1 : -1;
+    const tie = idx.get(a)! - idx.get(b)!;
+    return (a.on ? a.left - b.left : b.weight - a.weight) || tie;
+  });
+}
+
 export type Score = { done: number; total: number; pct: number | null };
 
 // Items that existed at `at`; the score only ever counts those.
