@@ -188,13 +188,11 @@ export default function UpkeepWidget({
     storage.setItem(logKey, JSON.stringify(next));
   }
 
-  // Tap: start (or restart) the item's countdown now. A tap right after a
-  // check undoes it instead, so a misclick does not restart a long timer.
+  // Tap: start (or restart) the item's countdown now. Always a check; turning
+  // an item off is the check mark's job (stop below), so a row never toggles.
   function tap(it: Item) {
     const at = Date.now();
-    const st = stateAt(it, log, at);
-    if (st.on && st.since != null && at - st.since < UNDO_WINDOW) persistLog(removeCheck(log, it.id, st.since));
-    else persistLog(addCheck(log, it.id, at));
+    persistLog(addCheck(log, it.id, at));
     setNow(at);
   }
 

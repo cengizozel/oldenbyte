@@ -33,8 +33,8 @@ export const HOUR = 3600000;
 export const DAY = 24 * HOUR;
 export const MAX_HOURS = 24 * 365;
 export const DEFAULT_HOURS = 24;
-// Tapping an item that was checked this recently undoes the check (a misclick)
-// instead of restarting its countdown.
+// Turning an item off this soon after a check removes the check (a misclick)
+// instead of recording a stop.
 export const UNDO_WINDOW = 5 * 60000;
 const MAX_CHECKS_PER_ITEM = 500;
 
