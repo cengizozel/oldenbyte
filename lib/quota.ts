@@ -1,6 +1,6 @@
 // Per-user storage limits, so one account cannot fill the server's disk.
 // Admins (the operator) are unlimited; every other account gets a shared file
-// quota across uploads and the library, plus caps on settings rows.
+// quota across uploads and the library, plus caps on settings and cache rows.
 import { readdir, stat } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/prisma";
@@ -11,8 +11,8 @@ const libraryDir = process.env.LIBRARY_DIR ?? path.join(process.cwd(), "data", "
 
 // Uploads + library, per non-admin account. USER_STORAGE_QUOTA_MB overrides.
 const FILE_QUOTA_BYTES = (Number(process.env.USER_STORAGE_QUOTA_MB) || 2048) * 1024 * 1024;
-const SETTINGS_MAX_KEYS = 2000;
-const SETTINGS_MAX_BYTES = 50 * 1024 * 1024;
+const ROWS_MAX_KEYS = 2000;
+const ROWS_MAX_BYTES = 50 * 1024 * 1024;
 
 type QuotaUser = { id: string; role: string };
 
@@ -42,23 +42,33 @@ export async function fileRoomLeft(user: QuotaUser): Promise<number> {
   return left;
 }
 
-// Throws 413 if writing these settings would take a non-admin account past the
-// key-count or total-size cap. Overwrites of existing keys count as the change
-// in size, not the full new size.
-export async function assertSettingsRoom(user: QuotaUser, writes: [string, string][]): Promise<void> {
+// Throws 413 if writing these rows would take a non-admin account past the
+// key-count or total-size cap of the table. Overwrites of existing keys count
+// as the change in size, not the full new size.
+async function assertRoom(table: "Setting" | "Cache", user: QuotaUser, writes: [string, string][], what: string): Promise<void> {
   if (user.role === "admin" || writes.length === 0) return;
   const keys = writes.map(([k]) => k);
-  const [totals] = await prisma.$queryRaw<{ n: bigint | number; b: bigint | number }[]>`
-    SELECT COUNT(*) AS n, COALESCE(SUM(LENGTH("value")), 0) AS b FROM "Setting" WHERE "userId" = ${user.id}`;
+  const [totals] = await prisma.$queryRawUnsafe<{ n: bigint | number; b: bigint | number }[]>(
+    `SELECT COUNT(*) AS n, COALESCE(SUM(LENGTH("value")), 0) AS b FROM "${table}" WHERE "userId" = ?`,
+    user.id,
+  );
   const existing = await prisma.$queryRawUnsafe<{ key: string; l: bigint | number }[]>(
-    `SELECT "key", LENGTH("value") AS l FROM "Setting" WHERE "userId" = ? AND "key" IN (${keys.map(() => "?").join(",")})`,
+    `SELECT "key", LENGTH("value") AS l FROM "${table}" WHERE "userId" = ? AND "key" IN (${keys.map(() => "?").join(",")})`,
     user.id,
     ...keys,
   );
   const old = new Map(existing.map((r) => [r.key, Number(r.l)]));
   const newKeys = writes.filter(([k]) => !old.has(k)).length;
   const delta = writes.reduce((sum, [k, v]) => sum + v.length - (old.get(k) ?? 0), 0);
-  if (Number(totals.n) + newKeys > SETTINGS_MAX_KEYS || Number(totals.b) + delta > SETTINGS_MAX_BYTES) {
-    throw new ClientError("Settings storage limit reached.", 413);
+  if (Number(totals.n) + newKeys > ROWS_MAX_KEYS || Number(totals.b) + delta > ROWS_MAX_BYTES) {
+    throw new ClientError(`${what} storage limit reached.`, 413);
   }
+}
+
+export function assertSettingsRoom(user: QuotaUser, writes: [string, string][]): Promise<void> {
+  return assertRoom("Setting", user, writes, "Settings");
+}
+
+export function assertCacheRoom(user: QuotaUser, writes: [string, string][]): Promise<void> {
+  return assertRoom("Cache", user, writes, "Cache");
 }

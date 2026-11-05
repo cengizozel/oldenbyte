@@ -13,7 +13,7 @@ A daily notepad with a built-in calendar for browsing past entries. Notes are ri
 
 Each edit rewrites only that day's key, plus the index when the day gains or loses its note. The day key is written before it is indexed and unindexed before it is removed, so the index never points at a missing note. These keys are user data: the cache cleanup never touches them even though they contain dates.
 
-**Legacy format.** Older versions kept every day in one `notebook-{id}-dates` object (`YYYY-MM-DD` to note) that was rewritten on each edit. When a notepad has no index yet, the blob is copied into per-day keys plus the index on load, and the blob is removed only after every write is confirmed; if a write fails the migration is retried on the next load.
+**Legacy format.** Older versions kept every day in one `notebook-{id}-dates` object (`YYYY-MM-DD` to note) that was rewritten on each edit. When the index is read and does not exist yet, the server splits the blob into per-day keys plus the index and removes it, in one transaction (`lib/migrations.ts`); an unreadable blob is left untouched.
 
 ## Loading and Save Safety
 

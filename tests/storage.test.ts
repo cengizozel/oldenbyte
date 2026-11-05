@@ -65,3 +65,43 @@ describe("storage.setItem keepalive budget", () => {
     vi.unstubAllGlobals();
   });
 });
+
+// Every read remembers the key's version and every write sends it, so a stale
+// page is refused instead of overwriting a newer save (see /api/settings).
+describe("storage version handshake", () => {
+  it("sends the version it read, keeps the one the server returns, and omits it for unread keys", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (!init || init.method !== "POST") return new Response(JSON.stringify({ value: "v", version: 3 }), { status: 200 });
+      const body = JSON.parse(String(init.body));
+      bodies.push(body);
+      return new Response(JSON.stringify({ ok: true, version: (body.version ?? 0) + 1 }), { status: 200 });
+    }));
+    const storage = await import("@/lib/storage");
+    await storage.getItemResult("ver-a");
+    expect(await storage.setItem("ver-a", "1")).toBe(true);
+    expect(await storage.setItem("ver-a", "2")).toBe(true);
+    expect(await storage.setItem("ver-unread", "x")).toBe(true);
+    expect(bodies.map(b => b.version)).toEqual([3, 4, undefined]);
+    vi.unstubAllGlobals();
+  });
+
+  it("reports a conflict as a failed save and stays stale until the page reloads", async () => {
+    const versions: unknown[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (!init || init.method !== "POST") return new Response(JSON.stringify({ value: "v", version: 3 }), { status: 200 });
+      versions.push(JSON.parse(String(init.body)).version);
+      return new Response(JSON.stringify({ error: "changed in another tab", conflict: true, version: 9 }), { status: 409 });
+    }));
+    const failures: string[] = [];
+    vi.stubGlobal("window", { dispatchEvent: (e: CustomEvent<{ reason: string }>) => { if (e.type === "savefailed") failures.push(e.detail.reason); return true; }, location: {} });
+    vi.stubGlobal("CustomEvent", class { type: string; detail: unknown; constructor(type: string, init: { detail: unknown }) { this.type = type; this.detail = init.detail; } });
+    const storage = await import("@/lib/storage");
+    await storage.getItemResult("ver-b");
+    expect(await storage.setItem("ver-b", "1")).toBe(false);
+    expect(await storage.setItem("ver-b", "2")).toBe(false);
+    expect(versions).toEqual([3, 3]);
+    expect(failures).toEqual(["changed in another tab", "changed in another tab"]);
+    vi.unstubAllGlobals();
+  });
+});

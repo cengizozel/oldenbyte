@@ -28,10 +28,25 @@ export async function getItemResult(key: string): Promise<{ ok: boolean; value: 
     const res = check401(await fetch(`/api/settings?key=${encodeURIComponent(key)}`));
     if (!res.ok) return { ok: false, value: null };
     const data = await res.json();
+    rememberVersion(key, data.version);
     return { ok: true, value: data.value ?? null };
   } catch {
     return { ok: false, value: null };
   }
+}
+
+// The server counts writes per key and tells us the count on every read and
+// successful write. A write sends the count it last saw, and the server
+// refuses it (409) if the key moved on since: another tab, another device or
+// the config API saved in between. The stale count is kept after a conflict,
+// so every further save from this page fails the same way until it reloads,
+// instead of the page winning on its second try and quietly undoing the other
+// save. Keys this page never read are written unconditionally.
+const versions = new Map<string, number>();
+
+function rememberVersion(key: string, version: unknown) {
+  if (typeof version === "number") versions.set(key, version);
+  else versions.delete(key);
 }
 
 // Fired on window when a write fails, so the page can tell the user instead of
@@ -88,7 +103,8 @@ async function post(body: string, keepalive: boolean): Promise<Response> {
 }
 
 async function send(key: string, value: string): Promise<boolean> {
-  const body = JSON.stringify({ key, value });
+  const version = versions.get(key);
+  const body = JSON.stringify(version === undefined ? { key, value } : { key, value, version });
   // Small writes may finish even if the page is reloaded or closed meanwhile.
   const keepalive = keepaliveInFlight + body.length < KEEPALIVE_BUDGET;
   if (keepalive) keepaliveInFlight += body.length;
@@ -102,8 +118,11 @@ async function send(key: string, value: string): Promise<boolean> {
       if (!keepalive) throw err;
       res = await post(body, false);
     }
-    if (res.ok) return true;
     const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      if (typeof data.version === "number") versions.set(key, data.version);
+      return true;
+    }
     reportSaveFailure(key, typeof data.error === "string" ? data.error : `HTTP ${res.status}`);
     return false;
   } catch {
@@ -149,6 +168,7 @@ export function setItem(key: string, value: string): Promise<boolean> {
 
 export async function removeItem(key: string): Promise<boolean> {
   if (isDemoMode()) { demoRemoveItem(key); return true; }
+  versions.delete(key);
   try {
     const res = check401(
       await fetch(`/api/settings?key=${encodeURIComponent(key)}`, {

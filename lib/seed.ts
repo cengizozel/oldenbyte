@@ -86,17 +86,15 @@ export function buildSeed(): Record<string, unknown> {
     // ── Widget content: make it look lived-in ────────────────────────────────
     "notepad-registry": ["notebook-home", "notebook-research"],
     "notebook-notebook-home-name": "Daily notes",
-    "notebook-notebook-home-dates": {
-      [today]: "groceries after work: <b>coffee beans</b>, olive oil, lemons<div>call the bike shop about the <u>rear brake</u></div>",
-      [d1]: "really good walk in the evening, <i>should make that a habit</i><div>the balcony plants need bigger pots</div>",
-      [d3]: "weekend plan:<ul><li>try the new bakery</li><li>finish the bookshelf</li><li><b>backup the NAS</b></li></ul>",
-    },
+    "notebook-notebook-home-days": [d3, d1, today],
+    [`notebook-notebook-home-day-${today}`]: "groceries after work: <b>coffee beans</b>, olive oil, lemons<div>call the bike shop about the <u>rear brake</u></div>",
+    [`notebook-notebook-home-day-${d1}`]: "really good walk in the evening, <i>should make that a habit</i><div>the balcony plants need bigger pots</div>",
+    [`notebook-notebook-home-day-${d3}`]: "weekend plan:<ul><li>try the new bakery</li><li>finish the bookshelf</li><li><b>backup the NAS</b></li></ul>",
     "notebook-notebook-research-name": "Research notes",
-    "notebook-notebook-research-dates": {
-      [today]: "reading about <b>retrieval-augmented agents</b>, the tool-use evals look weak<div><i>idea: compare embedding models on my own notes</i></div>",
-      [d2]: "watched the new 3blue1brown video, the attention visualization is <u>the clearest I have seen</u><div>queued two papers from HF daily</div>",
-      [d4]: "to re-read monthly:<ul><li>attention is all you need</li><li>lost in the middle</li></ul>",
-    },
+    "notebook-notebook-research-days": [d4, d2, today],
+    [`notebook-notebook-research-day-${today}`]: "reading about <b>retrieval-augmented agents</b>, the tool-use evals look weak<div><i>idea: compare embedding models on my own notes</i></div>",
+    [`notebook-notebook-research-day-${d2}`]: "watched the new 3blue1brown video, the attention visualization is <u>the clearest I have seen</u><div>queued two papers from HF daily</div>",
+    [`notebook-notebook-research-day-${d4}`]: "to re-read monthly:<ul><li>attention is all you need</li><li>lost in the middle</li></ul>",
 
     "tracker-config-tracker-home": {
       items: [

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { GripVertical, Download, Upload, Search, Undo2, Redo2, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { GripVertical, Download, Upload, Search, Undo2, Redo2, Trash2, ChevronDown, ChevronUp, Eraser, X } from "lucide-react";
 import type { Widget } from "@/lib/widgets";
 import { colorMap, WIDGET_CATEGORIES } from "@/lib/widgets";
 import { FOCUS_RING } from "@/components/ui/Field";
@@ -40,6 +40,30 @@ export default function WidgetShelf({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
+
+  // Leftover data of widgets removed from every dashboard (lib/gc.ts): listed
+  // on demand, removed one widget at a time, never automatically.
+  type Leftover = { id: string; keys: number; bytes: number; lastWrite: string };
+  const [leftovers, setLeftovers] = useState<Leftover[] | null>(null);
+  const [leftoversOpen, setLeftoversOpen] = useState(false);
+  async function loadLeftovers() {
+    setLeftoversOpen(true);
+    setLeftovers(null);
+    try {
+      const res = await fetch("/api/settings/orphans");
+      const data = res.ok ? await res.json() : { orphans: [] };
+      setLeftovers(Array.isArray(data.orphans) ? data.orphans : []);
+    } catch {
+      setLeftovers([]);
+    }
+  }
+  async function removeLeftover(id: string) {
+    try {
+      const res = await fetch(`/api/settings/orphans?instance=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (res.ok) setLeftovers(l => (l ?? []).filter(o => o.id !== id));
+    } catch {}
+  }
+  const fmtBytes = (b: number) => b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`;
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const dragging = useRef(false);
   const dragOffset = useRef({ x: 0, y: 0 });
@@ -238,6 +262,15 @@ export default function WidgetShelf({
           }}
         />
         <button
+          onClick={() => (leftoversOpen ? setLeftoversOpen(false) : loadLeftovers())}
+          disabled={backupDisabled}
+          aria-expanded={leftoversOpen}
+          className={`p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-25 ${leftoversOpen ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+          title={backupDisabled ? "Not available in demo mode" : "Leftover data from removed widgets"}
+        >
+          <Eraser size={14} />
+        </button>
+        <button
           onClick={onWipe}
           className="p-2 rounded-xl text-[var(--text-muted)] hover:text-red-500 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           title="Clear the dashboard (undoable)"
@@ -245,6 +278,42 @@ export default function WidgetShelf({
           <Trash2 size={14} />
         </button>
       </div>
+      {leftoversOpen && (
+        <div className="px-3 pb-3">
+          <div className="rounded-xl border border-[var(--surface-border)] p-2 text-xs text-[var(--text-secondary)]">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="font-medium">Leftover data</span>
+              <button onClick={() => setLeftoversOpen(false)} aria-label="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`}>
+                <X size={12} />
+              </button>
+            </div>
+            <p className="text-[var(--text-muted)] leading-relaxed mb-1.5">
+              Data of widgets that are on no dashboard any more. Nothing is removed on its own; a widget added back later starts empty either way.
+            </p>
+            {leftovers === null ? (
+              <div className="text-[var(--text-muted)]">Looking...</div>
+            ) : leftovers.length === 0 ? (
+              <div className="text-[var(--text-muted)]">Nothing left over.</div>
+            ) : (
+              <ul className="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
+                {leftovers.map(o => (
+                  <li key={o.id} className="flex items-center gap-2">
+                    <span className="flex-1 min-w-0 truncate" title={o.id}>{o.id}</span>
+                    <span className="shrink-0 tabular-nums text-[var(--text-muted)]">{o.keys} {o.keys === 1 ? "key" : "keys"}, {fmtBytes(o.bytes)}</span>
+                    <button
+                      onClick={() => removeLeftover(o.id)}
+                      className={`shrink-0 px-1.5 py-0.5 rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-black/5 dark:hover:bg-white/5 ${FOCUS_RING}`}
+                      title={`Remove the leftover data of ${o.id}`}
+                    >
+                      remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
       </>
       )}
     </div>

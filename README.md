@@ -1,6 +1,6 @@
 # oldenbyte
 
-A personal dashboard built with Next.js. Widgets are draggable, resizable, and persist their state to a local SQLite database. Multiple named dashboards, each with its own layout and widgets, switchable from the top bar. In layout edit mode a widget can be grouped with another as tabs or moved to another dashboard, taking its data with it. Multiple accounts, each with its own dashboards. Responsive for mobile portrait view.
+A personal dashboard built with Next.js. Widgets are draggable, resizable, and persist their state to a local SQLite database. Multiple named dashboards, each with its own layout and widgets, switchable from the top bar. In layout edit mode a widget can be grouped with another as tabs or moved to another dashboard, taking its data with it; the edit shelf also exports and imports a backup and lists the leftover data of removed widgets for cleanup. Multiple accounts, each with its own dashboards. Responsive for mobile portrait view.
 
 ![screenshot](public/screenshot.png)
 

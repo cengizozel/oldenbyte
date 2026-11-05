@@ -14,7 +14,7 @@ Times how long you spend on each of a set of named activities. Only one activity
 Two keys with different lifetimes:
 
 - **`tracker-config-{id}`**: the activity list plus the "what's running" pointer (`activeId` + `since`, an epoch-ms timestamp). This persists across days, so a stopwatch left running keeps running into the next day.
-- **`tracker-days-{id}`**: every day's accumulated seconds per activity, keyed by local date. Past days are retained; the history overlay reads them. (An earlier version stored one key per day, `tracker-day-{id}-{date}`; on load that today-key is migrated into this consolidated store. Those dated keys are user data, so the cache cleanup never deletes them.)
+- **`tracker-days-{id}`**: every day's accumulated seconds per activity, keyed by local date. Past days are retained; the history overlay reads them. (An earlier version stored one key per day, `tracker-day-{id}-{date}`; the server folds any such keys into this store when it is read, an existing store winning for a date both have, see `lib/migrations.ts`. Those dated keys are user data, so the cache rules never match them.)
 
 ## Day Boundary: Local Midnight
 

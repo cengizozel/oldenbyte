@@ -197,31 +197,14 @@ function getFirstDayOfMonth(year: number, month: number) {
 //   notebook-${id}-day-${date}   that day's note (HTML, or plain text from older versions)
 //   notebook-${id}-name          custom name
 // Older versions kept every day in one `notebook-${id}-dates` object that was
-// rewritten on each edit; loadIndex migrates it the first time it is seen.
+// rewritten on each edit; the server splits it into this shape the first time
+// the index is read (lib/migrations).
 const indexKey = (id: string) => `notebook-${id}-days`;
 const dayKey = (id: string, date: string) => `notebook-${id}-day-${date}`;
-const legacyKey = (id: string) => `notebook-${id}-dates`;
-
-// Copy a legacy blob into per-day keys plus the index, and only remove the
-// blob once every write is confirmed. Returns the index, or null when the blob
-// is unreadable (left untouched) or a write failed (retried on the next load).
-async function migrateLegacy(id: string, raw: string): Promise<string[] | null> {
-  const parsed = parseJson<unknown>(raw, null);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-  const entries = Object.entries(parsed as Record<string, unknown>);
-  if (entries.some(([, html]) => typeof html !== "string")) return null;
-  const withContent = entries.filter(([, html]) => html !== "") as [string, string][];
-  const written = await Promise.all(withContent.map(([date, html]) => storage.setItem(dayKey(id, date), html)));
-  if (written.includes(false)) return null;
-  const dates = withContent.map(([date]) => date).sort();
-  if (!(await storage.setItem(indexKey(id), JSON.stringify(dates)))) return null;
-  await storage.removeItem(legacyKey(id));
-  return dates;
-}
 
 // The dates a notepad has notes for, or null when that could not be read
 // reliably (a failed read must never look like an empty notepad). Concurrent
-// calls for one id share a single load, so a migration never runs twice.
+// calls for one id share a single load.
 const indexLoads = new Map<string, Promise<string[] | null>>();
 function loadIndex(id: string): Promise<string[] | null> {
   let p = indexLoads.get(id);
@@ -229,14 +212,9 @@ function loadIndex(id: string): Promise<string[] | null> {
     p = (async () => {
       const idx = await storage.getItemResult(indexKey(id));
       if (!idx.ok) return null;
-      if (idx.value !== null) {
-        const dates = parseJson<unknown>(idx.value, null);
-        return Array.isArray(dates) && dates.every(d => typeof d === "string") ? dates : null;
-      }
-      const legacy = await storage.getItemResult(legacyKey(id));
-      if (!legacy.ok) return null;
-      if (legacy.value === null) return [];
-      return migrateLegacy(id, legacy.value);
+      if (idx.value === null) return [];
+      const dates = parseJson<unknown>(idx.value, null);
+      return Array.isArray(dates) && dates.every(d => typeof d === "string") ? dates : null;
     })().finally(() => indexLoads.delete(id));
     indexLoads.set(id, p);
   }

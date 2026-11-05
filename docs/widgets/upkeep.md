@@ -12,11 +12,11 @@ A checklist of essentials, the third sibling of Tracker and Rhythm. Each item is
 - `items` - array of `{ id, name, weight, hours }`.
   - **`id` must start with the creation timestamp in ms** (e.g. `1782354352574-0`). Scoring derives each item's creation time from `parseInt(id.split("-")[0])`, so an item only counts toward the score from the moment it existed, and a new habit never lowers past scores. Ids without a numeric prefix (older items, the seed) count from the beginning of time.
   - `weight` - points the item is worth (new items start at 10; a missing or non-positive weight is treated as 1).
-  - `hours` - how long one check lasts. New items start at 24. Configs from the earlier day-based version carry `every` (days) instead, which is read as `every * 24` and rewritten on load.
+  - `hours` - how long one check lasts. New items start at 24. Configs from the earlier day-based version carried `every` (days) instead; the server rewrites them as `every * 24` on read (`lib/migrations.ts`).
 - The log keeps at most 500 checks per item. Removing an item in settings drops its checks.
 - Score at a moment = `(sum of weights of items whose latest check is less than `hours` old / sum of weights of items that existed then) * 100`. It is derived, never stored, so it can be computed for any past moment and always reflects the current items, weights and spans. Changing an item's span rewrites its past as well.
 - Scoring lives in `lib/upkeep.ts`, shared with the chat reader, with tests in `tests/upkeep.test.ts`.
-- Earlier versions stored `upkeep-days-{id}` (`{ "YYYY-MM-DD": itemId[] }`). On load, if no log exists, those days become checks at local noon of each day (or now, if earlier), the log is written, and the old key is removed only after that write succeeds.
+- Earlier versions stored `upkeep-days-{id}` (`{ "YYYY-MM-DD": itemId[] }`). When the log is read and does not exist yet, the server turns those days into checks at noon of each day in the user's timezone (or now, if earlier), writes the log and removes the old key in one transaction (`lib/migrations.ts`).
 
 ## Behaviour
 

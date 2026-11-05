@@ -144,13 +144,13 @@ export default function TrackerWidget({
   // within a second of local midnight (the tick below keeps renders coming).
   const today = localDateStr();
 
+  // The old one-key-per-day store is folded into the days key by the server
+  // on read (lib/migrations), so this only parses.
   useEffect(() => {
-    const legacyDayKey = `tracker-day-${widget.id}-${localDateStr()}`;
     Promise.all([
       storage.getItem(configKey),
       storage.getItem(daysKey),
-      storage.getItem(legacyDayKey),
-    ]).then(([cfgRaw, daysRaw, legacyRaw]) => {
+    ]).then(([cfgRaw, daysRaw]) => {
       try {
         if (cfgRaw) {
           const cfg = parseJson<{ items?: Item[]; activeId?: string | null; since?: number | null }>(cfgRaw, {});
@@ -159,16 +159,7 @@ export default function TrackerWidget({
           setActiveId(cfg.activeId ?? null);
           setSince(cfg.since ?? null);
         }
-        let stored: Days = {};
-        if (daysRaw) {
-          stored = parseJson<Days | null>(daysRaw, null) ?? {};
-        } else if (legacyRaw) {
-          // Migrate the old one-key-per-day format (only today's key is reachable).
-          const d = parseJson<{ elapsed?: Record<string, number> }>(legacyRaw, {});
-          if (d.elapsed) stored[localDateStr()] = d.elapsed;
-          storage.setItem(daysKey, JSON.stringify(stored));
-        }
-        setDays(stored);
+        setDays(daysRaw ? parseJson<Days | null>(daysRaw, null) ?? {} : {});
       } catch {}
       setNow(Date.now());
       setLoaded(true);

@@ -4,11 +4,13 @@
 // explicit call per widget (visible in the chat's research trail) and gets a
 // self-contained snapshot back.
 //
-// Reads go straight to the Setting table (prisma) and to the external sources
+// Reads go straight to the database (through lib/migrations.readSetting, so
+// an old value shape is brought up to date first) and to the external sources
 // the widgets use; /api/* routes can't be called from here (the auth
 // middleware would bounce a cookie-less server-side fetch).
 
 import { prisma } from "@/lib/prisma";
+import { readSetting } from "@/lib/migrations";
 import { fetchFeed } from "@/lib/rss";
 import { listEvents, type CalDAVCalendar } from "@/lib/caldav";
 import { summarizeForecast } from "@/lib/weather";
@@ -18,8 +20,7 @@ import { decodeEntities } from "@/lib/text";
 import { DAY, HOUR, formatSpan, normalizeItem, perfectSince, sampleScores, scoreAt, stateAt, summarize, type UpkeepItem, type UpkeepLog } from "@/lib/upkeep";
 
 async function read(userId: string, key: string): Promise<string | null> {
-  const row = await prisma.setting.findUnique({ where: { userId_key: { userId, key } } });
-  return row?.value ?? null;
+  return (await readSetting(userId, key)).value;
 }
 
 async function readJSON<T>(userId: string, key: string): Promise<T | null> {
@@ -59,16 +60,16 @@ function formatItems(items: { title: string; meta?: string; body?: string; link?
 // ── Per-type readers ─────────────────────────────────────────────────────────
 
 // Notes are stored one key per day (`notebook-<id>-day-<date>`, listed in
-// `notebook-<id>-days`); a notepad not yet opened since that change still has
-// its whole history in the legacy `notebook-<id>-dates` blob.
+// `notebook-<id>-days`). Reading the index first lets lib/migrations split a
+// notepad still stored in the old single-blob shape.
 async function readNotebook(userId: string, id: string, title: string): Promise<string> {
   const prefix = `notebook-${id}-day-`;
-  const [dayRows, legacy, name] = await Promise.all([
+  await read(userId, `notebook-${id}-days`);
+  const [dayRows, name] = await Promise.all([
     prisma.setting.findMany({ where: { userId, key: { startsWith: prefix } }, select: { key: true, value: true } }),
-    readJSON<Record<string, string>>(userId, `notebook-${id}-dates`),
     read(userId, `notebook-${id}-name`),
   ]);
-  const byDate: Record<string, string> = { ...(legacy ?? {}) };
+  const byDate: Record<string, string> = {};
   for (const r of dayRows) byDate[r.key.slice(prefix.length)] = r.value;
   const entries = Object.entries(byDate)
     .map(([date, html]) => ({ date, text: stripTags(html) }))
@@ -263,8 +264,8 @@ async function readUpkeep(userId: string, id: string, title: string): Promise<st
 
 async function readF1(userId: string, title: string, opts?: ReadOpts): Promise<string> {
   // The F1 widget caches hourly; read today's freshest snapshot.
-  const rows = await prisma.setting.findMany({
-    where: { userId, key: { startsWith: `f1-cache-${userToday(opts)}` } },
+  const rows = await prisma.cache.findMany({
+    where: { userId, key: { startsWith: `f1-cache-${userToday(opts)}` }, expiresAt: { gt: new Date() } },
     orderBy: { key: "desc" },
     take: 1,
   });

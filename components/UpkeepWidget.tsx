@@ -10,7 +10,7 @@ import { formatDate, localDateStr } from "@/lib/format";
 import {
   type UpkeepItem as Item, type UpkeepLog as Log,
   HOUR, DAY, MAX_HOURS, DEFAULT_HOURS, UNDO_WINDOW,
-  addCheck, removeCheck, normalizeItem, migrateDays, shiftDay,
+  addCheck, removeCheck, normalizeItem, shiftDay,
   stateAt, scoreAt, perfectSince, nextExpiry, sampleScores, summarize, dayChecks, formatSpan,
 } from "@/lib/upkeep";
 import FlipCard from "./ui/FlipCard";
@@ -100,7 +100,6 @@ export default function UpkeepWidget({
 
   const configKey = `upkeep-config-${widget.id}`;
   const logKey = `upkeep-log-${widget.id}`;
-  const legacyDaysKey = `upkeep-days-${widget.id}`;
 
   const [items, setItems] = useState<Item[]>([]);
   const [log, setLog] = useState<Log>({});
@@ -116,31 +115,20 @@ export default function UpkeepWidget({
   const [range, setRange] = useState<RangeKey>("2w");
   const [detailDate, setDetailDate] = useState<string | null>(null);
 
+  // Older shapes (a day-based span, a per-day checklist) are brought up to
+  // date by the server on read (lib/migrations), so this only parses.
   useEffect(() => {
-    Promise.all([storage.getItem(configKey), storage.getItem(logKey), storage.getItem(legacyDaysKey)]).then(async ([cfgRaw, logRaw, daysRaw]) => {
+    Promise.all([storage.getItem(configKey), storage.getItem(logKey)]).then(([cfgRaw, logRaw]) => {
       try {
         const at = Date.now();
         let its: Item[] = [];
         if (cfgRaw) {
           const cfg = parseJson<{ items?: Partial<Item>[] }>(cfgRaw, {});
-          const raw = (cfg.items ?? []).filter((i): i is Item => !!i.id && !!i.name);
-          its = raw.map(normalizeItem);
-          // Old configs carried a day-based span; rewrite them once in hours.
-          if (raw.some(i => !(Number(i.hours) > 0))) storage.setItem(configKey, JSON.stringify({ items: its }));
+          its = (cfg.items ?? []).filter((i): i is Item => !!i.id && !!i.name).map(normalizeItem);
         }
         setItems(its);
         setDraft(its);
-        if (logRaw) {
-          setLog(parseJson<Log | null>(logRaw, null) ?? {});
-        } else if (daysRaw) {
-          // Earlier versions stored which items were checked per local day.
-          // Turn those into check times, and drop the old key only once the
-          // new one is safely written.
-          const days = parseJson<Record<string, string[]> | null>(daysRaw, null) ?? {};
-          const migrated = migrateDays(days, at);
-          setLog(migrated);
-          if (await storage.setItem(logKey, JSON.stringify(migrated))) storage.removeItem(legacyDaysKey);
-        }
+        if (logRaw) setLog(parseJson<Log | null>(logRaw, null) ?? {});
         setNow(at);
       } catch {}
       setLoaded(true);

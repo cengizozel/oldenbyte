@@ -28,8 +28,11 @@ export async function DELETE(
   }
 
   // Database rows go in one transaction; files are removed after it commits.
+  // The relations in prisma/schema.prisma cascade these deletes already; the
+  // explicit ones keep the intent visible and the transaction self-contained.
   await prisma.$transaction([
     prisma.setting.deleteMany({ where: { userId: targetId } }),
+    prisma.cache.deleteMany({ where: { userId: targetId } }),
     prisma.session.deleteMany({ where: { userId: targetId } }),
     prisma.user.delete({ where: { id: targetId } }),
   ]);
