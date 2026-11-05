@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ComponentType } from "react";
 import { createPortal } from "react-dom";
 import * as storage from "@/lib/storage";
-import { Layers } from "lucide-react";
+import { Layers, ArrowRightLeft } from "lucide-react";
 import GridLayout from "react-grid-layout";
 import type { Layout as LayoutItem } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -11,7 +11,7 @@ import "react-resizable/css/styles.css";
 import type { Widget, WidgetType, WidgetSize } from "@/lib/widgets";
 import { colorMap, widgets as widgetDefs, defaultSizeFor, instanceOf } from "@/lib/widgets";
 import { WidgetActiveContext, usePageVisible } from "@/lib/activeDashboard";
-import { layoutKey, instancesKey } from "@/lib/dashboards";
+import { layoutKey, instancesKey, DASHBOARD_RELOAD_EVENT, type DashboardMeta } from "@/lib/dashboards";
 import { isDemoMode } from "@/lib/demo";
 import WidgetCard from "./WidgetCard";
 import WidgetShelf from "./WidgetShelf";
@@ -141,6 +141,7 @@ export default function WidgetGrid({
   editing = false,
   onRegisterEditControls,
   dashboardId = "default",
+  dashboards,
   active = true,
 }: {
   widgets: Widget[];
@@ -148,6 +149,8 @@ export default function WidgetGrid({
   // Lets the TopBar cancel an edit session (revert to the pre-edit layout).
   onRegisterEditControls?: (controls: { cancel: () => void }) => void;
   dashboardId?: string;
+  // Every dashboard, so a tile can offer "move to" the other ones.
+  dashboards?: DashboardMeta[];
   // Whether this dashboard is the one on screen (page.tsx keeps hidden ones
   // mounted). Feeds useWidgetActive() together with tab visibility.
   active?: boolean;
@@ -220,6 +223,9 @@ export default function WidgetGrid({
   const slot = (id: string) => <WidgetSlot node={getNode(id)} park={park} />;
   const [gridReady, setGridReady] = useState(false);
   const [groupingSource, setGroupingSource] = useState<string | null>(null);
+  // Which tile's "move to dashboard" menu is open.
+  const [moveMenuFor, setMoveMenuFor] = useState<string | null>(null);
+  const otherDashboards = (dashboards ?? []).filter(d => d.id !== dashboardId);
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
 
   // ── Edit-session history (undo/redo) and cancel-revert ────────────────────
@@ -298,6 +304,14 @@ export default function WidgetGrid({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onRegisterEditControls]);
 
+  // Another grid moved a widget into this dashboard: reload from storage.
+  const [reloadTick, setReloadTick] = useState(0);
+  useEffect(() => {
+    const onReload = (e: Event) => { if ((e as CustomEvent<string>).detail === dashboardId) setReloadTick(t => t + 1); };
+    window.addEventListener(DASHBOARD_RELOAD_EVENT, onReload);
+    return () => window.removeEventListener(DASHBOARD_RELOAD_EVENT, onReload);
+  }, [dashboardId]);
+
   // Load persisted layout from DB after hydration. Only mark loaded (which
   // enables the persist effects below) once the reads SUCCEED: a failed read
   // must not let the in-memory default get written over real, momentarily
@@ -332,8 +346,9 @@ export default function WidgetGrid({
       setLoaded(true);
     });
     // The keys derive from dashboardId, fixed for this grid's lifetime (each
-    // dashboard mounts its own grid), so this runs once.
-  }, [LAYOUT_KEY, INSTANCES_KEY]);
+    // dashboard mounts its own grid), so this runs once, plus once per reload
+    // request (a reload writes the same data straight back, which is harmless).
+  }, [LAYOUT_KEY, INSTANCES_KEY, reloadTick]);
 
   const [droppingId, setDroppingId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -363,9 +378,9 @@ export default function WidgetGrid({
     storage.setItem(INSTANCES_KEY, JSON.stringify(instances));
   }, [instances, loaded, INSTANCES_KEY]);
 
-  // Cancel grouping mode when edit mode is turned off
+  // Cancel grouping mode and close the move menu when edit mode is turned off
   useEffect(() => {
-    if (!editing) setGroupingSource(null);
+    if (!editing) { setGroupingSource(null); setMoveMenuFor(null); }
   }, [editing]);
 
   // react-grid-layout mounts each tile at the origin and transitions it into
@@ -434,6 +449,47 @@ export default function WidgetGrid({
       delete next[instanceId];
       return next;
     });
+  }
+
+  // Move a tile (with its tabs) to another dashboard: append it to that
+  // dashboard's stored layout and instances, then drop it here. A mounted grid
+  // for the target reloads on DASHBOARD_RELOAD_EVENT. Per-widget data keys are
+  // instance-scoped, so the widget's content follows it untouched. The move is
+  // kept out of the edit session's undo history and cancel revert point: the
+  // widget now lives elsewhere, and reviving it here would duplicate it.
+  async function moveWidget(instanceId: string, targetId: string) {
+    const item = layout.find(l => l.i === instanceId);
+    if (!item || targetId === dashboardId) return;
+    const ids = [instanceId, ...(item.tabs ?? [])].filter(id => instances[id]);
+    const [lR, iR] = await Promise.all([
+      storage.getItemResult(layoutKey(targetId)),
+      storage.getItemResult(instancesKey(targetId)),
+    ]);
+    if (!lR.ok || !iR.ok) return;
+    let targetLayout: TabLayoutItem[] = [];
+    let targetInstances: Record<string, Widget> = {};
+    try {
+      targetLayout = lR.value ? JSON.parse(lR.value) : [];
+      targetInstances = iR.value ? JSON.parse(iR.value) : {};
+    } catch { return; }
+    targetLayout = targetLayout.filter(l => !ids.includes(l.i));
+    const pos = findNextPosition(targetLayout, item.w, item.h);
+    const nextLayout = [...targetLayout, { ...item, x: pos.x, y: pos.y, w: pos.w, h: pos.h }];
+    const nextInstances = { ...targetInstances };
+    for (const id of ids) nextInstances[id] = instances[id];
+    if (!(await storage.setItem(instancesKey(targetId), JSON.stringify(nextInstances)))) return;
+    if (!(await storage.setItem(layoutKey(targetId), JSON.stringify(nextLayout)))) return;
+    const drop = (snap: Snap): Snap => ({
+      layout: snap.layout.filter(l => l.i !== instanceId),
+      instances: Object.fromEntries(Object.entries(snap.instances).filter(([id]) => !ids.includes(id))),
+      activeTabs: Object.fromEntries(Object.entries(snap.activeTabs).filter(([id]) => id !== instanceId)),
+    });
+    applySnap(drop(takeSnap()));
+    if (editStartRef.current) editStartRef.current = drop(editStartRef.current);
+    historyRef.current = { past: [], future: [] };
+    setHistVersion(v => v + 1);
+    setMoveMenuFor(null);
+    window.dispatchEvent(new CustomEvent(DASHBOARD_RELOAD_EVENT, { detail: targetId }));
   }
 
   // Starting size for a new or ungrouped instance: bank defs carry their own,
@@ -826,6 +882,42 @@ export default function WidgetGrid({
                           Add as tab
                         </div>
                       </div>
+                    )}
+                    {/* Move to another dashboard */}
+                    {otherDashboards.length > 0 && (
+                      <>
+                        <button
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={() => setMoveMenuFor(m => (m === i ? null : i))}
+                          aria-label={`Move ${widget.title} to another dashboard`}
+                          aria-expanded={moveMenuFor === i}
+                          title="Move to another dashboard"
+                          className={`absolute top-2 right-14 z-20 w-5 h-5 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
+                            moveMenuFor === i
+                              ? "bg-blue-100 border-blue-300 text-blue-600"
+                              : "bg-white border-neutral-200 text-neutral-400 hover:text-neutral-600"
+                          }`}
+                        >
+                          <ArrowRightLeft size={12} />
+                        </button>
+                        {moveMenuFor === i && (
+                          <div
+                            onMouseDown={e => e.stopPropagation()}
+                            className="absolute top-8 right-2 z-30 min-w-32 max-w-[80%] rounded-xl border border-neutral-200 bg-white shadow-md py-1 text-xs text-neutral-700"
+                          >
+                            <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-neutral-400">Move to</div>
+                            {otherDashboards.map(d => (
+                              <button
+                                key={d.id}
+                                onClick={() => moveWidget(i, d.id)}
+                                className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 truncate"
+                              >
+                                {d.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                     {/* Layers (group) button */}
                     <button

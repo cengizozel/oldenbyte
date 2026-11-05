@@ -89,6 +89,7 @@ export default function Home() {
           <div key={id} className={active ? "flex flex-col gap-4 md:gap-5 flex-1 min-h-0" : "hidden"}>
             <WidgetGrid
               dashboardId={id}
+              dashboards={dashboards.list}
               active={active}
               widgets={widgets}
               editing={editing && active}

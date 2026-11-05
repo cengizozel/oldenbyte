@@ -49,3 +49,9 @@ export async function getActiveDataKeys(): Promise<{ layout: string; instances: 
 // PRELOAD_EVENT (detail: boolean) to apply a change without a reload.
 export const PRELOAD_KEY = "preload-dashboards";
 export const PRELOAD_EVENT = "preloadchange";
+
+// Fired (detail: dashboard id) when another grid wrote to that dashboard's
+// layout and instances keys, e.g. a widget moved there, so a mounted grid for
+// it reloads from storage instead of later overwriting the change with its
+// stale in-memory copy.
+export const DASHBOARD_RELOAD_EVENT = "dashboardreload";
