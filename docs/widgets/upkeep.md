@@ -24,7 +24,7 @@ A checklist of essentials, the third sibling of Tracker and Rhythm. Each item is
 - Under the ring: how long the score has been at 100, or otherwise which item runs out next and when.
 - The view ticks every 30 seconds so countdowns move and timers run out on screen.
 - The history view plots the score over time, sampled hourly for the last two weeks or at midnight and noon for the last three months, with the last 7 days' average and share of time at 100, and a 14-day heatmap of each day's average score. Tapping a day lists that day's checks with their times; a check can be removed there.
-- Add/rename/remove/reweight items in the settings card, and set each one's span in days and hours.
+- Add/rename/remove/reweight items in the settings card, set each one's span in days and hours, and drag an item's dot to reorder the list.
 
 Upkeep is not `digestable`; the chat's `read_widget` tool reads it through `lib/widgetData.ts` (`readUpkeep`): the score now, how long it has been at 100, each item's state and time left, and the last 7 days' average.
 

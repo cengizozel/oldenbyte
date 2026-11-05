@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, Plus, History, X, Flame, ChevronLeft, Circle, CircleCheck } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -110,6 +110,43 @@ export default function UpkeepWidget({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<Item[]>([]);
   const [nameInput, setNameInput] = useState("");
+  // Drag reorder in the settings list with live preview, as in Bookmarks: rows
+  // shift out of the way while dragging and the move commits on drop. The
+  // target slot comes from the pointer against the list's untransformed
+  // geometry, since the rows under the cursor move as the preview updates.
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const ROW_GAP = 6; // gap-1.5
+
+  function shiftFor(i: number): number {
+    if (dragIdx === null || overIdx === null || dragIdx === overIdx) return 0;
+    const h = (rowRefs.current[dragIdx]?.offsetHeight ?? 0) + ROW_GAP;
+    if (i === dragIdx) return (overIdx - dragIdx) * h;
+    if (dragIdx < overIdx && i > dragIdx && i <= overIdx) return -h;
+    if (dragIdx > overIdx && i >= overIdx && i < dragIdx) return h;
+    return 0;
+  }
+
+  function slotFromPointer(clientY: number): number | null {
+    const list = listRef.current;
+    const h = dragIdx !== null ? (rowRefs.current[dragIdx]?.offsetHeight ?? 0) + ROW_GAP : 0;
+    if (!list || !h) return null;
+    const y = clientY - list.getBoundingClientRect().top;
+    return Math.max(0, Math.min(draft.length - 1, Math.floor(y / h)));
+  }
+
+  // Reorder happens on the draft and commits with the rest of the edits on save.
+  function reorder(from: number, to: number) {
+    if (from === to) return;
+    setDraft(d => {
+      const a = [...d];
+      const [moved] = a.splice(from, 1);
+      a.splice(to, 0, moved);
+      return a;
+    });
+  }
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [range, setRange] = useState<RangeKey>("2w");
@@ -304,12 +341,41 @@ export default function UpkeepWidget({
             <Plus size={14} />
           </SmallButton>
         </div>
+        {draft.length > 1 && (
+          <p className={`text-xs opacity-60 -mt-1 ${c.text}`}>Drag the dot to reorder.</p>
+        )}
         {draft.length > 0 && (
           <>
-            <div className="flex flex-col gap-1.5">
-              {draft.map(it => (
-                <div key={it.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-black/5 dark:bg-white/10">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colorOf(it.id) }} />
+            <div
+              ref={listRef}
+              className="flex flex-col gap-1.5"
+              onDragOver={e => {
+                if (dragIdx === null) return;
+                e.preventDefault();
+                const slot = slotFromPointer(e.clientY);
+                if (slot !== null && slot !== overIdx) setOverIdx(slot);
+              }}
+              onDrop={() => {
+                if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
+                setDragIdx(null);
+                setOverIdx(null);
+              }}
+            >
+              {draft.map((it, i) => (
+                <div
+                  key={it.id}
+                  ref={el => { rowRefs.current[i] = el; }}
+                  style={{ transform: shiftFor(i) ? `translateY(${shiftFor(i)}px)` : undefined }}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-lg bg-black/5 dark:bg-white/10 transition-[transform,opacity] duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
+                >
+                  <span
+                    draggable
+                    onDragStart={() => setDragIdx(i)}
+                    onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
+                    title="Drag to reorder"
+                    className="w-2.5 h-2.5 rounded-full shrink-0 cursor-grab active:cursor-grabbing"
+                    style={{ backgroundColor: colorOf(it.id) }}
+                  />
                   <input
                     value={it.name}
                     onChange={e => setDraft(d => d.map(x => x.id === it.id ? { ...x, name: e.target.value } : x))}
