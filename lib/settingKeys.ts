@@ -48,6 +48,7 @@ const WIDGET_KEYS: RegExp[] = [
   /^tracker-day-(.+)-\d{4}-\d{2}-\d{2}$/,
   /^rhythm-(?:config|log)-(.+)$/,
   /^upkeep-(?:config|log|days)-(.+)$/,
+  /^deficit-(?:config|days)-(.+)$/,
   /^bookmarks-config-(.+)$/,
   /^typing-(?:config|stats)-(.+)$/,
   /^chess-(.+)$/,

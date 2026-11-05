@@ -142,6 +142,7 @@ Per-widget keys (`<id>` is the instance ID):
 | Tracker | `tracker-config-<id>`, `tracker-days-<id>` |
 | Rhythm | `rhythm-config-<id>`, `rhythm-log-<id>` |
 | Upkeep | `upkeep-config-<id>`, `upkeep-log-<id>` |
+| Deficit | `deficit-config-<id>`, `deficit-days-<id>` |
 | Bookmarks | `bookmarks-config-<id>` |
 | Typing | `typing-config-<id>`, `typing-stats-<id>` |
 | Chess | `chess-<id>` |

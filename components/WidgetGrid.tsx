@@ -26,6 +26,7 @@ import HuggingFaceWidget from "./HuggingFaceWidget";
 import TrackerWidget from "./TrackerWidget";
 import RhythmWidget from "./RhythmWidget";
 import UpkeepWidget from "./UpkeepWidget";
+import DeficitWidget from "./DeficitWidget";
 import BookmarksWidget from "./BookmarksWidget";
 import TypingWidget from "./TypingWidget";
 import dynamic from "next/dynamic";
@@ -89,6 +90,7 @@ const WIDGET_COMPONENTS: Record<Exclude<WidgetType, "custom" | "empty">, Compone
   tracker: TrackerWidget,
   rhythm: RhythmWidget,
   upkeep: UpkeepWidget,
+  deficit: DeficitWidget,
   bookmarks: BookmarksWidget,
   typing: TypingWidget,
   chess: ChessWidget,

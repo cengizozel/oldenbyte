@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "deficit" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -193,6 +193,16 @@ export const widgets: Widget[] = [
     color: "orange",
     title: "Upkeep",
     description: "Check off essentials, each lasting a set time, and keep the score at 100.",
+    digestable: false,
+  },
+  {
+    id: "deficit",
+    type: "deficit",
+    defaultSize: { w: 1, h: 4 },
+    category: "tools",
+    color: "rose",
+    title: "Deficit",
+    description: "Log calories against your daily burn and watch the estimated weight head for the goal.",
     digestable: false,
   },
   {

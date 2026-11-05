@@ -68,6 +68,7 @@ describe("instanceIdOf", () => {
     ["rhythm-log-rhythm-1", "rhythm-1"],
     ["upkeep-config-upkeep-1790033980013", "upkeep-1790033980013"],
     ["upkeep-days-upkeep-ov", "upkeep-ov"],
+    ["deficit-days-deficit-1790000000000", "deficit-1790000000000"],
     ["bookmarks-config-bookmarks-2", "bookmarks-2"],
     ["typing-stats-typing-1", "typing-1"],
     ["chess-chess-1790000000000", "chess-1790000000000"],

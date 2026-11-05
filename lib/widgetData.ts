@@ -18,6 +18,7 @@ import { userFetch } from "@/lib/requestUser";
 import { todayIn } from "@/lib/timezone";
 import { decodeEntities } from "@/lib/text";
 import { DAY, HOUR, formatSpan, normalizeItem, perfectSince, sampleScores, scoreAt, stateAt, summarize, type UpkeepItem, type UpkeepLog } from "@/lib/upkeep";
+import { isValidConfig, project, type DeficitConfig, type DeficitDays } from "@/lib/deficit";
 
 async function read(userId: string, key: string): Promise<string | null> {
   return (await readSetting(userId, key)).value;
@@ -262,6 +263,26 @@ async function readUpkeep(userId: string, id: string, title: string): Promise<st
   return `## ${title} (Upkeep, essentials score)\nEach item is a countdown that a check starts; the score is the running items' points out of 100, right now.\nScore ${pct ?? "—"}/100.${sinceLine}\n${lines.join("\n")}${weekLine}`;
 }
 
+async function readDeficit(userId: string, id: string, title: string, opts?: ReadOpts): Promise<string> {
+  const [config, days] = await Promise.all([
+    readJSON<Partial<DeficitConfig>>(userId, `deficit-config-${id}`),
+    readJSON<DeficitDays>(userId, `deficit-days-${id}`),
+  ]);
+  if (!isValidConfig(config)) return "The deficit widget has no profile yet.";
+  const p = project(config, days ?? {}, userToday(opts));
+  const kcal = (n: number) => Math.round(n).toLocaleString();
+  const head = [
+    `Estimated weight ${p.estWeight.toFixed(1)} kg (started ${config.startWeightKg} kg on ${config.startDate}, goal ${config.goalWeightKg} kg).`,
+    p.reached ? "Goal reached." : `${kcal(Math.abs(p.remainingKcal))} kcal to go.`,
+    p.avgDeficit !== null ? `Average ${kcal(Math.abs(p.avgDeficit))} kcal ${p.avgDeficit >= 0 ? "deficit" : "surplus"} a day over ${p.loggedDays} logged days.` : "No days logged yet.",
+    p.goalDate ? `At that pace the goal lands around ${p.goalDate}.` : (!p.reached && p.loggedDays ? "Not on track at that pace." : ""),
+    `Base burn now about ${kcal(p.burnNow)} kcal a day.`,
+  ].filter(Boolean).join(" ");
+  const recent = p.points.slice(-7).reverse()
+    .map(pt => `  ${pt.date}: ate ${kcal(pt.ate)}, burned ${kcal(pt.burn)}, ${kcal(Math.abs(pt.deficit))} ${pt.deficit >= 0 ? "deficit" : "surplus"}${pt.weight ? `, weighed ${pt.weight} kg` : ""}`);
+  return `## ${title} (Deficit, calorie balance)\n${head}${recent.length ? `\n### Recent days\n${recent.join("\n")}` : ""}`;
+}
+
 async function readF1(userId: string, title: string, opts?: ReadOpts): Promise<string> {
   // The F1 widget caches hourly; read today's freshest snapshot.
   const rows = await prisma.cache.findMany({
@@ -385,6 +406,7 @@ export async function readWidgetData(userId: string, id: string, type: string, t
       case "tracker":  return await readTracker(userId, id, title);
       case "rhythm":   return await readRhythm(userId, id, title, opts);
       case "upkeep":   return await readUpkeep(userId, id, title);
+      case "deficit":  return await readDeficit(userId, id, title, opts);
       case "bookmarks": return await readBookmarks(userId, id, title);
       case "f1":       return await readF1(userId, title, opts);
       case "rss":      return await readRss(userId, id, title);

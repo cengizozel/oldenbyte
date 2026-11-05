@@ -12,7 +12,7 @@ All built-in widget types are registered in the `widgets` array in `lib/widgets.
 type Widget = {
   id: string;              // template id, or the instance id once placed (e.g. "notebook", "rss-1776129788318")
   type: WidgetType;        // "notebook" | "ebook" | "text" | "rss" | "reddit" | "youtube" | "f1" | "weather" | "calendar"
-                           // | "schedule" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "bookmarks" | "typing"
+                           // | "schedule" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "deficit" | "bookmarks" | "typing"
                            // | "chess" | "tv" | "chat" | "kiwix" | "anytype" | "custom" | "empty"
   color: WidgetColor;      // "amber" | "sky" | "neutral" | "rose" | "teal" | "orange"
   title: string;           // picker label and default instance title
@@ -26,7 +26,7 @@ type Widget = {
 
 `defaultSize` lives only on registry entries: `instanceOf()` strips it so it is never saved on placed instances, and `defaultSizeFor(type)` reads it (falling back to 2x2). The registry has no icon field: each widget component renders its own header icon (lucide-react).
 
-`digestable` defaults to `true`: widgets appear in the digest unless explicitly set to `false`. Currently `notebook`, `ebook`, `tracker`, `schedule`, `rhythm`, `upkeep`, `bookmarks`, `typing`, `chess`, `chat`, `kiwix`, `anytype` and `tv` are `false`. The `/digest` page looks up each widget's definition at runtime to apply this filter, and only has loaders for `text`, `weather`, `calendar`, `f1`, `rss`, `reddit`, `youtube`, `arxiv` and `hf`; community (`custom`) widgets are skipped.
+`digestable` defaults to `true`: widgets appear in the digest unless explicitly set to `false`. Currently `notebook`, `ebook`, `tracker`, `schedule`, `rhythm`, `upkeep`, `deficit`, `bookmarks`, `typing`, `chess`, `chat`, `kiwix`, `anytype` and `tv` are `false`. The `/digest` page looks up each widget's definition at runtime to apply this filter, and only has loaders for `text`, `weather`, `calendar`, `f1`, `rss`, `reddit`, `youtube`, `arxiv` and `hf`; community (`custom`) widgets are skipped.
 
 The `colorMap` in `lib/widgets.ts` maps each color to a set of Tailwind CSS variable classes (`bg`, `border`, `label`, `text`, `fade`, `glow`, `icon`) that all widget components consume.
 
@@ -74,6 +74,7 @@ The starting size comes from the registry entry's `defaultSize`; community widge
 | schedule | 2 | 4 |
 | rhythm | 1 | 3 |
 | upkeep | 1 | 3 |
+| deficit | 1 | 4 |
 | bookmarks | 1 | 3 |
 | typing | 2 | 3 |
 | chess | 2 | 4 |
