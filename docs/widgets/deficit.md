@@ -6,11 +6,12 @@ A calorie balance toward a goal weight. A profile gives the daily burn; each day
 
 | Key | Value |
 |---|---|
-| `deficit-config-{id}` | JSON: `{ sex, age, heightCm, startWeightKg, goalWeightKg, activity, startDate }` |
+| `deficit-config-{id}` | JSON: `{ sex, age, heightCm, startWeightKg, goalWeightKg, activity, startDate, chart? }` |
 | `deficit-days-{id}` | JSON: `{ [date: "YYYY-MM-DD"]: { ate, burned?, weight? } }`: calories eaten, extra calories burned by exercise, and a weigh-in in kg |
 
 - `activity` is the multiplier on the basal rate: 1.2 sedentary, 1.375 light, 1.55 moderate, 1.725 active, 1.9 very active.
 - `startDate` is the day `startWeightKg` was true; entries before it are ignored.
+- `chart` is the front's drawing: `line` (default) or `belly`.
 
 ## Model
 
@@ -24,7 +25,7 @@ Everything derived is computed in `lib/deficit.ts` (tested in `tests/deficit.tes
 ## Behaviour
 
 - The front shows the estimated weight now and the goal, the calories to go, the projected date and the average pace, a chart, and the day entry.
-- The chart runs from the start date to the goal date (or today): the estimated weight as a line with the area under it filled, the goal as a dashed line, a dotted line from the latest estimate to the goal date, and weigh-ins as green dots so the estimate can be checked against reality.
+- The drawing, chosen in the settings card, is one of two. "Over time" runs from the start date to the goal date (or today): the estimated weight as a line with the area under it filled, the goal as a dashed line, a dotted line from the latest estimate to the goal date, and weigh-ins as green dots so the estimate can be checked against reality. "Belly" is a side profile: a straight back and a belly bulging right by an amount mapped from weight, with the outline at the start weight, the filled shape at the estimate now, the shaded gap between them for what has gone, and a dashed green outline at the goal. A goal above the start weight bulges the other way round.
 - The day entry defaults to today; the arrows step to past days to fix them. Fields commit on blur or Enter; clearing "ate" removes the day. Under the fields: that day's burn and its deficit or surplus, with the weight it moves.
 - The settings card holds the profile and goal and previews the daily burn at the start weight.
 

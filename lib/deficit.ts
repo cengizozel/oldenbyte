@@ -10,6 +10,9 @@
 import { shiftDay } from "@/lib/upkeep";
 
 export type Sex = "male" | "female";
+// The front's drawing: the estimate over time, or a side profile whose belly
+// shrinks from the start weight toward the goal.
+export type DeficitChart = "line" | "belly";
 export type DeficitConfig = {
   sex: Sex;
   age: number;
@@ -18,6 +21,7 @@ export type DeficitConfig = {
   goalWeightKg: number;
   activity: number;   // multiplier on the basal rate, see ACTIVITY_LEVELS
   startDate: string;  // "YYYY-MM-DD", the day startWeightKg was true
+  chart?: DeficitChart;
 };
 // One day's entry: calories eaten, optional extra burn from exercise, optional
 // weigh-in that morning.

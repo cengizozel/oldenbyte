@@ -9,7 +9,7 @@ import { formatDate, localDateStr } from "@/lib/format";
 import { shiftDay } from "@/lib/upkeep";
 import {
   ACTIVITY_LEVELS, KCAL_PER_KG, dailyBurn, isValidConfig, project,
-  type DeficitConfig, type DeficitDays, type DayEntry,
+  type DeficitConfig, type DeficitDays, type DayEntry, type DeficitChart,
 } from "@/lib/deficit";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, SettingsSelect, HIT_AREA, FOCUS_RING } from "./ui/Field";
@@ -34,6 +34,20 @@ const toDraft = (c: DeficitConfig): Draft => ({
   sex: c.sex, age: String(c.age), heightCm: String(c.heightCm), startWeightKg: String(c.startWeightKg),
   goalWeightKg: String(c.goalWeightKg), activity: String(c.activity), startDate: c.startDate,
 });
+
+// Belly profile geometry: a straight back on the left and a belly bulging to
+// the right, drawn as one cubic curve whose control points push right by an
+// amount mapped from weight (full at the start weight, small at the goal).
+const BELLY = { backX: 40, top: 12, bottom: 100, bulgeMax: 150, bulgeMin: 28 };
+function bellyPath(b: number, reverse = false): string {
+  const { backX, top, bottom } = BELLY;
+  const h = bottom - top;
+  const cx = backX + b * 1.15;
+  return reverse
+    ? `C ${cx} ${bottom - h * 0.18}, ${cx} ${top + h * 0.22}, ${backX} ${top}`
+    : `M ${backX} ${top} C ${cx} ${top + h * 0.22}, ${cx} ${bottom - h * 0.18}, ${backX} ${bottom}`;
+}
+const bellyApexX = (b: number) => BELLY.backX + 0.75 * b * 1.15;
 
 export default function DeficitWidget({
   widget,
@@ -112,11 +126,20 @@ export default function DeficitWidget({
       goalWeightKg: Number(draft.goalWeightKg),
       activity: Number(draft.activity),
       startDate: draft.startDate,
+      chart: config?.chart ?? "line",
     };
     if (!isValidConfig(next)) return;
     setConfig(next);
     storage.setItem(configKey, JSON.stringify(next));
     setSettingsOpen(false);
+  }
+
+  // The drawing choice saves on its own, like a view switch.
+  function changeChart(chart: DeficitChart) {
+    if (!config) return;
+    const next = { ...config, chart };
+    setConfig(next);
+    storage.setItem(configKey, JSON.stringify(next));
   }
 
   // ── Derived ──────────────────────────────────────────────────────────────
@@ -136,7 +159,27 @@ export default function DeficitWidget({
   // x: from the start date to the goal date (or today), y: between the goal
   // and the start, padded so weigh-ins outside that band still show.
   let chart: React.ReactNode = null;
-  if (config && p) {
+  if (config && p && (config.chart ?? "line") === "belly") {
+    const span = config.startWeightKg - config.goalWeightKg;
+    const bulgeFor = (kg: number) => {
+      const t = span === 0 ? 1 : Math.max(0, Math.min(1, (kg - config.goalWeightKg) / span));
+      return BELLY.bulgeMin + (BELLY.bulgeMax - BELLY.bulgeMin) * (config.goalWeightKg <= config.startWeightKg ? t : 1 - t);
+    };
+    const bs = bulgeFor(config.startWeightKg), bn = bulgeFor(p.estWeight), bg = bulgeFor(config.goalWeightKg);
+    const apexY = BELLY.top + (BELLY.bottom - BELLY.top) * 0.52;
+    chart = (
+      <svg viewBox="0 0 240 112" className="w-full" aria-hidden>
+        <line x1={BELLY.backX} y1={BELLY.top} x2={BELLY.backX} y2={BELLY.bottom} className="stroke-black/15 dark:stroke-white/15" strokeWidth={1} />
+        <path d={`${bellyPath(Math.max(bs, bn))} ${bellyPath(Math.min(bs, bn), true)} Z`} fill="currentColor" className={c.text} opacity={0.22} />
+        <path d={`${bellyPath(bn)} Z`} fill="currentColor" stroke="currentColor" className={c.text} fillOpacity={0.12} strokeWidth={1.6} strokeLinejoin="round" />
+        <path d={bellyPath(bs)} fill="none" stroke="currentColor" className={c.label} strokeWidth={1} opacity={0.6} />
+        <path d={bellyPath(bg)} fill="none" className="stroke-emerald-500" strokeWidth={1.2} strokeDasharray="3 3" />
+        <text x={bellyApexX(bs) + 4} y={apexY - 10} fontSize={9.5} fill="currentColor" className={`${c.label} tabular-nums`} opacity={0.7}>{fmtKg(config.startWeightKg)} start</text>
+        <text x={bellyApexX(bn) + 4} y={apexY + 3} fontSize={9.5} fontWeight={500} fill="currentColor" className={`${c.text} tabular-nums`}>{fmtKg(p.estWeight)} now</text>
+        <text x={bellyApexX(bg) + 4} y={apexY + 16} fontSize={9.5} className="fill-emerald-500 tabular-nums">{fmtKg(config.goalWeightKg)} goal</text>
+      </svg>
+    );
+  } else if (config && p) {
     const endDate = p.goalDate && p.goalDate > today ? p.goalDate : today;
     const span = Math.max(CHART_DAYS_MIN, Math.min(CHART_DAYS_MAX, dayDiff(config.startDate, endDate)));
     const x = (date: string) => 2 + (Math.max(0, Math.min(span, dayDiff(config.startDate, date))) / span) * 236;
@@ -278,6 +321,20 @@ export default function DeficitWidget({
         ))}
         {field("start date", (
           <SettingsInput type="date" value={draft.startDate} max={today} onChange={e => setDraft(d => ({ ...d, startDate: e.target.value }))} className="!py-1.5" />
+        ))}
+        {config && field("drawing", (
+          <div className="flex gap-1">
+            {([["line", "over time"], ["belly", "belly"]] as [DeficitChart, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => changeChart(key)}
+                title={key === "belly" ? "A side profile whose belly shrinks from the start weight toward the goal" : "The estimated weight over time, toward the goal date"}
+                className={`px-2 py-1 rounded-md text-xs ${FOCUS_RING} ${(config.chart ?? "line") === key ? `bg-black/10 dark:bg-white/15 ${c.text}` : `opacity-60 hover:opacity-100 ${c.label}`}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         ))}
         <p className={`text-xs leading-relaxed opacity-60 ${c.text}`}>
           {draftBurn !== null
