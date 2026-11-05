@@ -20,7 +20,7 @@ A checklist of essentials, the third sibling of Tracker and Rhythm. Each item is
 
 ## Behaviour
 
-- Tap an item to start its countdown; the row shows the time left, and the completion ring (one slice per item, sized by weight) and score update live. Tapping a running item restarts its countdown; a tap is always a check and never toggles. The check mark at the right of a running item turns it off now: the check keeps its start and gets the current time as its end, or, within five minutes of the check, is simply removed as a misclick.
+- Tap an item to turn it on: its countdown starts, the row shows the time left, and the completion ring (one slice per item, sized by weight) and score update live. Tap it again to turn it off: the check keeps its start and gets the current time as its end, and the row shows an undo button for 30 seconds that lets the check run its full span again. A running item also has a rewind button for "did it again", which starts the countdown over from now and keeps the earlier check in the log.
 - Under the ring: how long the score has been at 100, or otherwise which item runs out next and when.
 - The view ticks every 30 seconds so countdowns move and timers run out on screen.
 - The history view plots the score over time, sampled hourly for the last two weeks or at midnight and noon for the last three months, with the last 7 days' average and share of time at 100, and a 14-day heatmap of each day's average score. Tapping a day lists that day's checks with their times (and the time they were turned off, if they were); a check can be removed there.

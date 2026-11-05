@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ShieldCheck, Plus, History, X, Flame, ChevronLeft, Circle, CircleCheck } from "lucide-react";
+import { ShieldCheck, Plus, History, X, Flame, ChevronLeft, Circle, CircleCheck, RotateCcw, Undo2 } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { parseJson } from "@/lib/text";
@@ -10,7 +10,7 @@ import { formatDate, localDateStr } from "@/lib/format";
 import {
   type UpkeepItem as Item, type UpkeepLog as Log,
   HOUR, DAY, MAX_HOURS, DEFAULT_HOURS, UNDO_WINDOW,
-  addCheck, removeCheck, stopCheck, normalizeItem, shiftDay,
+  addCheck, removeCheck, stopCheck, unstopCheck, normalizeItem, shiftDay,
   stateAt, scoreAt, perfectSince, nextExpiry, sampleScores, summarize, dayChecks, formatSpan,
 } from "@/lib/upkeep";
 import FlipCard from "./ui/FlipCard";
@@ -152,6 +152,16 @@ export default function UpkeepWidget({
   const [range, setRange] = useState<RangeKey>("2w");
   const [detailDate, setDetailDate] = useState<string | null>(null);
 
+  // The item just turned off, for the undo button that stays UNDO_WINDOW long.
+  const [undoable, setUndoable] = useState<{ id: string; start: number } | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function offerUndo(next: { id: string; start: number } | null) {
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    setUndoable(next);
+    if (next) undoTimer.current = setTimeout(() => setUndoable(null), UNDO_WINDOW);
+  }
+  useEffect(() => () => { if (undoTimer.current) clearTimeout(undoTimer.current); }, []);
+
   // Older shapes (a day-based span, a per-day checklist) are brought up to
   // date by the server on read (lib/migrations), so this only parses.
   useEffect(() => {
@@ -188,23 +198,36 @@ export default function UpkeepWidget({
     storage.setItem(logKey, JSON.stringify(next));
   }
 
-  // Tap: start (or restart) the item's countdown now. Always a check; turning
-  // an item off is the check mark's job (stop below), so a row never toggles.
+  // The row toggles: a dark item turns on (its countdown starts now), a
+  // running item turns off (the check keeps its start and gets this moment as
+  // its end, so history stays honest) and offers an undo for a short while.
   function tap(it: Item) {
+    const at = Date.now();
+    const st = stateAt(it, log, at);
+    if (st.on && st.since != null) {
+      persistLog(stopCheck(log, it.id, at));
+      offerUndo({ id: it.id, start: st.since });
+    } else {
+      persistLog(addCheck(log, it.id, at));
+      if (undoable?.id === it.id) offerUndo(null);
+    }
+    setNow(at);
+  }
+
+  // The rewind button on a running item: did it again, so the countdown
+  // starts over from now. The earlier check stays in the log.
+  function restart(it: Item) {
     const at = Date.now();
     persistLog(addCheck(log, it.id, at));
     setNow(at);
   }
 
-  // The check mark on a running item: turn it off now ("not true any more").
-  // Right after a check that is the same as undoing it; later the check keeps
-  // its start and gets this moment as its end, so history stays honest.
-  function stop(it: Item) {
-    const at = Date.now();
-    const st = stateAt(it, log, at);
-    if (!st.on || st.since == null) return;
-    persistLog(at - st.since < UNDO_WINDOW ? removeCheck(log, it.id, st.since) : stopCheck(log, it.id, at));
-    setNow(at);
+  // Undo turning an item off: its check runs its full span again.
+  function undoOff() {
+    if (!undoable) return;
+    persistLog(unstopCheck(log, undoable.id, undoable.start));
+    offerUndo(null);
+    setNow(Date.now());
   }
 
   // ── Settings ───────────────────────────────────────────────────────────────
@@ -309,7 +332,7 @@ export default function UpkeepWidget({
               <li key={r.id} className={`flex items-center rounded-lg transition-colors ${r.on ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"}`}>
                 <button
                   onClick={() => tap(r)}
-                  title={r.on ? `Running, ${formatSpan(r.left)} left. Tap to restart the ${formatSpan(r.hours * HOUR)} countdown.` : `Tap to start the ${formatSpan(r.hours * HOUR)} countdown.`}
+                  title={r.on ? `On, ${formatSpan(r.left)} left. Tap to turn off.` : `Tap to turn on for ${formatSpan(r.hours * HOUR)}.`}
                   className={`flex-1 min-w-0 flex items-center gap-2 pl-2 pr-1 py-2 rounded-l-lg text-left ${FOCUS_RING}`}
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color, opacity: r.on ? 1 : 0.4 }} />
@@ -318,23 +341,28 @@ export default function UpkeepWidget({
                   <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{r.weight}</span>
                 </button>
                 {r.on ? (
+                  <>
+                    <button
+                      onClick={() => restart(r)}
+                      title={`Did it again: start the ${formatSpan(r.hours * HOUR)} over`}
+                      aria-label={`Restart ${r.name}`}
+                      className={`shrink-0 px-1 py-2 opacity-50 hover:opacity-100 ${c.label} ${FOCUS_RING}`}
+                    >
+                      <RotateCcw size={13} />
+                    </button>
+                    <span className="shrink-0 pl-0.5 pr-2 py-2 text-emerald-600 dark:text-emerald-400"><CircleCheck size={14} /></span>
+                  </>
+                ) : undoable?.id === r.id ? (
                   <button
-                    onClick={() => stop(r)}
-                    title="Turn off now"
-                    aria-label={`Turn off ${r.name}`}
-                    className={`shrink-0 pl-1 pr-2 py-2 rounded-r-lg text-emerald-600 dark:text-emerald-400 hover:text-red-500 dark:hover:text-red-400 ${FOCUS_RING}`}
+                    onClick={undoOff}
+                    title="Undo turning this off"
+                    className={`shrink-0 flex items-center gap-1 pl-1 pr-2 py-2 text-xs ${c.label} opacity-80 hover:opacity-100 ${FOCUS_RING}`}
                   >
-                    <CircleCheck size={14} />
+                    <Undo2 size={13} />
+                    <span>undo</span>
                   </button>
                 ) : (
-                  <button
-                    onClick={() => tap(r)}
-                    title={`Tap to start the ${formatSpan(r.hours * HOUR)} countdown.`}
-                    aria-label={`Check ${r.name}`}
-                    className={`shrink-0 pl-1 pr-2 py-2 rounded-r-lg opacity-30 ${c.label} ${FOCUS_RING}`}
-                  >
-                    <Circle size={14} />
-                  </button>
+                  <span className={`shrink-0 pl-1 pr-2 py-2 opacity-30 ${c.label}`}><Circle size={14} /></span>
                 )}
               </li>
             ))}

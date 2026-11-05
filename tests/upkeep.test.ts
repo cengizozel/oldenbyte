@@ -150,3 +150,14 @@ describe("stopCheck", () => {
     expect(perfectSince([teeth, shave], l, T0 + 4 * HOUR)).toBe(T0 + 3 * HOUR);
   });
 });
+
+describe("unstopCheck", () => {
+  it("lets a stopped check run its full span again", async () => {
+    const { stopCheck, unstopCheck } = await import("@/lib/upkeep");
+    const stopped = stopCheck(addCheck({}, "teeth", T0), "teeth", T0 + HOUR);
+    const back = unstopCheck(stopped, "teeth", T0);
+    expect(back.teeth).toEqual([T0]);
+    expect(stateAt(teeth, back, T0 + 5 * HOUR).on).toBe(true);
+    expect(unstopCheck({}, "teeth", T0)).toEqual({});
+  });
+});

@@ -33,9 +33,8 @@ export const HOUR = 3600000;
 export const DAY = 24 * HOUR;
 export const MAX_HOURS = 24 * 365;
 export const DEFAULT_HOURS = 24;
-// Turning an item off this soon after a check removes the check (a misclick)
-// instead of recording a stop.
-export const UNDO_WINDOW = 5 * 60000;
+// How long the undo button stays after an item is turned off.
+export const UNDO_WINDOW = 30_000;
 const MAX_CHECKS_PER_ITEM = 500;
 
 // Weight below 1 counts as 1. A span comes from `hours`, or from the earlier
@@ -90,6 +89,14 @@ export function stopCheck(log: UpkeepLog, id: string, at: number): UpkeepLog {
   if (stop !== null && stop <= at) return log;
   const next = [...arr];
   next[i] = [startOf(arr[i]), at];
+  return { ...log, [id]: next };
+}
+
+// Undo a stop: the check that started at `start` runs its full span again.
+export function unstopCheck(log: UpkeepLog, id: string, start: number): UpkeepLog {
+  const arr = log[id];
+  if (!arr?.length) return log;
+  const next = arr.map(e => (startOf(e) === start ? start : e));
   return { ...log, [id]: next };
 }
 
