@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ShieldCheck, Plus, History, X, Flame, ChevronLeft, Circle, CircleCheck, RotateCcw, Undo2 } from "lucide-react";
+import { ShieldCheck, Plus, History, X, Flame, ChevronLeft, RotateCcw, Undo2 } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { parseJson } from "@/lib/text";
@@ -347,17 +347,14 @@ export default function UpkeepWidget({
                   <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{r.weight}</span>
                 </button>
                 {r.on ? (
-                  <>
-                    <button
-                      onClick={() => restart(r)}
-                      title={`Did it again: start the ${formatSpan(r.hours * HOUR)} over`}
-                      aria-label={`Restart ${r.name}`}
-                      className={`shrink-0 px-1 py-2 opacity-50 hover:opacity-100 ${c.label} ${FOCUS_RING}`}
-                    >
-                      <RotateCcw size={13} />
-                    </button>
-                    <span className="shrink-0 pl-0.5 pr-2 py-2 text-emerald-600 dark:text-emerald-400"><CircleCheck size={14} /></span>
-                  </>
+                  <button
+                    onClick={() => restart(r)}
+                    title={`Did it again: start the ${formatSpan(r.hours * HOUR)} over`}
+                    aria-label={`Restart ${r.name}`}
+                    className={`shrink-0 pl-1 pr-2 py-2 rounded-r-lg opacity-50 hover:opacity-100 ${c.label} ${FOCUS_RING}`}
+                  >
+                    <RotateCcw size={13} />
+                  </button>
                 ) : undoable?.id === r.id ? (
                   <button
                     onClick={undoOff}
@@ -367,9 +364,7 @@ export default function UpkeepWidget({
                     <Undo2 size={13} />
                     <span>undo</span>
                   </button>
-                ) : (
-                  <span className={`shrink-0 pl-1 pr-2 py-2 opacity-30 ${c.label}`}><Circle size={14} /></span>
-                )}
+                ) : null}
               </li>
             ))}
           </ul>
