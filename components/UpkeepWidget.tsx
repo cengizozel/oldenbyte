@@ -10,7 +10,7 @@ import { formatDate, localDateStr } from "@/lib/format";
 import {
   type UpkeepItem as Item, type UpkeepLog as Log,
   HOUR, DAY, MAX_HOURS, DEFAULT_HOURS, UNDO_WINDOW,
-  addCheck, removeCheck, normalizeItem, shiftDay,
+  addCheck, removeCheck, stopCheck, normalizeItem, shiftDay,
   stateAt, scoreAt, perfectSince, nextExpiry, sampleScores, summarize, dayChecks, formatSpan,
 } from "@/lib/upkeep";
 import FlipCard from "./ui/FlipCard";
@@ -198,6 +198,17 @@ export default function UpkeepWidget({
     setNow(at);
   }
 
+  // The check mark on a running item: turn it off now ("not true any more").
+  // Right after a check that is the same as undoing it; later the check keeps
+  // its start and gets this moment as its end, so history stays honest.
+  function stop(it: Item) {
+    const at = Date.now();
+    const st = stateAt(it, log, at);
+    if (!st.on || st.since == null) return;
+    persistLog(at - st.since < UNDO_WINDOW ? removeCheck(log, it.id, st.since) : stopCheck(log, it.id, at));
+    setNow(at);
+  }
+
   // ── Settings ───────────────────────────────────────────────────────────────
   function addItem() {
     const name = nameInput.trim();
@@ -297,22 +308,36 @@ export default function UpkeepWidget({
 
           <ul className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-1">
             {rows.map(r => (
-              <li key={r.id}>
+              <li key={r.id} className={`flex items-center rounded-lg transition-colors ${r.on ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"}`}>
                 <button
                   onClick={() => tap(r)}
                   title={r.on ? `Running, ${formatSpan(r.left)} left. Tap to restart the ${formatSpan(r.hours * HOUR)} countdown.` : `Tap to start the ${formatSpan(r.hours * HOUR)} countdown.`}
-                  className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors ${FOCUS_RING} ${
-                    r.on ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"
-                  }`}
+                  className={`flex-1 min-w-0 flex items-center gap-2 pl-2 pr-1 py-2 rounded-l-lg text-left ${FOCUS_RING}`}
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color, opacity: r.on ? 1 : 0.4 }} />
                   <span className={`flex-1 min-w-0 truncate text-sm ${c.text} ${r.on ? "" : "opacity-80"}`}>{r.name}</span>
                   {r.on && <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{formatSpan(r.left)}</span>}
                   <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{r.weight}</span>
-                  <span className={r.on ? "text-emerald-600 dark:text-emerald-400" : `opacity-30 ${c.label}`}>
-                    {r.on ? <CircleCheck size={14} /> : <Circle size={14} />}
-                  </span>
                 </button>
+                {r.on ? (
+                  <button
+                    onClick={() => stop(r)}
+                    title="Turn off now"
+                    aria-label={`Turn off ${r.name}`}
+                    className={`shrink-0 pl-1 pr-2 py-2 rounded-r-lg text-emerald-600 dark:text-emerald-400 hover:text-red-500 dark:hover:text-red-400 ${FOCUS_RING}`}
+                  >
+                    <CircleCheck size={14} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => tap(r)}
+                    title={`Tap to start the ${formatSpan(r.hours * HOUR)} countdown.`}
+                    aria-label={`Check ${r.name}`}
+                    className={`shrink-0 pl-1 pr-2 py-2 rounded-r-lg opacity-30 ${c.label} ${FOCUS_RING}`}
+                  >
+                    <Circle size={14} />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -492,7 +517,7 @@ export default function UpkeepWidget({
                           <div key={`${ch.item.id}-${ch.at}`} className={`group/row flex items-center gap-2 px-2 py-2 rounded-lg ${FOCUS_RING} hover:bg-black/5 dark:hover:bg-white/10`}>
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorOf(ch.item.id) }} />
                             <span className={`flex-1 min-w-0 truncate text-sm ${c.text}`}>{ch.item.name}</span>
-                            <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{fmtTime(ch.at)}</span>
+                            <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{fmtTime(ch.at)}{ch.stoppedAt != null && ` off ${fmtTime(ch.stoppedAt)}`}</span>
                             <button
                               onClick={() => persistLog(removeCheck(log, ch.item.id, ch.at))}
                               aria-label={`Remove this ${ch.item.name} check`}

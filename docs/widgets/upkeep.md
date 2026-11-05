@@ -7,7 +7,7 @@ A checklist of essentials, the third sibling of Tracker and Rhythm. Each item is
 | Key | Value |
 |---|---|
 | `upkeep-config-{id}` | JSON: `{ items: Item[] }` |
-| `upkeep-log-{id}` | JSON: `{ [itemId]: number[] }`: every time each item was checked, epoch ms, ascending |
+| `upkeep-log-{id}` | JSON: `{ [itemId]: Entry[] }`, ascending by start, where an entry is the check time (epoch ms) or `[time, stoppedAt]` for a check the user turned off before its span ran out |
 
 - `items` - array of `{ id, name, weight, hours }`.
   - **`id` must start with the creation timestamp in ms** (e.g. `1782354352574-0`). Scoring derives each item's creation time from `parseInt(id.split("-")[0])`, so an item only counts toward the score from the moment it existed, and a new habit never lowers past scores. Ids without a numeric prefix (older items, the seed) count from the beginning of time.
@@ -20,10 +20,10 @@ A checklist of essentials, the third sibling of Tracker and Rhythm. Each item is
 
 ## Behaviour
 
-- Tap an item to start its countdown; the row shows the time left, and the completion ring (one slice per item, sized by weight) and score update live. Tapping a running item restarts its countdown, except within five minutes of a check, where the tap undoes it (a misclick should not restart a long timer).
+- Tap an item to start its countdown; the row shows the time left, and the completion ring (one slice per item, sized by weight) and score update live. Tapping a running item restarts its countdown, except within five minutes of a check, where the tap undoes it (a misclick should not restart a long timer). The check mark at the right of a running item turns it off now: the check keeps its start and gets the current time as its end (or, within five minutes of the check, is simply removed).
 - Under the ring: how long the score has been at 100, or otherwise which item runs out next and when.
 - The view ticks every 30 seconds so countdowns move and timers run out on screen.
-- The history view plots the score over time, sampled hourly for the last two weeks or at midnight and noon for the last three months, with the last 7 days' average and share of time at 100, and a 14-day heatmap of each day's average score. Tapping a day lists that day's checks with their times; a check can be removed there.
+- The history view plots the score over time, sampled hourly for the last two weeks or at midnight and noon for the last three months, with the last 7 days' average and share of time at 100, and a 14-day heatmap of each day's average score. Tapping a day lists that day's checks with their times (and the time they were turned off, if they were); a check can be removed there.
 - Add/rename/remove/reweight items in the settings card, set each one's span in days and hours, and drag an item's dot to reorder the list.
 
 Upkeep is not `digestable`; the chat's `read_widget` tool reads it through `lib/widgetData.ts` (`readUpkeep`): the score now, how long it has been at 100, each item's state and time left, and the last 7 days' average.

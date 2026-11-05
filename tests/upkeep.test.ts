@@ -30,17 +30,17 @@ describe("normalizeItem", () => {
 describe("stateAt", () => {
   const log = addCheck({}, "teeth", T0);
   it("runs for the item's span from the check", () => {
-    expect(stateAt(teeth, log, T0)).toEqual({ on: true, left: 12 * HOUR, since: T0 });
-    expect(stateAt(teeth, log, T0 + 11 * HOUR)).toEqual({ on: true, left: HOUR, since: T0 });
-    expect(stateAt(teeth, log, T0 + 12 * HOUR)).toEqual({ on: false, left: 0, since: T0 });
+    expect(stateAt(teeth, log, T0)).toEqual({ on: true, left: 12 * HOUR, since: T0, end: T0 + 12 * HOUR });
+    expect(stateAt(teeth, log, T0 + 11 * HOUR)).toEqual({ on: true, left: HOUR, since: T0, end: T0 + 12 * HOUR });
+    expect(stateAt(teeth, log, T0 + 12 * HOUR)).toEqual({ on: false, left: 0, since: T0, end: T0 + 12 * HOUR });
   });
   it("is off before the first check and after none", () => {
     expect(stateAt(teeth, log, T0 - 1).on).toBe(false);
-    expect(stateAt(teeth, {}, T0)).toEqual({ on: false, left: 0, since: null });
+    expect(stateAt(teeth, {}, T0)).toEqual({ on: false, left: 0, since: null, end: null });
   });
   it("a new check restarts the countdown", () => {
     const l2 = addCheck(log, "teeth", T0 + 10 * HOUR);
-    expect(stateAt(teeth, l2, T0 + 20 * HOUR)).toEqual({ on: true, left: 2 * HOUR, since: T0 + 10 * HOUR });
+    expect(stateAt(teeth, l2, T0 + 20 * HOUR)).toEqual({ on: true, left: 2 * HOUR, since: T0 + 10 * HOUR, end: T0 + 22 * HOUR });
   });
 });
 
@@ -121,5 +121,32 @@ describe("dayChecks, formatSpan, migrateDays", () => {
     const log = migrateDays({ "2026-11-04": ["a", "b"], "2026-11-05": ["a"] }, now, noon);
     expect(log.a).toEqual([noon("2026-11-04"), now]);
     expect(log.b).toEqual([noon("2026-11-04")]);
+  });
+});
+
+describe("stopCheck", () => {
+  const log = addCheck({}, "teeth", T0);
+  it("ends the latest check early and the item reads off from then on", async () => {
+    const { stopCheck, dayChecks } = await import("@/lib/upkeep");
+    const stopped = stopCheck(log, "teeth", T0 + 2 * HOUR);
+    expect(stopped.teeth).toEqual([[T0, T0 + 2 * HOUR]]);
+    expect(stateAt(teeth, stopped, T0 + HOUR)).toEqual({ on: true, left: HOUR, since: T0, end: T0 + 2 * HOUR });
+    expect(stateAt(teeth, stopped, T0 + 3 * HOUR)).toEqual({ on: false, left: 0, since: T0, end: T0 + 2 * HOUR });
+    expect(dayChecks([teeth], stopped, "2026-11-05", ms => new Date(ms).toISOString().slice(0, 10))[0].stoppedAt).toBe(T0 + 2 * HOUR);
+  });
+  it("is a no-op without a check, before the check, or when already stopped earlier", async () => {
+    const { stopCheck } = await import("@/lib/upkeep");
+    expect(stopCheck({}, "teeth", T0)).toEqual({});
+    expect(stopCheck(log, "teeth", T0 - 1)).toEqual(log);
+    const early = stopCheck(log, "teeth", T0 + HOUR);
+    expect(stopCheck(early, "teeth", T0 + 2 * HOUR)).toEqual(early);
+  });
+  it("breaks a perfect stretch at the stop and a new check starts a fresh one", async () => {
+    const { stopCheck } = await import("@/lib/upkeep");
+    let l = addCheck(addCheck({}, "shave", T0), "teeth", T0);
+    l = stopCheck(l, "teeth", T0 + HOUR);
+    expect(scoreAt([teeth, shave], l, T0 + 2 * HOUR).pct).toBe(33);
+    l = addCheck(l, "teeth", T0 + 3 * HOUR);
+    expect(perfectSince([teeth, shave], l, T0 + 4 * HOUR)).toBe(T0 + 3 * HOUR);
   });
 });

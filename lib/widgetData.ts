@@ -253,7 +253,7 @@ async function readUpkeep(userId: string, id: string, title: string): Promise<st
     const st = stateAt(it, log, at);
     const state = st.on ? `running, ${formatSpan(st.left)} left`
       : st.since == null ? "never checked"
-      : `ran out ${formatSpan(at - (st.since + it.hours * HOUR))} ago`;
+      : `off since ${formatSpan(at - (st.end ?? st.since))} ago`;
     return `  ${it.name} (${it.weight}pts, lasts ${formatSpan(it.hours * HOUR)}): ${state}`;
   });
   const week = summarize(sampleScores(items, log, at - 7 * DAY, at, HOUR));

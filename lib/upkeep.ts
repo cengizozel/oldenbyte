@@ -11,8 +11,23 @@
 import { localDateStr } from "@/lib/format";
 
 export type UpkeepItem = { id: string; name: string; weight: number; hours: number };
-// Per item: the times it was checked, epoch ms, ascending.
-export type UpkeepLog = Record<string, number[]>;
+// Per item, ascending by start: each check as its time (epoch ms), or as
+// [time, stoppedAt] when the user turned it off before the span ran out.
+export type UpkeepEntry = number | [number, number];
+export type UpkeepLog = Record<string, UpkeepEntry[]>;
+
+export function startOf(e: UpkeepEntry): number {
+  return typeof e === "number" ? e : e[0];
+}
+export function stopOf(e: UpkeepEntry): number | null {
+  return typeof e === "number" ? null : e[1];
+}
+// When a check stops counting: its span runs out, or it was turned off earlier.
+export function endOf(e: UpkeepEntry, hours: number): number {
+  const natural = startOf(e) + hours * HOUR;
+  const stop = stopOf(e);
+  return stop === null ? natural : Math.min(natural, stop);
+}
 
 export const HOUR = 3600000;
 export const DAY = 24 * HOUR;
@@ -51,36 +66,54 @@ export function itemCreatedMs(id: string): number {
 }
 
 export function addCheck(log: UpkeepLog, id: string, at: number): UpkeepLog {
-  const arr = [...(log[id] ?? []), at].sort((a, b) => a - b).slice(-MAX_CHECKS_PER_ITEM);
+  const arr = [...(log[id] ?? []), at].sort((a, b) => startOf(a) - startOf(b)).slice(-MAX_CHECKS_PER_ITEM);
   return { ...log, [id]: arr };
 }
 
-export function removeCheck(log: UpkeepLog, id: string, at: number): UpkeepLog {
-  const arr = (log[id] ?? []).filter(t => t !== at);
+// Remove the check that started at `start`.
+export function removeCheck(log: UpkeepLog, id: string, start: number): UpkeepLog {
+  const arr = (log[id] ?? []).filter(e => startOf(e) !== start);
   const next = { ...log };
   if (arr.length) next[id] = arr; else delete next[id];
   return next;
 }
 
-// The latest check at or before `at`, or null.
-export function lastCheckAt(log: UpkeepLog, id: string, at: number): number | null {
+// Turn the item off at `at`: the latest check started at or before `at` keeps
+// its start and gets `at` as its end. A check already stopped earlier stays.
+export function stopCheck(log: UpkeepLog, id: string, at: number): UpkeepLog {
+  const arr = log[id];
+  if (!arr?.length) return log;
+  let i = arr.length - 1;
+  while (i >= 0 && startOf(arr[i]) > at) i--;
+  if (i < 0) return log;
+  const stop = stopOf(arr[i]);
+  if (stop !== null && stop <= at) return log;
+  const next = [...arr];
+  next[i] = [startOf(arr[i]), at];
+  return { ...log, [id]: next };
+}
+
+// The latest check started at or before `at`, or null.
+export function lastCheckAt(log: UpkeepLog, id: string, at: number): UpkeepEntry | null {
   const arr = log[id];
   if (!arr?.length) return null;
-  for (let i = arr.length - 1; i >= 0; i--) if (arr[i] <= at) return arr[i];
+  for (let i = arr.length - 1; i >= 0; i--) if (startOf(arr[i]) <= at) return arr[i];
   return null;
 }
 
 export type ItemState = {
   on: boolean;          // the countdown is running at `at`
   left: number;         // ms until it runs out (0 when off)
-  since: number | null; // the check that started it, or the last check if it has run out
+  since: number | null; // when the latest check started (running or not)
+  end: number | null;   // when that check stops or stopped counting
 };
 
 export function stateAt(it: UpkeepItem, log: UpkeepLog, at: number): ItemState {
-  const since = lastCheckAt(log, it.id, at);
-  if (since == null) return { on: false, left: 0, since: null };
-  const end = since + it.hours * HOUR;
-  return end > at ? { on: true, left: end - at, since } : { on: false, left: 0, since };
+  const entry = lastCheckAt(log, it.id, at);
+  if (entry == null) return { on: false, left: 0, since: null, end: null };
+  const since = startOf(entry);
+  const end = endOf(entry, it.hours);
+  return end > at ? { on: true, left: end - at, since, end } : { on: false, left: 0, since, end };
 }
 
 export type Score = { done: number; total: number; pct: number | null };
@@ -100,18 +133,18 @@ export function scoreAt(items: UpkeepItem[], log: UpkeepLog, at: number): Score 
 }
 
 // When the current stretch at 100 began, or null if the score is not 100 now.
-// Each item's stretch runs back through checks that re-armed it before it ran
-// out; the score's stretch began when the last of those stretches began.
+// Each item's stretch runs back through checks that re-armed it before it
+// stopped counting; the score's stretch began when the last of those began.
 export function perfectSince(items: UpkeepItem[], log: UpkeepLog, at: number): number | null {
   if (scoreAt(items, log, at).pct !== 100) return null;
   let start = 0;
   for (const it of activeAt(items, at)) {
     const arr = log[it.id] ?? [];
     let i = arr.length - 1;
-    while (i >= 0 && arr[i] > at) i--;
-    let s = arr[i];
+    while (i >= 0 && startOf(arr[i]) > at) i--;
+    let s = startOf(arr[i]);
     for (let j = i - 1; j >= 0; j--) {
-      if (arr[j] + it.hours * HOUR >= arr[j + 1]) s = arr[j]; else break;
+      if (endOf(arr[j], it.hours) >= startOf(arr[j + 1])) s = startOf(arr[j]); else break;
     }
     start = Math.max(start, s, itemCreatedMs(it.id));
   }
@@ -146,10 +179,14 @@ export function summarize(samples: { pct: number | null }[]): { avg: number | nu
   };
 }
 
-// Every check that fell on a local day, newest first.
-export function dayChecks(items: UpkeepItem[], log: UpkeepLog, date: string, dayOf: (ms: number) => string = ms => localDateStr(new Date(ms))): { item: UpkeepItem; at: number }[] {
-  const out: { item: UpkeepItem; at: number }[] = [];
-  for (const it of items) for (const t of log[it.id] ?? []) if (dayOf(t) === date) out.push({ item: it, at: t });
+// Every check that started on a local day, newest first, with its stop time
+// if it was turned off early.
+export function dayChecks(items: UpkeepItem[], log: UpkeepLog, date: string, dayOf: (ms: number) => string = ms => localDateStr(new Date(ms))): { item: UpkeepItem; at: number; stoppedAt: number | null }[] {
+  const out: { item: UpkeepItem; at: number; stoppedAt: number | null }[] = [];
+  for (const it of items) for (const e of log[it.id] ?? []) {
+    const at = startOf(e);
+    if (dayOf(at) === date) out.push({ item: it, at, stoppedAt: stopOf(e) });
+  }
   return out.sort((a, b) => b.at - a.at);
 }
 
