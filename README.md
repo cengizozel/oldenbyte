@@ -20,7 +20,7 @@ A personal dashboard built with Next.js. Widgets are draggable, resizable, and p
 - **Schedule** - your fixed weekly routine on a seven-day time grid; click a slot to add, drag to move, entries can repeat across days and run past midnight
 - **Tracker** - time how long you spend on each activity with a one-tap stopwatch (only one runs at a time) and a donut chart of the day's breakdown; keeps a full per-day history with streaks, week-over-week stats, and editable past durations, and time that crosses midnight is credited to the day it happened in
 - **Rhythm** - tap to log habits (one-tap moments or timed sessions) and see how often and at what time of day you do them
-- **Upkeep** - a weighted daily checklist of essentials that keeps the day's score at 100
+- **Upkeep** - a weighted checklist of essentials where each check lasts a set time; keep the score at 100
 - **Bookmarks** - your favorite links as favicon tiles, tiles with names, rows, or a names-only list
 - **Typing** - a Monkeytype-style typing trainer with words, time, drill and metronome modes; it learns your weak keys and drills them, and counts wpm, raw, accuracy and characters the way Monkeytype does
 - **Chess** - play an ongoing game against the Stockfish engine with an adjustable Elo difficulty; the game persists between visits

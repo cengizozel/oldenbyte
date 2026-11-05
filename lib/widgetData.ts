@@ -15,7 +15,7 @@ import { summarizeForecast } from "@/lib/weather";
 import { userFetch } from "@/lib/requestUser";
 import { todayIn } from "@/lib/timezone";
 import { decodeEntities } from "@/lib/text";
-import { coverageOn, itemEvery, normalizeItem, scoreDay, type UpkeepDays, type UpkeepItem } from "@/lib/upkeep";
+import { DAY, HOUR, formatSpan, normalizeItem, perfectSince, sampleScores, scoreAt, stateAt, summarize, type UpkeepItem, type UpkeepLog } from "@/lib/upkeep";
 
 async function read(userId: string, key: string): Promise<string | null> {
   const row = await prisma.setting.findUnique({ where: { userId_key: { userId, key } } });
@@ -237,31 +237,28 @@ async function readRhythm(userId: string, id: string, title: string, opts?: Read
   return `## ${title} (Rhythm, habit logging)\nToday is ${userToday(opts)}. Times are local.\n` + lines.join("\n");
 }
 
-async function readUpkeep(userId: string, id: string, title: string, opts?: ReadOpts): Promise<string> {
-  const [config, daysMap] = await Promise.all([
-    readJSON<{ items: UpkeepItem[] }>(userId, `upkeep-config-${id}`),
-    readJSON<UpkeepDays>(userId, `upkeep-days-${id}`),
+async function readUpkeep(userId: string, id: string, title: string): Promise<string> {
+  const [config, logMap] = await Promise.all([
+    readJSON<{ items: Partial<UpkeepItem>[] }>(userId, `upkeep-config-${id}`),
+    readJSON<UpkeepLog>(userId, `upkeep-log-${id}`),
   ]);
   if (!config?.items?.length) return "The upkeep widget has no items yet.";
-  const items = config.items.map(normalizeItem);
-  const days = daysMap ?? {};
-  // An item's creation day comes from its id's timestamp, read as a UTC date here.
-  const dayOf = (ms: number) => new Date(ms).toISOString().split("T")[0];
-  const score = (date: string) => scoreDay(items, days, date, dayOf).pct;
-  const t = userToday(opts);
-  const todayLines = items.map(it => {
-    const every = itemEvery(it);
-    const span = every > 1 ? `, lasts ${every} days` : "";
-    const cov = coverageOn(it, days, t);
-    const state = cov.done ? "done"
-      : cov.carried ? `covered by an earlier check, ${cov.left >= 1 ? `${cov.left} more day${cov.left === 1 ? "" : "s"}` : "last day"}`
-      : "not yet";
-    return `  ${it.name} (${it.weight}pts${span}): ${state}`;
+  const items = config.items.filter((i): i is UpkeepItem => !!i.id && !!i.name).map(normalizeItem);
+  const log = logMap ?? {};
+  const at = Date.now();
+  const { pct } = scoreAt(items, log, at);
+  const since = perfectSince(items, log, at);
+  const lines = items.map(it => {
+    const st = stateAt(it, log, at);
+    const state = st.on ? `running, ${formatSpan(st.left)} left`
+      : st.since == null ? "never checked"
+      : `ran out ${formatSpan(at - (st.since + it.hours * HOUR))} ago`;
+    return `  ${it.name} (${it.weight}pts, lasts ${formatSpan(it.hours * HOUR)}): ${state}`;
   });
-  const recent = Object.keys(days).filter(d => d < t).sort((a, b) => b.localeCompare(a)).slice(0, 6)
-    .map(d => `  ${d}: ${score(d) ?? "—"}/100`);
-  const recentBlock = recent.length ? `\n### Recent days\n${recent.join("\n")}` : "";
-  return `## ${title} (Upkeep, daily essentials score)\nToday is ${t}. Score ${score(t) ?? "—"}/100.\n${todayLines.join("\n")}${recentBlock}`;
+  const week = summarize(sampleScores(items, log, at - 7 * DAY, at, HOUR));
+  const weekLine = week.avg != null ? `\nLast 7 days: average ${week.avg}/100, at 100 for ${week.perfectShare}% of the time.` : "";
+  const sinceLine = since != null ? ` At 100 for ${formatSpan(at - since)}.` : "";
+  return `## ${title} (Upkeep, essentials score)\nEach item is a countdown that a check starts; the score is the running items' points out of 100, right now.\nScore ${pct ?? "—"}/100.${sinceLine}\n${lines.join("\n")}${weekLine}`;
 }
 
 async function readF1(userId: string, title: string, opts?: ReadOpts): Promise<string> {
@@ -386,7 +383,7 @@ export async function readWidgetData(userId: string, id: string, type: string, t
       case "schedule": return await readSchedule(userId, id, title);
       case "tracker":  return await readTracker(userId, id, title);
       case "rhythm":   return await readRhythm(userId, id, title, opts);
-      case "upkeep":   return await readUpkeep(userId, id, title, opts);
+      case "upkeep":   return await readUpkeep(userId, id, title);
       case "bookmarks": return await readBookmarks(userId, id, title);
       case "f1":       return await readF1(userId, title, opts);
       case "rss":      return await readRss(userId, id, title);

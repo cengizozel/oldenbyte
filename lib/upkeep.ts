@@ -1,31 +1,38 @@
 // Upkeep scoring, shared by the widget (components/UpkeepWidget.tsx) and the
-// chat's dashboard reader (lib/widgetData.ts) so both agree on what a day scored.
+// chat's dashboard reader (lib/widgetData.ts) so both agree on the score.
 //
-// An item is normally daily: checked today or not. An item can instead last
-// several days (`every`): one check covers that day and the following
-// `every - 1` days, so "shaved" set to 3 stays covered for three days and
-// counts toward each of those days' scores without being re-checked.
+// Each item is a countdown: checking it starts a timer of `hours`, and the
+// item counts toward the score while that timer is running. There is no daily
+// reset; the score at any moment is the weight of the items whose timers are
+// still running over the weight of all items, times 100. Because the log keeps
+// every check time, the score is derivable for any past moment too, which is
+// what the history view and the "at 100 since" readout use.
 
 import { localDateStr } from "@/lib/format";
 
-export type UpkeepItem = { id: string; name: string; weight: number; every?: number };
-// Per local day: the ids that were checked off that day. Scores are derived,
-// never stored, so they always reflect the current items, weights and spans.
-export type UpkeepDays = Record<string, string[]>;
+export type UpkeepItem = { id: string; name: string; weight: number; hours: number };
+// Per item: the times it was checked, epoch ms, ascending.
+export type UpkeepLog = Record<string, number[]>;
 
-export const MAX_EVERY = 99;
+export const HOUR = 3600000;
+export const DAY = 24 * HOUR;
+export const MAX_HOURS = 24 * 365;
+export const DEFAULT_HOURS = 24;
+// Tapping an item that was checked this recently undoes the check (a misclick)
+// instead of restarting its countdown.
+export const UNDO_WINDOW = 5 * 60000;
+const MAX_CHECKS_PER_ITEM = 500;
 
-export function itemEvery(it: Pick<UpkeepItem, "every">): number {
-  const n = Math.floor(Number(it.every));
-  return Number.isFinite(n) && n >= 1 ? Math.min(n, MAX_EVERY) : 1;
-}
-
-// Weight below 1 counts as 1, span below 1 (or absent) as daily.
-export function normalizeItem(it: UpkeepItem): UpkeepItem {
-  const every = itemEvery(it);
-  const out: UpkeepItem = { id: it.id, name: it.name, weight: it.weight > 0 ? it.weight : 1 };
-  if (every > 1) out.every = every;
-  return out;
+// Weight below 1 counts as 1. A span comes from `hours`, or from the earlier
+// day-based `every` field (days) on old configs; anything else is one day.
+export function normalizeItem(raw: { id: string; name: string; weight?: number; hours?: number; every?: number }): UpkeepItem {
+  const weight = Number(raw.weight) > 0 ? Number(raw.weight) : 1;
+  let hours = Number(raw.hours);
+  if (!(hours > 0)) {
+    const every = Math.floor(Number(raw.every));
+    hours = every >= 1 ? every * 24 : DEFAULT_HOURS;
+  }
+  return { id: raw.id, name: raw.name, weight, hours: Math.min(hours, MAX_HOURS) };
 }
 
 // Calendar arithmetic on "YYYY-MM-DD" strings, independent of the host timezone.
@@ -34,55 +41,134 @@ export function shiftDay(date: string, delta: number): string {
   return new Date(Date.UTC(y, m - 1, d + delta)).toISOString().slice(0, 10);
 }
 
-// Ids carry their creation time as a prefix (`${Date.now()}-...`), so a day only
-// counts an item toward its score if the item already existed then. This keeps
-// a fresh habit from retroactively breaking past perfect days. Ids without a
-// numeric prefix (older items, seeds) count from the beginning of time.
-export function itemCreatedDay(id: string, dayOf: (ms: number) => string = ms => localDateStr(new Date(ms))): string {
+// Ids carry their creation time as a prefix (`${Date.now()}-...`), so an item
+// only counts toward the score from the moment it existed; a fresh habit never
+// retroactively lowers past scores. Ids without a numeric prefix count from
+// the beginning of time.
+export function itemCreatedMs(id: string): number {
   const ms = parseInt(id.split("-")[0], 10);
-  return Number.isFinite(ms) ? dayOf(ms) : "1970-01-01";
+  return Number.isFinite(ms) ? ms : 0;
 }
 
-export type Coverage = {
-  done: boolean;     // checked on this very day
-  carried: boolean;  // not checked this day, but covered by a check on an earlier day
-  left: number;      // days of coverage remaining after this day (0 when none)
+export function addCheck(log: UpkeepLog, id: string, at: number): UpkeepLog {
+  const arr = [...(log[id] ?? []), at].sort((a, b) => a - b).slice(-MAX_CHECKS_PER_ITEM);
+  return { ...log, [id]: arr };
+}
+
+export function removeCheck(log: UpkeepLog, id: string, at: number): UpkeepLog {
+  const arr = (log[id] ?? []).filter(t => t !== at);
+  const next = { ...log };
+  if (arr.length) next[id] = arr; else delete next[id];
+  return next;
+}
+
+// The latest check at or before `at`, or null.
+export function lastCheckAt(log: UpkeepLog, id: string, at: number): number | null {
+  const arr = log[id];
+  if (!arr?.length) return null;
+  for (let i = arr.length - 1; i >= 0; i--) if (arr[i] <= at) return arr[i];
+  return null;
+}
+
+export type ItemState = {
+  on: boolean;          // the countdown is running at `at`
+  left: number;         // ms until it runs out (0 when off)
+  since: number | null; // the check that started it, or the last check if it has run out
 };
 
-// Whether an item counts on a day: checked that day, or checked within the last
-// `every - 1` days. `left` is how many more days the latest check still covers.
-export function coverageOn(it: UpkeepItem, days: UpkeepDays, date: string): Coverage {
-  const every = itemEvery(it);
-  const done = (days[date] ?? []).includes(it.id);
-  let latest: string | null = done ? date : null;
-  if (!latest) {
-    for (let back = 1; back < every; back++) {
-      const d = shiftDay(date, -back);
-      if ((days[d] ?? []).includes(it.id)) { latest = d; break; }
-    }
-  }
-  if (!latest) return { done: false, carried: false, left: 0 };
-  const end = shiftDay(latest, every - 1);
-  const left = Math.max(0, Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 86400000));
-  return { done, carried: !done, left };
+export function stateAt(it: UpkeepItem, log: UpkeepLog, at: number): ItemState {
+  const since = lastCheckAt(log, it.id, at);
+  if (since == null) return { on: false, left: 0, since: null };
+  const end = since + it.hours * HOUR;
+  return end > at ? { on: true, left: end - at, since } : { on: false, left: 0, since };
 }
 
-export type DayScore = { done: number; total: number; pct: number | null };
+export type Score = { done: number; total: number; pct: number | null };
 
-// A day's score is the covered points over the points that were possible that
-// day, times 100. "Possible" counts only items that existed on the day, so
-// everything covered is always exactly 100. Days before any item exists score null.
-export function scoreDay(
-  items: UpkeepItem[],
-  days: UpkeepDays,
-  date: string,
-  dayOf?: (ms: number) => string,
-): DayScore {
-  const active = items.filter(it => itemCreatedDay(it.id, dayOf) <= date);
+// Items that existed at `at`; the score only ever counts those.
+export function activeAt(items: UpkeepItem[], at: number): UpkeepItem[] {
+  return items.filter(it => itemCreatedMs(it.id) <= at);
+}
+
+// Running weight over possible weight, times 100. Null before any item exists.
+export function scoreAt(items: UpkeepItem[], log: UpkeepLog, at: number): Score {
+  const active = activeAt(items, at);
   const total = active.reduce((a, it) => a + it.weight, 0);
   if (total <= 0) return { done: 0, total: 0, pct: null };
-  const done = active
-    .filter(it => { const c = coverageOn(it, days, date); return c.done || c.carried; })
-    .reduce((a, it) => a + it.weight, 0);
+  const done = active.filter(it => stateAt(it, log, at).on).reduce((a, it) => a + it.weight, 0);
   return { done, total, pct: Math.round((done / total) * 100) };
+}
+
+// When the current stretch at 100 began, or null if the score is not 100 now.
+// Each item's stretch runs back through checks that re-armed it before it ran
+// out; the score's stretch began when the last of those stretches began.
+export function perfectSince(items: UpkeepItem[], log: UpkeepLog, at: number): number | null {
+  if (scoreAt(items, log, at).pct !== 100) return null;
+  let start = 0;
+  for (const it of activeAt(items, at)) {
+    const arr = log[it.id] ?? [];
+    let i = arr.length - 1;
+    while (i >= 0 && arr[i] > at) i--;
+    let s = arr[i];
+    for (let j = i - 1; j >= 0; j--) {
+      if (arr[j] + it.hours * HOUR >= arr[j + 1]) s = arr[j]; else break;
+    }
+    start = Math.max(start, s, itemCreatedMs(it.id));
+  }
+  return start;
+}
+
+// The running item that runs out soonest, for the "next up" line.
+export function nextExpiry(items: UpkeepItem[], log: UpkeepLog, at: number): { item: UpkeepItem; at: number } | null {
+  let best: { item: UpkeepItem; at: number } | null = null;
+  for (const it of activeAt(items, at)) {
+    const st = stateAt(it, log, at);
+    if (st.on && (!best || at + st.left < best.at)) best = { item: it, at: at + st.left };
+  }
+  return best;
+}
+
+// The score sampled every `step` ms from `from` (inclusive) to `to` (exclusive),
+// for charts and averages. Samples before any item existed are null.
+export function sampleScores(items: UpkeepItem[], log: UpkeepLog, from: number, to: number, step: number): { t: number; pct: number | null }[] {
+  const out: { t: number; pct: number | null }[] = [];
+  for (let t = from; t < to; t += step) out.push({ t, pct: scoreAt(items, log, t).pct });
+  return out;
+}
+
+// Mean and share-at-100 of the non-null samples, or nulls when there are none.
+export function summarize(samples: { pct: number | null }[]): { avg: number | null; perfectShare: number | null } {
+  const vals = samples.map(s => s.pct).filter((p): p is number => p != null);
+  if (!vals.length) return { avg: null, perfectShare: null };
+  return {
+    avg: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+    perfectShare: Math.round((vals.filter(v => v === 100).length / vals.length) * 100),
+  };
+}
+
+// Every check that fell on a local day, newest first.
+export function dayChecks(items: UpkeepItem[], log: UpkeepLog, date: string, dayOf: (ms: number) => string = ms => localDateStr(new Date(ms))): { item: UpkeepItem; at: number }[] {
+  const out: { item: UpkeepItem; at: number }[] = [];
+  for (const it of items) for (const t of log[it.id] ?? []) if (dayOf(t) === date) out.push({ item: it, at: t });
+  return out.sort((a, b) => b.at - a.at);
+}
+
+// "2d 4h", "3h 20m", "12m": a span for the countdown labels.
+export function formatSpan(ms: number): string {
+  const m = Math.max(0, Math.round(ms / 60000));
+  const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`;
+  if (h > 0) return mm > 0 ? `${h}h ${mm}m` : `${h}h`;
+  return `${mm}m`;
+}
+
+// Convert the earlier day-keyed store ({ "YYYY-MM-DD": itemId[] }) into check
+// times: each check lands at local noon of its day, or now if that is earlier.
+export function migrateDays(days: Record<string, string[]>, now: number, noonOf: (date: string) => number = date => new Date(`${date}T12:00:00`).getTime()): UpkeepLog {
+  let log: UpkeepLog = {};
+  for (const [date, ids] of Object.entries(days)) {
+    const at = Math.min(noonOf(date), now);
+    for (const id of ids) log = addCheck(log, id, at);
+  }
+  return log;
 }

@@ -99,7 +99,7 @@ Per-widget keys (`<id>` is the instance ID):
 | Schedule | `schedule-widget-<id>` |
 | Tracker | `tracker-config-<id>`, `tracker-days-<id>` (today's legacy `tracker-day-<id>-<date>` key is migrated when no days key exists) |
 | Rhythm | `rhythm-config-<id>`, `rhythm-log-<id>` |
-| Upkeep | `upkeep-config-<id>`, `upkeep-days-<id>` |
+| Upkeep | `upkeep-config-<id>`, `upkeep-log-<id>` |
 | Bookmarks | `bookmarks-config-<id>` |
 | Typing | `typing-config-<id>`, `typing-stats-<id>` |
 | Chess | `chess-<id>` |

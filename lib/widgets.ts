@@ -192,7 +192,7 @@ export const widgets: Widget[] = [
     category: "tools",
     color: "orange",
     title: "Upkeep",
-    description: "Check off daily essentials and keep your day's score at 100.",
+    description: "Check off essentials, each lasting a set time, and keep the score at 100.",
     digestable: false,
   },
   {
