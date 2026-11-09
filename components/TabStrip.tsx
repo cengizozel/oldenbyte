@@ -143,7 +143,6 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
         onDrop={onDrop}
       >
         {order.map((tabId, index) => {
-          const w = instances[tabId];
           const isActive = tabId === activeId;
           const shift = shiftFor(index);
           return (
@@ -163,17 +162,15 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
                 onClick={() => onSelect(tabId)}
                 onKeyDown={e => onKeyDown(e, tabId)}
                 title={editing ? "Drag to reorder" : undefined}
-                className={`relative flex items-center gap-1.5 h-6 px-1 rounded-md text-sm whitespace-nowrap transition-opacity [&:has([data-slot=title]:not(:empty))_[data-fallback]]:hidden ${c.label} ${FOCUS_RING} ${
+                className={`relative flex items-center gap-1.5 h-6 px-1 rounded-md text-sm whitespace-nowrap transition-opacity ${c.label} ${FOCUS_RING} ${
                   isActive
                     ? "font-medium opacity-100 after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:rounded-full after:bg-current"
                     : "opacity-70 hover:opacity-100 after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:rounded-full after:bg-current after:opacity-0 hover:after:opacity-30 after:transition-opacity"
                 }`}
               >
                 <span ref={slotHost("icons", tabId)} className="flex items-center shrink-0 empty:hidden" />
-                {/* The header's title lands in the first span; the instance
-                    title stands in until it does. */}
-                <span ref={slotHost("titles", tabId)} data-slot="title" className="truncate empty:hidden" />
-                <span data-fallback className="truncate">{w?.title ?? tabId}</span>
+                {/* The widget's header renders its title here (every widget has one). */}
+                <span ref={slotHost("titles", tabId)} className="truncate" />
                 {editing && tabId !== order[0] && (
                   <span
                     role="button"

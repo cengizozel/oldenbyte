@@ -254,15 +254,15 @@ export default function DeficitWidget({
             </div>
             <div className="flex items-center gap-1.5">
               <label className={`flex-1 min-w-0 flex items-center gap-1 text-xs ${c.label}`} title="Calories eaten this day">
-                <SettingsInput inputMode="numeric" value={ate} onChange={e => setAte(e.target.value.replace(/[^\d]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="ate" className="!px-2 !py-1 !rounded-lg text-center" />
+                <SettingsInput inputMode="numeric" value={ate} onChange={e => setAte(e.target.value.replace(/[^\d]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="ate" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
                 <span className="opacity-70 shrink-0">kcal</span>
               </label>
               <label className={`flex-1 min-w-0 flex items-center gap-1 text-xs ${c.label}`} title="Extra calories burned by exercise this day">
-                <SettingsInput inputMode="numeric" value={burned} onChange={e => setBurned(e.target.value.replace(/[^\d]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="burned" className="!px-2 !py-1 !rounded-lg text-center" />
+                <SettingsInput inputMode="numeric" value={burned} onChange={e => setBurned(e.target.value.replace(/[^\d]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="burned" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
                 <span className="opacity-70 shrink-0">kcal</span>
               </label>
               <label className={`flex-1 min-w-0 flex items-center gap-1 text-xs ${c.label}`} title="Weigh-in this day, optional">
-                <SettingsInput inputMode="decimal" value={weight} onChange={e => setWeight(e.target.value.replace(/[^\d.]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="weigh" className="!px-2 !py-1 !rounded-lg text-center" />
+                <SettingsInput inputMode="decimal" value={weight} onChange={e => setWeight(e.target.value.replace(/[^\d.]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="weigh" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
                 <span className="opacity-70 shrink-0">kg</span>
               </label>
             </div>
