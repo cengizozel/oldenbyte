@@ -674,7 +674,7 @@ export default function WidgetGrid({
     const activeWidget = instances[activeId];
     const activeC = colorMap[activeWidget?.color ?? "neutral"];
     return (
-      <div className={`flex flex-col h-full rounded-2xl overflow-hidden border ${activeC.border} ${activeC.bg} ${activeC.glow}`}>
+      <div className={`group flex flex-col h-full rounded-2xl overflow-hidden border ${activeC.border} ${activeC.bg} ${activeC.glow}`}>
         <TabStrip
           order={[item.i, ...(item.tabs ?? [])]}
           activeId={activeId}
