@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Pencil, Check, X, RotateCcw, Loader, RefreshCw, type LucideIcon } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, type LucideIcon } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { FOCUS_RING, HIT_AREA } from "./Field";
 
@@ -43,6 +43,23 @@ export function RefreshButton({ c, onClick, busy }: { c: ColorClasses; onClick: 
 }
 
 // Gradient overlays for scrollable lists; pair with useScrollFade().
+// The back control of a detail view. It sits on the left of the first block
+// (the thumbnail, or the title when there is none) and stretches to its
+// height, so on a phone it is a large target rather than a 14px chevron.
+export function BackButton({ c, onClick, label = "Back to list" }: { c: ColorClasses; onClick: () => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`shrink-0 self-stretch min-h-9 w-9 rounded-xl flex items-center justify-center bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 transition-colors ${c.label} ${FOCUS_RING}`}
+    >
+      <ChevronLeft size={16} />
+    </button>
+  );
+}
+
 export function ScrollFades({ c, top, bottom }: { c: ColorClasses; top: boolean; bottom: boolean }) {
   return (
     <>
@@ -67,7 +84,7 @@ export function LoadingState({ c }: { c: ColorClasses }) {
 export function EmptyState({ c, action, children }: { c: ColorClasses; action?: string; children?: ReactNode }) {
   return (
     <div className="flex-1 h-full min-h-0 flex items-center justify-center text-center px-4">
-      <p className={`text-xs opacity-60 ${c.text}`}>
+      <p className={`text-xs opacity-70 ${c.text}`}>
         {children ?? `hover and click the pencil to ${action}`}
       </p>
     </div>
@@ -152,7 +169,7 @@ export function Chip({
       title={title}
       aria-pressed={active}
       className={`h-6 px-2 rounded-md text-xs leading-none transition-colors ${FOCUS_RING} ${
-        active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-60 hover:opacity-100`
+        active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-70 hover:opacity-100`
       } ${className}`}
     >
       {children}

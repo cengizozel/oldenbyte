@@ -207,12 +207,12 @@ export default function TvWidget({
             right={
               <>
                 {playing && (
-                  <button onClick={stop} title="Stop" aria-label="Stop" className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
+                  <button onClick={stop} title="Stop" aria-label="Stop" className={`opacity-70 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
                     <Square size={12} />
                   </button>
                 )}
                 {config.channels.length > 1 && (
-                  <button onClick={() => setPickerOpen(o => !o)} title="Channels" aria-label="Channels" className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
+                  <button onClick={() => setPickerOpen(o => !o)} title="Channels" aria-label="Channels" className={`opacity-70 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
                     <List size={14} />
                   </button>
                 )}
@@ -290,7 +290,7 @@ export default function TvWidget({
                     className={`text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${
                       draft.channelUrl === ch.url
                         ? `bg-black/10 dark:bg-white/15 ${c.text}`
-                        : `${c.text} opacity-60 hover:opacity-100`
+                        : `${c.text} opacity-70 hover:opacity-100`
                     }`}
                   >
                     {ch.name}

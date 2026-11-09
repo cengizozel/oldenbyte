@@ -103,23 +103,23 @@ export default function F1Widget({
               {data.race ? (
                 <div className="flex items-start gap-3">
                   <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                    <p className={`text-xs font-medium opacity-60 mb-0.5 ${c.label}`}>
+                    <p className={`text-xs font-medium opacity-70 mb-0.5 ${c.label}`}>
                       Next race · Round {data.race.round}
                     </p>
                     <p className={`text-sm font-medium leading-snug ${c.text}`}>{data.race.raceName}</p>
-                    <p className={`text-xs opacity-60 ${c.text}`}>{data.race.Circuit.circuitName}</p>
-                    <p className={`text-xs opacity-60 ${c.text}`}>
+                    <p className={`text-xs opacity-70 ${c.text}`}>{data.race.Circuit.circuitName}</p>
+                    <p className={`text-xs opacity-70 ${c.text}`}>
                       {formatDate(`${data.race.date}T12:00:00Z`, { year: false })} · {countdown(data.race.date, data.race.time)}
                     </p>
                   </div>
                   <img
                     src={`/circuits/${data.race.Circuit.circuitId}.svg`}
                     alt=""
-                    className="w-16 h-16 shrink-0 opacity-20 dark:opacity-60 dark:invert"
+                    className="w-16 h-16 shrink-0 opacity-20 dark:opacity-70 dark:invert"
                   />
                 </div>
               ) : (
-                <p className={`text-xs opacity-60 ${c.text}`}>Season complete</p>
+                <p className={`text-xs opacity-70 ${c.text}`}>Season complete</p>
               )}
 
               {/* Standings */}
@@ -127,7 +127,7 @@ export default function F1Widget({
                 <>
                   <div className="border-t border-black/10 dark:border-white/10" />
                   <div className="flex flex-col">
-                    <p className={`text-xs font-medium opacity-60 mb-1 ${c.label}`}>
+                    <p className={`text-xs font-medium opacity-70 mb-1 ${c.label}`}>
                       Standings
                     </p>
                     {data.standings.map((s, i) => (
@@ -135,7 +135,7 @@ export default function F1Widget({
                         key={s.position}
                         className={`flex items-center gap-2 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}
                       >
-                        <span className={`text-xs opacity-60 w-4 shrink-0 tabular-nums ${c.label}`}>{s.position}</span>
+                        <span className={`text-xs opacity-70 w-4 shrink-0 tabular-nums ${c.label}`}>{s.position}</span>
                         <span className={`text-xs font-medium w-8 shrink-0 ${c.label}`}>{s.Driver.code}</span>
                         <span className={`text-xs flex-1 opacity-80 truncate ${c.text}`}>{s.Driver.familyName}</span>
                         <span className={`text-xs tabular-nums opacity-80 ${c.text}`}>{s.points}</span>
@@ -148,7 +148,7 @@ export default function F1Widget({
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-2 h-full text-center">
-              <p className={`text-xs opacity-60 ${c.text}`}>couldn&apos;t load F1 data</p>
+              <p className={`text-xs opacity-70 ${c.text}`}>couldn&apos;t load F1 data</p>
               <SmallButton c={c} onClick={load}>
                 <RotateCcw size={12} /> Retry
               </SmallButton>

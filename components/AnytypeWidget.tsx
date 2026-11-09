@@ -303,7 +303,7 @@ export default function AnytypeWidget({
             right={
               <>
                 {(searched || query || activeType || reader) && (
-                  <button onClick={goHome} title="Back to start" aria-label="Back to start" className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
+                  <button onClick={goHome} title="Back to start" aria-label="Back to start" className={`opacity-70 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
                     <Home size={14} />
                   </button>
                 )}
@@ -330,11 +330,11 @@ export default function AnytypeWidget({
                   {reader ? (
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
-                        <button onClick={() => { setReader(null); setReaderObj(null); }} title="Back" aria-label="Back" className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
+                        <button onClick={() => { setReader(null); setReaderObj(null); }} title="Back" aria-label="Back" className={`opacity-70 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
                           <ChevronLeft size={14} />
                         </button>
                         <span className={`flex-1 min-w-0 text-sm font-medium truncate ${c.text}`}>{readerObj?.name ?? reader.name}</span>
-                        <a href={deepLink(reader)} title="Open in Anytype" aria-label="Open in Anytype" className={`shrink-0 opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
+                        <a href={deepLink(reader)} title="Open in Anytype" aria-label="Open in Anytype" className={`shrink-0 opacity-70 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
                           <ExternalLink size={14} />
                         </a>
                       </div>
@@ -374,10 +374,10 @@ export default function AnytypeWidget({
                     <>
                       {activeType && (
                         <div className="flex items-center gap-1.5 mb-1">
-                          <button onClick={goHome} title="Back to types" aria-label="Back to types" className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
+                          <button onClick={goHome} title="Back to types" aria-label="Back to types" className={`opacity-70 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
                             <ChevronLeft size={14} />
                           </button>
-                          <span className={`text-xs font-medium opacity-60 ${c.label}`}>{activeType.name}</span>
+                          <span className={`text-xs font-medium opacity-70 ${c.label}`}>{activeType.name}</span>
                         </div>
                       )}
                       {objects.length ? (
@@ -400,8 +400,8 @@ export default function AnytypeWidget({
                                   <ExternalLink size={12} />
                                 </a>
                               </div>
-                              {o.snippet && <p className={`text-xs mt-0.5 opacity-60 ${c.text} line-clamp-2 break-words`}>{o.snippet}</p>}
-                              {o.type && !activeType && <span className={`text-xs opacity-60 ${c.label}`}>{o.type}</span>}
+                              {o.snippet && <p className={`text-xs mt-0.5 opacity-70 ${c.text} line-clamp-2 break-words`}>{o.snippet}</p>}
+                              {o.type && !activeType && <span className={`text-xs opacity-70 ${c.label}`}>{o.type}</span>}
                             </li>
                           ))}
                         </ul>
@@ -432,7 +432,7 @@ export default function AnytypeWidget({
           {draft.apiKey ? (
             <div className="flex items-center gap-2">
               {loadingSpaces ? (
-                <span className={`flex items-center gap-1.5 text-xs opacity-60 ${c.text}`}><Loader size={12} className="animate-spin" /> loading spaces…</span>
+                <span className={`flex items-center gap-1.5 text-xs opacity-70 ${c.text}`}><Loader size={12} className="animate-spin" /> loading spaces…</span>
               ) : spaces.length > 0 ? (
                 <SettingsSelect
                   value={draft.spaceId}
@@ -445,7 +445,7 @@ export default function AnytypeWidget({
                   {spaces.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </SettingsSelect>
               ) : (
-                <span className={`text-xs opacity-60 truncate min-w-0 ${c.text}`}>{draft.spaceName || "paired ✓, no spaces loaded"}</span>
+                <span className={`text-xs opacity-70 truncate min-w-0 ${c.text}`}>{draft.spaceName || "paired ✓, no spaces loaded"}</span>
               )}
               <SmallButton c={c} onClick={() => loadSpaces(draft.baseUrl, draft.apiKey, draft.spaceId)} className="shrink-0">
                 Reload
@@ -453,7 +453,7 @@ export default function AnytypeWidget({
             </div>
           ) : pairing === "awaiting-code" ? (
             <div className="flex flex-col gap-1.5">
-              <p className={`text-xs opacity-60 ${c.label}`}>Enter the 4-digit code shown in Anytype:</p>
+              <p className={`text-xs opacity-70 ${c.label}`}>Enter the 4-digit code shown in Anytype:</p>
               <div className="flex items-center gap-2">
                 <SettingsInput
                   autoFocus
@@ -476,7 +476,7 @@ export default function AnytypeWidget({
           )}
 
           <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-60 ${c.label}`}>Home</span>
+            <span className={`text-xs opacity-70 ${c.label}`}>Home</span>
             {([["recent", "Recent"], ["types", "Types"]] as [HomeView, string][]).map(([v, label]) => (
               <Chip key={v} c={c} active={draft.home === v} onClick={() => setDraft((d) => ({ ...d, home: v }))}>
                 {label}
@@ -485,7 +485,7 @@ export default function AnytypeWidget({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-60 ${c.label}`}>Results</span>
+            <span className={`text-xs opacity-70 ${c.label}`}>Results</span>
             {[10, 25, 50, 100].map((n) => (
               <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft((d) => ({ ...d, limit: n }))} className="tabular-nums">
                 {n}

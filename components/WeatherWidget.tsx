@@ -181,12 +181,12 @@ export default function WeatherWidget({
               <span className={`text-2xl font-semibold tabular-nums leading-none ${c.text}`}>
                 {Math.round(current.temp)}{unitSuffix}
               </span>
-              <span className={`text-xs opacity-60 ${c.label}`}>
+              <span className={`text-xs opacity-70 ${c.label}`}>
                 feels {Math.round(current.feelsLike)}° · {codeInfo(current.code).label}
               </span>
             </div>
           </div>
-          <div className={`shrink-0 flex items-center justify-center gap-4 text-xs opacity-60 ${c.label}`}>
+          <div className={`shrink-0 flex items-center justify-center gap-4 text-xs opacity-70 ${c.label}`}>
             <span className="flex items-center gap-1"><Droplets size={12} />{current.humidity}%</span>
             <span className="flex items-center gap-1"><Wind size={12} />{Math.round(current.windKmh)} km/h</span>
           </div>
@@ -199,12 +199,12 @@ export default function WeatherWidget({
                 return (
                   <li key={d.date} className={`flex items-center gap-2 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`} title={formatDate(`${d.date}T12:00:00`)}>
                     <span className={`w-10 shrink-0 text-xs ${c.text} ${i === 0 ? "font-medium" : "opacity-80"}`}>{dayLabel(d.date, i)}</span>
-                    <Icon size={14} className={`shrink-0 opacity-60 ${c.label}`} />
+                    <Icon size={14} className={`shrink-0 opacity-70 ${c.label}`} />
                     {d.rainPct > 20 ? (
-                      <span className={`text-xs tabular-nums opacity-60 ${c.label}`}>{d.rainPct}%</span>
+                      <span className={`text-xs tabular-nums opacity-70 ${c.label}`}>{d.rainPct}%</span>
                     ) : <span />}
                     <span className={`flex-1 text-right text-xs tabular-nums ${c.text}`}>
-                      <span className="opacity-60">{Math.round(d.min)}°</span>
+                      <span className="opacity-70">{Math.round(d.min)}°</span>
                       {" "}
                       <span>{Math.round(d.max)}°</span>
                     </span>
@@ -253,10 +253,10 @@ export default function WeatherWidget({
           </div>
         )}
         {configured(draft) && (
-          <p className={`text-xs opacity-60 ${c.label}`}>chosen: {draft.name}{draft.region ? `, ${draft.region}` : ""}</p>
+          <p className={`text-xs opacity-70 ${c.label}`}>chosen: {draft.name}{draft.region ? `, ${draft.region}` : ""}</p>
         )}
         <div className="flex items-center gap-2">
-          <span className={`text-xs opacity-60 ${c.label}`}>Unit</span>
+          <span className={`text-xs opacity-70 ${c.label}`}>Unit</span>
           {(["c", "f"] as const).map(u => (
             <Chip key={u} c={c} active={draft.unit === u} onClick={() => setDraft(d => ({ ...d, unit: u }))}>
               °{u.toUpperCase()}

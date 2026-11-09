@@ -35,10 +35,10 @@ export default function HistoryPanel({ c, conversations, activeId, active, onNew
           title="Chats"
           right={
             <>
-              <button onClick={onNew} title="New chat with the Assistant" aria-label="New chat" className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}>
+              <button onClick={onNew} title="New chat with the Assistant" aria-label="New chat" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}>
                 <Plus size={14} />
               </button>
-              <button onClick={onClose} title="Close" aria-label="Close" className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}>
+              <button onClick={onClose} title="Close" aria-label="Close" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}>
                 <X size={14} />
               </button>
             </>
@@ -77,7 +77,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, onNew
                 ) : (
                   <p className={`text-sm font-medium truncate ${c.text} ${isActive ? "" : "opacity-80"}`}>{title}</p>
                 )}
-                <p className={`text-xs ${c.label} opacity-60`}>
+                <p className={`text-xs ${c.label} opacity-70`}>
                   {count} message{count === 1 ? "" : "s"}{cv.updatedAt ? ` · ${timeAgo(cv.updatedAt)}` : ""}
                 </p>
               </div>
@@ -85,7 +85,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, onNew
                 onClick={e => { e.stopPropagation(); setRenameDraft(cv.renamed ? cv.title : ""); setRenamingId(cv.id); }}
                 title="Rename chat"
                 aria-label="Rename chat"
-                className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
+                className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
               >
                 <Pencil size={14} />
               </button>
@@ -93,7 +93,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, onNew
                 onClick={e => { e.stopPropagation(); onDelete(cv.id); }}
                 title="Delete chat"
                 aria-label="Delete chat"
-                className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
+                className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
               >
                 <X size={14} />
               </button>

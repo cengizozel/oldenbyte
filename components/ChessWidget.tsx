@@ -234,7 +234,7 @@ export default function ChessWidget({
         icon={Swords}
         title="Chess"
         right={
-          <span className={`flex items-center gap-1 text-xs opacity-60 min-w-0 ${c.label}`}>
+          <span className={`flex items-center gap-1 text-xs opacity-70 min-w-0 ${c.label}`}>
             {thinking && <Loader size={12} className="animate-spin shrink-0" />}
             <span className="truncate">{status}</span>
           </span>
@@ -264,7 +264,7 @@ export default function ChessWidget({
 
       <div className="shrink-0 mt-3 flex flex-col gap-2">
         <label className={`flex items-center gap-2 text-xs ${c.label}`}>
-          <span className="opacity-60 tabular-nums w-14 shrink-0">Elo {elo}</span>
+          <span className="opacity-70 tabular-nums w-14 shrink-0">Elo {elo}</span>
           <input
             type="range"
             min={MIN_ELO}
@@ -276,7 +276,7 @@ export default function ChessWidget({
           />
         </label>
         <div className="flex items-center gap-2">
-          <span className={`text-xs opacity-60 ${c.label}`}>New game:</span>
+          <span className={`text-xs opacity-70 ${c.label}`}>New game:</span>
           <SmallButton c={c} onClick={() => newGame("w")}>as White</SmallButton>
           <SmallButton c={c} onClick={() => newGame("b")}>as Black</SmallButton>
           <RotateCcw size={14} className={`opacity-30 ${c.label} ml-auto`} />

@@ -28,8 +28,8 @@ export function CharactersPanel({ c, characters, activeCharId, onCreate, onClose
           title="Characters"
           right={
             <>
-              <button onClick={onCreate} title="New character" aria-label="New character" className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Plus size={14} /></button>
-              <button onClick={onClose} title="Close" aria-label="Close" className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><X size={14} /></button>
+              <button onClick={onCreate} title="New character" aria-label="New character" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Plus size={14} /></button>
+              <button onClick={onClose} title="Close" aria-label="Close" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><X size={14} /></button>
             </>
           }
         />
@@ -46,15 +46,15 @@ export function CharactersPanel({ c, characters, activeCharId, onCreate, onClose
               <span className="text-base leading-none mt-0.5 shrink-0">{ch.id === DEFAULT_CHARACTER_ID ? "🤖" : ch.emoji}</span>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium truncate ${c.text} ${isActive ? "" : "opacity-80"}`}>{ch.name}</p>
-                <p className={`text-xs ${c.label} opacity-60 truncate`}>
+                <p className={`text-xs ${c.label} opacity-70 truncate`}>
                   {ch.id === DEFAULT_CHARACTER_ID ? "default · no memory" : (ch.focus ? `remembers: ${ch.focus}` : "no focus, won't auto-remember")}
                   {ch.memories.length ? ` · ${ch.memories.length} ${ch.memories.length === 1 ? "memory" : "memories"}` : ""}
                 </p>
               </div>
-              <button onClick={e => { e.stopPropagation(); onEdit(ch); }} title="Edit" aria-label="Edit character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Pencil size={14} /></button>
-              <button onClick={e => { e.stopPropagation(); onDuplicate(ch); }} title="Duplicate: same persona, fresh memory" aria-label="Duplicate character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Copy size={14} /></button>
+              <button onClick={e => { e.stopPropagation(); onEdit(ch); }} title="Edit" aria-label="Edit character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Pencil size={14} /></button>
+              <button onClick={e => { e.stopPropagation(); onDuplicate(ch); }} title="Duplicate: same persona, fresh memory" aria-label="Duplicate character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Copy size={14} /></button>
               {ch.id !== DEFAULT_CHARACTER_ID && (
-                <button onClick={e => { e.stopPropagation(); onDelete(ch.id); }} title="Delete character" aria-label="Delete character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><X size={14} /></button>
+                <button onClick={e => { e.stopPropagation(); onDelete(ch.id); }} title="Delete character" aria-label="Delete character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><X size={14} /></button>
               )}
             </div>
           );
@@ -100,15 +100,15 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
         ) : (
           <>
             <div>
-              <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Persona <span className="opacity-60">(its system prompt)</span></p>
+              <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Persona <span className="opacity-70">(its system prompt)</span></p>
               <SettingsTextarea value={charDraft.persona} onChange={e => set({ persona: e.target.value })} rows={4} placeholder="You are my education coach. Help me plan, stay accountable, and learn effectively." />
             </div>
             <div>
-              <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Remembers <span className="opacity-60">(what it cares about; empty = no memory)</span></p>
+              <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Remembers <span className="opacity-70">(what it cares about; empty = no memory)</span></p>
               <SettingsInput value={charDraft.focus} onChange={e => set({ focus: e.target.value })} placeholder="my education, goals, academic background" />
             </div>
             <div>
-              <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Memories <span className="opacity-60">({charDraft.memories.length})</span></p>
+              <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Memories <span className="opacity-70">({charDraft.memories.length})</span></p>
               <div className="flex flex-col gap-1">
                 {charDraft.memories.map((m, i) => (
                   <div key={i} className="flex items-center gap-2">

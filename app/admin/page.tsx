@@ -216,7 +216,7 @@ export default function AdminPage() {
     <main className="min-h-screen bg-[var(--page-bg)] px-5 py-8">
       <div className="max-w-2xl mx-auto flex flex-col gap-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-medium text-[var(--text-primary)] font-[family-name:var(--font-playfair)]">
+          <h1 className="text-xl font-medium text-[var(--text-primary)]">
             User management
           </h1>
           <Link href="/" className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">

@@ -118,7 +118,7 @@ export default function BankWidget({
   if (!def) {
     return (
       <div className={`rounded-2xl border h-full p-5 ${c.bg} ${c.border} ${c.glow} ${className}`}>
-        <p className={`text-xs opacity-60 ${c.text}`}>
+        <p className={`text-xs opacity-70 ${c.text}`}>
           This community widget&apos;s definition is no longer in the bank.
         </p>
       </div>
@@ -131,7 +131,7 @@ export default function BankWidget({
         const text = resolveText(p.value, data);
         if (!text) return null;
         const size = p.size === "lg" ? "text-lg font-medium" : p.size === "xs" ? "text-xs" : "text-sm";
-        return <p key={i} className={`${size} ${p.muted ? `opacity-60 ${c.label}` : c.text}`}>{text}</p>;
+        return <p key={i} className={`${size} ${p.muted ? `opacity-70 ${c.label}` : c.text}`}>{text}</p>;
       }
       case "list": {
         const arr = resolveValue(p.path, data);
@@ -154,9 +154,9 @@ export default function BankWidget({
                 <li key={j} className={`py-2 ${j > 0 ? `border-t ${c.border}` : ""}`}>
                   <div className="flex items-baseline gap-2">
                     <div className="flex-1 min-w-0">{head}</div>
-                    {meta && <span className={`shrink-0 text-xs tabular-nums opacity-60 ${c.label}`}>{meta}</span>}
+                    {meta && <span className={`shrink-0 text-xs tabular-nums opacity-70 ${c.label}`}>{meta}</span>}
                   </div>
-                  {subtitle && <p className={`mt-0.5 text-xs leading-snug opacity-60 line-clamp-2 ${c.text}`}>{subtitle}</p>}
+                  {subtitle && <p className={`mt-0.5 text-xs leading-snug opacity-70 line-clamp-2 ${c.text}`}>{subtitle}</p>}
                 </li>
               );
             })}
@@ -170,7 +170,7 @@ export default function BankWidget({
           <div key={i} className="flex flex-col gap-1">
             {items.map((s, j) => (
               <div key={j} className="flex items-baseline justify-between gap-2">
-                <span className={`text-xs opacity-60 ${c.label}`}>{s.label}</span>
+                <span className={`text-xs opacity-70 ${c.label}`}>{s.label}</span>
                 <span className={`text-sm tabular-nums ${c.text}`}>{s.value}</span>
               </div>
             ))}
@@ -198,7 +198,7 @@ export default function BankWidget({
               if (!text) return null;
               const tc = tagColor(text.toLowerCase());
               return (
-                <span key={j} className={`px-1.5 py-0.5 rounded-full text-[11px] font-medium ${tc.bg} ${tc.label}`}>
+                <span key={j} className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${tc.bg} ${tc.label}`}>
                   {text}
                 </span>
               );
@@ -216,7 +216,7 @@ export default function BankWidget({
           <figure key={i} className="flex-1 min-h-0 flex flex-col items-center gap-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={src} alt={caption || resolveText(p.src, data)} className="w-full flex-1 min-h-0 object-contain rounded-xl" />
-            {caption && <ExpandableCaption text={caption} className={`shrink-0 text-xs text-center opacity-60 ${c.text}`} />}
+            {caption && <ExpandableCaption text={caption} className={`shrink-0 text-xs text-center opacity-70 ${c.text}`} />}
           </figure>
         );
       }
@@ -274,7 +274,7 @@ export default function BankWidget({
       <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
         {(def.config ?? []).map(f => (
           <div key={f.key}>
-            <p className={`text-xs mb-1 opacity-60 ${c.label}`}>{f.label}</p>
+            <p className={`text-xs mb-1 opacity-70 ${c.label}`}>{f.label}</p>
             {f.type === "select" ? (
               <SettingsSelect
                 value={String(draft[f.key] ?? "")}
@@ -293,9 +293,9 @@ export default function BankWidget({
           </div>
         ))}
         {(def.config ?? []).length === 0 && (
-          <p className={`text-xs opacity-60 ${c.text}`}>This widget has no settings.</p>
+          <p className={`text-xs opacity-70 ${c.text}`}>This widget has no settings.</p>
         )}
-        <div className={`text-xs leading-relaxed opacity-60 ${c.label}`}>
+        <div className={`text-xs leading-relaxed opacity-70 ${c.label}`}>
           <p>{def.description}</p>
           <p className="mt-1 break-all">source: {def.fetch.url.split("?")[0]}</p>
         </div>

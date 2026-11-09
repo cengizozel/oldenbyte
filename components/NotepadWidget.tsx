@@ -158,7 +158,7 @@ function RichTextEditor({
               aria-label={label}
               onMouseDown={e => e.preventDefault()}
               onClick={() => applyFormat(cmd)}
-              className={`p-[5px] opacity-60 hover:opacity-100 hover:bg-white/40 transition-opacity ${FOCUS_RING} ${labelClass}`}
+              className={`p-[5px] opacity-70 hover:opacity-100 hover:bg-white/40 transition-opacity ${FOCUS_RING} ${labelClass}`}
             >
               <Icon size={14} />
             </button>
@@ -178,7 +178,7 @@ function RichTextEditor({
           e.preventDefault();
           document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
         }}
-        className={`flex-1 min-h-0 overflow-y-auto outline-none text-sm leading-relaxed break-words ${textClass} ${editable ? "" : "opacity-60"} empty:before:content-[attr(data-ph)] empty:before:opacity-50 empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4`}
+        className={`flex-1 min-h-0 overflow-y-auto outline-none text-sm leading-relaxed break-words ${textClass} ${editable ? "" : "opacity-70"} empty:before:content-[attr(data-ph)] empty:before:opacity-50 empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4`}
       />
     </div>
   );
@@ -505,7 +505,7 @@ export default function NotebookWidget({
 
           {!isToday && (
             <div className="mb-2 shrink-0">
-              <p className={`text-xs opacity-60 ${c.label}`}>
+              <p className={`text-xs opacity-70 ${c.label}`}>
                 {fmtDate(viewDate)}
                 {" · "}
                 <button onClick={() => setViewDate(today)} className={`underline underline-offset-2 ${FOCUS_RING}`}>back to today</button>
@@ -543,14 +543,14 @@ export default function NotebookWidget({
         <div className="w-28 min-w-0 flex flex-col gap-2">
 
           <div className="flex items-center justify-between">
-            <button onClick={prevMonth} aria-label="Previous month" className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><ChevronLeft size={14} /></button>
+            <button onClick={prevMonth} aria-label="Previous month" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><ChevronLeft size={14} /></button>
             <span className={`text-xs font-medium ${c.label} opacity-80`}>{monthLabel}</span>
-            <button onClick={nextMonth} aria-label="Next month" className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><ChevronRight size={14} /></button>
+            <button onClick={nextMonth} aria-label="Next month" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><ChevronRight size={14} /></button>
           </div>
 
           <div className="grid grid-cols-7 gap-px">
             {["S","M","T","W","T","F","S"].map((d, i) => (
-              <span key={i} className={`text-center text-xs font-medium opacity-60 ${c.label}`}>{d}</span>
+              <span key={i} className={`text-center text-xs font-medium opacity-70 ${c.label}`}>{d}</span>
             ))}
           </div>
 
@@ -570,14 +570,14 @@ export default function NotebookWidget({
                   key={day}
                   onClick={() => setViewDate(dateStr)}
                   className={`
-                    relative flex items-center justify-center rounded-md text-xs aspect-square ${FOCUS_RING}
+                    relative flex items-center justify-center rounded-md text-xs aspect-square min-h-6 ${FOCUS_RING}
                     ${isSelected ? `${c.label} font-medium opacity-100` : `${c.text} opacity-80 hover:opacity-100`}
                     ${isTodayCell ? "underline underline-offset-2" : ""}
                   `}
                 >
                   {day}
                   {hasNote && !isSelected && (
-                    <span className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 h-0.5 rounded-full ${c.label} opacity-60`} />
+                    <span className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 h-0.5 rounded-full ${c.label} opacity-70`} />
                   )}
                 </button>
               );
@@ -595,7 +595,7 @@ export default function NotebookWidget({
             icon={History}
             title="All notes"
             right={
-              <button onClick={() => setHistoryOpen(false)} className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`} title="Close" aria-label="Close">
+              <button onClick={() => setHistoryOpen(false)} className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`} title="Close" aria-label="Close">
                 <X size={14} />
               </button>
             }
@@ -608,15 +608,15 @@ export default function NotebookWidget({
                 <button onClick={() => openDate(e.date)} className={`flex-1 min-w-0 text-left hover:opacity-70 transition-opacity ${FOCUS_RING}`}>
                   <div className="flex items-center gap-2">
                     <span className={`text-sm font-medium shrink-0 ${c.label}`}>{fmtDate(e.date)}</span>
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full bg-white/50 truncate ${c.label} opacity-80`}>{e.name}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full bg-white/50 truncate ${c.label} opacity-80`}>{e.name}</span>
                   </div>
-                  <p className={`text-xs opacity-60 truncate mt-1 ${c.text}`}>{e.snippet}</p>
+                  <p className={`text-xs opacity-70 truncate mt-1 ${c.text}`}>{e.snippet}</p>
                 </button>
                 <button
                   onClick={() => deleteEntry(e.id, e.date)}
                   title="Delete note"
                   aria-label="Delete note"
-                  className={`shrink-0 mt-0.5 opacity-60 hover:opacity-100 hover:text-red-500 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
+                  className={`shrink-0 mt-0.5 opacity-70 hover:opacity-100 hover:text-red-500 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
                 >
                   <Trash2 size={14} />
                 </button>

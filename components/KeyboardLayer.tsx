@@ -347,7 +347,7 @@ export default function KeyboardLayer({
           key={b.key}
           aria-hidden
           style={{ top: b.top, left: b.left }}
-          className={`fixed z-[60] pointer-events-none rounded-md shadow-md font-medium tabular-nums bg-[var(--text-primary)] text-[var(--surface)] ${b.tab ? "px-1 text-[11px]" : "px-1.5 py-0.5 text-sm"}`}
+          className={`fixed z-[60] pointer-events-none rounded-md shadow-md font-medium tabular-nums bg-[var(--text-primary)] text-[var(--surface)] ${b.tab ? "px-1 text-xs" : "px-1.5 py-0.5 text-sm"}`}
         >
           {b.label}
         </span>

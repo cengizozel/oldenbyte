@@ -551,7 +551,7 @@ function FullscreenOverlay({
         <div className="flex items-center justify-between px-5 py-3 shrink-0 border-b border-[var(--surface-border)]">
           <div className="min-w-0">
             <p className="text-sm font-medium text-[var(--text-primary)] truncate">{config.displayName}</p>
-            <span className="text-xs text-[var(--text-secondary)] opacity-60">{config.fileType}</span>
+            <span className="text-xs text-[var(--text-secondary)] opacity-70">{config.fileType}</span>
           </div>
           <button onClick={onClose} aria-label="Close" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-4 ${HIT_AREA} ${FOCUS_RING}`}>
             <X size={16} />
@@ -748,7 +748,7 @@ export default function ReaderWidget({
             {compact ? "Upload new file" : "Upload PDF or EPUB"}
           </SmallButton>
           {!compact && (
-            <p className={`text-xs opacity-60 ${c.text}`}>or drag and drop</p>
+            <p className={`text-xs opacity-70 ${c.text}`}>or drag and drop</p>
           )}
         </>
       )}
@@ -828,17 +828,17 @@ export default function ReaderWidget({
                 {dir && (
                   <button
                     onClick={() => loadDir(dir.split("/").slice(0, -1).join("/"))}
-                    className={`opacity-60 hover:opacity-100 shrink-0 ${HIT_AREA} ${FOCUS_RING}`}
+                    className={`opacity-70 hover:opacity-100 shrink-0 ${HIT_AREA} ${FOCUS_RING}`}
                     title="Up one folder"
                     aria-label="Up one folder"
                   >
                     <ChevronLeft size={14} />
                   </button>
                 )}
-                <span className="flex-1 min-w-0 truncate opacity-60 font-medium">{dir || "Library"}</span>
+                <span className="flex-1 min-w-0 truncate opacity-70 font-medium">{dir || "Library"}</span>
                 <button
                   onClick={() => setNewFolderOpen(o => !o)}
-                  className={`opacity-60 hover:opacity-100 shrink-0 ${HIT_AREA} ${FOCUS_RING}`}
+                  className={`opacity-70 hover:opacity-100 shrink-0 ${HIT_AREA} ${FOCUS_RING}`}
                   title="New folder"
                   aria-label="New folder"
                 >
@@ -846,7 +846,7 @@ export default function ReaderWidget({
                 </button>
                 <button
                   onClick={() => libFileRef.current?.click()}
-                  className={`opacity-60 hover:opacity-100 shrink-0 ${HIT_AREA} ${FOCUS_RING}`}
+                  className={`opacity-70 hover:opacity-100 shrink-0 ${HIT_AREA} ${FOCUS_RING}`}
                   title="Upload into this folder"
                   aria-label="Upload into this folder"
                 >

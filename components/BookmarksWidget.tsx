@@ -410,7 +410,7 @@ export default function BookmarksWidget({
         </div>
 
         {draft.length > 1 && (
-          <p className={`text-xs opacity-60 -mt-1 ${c.text}`}>Drag the handle to reorder.</p>
+          <p className={`text-xs opacity-70 -mt-1 ${c.text}`}>Drag the handle to reorder.</p>
         )}
 
         {draft.length > 0 && (
@@ -463,7 +463,7 @@ export default function BookmarksWidget({
                   </button>
                   <button
                     onClick={() => setDraft(d => d.filter(x => x.id !== bm.id))}
-                    className={`opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
+                    className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
                     title="Remove"
                     aria-label="Remove"
                   >
@@ -474,13 +474,13 @@ export default function BookmarksWidget({
                   value={bm.url}
                   onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, url: e.target.value } : x))}
                   placeholder="https://..."
-                  className={`w-full bg-transparent dark:!bg-transparent text-xs opacity-60 outline-none ${c.label}`}
+                  className={`w-full bg-transparent dark:!bg-transparent text-xs opacity-70 outline-none ${c.label}`}
                 />
                 <input
                   value={bm.icon ?? ""}
                   onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, icon: e.target.value } : x))}
                   placeholder="icon: emoji or image URL (optional)"
-                  className={`w-full bg-transparent dark:!bg-transparent text-xs opacity-60 outline-none ${c.label}`}
+                  className={`w-full bg-transparent dark:!bg-transparent text-xs opacity-70 outline-none ${c.label}`}
                 />
               </div>
             ))}
@@ -488,7 +488,7 @@ export default function BookmarksWidget({
         )}
 
         {draft.length === 0 && (
-          <p className={`text-xs leading-relaxed opacity-60 ${c.text}`}>
+          <p className={`text-xs leading-relaxed opacity-70 ${c.text}`}>
             Add the sites you visit most. Each shows its favicon, with a tidy colored tile when one is not available. To override it, set an emoji or an image URL in a bookmark&apos;s icon field.
           </p>
         )}

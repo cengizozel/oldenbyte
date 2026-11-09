@@ -1,9 +1,10 @@
 @import "tailwindcss";
 @variant dark (&:where(.dark, .dark *));
 
-/* The UI's accent face (the date, the dashboard switcher, small labels): the
-   same Playfair Display as the header text, loaded in app/layout.tsx. Digits
-   stay fixed-width so times and counts line up. */
+/* The feed page's accent face (its small labels and controls): the same
+   Playfair Display as its headlines, loaded in app/layout.tsx. The dashboard
+   itself uses the one system sans face everywhere. Digits stay fixed-width so
+   times and counts line up. */
 @utility font-ui {
   font-family: var(--font-playfair);
   font-variant-numeric: lining-nums tabular-nums;
@@ -21,8 +22,8 @@
 
   /* Text */
   --text-primary:       #404040;
-  --text-secondary:     #737373;
-  --text-muted:         #a3a3a3;
+  --text-secondary:     #5c5c5c;
+  --text-muted:         #707070;
   --text-placeholder:   #d4d4d4;
 
   /* Amber widget */
@@ -34,7 +35,7 @@
   /* Sky widget */
   --w-sky-bg:           #f0f9ff;
   --w-sky-border:       #e0f2fe;
-  --w-sky-label:        #0369a1;
+  --w-sky-label:        #075985;
   --w-sky-text:         #0c4a6e;
 
   /* Neutral widget */
@@ -58,7 +59,7 @@
   /* Orange widget */
   --w-orange-bg:        #fff7ed;
   --w-orange-border:    #ffedd5;
-  --w-orange-label:     #c2410c;
+  --w-orange-label:     #9a3412;
   --w-orange-text:      #7c2d12;
 
   /* Analog clock */
@@ -78,7 +79,7 @@
 
   --text-primary:       #e5e5e5;
   --text-secondary:     #a3a3a3;
-  --text-muted:         #737373;
+  --text-muted:         #8a8a8a;
   --text-placeholder:   #4a4a4a;
 
   --w-amber-bg:         #1a1100;

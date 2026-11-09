@@ -5,14 +5,14 @@ a widget should not restyle what they already provide.
 
 ## Type scale
 
-Five sizes, nothing in between. Sizes are fixed pixels so a widget looks the
-same at every card size; the floor is 12px for anything meant to be read.
+Three sizes plus display numbers, nothing in between, all in the one system sans face (the feed
+page is the exception: it sets its headlines and labels in Playfair Display).
+Sizes are fixed pixels so a widget looks the same at every card size; the
+floor is 12px for anything meant to be read.
 
 | Size | Tailwind | Used for |
 |---|---|---|
-| 11px | `text-[11px]` | Badges and pills only (subreddit, channel, tag) |
-| 12px | `text-xs` | Meta text (times, counts, labels), widget titles, chips, empty states |
-| 13px | `text-[13px]` | Only the serif accent face (`font-ui`), whose small letters need it |
+| 12px | `text-xs` | Badges, meta text (times, counts, labels), widget titles, chips, settings section labels, empty states |
 | 14px | `text-sm` | Body text: list item titles, notes, chat, settings fields |
 | 16px+ | `text-base`, `text-lg`, `text-2xl` | Numbers meant to be read at a glance (temperature, timers, scores) |
 
@@ -31,10 +31,40 @@ Emphasis is done with opacity on the palette color, in three steps only:
 |---|---|
 | 100% | Primary content |
 | 80% | Secondary content (descriptions, body under a title) |
-| 60% | Meta (timestamps, counts, labels, empty states) |
+| 70% | Meta (timestamps, counts, labels, empty states, inactive chips) |
 
-Nothing readable sits below 60%. Lower values are for decoration: dividers,
-disabled controls, hover-only chrome, and the dimmed upcoming words in Typing.
+Nothing readable sits below 70%, with one exception: the upcoming words in
+Typing sit at 60% so the typed text stands out, which still clears 3:1 in both
+themes. Lower values are for decoration: dividers, disabled controls and
+hover-only chrome.
+
+## Accessibility
+
+The targets, from WCAG 2.2 level AA, and how the rules above meet them. The
+numbers were measured in a browser over every visible text run of the
+dashboard and the feed page in both themes (contrast is computed over the
+composited background: card over page), so a change to a palette color or to
+an opacity step should be re-measured, not assumed.
+
+- Contrast of text (1.4.3): primary and body text, controls and anything in
+  the page text colors reach 4.5:1 in both themes. Meta text at the 70% step
+  reaches 4.5:1 or better in dark mode and at least 3:1 in light mode (the
+  pale card backgrounds cannot carry a translucent label any higher; 3:1 is
+  the AA bar for large text and for user interface components and is where
+  the secondary label of iOS sits). Nothing readable goes below 3:1.
+- Non-text contrast (1.4.11): focus rings and control boundaries are drawn in
+  the secondary or muted text color, both at 3:1 or better on the page.
+- Target size (2.5.8): every control is at least 24 by 24 CSS pixels (icon
+  buttons through `HIT_AREA`, chips and tabs through `min-h-6`, detail views
+  through `BackButton`); neighbouring icon buttons keep `gap-3` so the areas
+  do not overlap.
+- Text size: the floor is 12px for anything meant to be read, 14px for body
+  text, 15px for the feed page's serif labels; the page zooms to 200% without
+  loss (1.4.4), and touch devices get 16px fields so iOS does not zoom in on
+  focus.
+- Focus visible (2.4.7) and names: every icon button has an `aria-label`, the
+  keyboard layer marks the focused widget, and the hidden inputs that catch
+  keys are labelled.
 
 ## Spacing
 
@@ -74,7 +104,7 @@ the palette `label` color at 50% opacity.
   for counts and small actions. Every widget shows its title.
 - Chip (`Chip`): the small toggle used for modes and options. 24px tall,
   `text-xs`, `rounded-md`; the active chip has the translucent fill, inactive
-  chips sit at 60% opacity.
+  chips sit at 70% opacity.
 - Button (`SmallButton`): the standard small action. 28px tall, `text-xs`,
   `rounded-lg`, palette label color on a translucent fill.
 - Icon buttons: 24px hit area (`HIT_AREA` from `ui/Field.tsx`), visible focus
@@ -82,13 +112,18 @@ the palette `label` color at 50% opacity.
   buttons sit at least `gap-3` apart so their hit areas do not overlap.
 - Settings: `PencilButton` opens the `FlipCard` back face; `SaveCancelRow`
   closes it. Fields use `ui/Field`.
-- Empty states: `EmptyState`, centered, 12px at 60%. Never inside a styled
+- Detail views: `BackButton` sits on the left of the first block (the
+  thumbnail, or the title when there is none) and stretches to its height, a
+  36px wide `rounded-xl` translucent fill with a 16px chevron, so it is an easy
+  target on phones. The row above it keeps the truncated title and the
+  open-externally link.
+- Empty states: `EmptyState`, centered, 12px at 70%. Never inside a styled
   frame (a player area, a dashed box) unless the frame is the control itself.
 
 ## Page chrome
 
-Top bar text: title and the right-hand field in Playfair at `text-2xl`
-(`text-lg` on phones); the date at `text-lg`; the dashboard switcher at
-`text-base` (`text-sm` on phones) in the secondary text color; action icons at
-16px in the secondary color. Settings sections use `text-[13px]` serif labels
-in normal case. No all-caps text anywhere.
+Top bar text, in the same face as the widgets: title and the right-hand field
+at `text-2xl font-medium` (`text-lg` on phones); the date at `text-lg`; the
+dashboard switcher at `text-base` (`text-sm` on phones) in the secondary text
+color; action icons at 16px in the secondary color. Settings sections use
+`text-xs` labels at 70% in normal case. No all-caps text anywhere.

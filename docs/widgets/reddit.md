@@ -1,6 +1,6 @@
 # Reddit Widget
 
-Displays top posts from one or more subreddits with per-subreddit time period and post limit controls. Clicking a post title opens an inline detail view with the post body.
+Displays top posts from one or more subreddits with per-subreddit time period and post limit controls. Clicking a post title opens an inline detail view with the post body; its image, like the title, links to the post on Reddit.
 
 ## Storage Keys
 

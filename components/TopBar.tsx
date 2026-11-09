@@ -342,7 +342,7 @@ function DateDisplay({ timezone }: { timezone: string }) {
       >
         {format === "analog"
           ? <AnalogClock time={shown} size={48} />
-          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center font-ui" suppressHydrationWarning>{fmt(shown, format)}</span>
+          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center" suppressHydrationWarning>{fmt(shown, format)}</span>
         }
       </button>
 
@@ -853,7 +853,7 @@ function DashboardSwitcher({
     <div ref={wrapRef} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 text-sm md:text-base font-ui text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+        className="flex items-center gap-1 text-sm md:text-base text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         title="Switch dashboard"
       >
         {active.name}
@@ -917,7 +917,7 @@ function DashboardSwitcher({
               )}
               <button
                 onClick={() => { setRenamingId(d.id); setDraft(d.name); }}
-                className={`opacity-0 group-hover/dash:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0`}
+                className={`opacity-0 group-hover/dash:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0`}
                 title="Rename"
                 aria-label={`Rename ${d.name}`}
               >
@@ -926,7 +926,7 @@ function DashboardSwitcher({
               {dashboards.list.length > 1 && (
                 <button
                   onClick={() => removeDashboard(d.id)}
-                  className={`opacity-0 group-hover/dash:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0 mr-1.5`}
+                  className={`opacity-0 group-hover/dash:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0 mr-1.5`}
                   title="Delete dashboard"
                   aria-label={`Delete ${d.name}`}
                 >
@@ -1050,7 +1050,7 @@ export default function TopBar({
         <EditableField
           storageKey="topbar-phrase"
           defaultValue="oldenbyte"
-          className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none font-[family-name:var(--font-playfair)]"
+          className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none"
         />
       </div>
       <div className="col-span-2 md:col-span-1 order-last md:order-none flex flex-col items-center justify-center gap-1.5">
@@ -1062,7 +1062,7 @@ export default function TopBar({
           {demo && (
             <button
               onClick={exitDemoMode}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[13px] font-ui text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
               title="Exit demo mode"
             >
               demo
@@ -1113,7 +1113,7 @@ export default function TopBar({
         <EditableField
           storageKey="topbar-mood"
           defaultValue="feeling quiet"
-          className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none font-[family-name:var(--font-playfair)]"
+          className="text-lg md:text-2xl text-[var(--text-primary)] font-medium leading-none"
           align="right"
         />
       </div>

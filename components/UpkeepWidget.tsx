@@ -314,7 +314,7 @@ export default function UpkeepWidget({
                   <span className={`text-2xl font-semibold tabular-nums leading-none ${perfect ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>
                     {pct ?? "-"}
                   </span>
-                  <span className={`mt-1 text-xs opacity-60 ${c.label}`}>
+                  <span className={`mt-1 text-xs opacity-70 ${c.label}`}>
                     {perfect ? "perfect" : "/ 100"}
                   </span>
                 </>
@@ -323,12 +323,12 @@ export default function UpkeepWidget({
           </div>
 
           {perfect && since != null ? (
-            <div className={`shrink-0 flex items-center justify-center gap-1 text-xs tabular-nums ${c.label} opacity-60`}>
+            <div className={`shrink-0 flex items-center justify-center gap-1 text-xs tabular-nums ${c.label} opacity-70`}>
               <Flame size={12} />
               <span>at 100 for {formatSpan(at - since)}</span>
             </div>
           ) : next ? (
-            <div className={`shrink-0 flex items-center justify-center gap-1 text-xs tabular-nums ${c.label} opacity-60 truncate px-2`}>
+            <div className={`shrink-0 flex items-center justify-center gap-1 text-xs tabular-nums ${c.label} opacity-70 truncate px-2`}>
               <span className="truncate">{next.item.name} runs out in {formatSpan(next.at - at)}</span>
             </div>
           ) : null}
@@ -343,8 +343,8 @@ export default function UpkeepWidget({
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color, opacity: r.on ? 1 : 0.4 }} />
                   <span className={`flex-1 min-w-0 truncate text-sm ${c.text} ${r.on ? "" : "opacity-80"}`}>{r.name}</span>
-                  {r.on && <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{formatSpan(r.left)}</span>}
-                  <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{r.weight}</span>
+                  {r.on && <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-70`}>{formatSpan(r.left)}</span>}
+                  <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-70`}>{r.weight}</span>
                 </button>
                 {r.on ? (
                   <button
@@ -394,20 +394,20 @@ export default function UpkeepWidget({
           </SmallButton>
         </div>
         <div className={`flex items-center gap-2 text-xs ${c.label}`}>
-          <span className="opacity-60">Order</span>
+          <span className="opacity-70">Order</span>
           {([["custom", "as arranged"], ["need", "by need"]] as [Order, string][]).map(([key, label]) => (
             <button
               key={key}
               onClick={() => changeOrder(key)}
               title={key === "need" ? "Off items first, heaviest first, then running items soonest to run out first" : "The order below, drag the dots to arrange"}
-              className={`px-1.5 py-0.5 rounded-md ${FOCUS_RING} ${order === key ? `bg-black/10 dark:bg-white/15 ${c.text}` : "opacity-60 hover:opacity-100"}`}
+              className={`px-1.5 py-0.5 rounded-md ${FOCUS_RING} ${order === key ? `bg-black/10 dark:bg-white/15 ${c.text}` : "opacity-70 hover:opacity-100"}`}
             >
               {label}
             </button>
           ))}
         </div>
         {draft.length > 1 && order === "custom" && (
-          <p className={`text-xs opacity-60 -mt-1 ${c.text}`}>Drag the dot to reorder.</p>
+          <p className={`text-xs opacity-70 -mt-1 ${c.text}`}>Drag the dot to reorder.</p>
         )}
         {draft.length > 0 && (
           <>
@@ -467,20 +467,20 @@ export default function UpkeepWidget({
                   <button
                     onClick={() => setDraft(d => d.filter(x => x.id !== it.id))}
                     aria-label={`Remove ${it.name}`}
-                    className={`opacity-60 hover:opacity-100 leading-none ${iconBtnCls} ${c.label}`}
+                    className={`opacity-70 hover:opacity-100 leading-none ${iconBtnCls} ${c.label}`}
                   >
                     ×
                   </button>
                 </div>
               ))}
             </div>
-            <p className={`text-xs leading-relaxed opacity-60 ${c.text}`}>
+            <p className={`text-xs leading-relaxed opacity-70 ${c.text}`}>
               Points add up to <span className="tabular-nums font-medium">{draftTotal}</span>. Everything running at once scores 100, so the weights just set how much each one moves the needle. The span is how long a check lasts: 12 hours for teeth, a week for laundry.
             </p>
           </>
         )}
         {draft.length === 0 && (
-          <p className={`text-xs leading-relaxed opacity-60 ${c.text}`}>
+          <p className={`text-xs leading-relaxed opacity-70 ${c.text}`}>
             Add the essentials you want to stay on top of: teeth, shower, laundry, a workout. Give each one points for how much it matters and a span for how long one check lasts. Checking an item starts its countdown; while it runs, its points count toward the score.
           </p>
         )}
@@ -517,11 +517,11 @@ export default function UpkeepWidget({
           {detailDate ? (
             /* Day detail header: a back button in place of the title */
             <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
-              <button onClick={() => setDetailDate(null)} title="Back to insights" className={`opacity-60 hover:opacity-100 flex items-center gap-1 min-w-0 ${iconBtnCls} ${c.label}`}>
+              <button onClick={() => setDetailDate(null)} title="Back to insights" className={`opacity-70 hover:opacity-100 flex items-center gap-1 min-w-0 ${iconBtnCls} ${c.label}`}>
                 <ChevronLeft size={14} />
                 <span className="text-xs font-medium truncate">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
               </button>
-              <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`shrink-0 opacity-60 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
+              <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`shrink-0 opacity-70 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
                 <X size={14} />
               </button>
             </div>
@@ -531,7 +531,7 @@ export default function UpkeepWidget({
               icon={History}
               title="Insights"
               right={
-                <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`opacity-60 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
+                <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`opacity-70 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
                   <X size={14} />
                 </button>
               }
@@ -557,7 +557,7 @@ export default function UpkeepWidget({
                           <div key={`${ch.item.id}-${ch.at}`} className={`group/row flex items-center gap-2 px-2 py-2 rounded-lg ${FOCUS_RING} hover:bg-black/5 dark:hover:bg-white/10`}>
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorOf(ch.item.id) }} />
                             <span className={`flex-1 min-w-0 truncate text-sm ${c.text}`}>{ch.item.name}</span>
-                            <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-60`}>{fmtTime(ch.at)}{ch.stoppedAt != null && ` off ${fmtTime(ch.stoppedAt)}`}</span>
+                            <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-70`}>{fmtTime(ch.at)}{ch.stoppedAt != null && ` off ${fmtTime(ch.stoppedAt)}`}</span>
                             <button
                               onClick={() => persistLog(removeCheck(log, ch.item.id, ch.at))}
                               aria-label={`Remove this ${ch.item.name} check`}
@@ -583,13 +583,13 @@ export default function UpkeepWidget({
                   {/* Score over time */}
                   <div className="shrink-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs ${c.label} opacity-60`}>score over time</span>
+                      <span className={`text-xs ${c.label} opacity-70`}>score over time</span>
                       <div className="flex gap-1">
                         {RANGES.map(r => (
                           <button
                             key={r.key}
                             onClick={() => setRange(r.key)}
-                            className={`text-xs px-1.5 py-0.5 rounded-md ${FOCUS_RING} ${range === r.key ? `bg-black/10 dark:bg-white/15 ${c.text}` : `opacity-60 hover:opacity-100 ${c.label}`}`}
+                            className={`text-xs px-1.5 py-0.5 rounded-md ${FOCUS_RING} ${range === r.key ? `bg-black/10 dark:bg-white/15 ${c.text}` : `opacity-70 hover:opacity-100 ${c.label}`}`}
                           >
                             {r.label}
                           </button>
@@ -614,7 +614,7 @@ export default function UpkeepWidget({
                         <circle cx={x(at)} cy={y(pct)} r={2.4} className={pct === 100 ? "fill-emerald-500" : `${c.text} fill-current`} />
                       )}
                     </svg>
-                    <div className={`flex justify-between text-xs opacity-60 ${c.label}`}>
+                    <div className={`flex justify-between text-xs opacity-70 ${c.label}`}>
                       <span>{fmtDay(shiftDay(today, -(rangeDef.days - 1)))}</span>
                       <span>now</span>
                     </div>
@@ -629,7 +629,7 @@ export default function UpkeepWidget({
                       <span className="flex items-center gap-1">
                         <Flame size={12} className={c.label} />
                         <span className="tabular-nums">{formatSpan(at - since)}</span>
-                        <span className="opacity-60">at 100 and counting</span>
+                        <span className="opacity-70">at 100 and counting</span>
                       </span>
                     )}
                   </div>
@@ -655,7 +655,7 @@ export default function UpkeepWidget({
                         );
                       })}
                     </div>
-                    <div className={`flex justify-between text-xs opacity-60 ${c.label} mt-1`}>
+                    <div className={`flex justify-between text-xs opacity-70 ${c.label} mt-1`}>
                       <span>{fmtDay(gridDates[0])}</span>
                       <span>{fmtDay(today)}</span>
                     </div>

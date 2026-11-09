@@ -174,7 +174,7 @@ export default function RssWidget({
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-60 ${c.label}`}>Items</span>
+            <span className={`text-xs opacity-70 ${c.label}`}>Items</span>
             {LIMITS.map(n => (
               <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft(d => ({ ...d, limit: n }))}>
                 {n}

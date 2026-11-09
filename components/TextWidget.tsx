@@ -232,14 +232,14 @@ export default function TextWidget({
 
             {/* Font picker */}
             <div>
-              <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Font</p>
+              <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Font</p>
               <div className="flex gap-1.5">
                 {(["sans", "serif", "mono"] as FontFamily[]).map(f => (
                   <div key={f} className="flex flex-col items-center gap-1">
                     <Chip c={c} active={draft.font === f} onClick={() => setDraft(d => ({ ...d, font: f }))} className={FONT_PREVIEW_CLASS[f]}>
                       Aa
                     </Chip>
-                    <span className={`text-xs opacity-60 ${c.label} ${FONT_PREVIEW_CLASS[f]}`}>
+                    <span className={`text-xs opacity-70 ${c.label} ${FONT_PREVIEW_CLASS[f]}`}>
                       {f.charAt(0).toUpperCase() + f.slice(1)}
                     </span>
                   </div>
@@ -249,7 +249,7 @@ export default function TextWidget({
 
             {/* Size picker */}
             <div>
-              <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Size</p>
+              <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Size</p>
               <div className="flex gap-1">
                 {SIZES.map(s => (
                   <Chip key={s.id} c={c} active={(draft.size ?? "auto") === s.id} onClick={() => setDraft(d => ({ ...d, size: s.id }))}>

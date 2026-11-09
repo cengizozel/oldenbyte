@@ -845,7 +845,7 @@ export default function ChatWidget({
         aria-label={a.title}
         className={`shrink-0 w-7 h-7 bg-black/5 dark:bg-white/10 flex items-center justify-center text-base leading-none hover:bg-black/10 dark:hover:bg-white/15 transition-colors ${FOCUS_RING} !rounded-lg`}
       >
-        {a.emoji || <Bot size={16} className="opacity-60" />}
+        {a.emoji || <Bot size={16} className="opacity-70" />}
       </button>
     );
   }) as unknown as LucideIcon);
@@ -867,9 +867,9 @@ export default function ChatWidget({
                 onClick={() => setCharactersOpen(true)}
                 title="Switch character"
                 aria-label="Switch character"
-                className={`shrink-0 opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}
+                className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}
               >
-                <ChevronDown size={12} />
+                <ChevronDown size={14} />
               </button>
               {/* Live status: residency dot first (the signal), model name truncates.
                   Separate tap target from the identity before it. */}
@@ -878,7 +878,7 @@ export default function ChatWidget({
                   <button
                     onClick={e => { e.stopPropagation(); setPowerOpen(o => !o); }}
                     title={isLoaded ? `Model loaded on ${backend}: click to control how long it stays` : "Model not loaded: click for options"}
-                    className={`flex items-center gap-1 min-w-0 text-xs opacity-60 hover:opacity-100 transition-opacity ${FOCUS_RING}`}
+                    className={`flex items-center gap-1 min-w-0 text-xs opacity-70 hover:opacity-100 transition-opacity ${FOCUS_RING}`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isLoaded ? "bg-emerald-500" : "bg-current opacity-40"}`} />
                     <span className="shrink-0">
@@ -887,14 +887,14 @@ export default function ChatWidget({
                     {config.model && <span className="truncate">&nbsp;· {config.model}</span>}
                   </button>
                 ) : (
-                  <span className="text-xs opacity-60 truncate">{config.model}</span>
+                  <span className="text-xs opacity-70 truncate">{config.model}</span>
                 )}
                 {powerOpen && powerCapable && (
                   <>
                     {/* click-away backdrop */}
                     <div className="fixed inset-0 z-40" onClick={() => setPowerOpen(false)} />
                     <div className={`absolute left-0 top-6 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2.5 flex flex-col gap-2`}>
-                      <p className={`text-xs opacity-60 ${c.label} flex items-center gap-1`}>
+                      <p className={`text-xs opacity-70 ${c.label} flex items-center gap-1`}>
                         <Power size={12} /> Keep model loaded
                       </p>
                       <div className="flex flex-wrap gap-1">
@@ -920,7 +920,7 @@ export default function ChatWidget({
                         {powerBusy ? <Loader size={12} className="animate-spin" /> : <Power size={12} />}
                         Unload now
                       </SmallButton>
-                      <p className={`text-xs opacity-60 ${c.label} leading-snug`}>
+                      <p className={`text-xs opacity-70 ${c.label} leading-snug`}>
                         {config.keepAlive === "-1"
                           ? "Stays loaded until you unload."
                           : config.keepAlive
@@ -955,11 +955,11 @@ export default function ChatWidget({
                     {/* click-away backdrop */}
                     <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                     <div className={`absolute right-0 top-6 z-50 w-60 rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
-                      <p className={`px-2.5 pt-1.5 pb-1 text-[13px] font-ui opacity-60 ${c.label}`}>Data access</p>
+                      <p className={`px-2.5 pt-1.5 pb-1 text-xs opacity-70 ${c.label}`}>Data access</p>
                       {/* One row per data-bearing widget on the dashboard; no master
                           switch. A calendar widget's row also grants its tools. */}
                       {roster.length === 0 && (
-                        <p className={`px-2.5 py-1.5 text-xs opacity-60 ${c.text}`}>No data widgets on this dashboard.</p>
+                        <p className={`px-2.5 py-1.5 text-xs opacity-70 ${c.text}`}>No data widgets on this dashboard.</p>
                       )}
                       {roster.map(w => {
                         const isCal = w.type === "calendar";
@@ -970,18 +970,18 @@ export default function ChatWidget({
                             key={w.id}
                             onClick={() => { if (ready) toggleWidgetAccess(w.id); }}
                             title={!ready ? "Configure the Calendar widget first" : on ? "On: click to turn off" : "Off: click to turn on"}
-                            className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/5 ${FOCUS_RING} ${c.text} ${ready ? "" : "opacity-60"}`}
+                            className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/5 ${FOCUS_RING} ${c.text} ${ready ? "" : "opacity-70"}`}
                           >
-                            {isCal ? <CalendarDays size={14} className={`shrink-0 opacity-60 ${c.label}`} /> : <Database size={14} className={`shrink-0 opacity-60 ${c.label}`} />}
+                            {isCal ? <CalendarDays size={14} className={`shrink-0 opacity-70 ${c.label}`} /> : <Database size={14} className={`shrink-0 opacity-70 ${c.label}`} />}
                             <span className="flex-1 min-w-0 truncate">
                               {w.title}
-                              <span className={`ml-1.5 text-xs opacity-60 ${c.label}`}>{isCal ? "agenda + add events" : w.type}</span>
+                              <span className={`ml-1.5 text-xs opacity-70 ${c.label}`}>{isCal ? "agenda + add events" : w.type}</span>
                             </span>
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${on && ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
                           </button>
                         );
                       })}
-                      <p className={`px-2.5 pt-2 pb-1 text-[13px] font-ui opacity-60 border-t ${c.border} mt-1 ${c.label}`}>Connections</p>
+                      <p className={`px-2.5 pt-2 pb-1 text-xs opacity-70 border-t ${c.border} mt-1 ${c.label}`}>Connections</p>
                       {([
                         { icon: Library, label: "Kiwix library", caption: "all books", on: config.useKiwix, ready: !!config.kiwixUrl, toggle: toggleKiwix, hint: "set up in settings" },
                         { icon: Layers, label: "Anytype", caption: config.anytypeSpaceName || "", on: config.useAnytype, ready: !!(config.anytypeApiKey && config.anytypeSpaceId), toggle: toggleAnytype, hint: "pair in settings" },
@@ -994,17 +994,17 @@ export default function ChatWidget({
                             openSettings();
                           }}
                           title={row.ready ? (row.on ? "On: click to turn off" : "Off: click to turn on") : row.hint}
-                          className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/5 ${FOCUS_RING} ${c.text} ${row.ready ? "" : "opacity-60"}`}
+                          className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/5 ${FOCUS_RING} ${c.text} ${row.ready ? "" : "opacity-70"}`}
                         >
-                          <row.icon size={14} className={`shrink-0 opacity-60 ${c.label}`} />
+                          <row.icon size={14} className={`shrink-0 opacity-70 ${c.label}`} />
                           <span className="flex-1 min-w-0 truncate">
                             {row.label}
-                            {row.caption && <span className={`ml-1.5 text-xs opacity-60 ${c.label}`}>{row.caption}</span>}
+                            {row.caption && <span className={`ml-1.5 text-xs opacity-70 ${c.label}`}>{row.caption}</span>}
                           </span>
                           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.on && row.ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
                         </button>
                       ))}
-                      <div className={`my-1 border-t ${c.border} opacity-60`} />
+                      <div className={`my-1 border-t ${c.border} opacity-70`} />
                       <button
                         onClick={() => { setMenuOpen(false); clearChat(); }}
                         disabled={messages.length === 0}
@@ -1072,13 +1072,13 @@ export default function ChatWidget({
           <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 min-h-0 overflow-y-auto px-4 pb-3 flex flex-col gap-3">
             {loadState === "failed" ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 px-4">
-                <p className={`text-xs opacity-60 ${c.text}`}>Could not load saved chats.</p>
+                <p className={`text-xs opacity-70 ${c.text}`}>Could not load saved chats.</p>
                 <SmallButton c={c} onClick={() => setLoadAttempt(n => n + 1)}>Retry</SmallButton>
               </div>
             ) : !configured && messages.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 px-4">
                 <Bot size={20} className={`opacity-40 ${c.text}`} />
-                <p className={`text-xs opacity-60 ${c.text}`}>
+                <p className={`text-xs opacity-70 ${c.text}`}>
                   hover and click the pencil to connect a local or OpenAI-compatible model
                 </p>
               </div>
@@ -1099,13 +1099,13 @@ export default function ChatWidget({
                       if (e.key === "Escape") setEditingTitle(false);
                     }}
                     placeholder={titleFrom(messages)}
-                    className={`px-2 py-0.5 rounded-full text-[13px] text-center font-ui bg-transparent border border-[var(--surface-border)] outline-none w-44 ${c.label}`}
+                    className={`px-2 py-0.5 rounded-full text-xs text-center bg-transparent border border-[var(--surface-border)] outline-none w-44 ${c.label}`}
                   />
                 ) : (
                   <button
                     onClick={() => { setTitleDraft(activeConv?.renamed ? activeConv.title : ""); setEditingTitle(true); }}
                     title="Rename this chat"
-                    className={`px-2 py-0.5 text-[13px] font-ui opacity-60 hover:opacity-80 transition-opacity ${FOCUS_RING} !rounded-full ${c.label}`}
+                    className={`px-2 py-0.5 min-h-6 text-xs opacity-70 hover:opacity-80 transition-opacity ${FOCUS_RING} !rounded-full ${c.label}`}
                   >
                     {chatTitle}
                   </button>
@@ -1195,7 +1195,7 @@ export default function ChatWidget({
                   >
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(w.type).dot }} />
                     <span className="flex-1 min-w-0 truncate">{w.title}</span>
-                    <span className="text-xs opacity-60">{w.type}</span>
+                    <span className="text-xs opacity-70">{w.type}</span>
                   </button>
                 ))}
               </div>
@@ -1248,7 +1248,7 @@ export default function ChatWidget({
                     disabled={!configured || pendingImages.length >= 3}
                     title={pendingImages.length >= 3 ? "Up to 3 images per message" : "Attach an image (or paste one)"}
                     aria-label="Attach an image"
-                    className={`shrink-0 p-1.5 disabled:opacity-30 ${FOCUS_RING} !rounded-full ${c.icon} opacity-60 hover:opacity-100 transition-opacity`}
+                    className={`shrink-0 p-1.5 disabled:opacity-30 ${FOCUS_RING} !rounded-full ${c.icon} opacity-70 hover:opacity-100 transition-opacity`}
                   >
                     <Paperclip size={14} />
                   </button>

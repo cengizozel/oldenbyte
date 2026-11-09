@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Plus, ChevronLeft, ExternalLink, Flame } from "lucide-react";
+import { Plus, ExternalLink, Flame } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { timeAgo, formatCount, localDateStr } from "@/lib/format";
@@ -10,7 +10,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
-import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip, BackButton } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { useFirstSeen } from "@/lib/useFirstSeen";
 import { redditCacheKey } from "@/lib/cacheKeys";
@@ -304,7 +304,7 @@ export default function RedditWidget({
                 <button
                   onClick={() => setStatusOpen(o => !o)}
                   title="Which subreddits loaded"
-                  className={`text-xs tabular-nums font-medium ${subStatus.some(s => s.ok === false) ? "text-red-500/80" : `${c.label} opacity-60`} hover:opacity-100 transition-opacity ${FOCUS_RING}`}
+                  className={`text-xs tabular-nums font-medium ${subStatus.some(s => s.ok === false) ? "text-red-500/80" : `${c.label} opacity-70`} hover:opacity-100 transition-opacity ${FOCUS_RING}`}
                 >
                   {subStatus.filter(s => s.ok).length}/{subStatus.length}
                 </button>
@@ -316,7 +316,7 @@ export default function RedditWidget({
                     {subStatus.map(s => (
                       <span key={s.name} className="flex items-center justify-between gap-2 text-xs">
                         <span className={`truncate ${c.text} opacity-80`}>r/{s.name}</span>
-                        <span className={`shrink-0 ${s.ok === true ? "text-emerald-600 dark:text-emerald-400" : s.ok === false ? "text-red-500" : `${c.label} opacity-60`}`}>
+                        <span className={`shrink-0 ${s.ok === true ? "text-emerald-600 dark:text-emerald-400" : s.ok === false ? "text-red-500" : `${c.label} opacity-70`}`}>
                           {s.ok === true ? "loaded" : s.ok === false ? "failed" : "waiting"}
                         </span>
                       </span>
@@ -348,18 +348,18 @@ export default function RedditWidget({
                             type="button"
                             onClick={() => toggleFilter(post.subreddit.toLowerCase())}
                             title={filter ? "Show everything" : `Show only r/${post.subreddit}`}
-                            className={`inline-block min-w-0 truncate text-[11px] font-medium px-1.5 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
+                            className={`inline-block min-w-0 truncate text-xs font-medium px-1.5 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
                           >
                             r/{post.subreddit}
                           </button>
                           {isNew && (
-                            <span title="New since your last visit" className={`shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/15 ${c.text}`}>new</span>
+                            <span title="New since your last visit" className={`shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/15 ${c.text}`}>new</span>
                           )}
                           {post.pubDate && (
-                            <span className={`shrink-0 text-xs opacity-60 ${c.text}`}>{timeAgo(post.pubDate)}</span>
+                            <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>{timeAgo(post.pubDate)}</span>
                           )}
                           {post.score > 0 && (
-                            <span className={`shrink-0 text-xs opacity-60 ${c.text}`}>▲ {formatCount(post.score)}</span>
+                            <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>▲ {formatCount(post.score)}</span>
                           )}
                         </span>
                         <div className="flex items-start gap-1 group/title">
@@ -412,9 +412,6 @@ export default function RedditWidget({
             {selected && (
               <>
                 <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
-                  <button onClick={() => setSelected(null)} aria-label="Back to list" className={`shrink-0 opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
-                    <ChevronLeft size={14} />
-                  </button>
                   <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
                   <a href={selected.link} target="_blank" rel="noopener noreferrer" aria-label="Open on Reddit" className={`shrink-0 opacity-40 hover:opacity-80 ${HIT_AREA} ${FOCUS_RING}`}>
                     <ExternalLink size={12} />
@@ -422,20 +419,26 @@ export default function RedditWidget({
                 </div>
                 <div ref={detail.ref} className="flex-1 min-h-0 overflow-y-auto pr-3" onScroll={detail.onScroll}>
                   {/* The detail view always shows the post image when there is
-                      one; the settings toggle only governs list thumbnails. */}
-                  {(selected.image || selected.thumbnail) && (
-                    <a href={selected.image || selected.link} target="_blank" rel="noopener noreferrer" className="block mb-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={selected.image || selected.thumbnail}
-                        alt=""
-                        loading="lazy"
-                        // A full image that fails (expired preview link) falls back to the thumbnail.
-                        onError={e => { if (selected.thumbnail && e.currentTarget.src !== selected.thumbnail) e.currentTarget.src = selected.thumbnail; }}
-                        className="w-full max-h-80 object-contain rounded-xl bg-black/5"
-                      />
-                    </a>
-                  )}
+                      one (linking to the post, like the title); the settings
+                      toggle only governs list thumbnails. */}
+                  <div className="flex gap-2 mb-3">
+                    <BackButton c={c} onClick={() => setSelected(null)} />
+                    {(selected.image || selected.thumbnail) ? (
+                      <a href={selected.link} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 block">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selected.image || selected.thumbnail}
+                          alt=""
+                          loading="lazy"
+                          // A full image that fails (expired preview link) falls back to the thumbnail.
+                          onError={e => { if (selected.thumbnail && e.currentTarget.src !== selected.thumbnail) e.currentTarget.src = selected.thumbnail; }}
+                          className="w-full max-h-80 object-contain rounded-xl bg-black/5"
+                        />
+                      </a>
+                    ) : (
+                      <p className={`flex-1 min-w-0 self-center text-sm font-medium leading-snug break-words ${c.text}`}>{selected.title}</p>
+                    )}
+                  </div>
                   {sanitizeRedditHtml(selected.content) ? (
                     <div
                       className={`text-sm leading-relaxed break-words ${c.text} opacity-80
@@ -452,7 +455,7 @@ export default function RedditWidget({
                       dangerouslySetInnerHTML={{ __html: sanitizeRedditHtml(selected.content) }}
                     />
                   ) : (
-                    <p className={`text-xs opacity-60 ${c.text}`}>No text content: this is a link post.</p>
+                    <p className={`text-xs opacity-70 ${c.text}`}>No text content: this is a link post.</p>
                   )}
                 </div>
                 <ScrollFades c={c} top={detail.topFade} bottom={detail.bottomFade} />
@@ -494,7 +497,7 @@ export default function RedditWidget({
           </label>
 
           <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-60 ${c.label}`}>Order</span>
+            <span className={`text-xs opacity-70 ${c.label}`}>Order</span>
             <Chip c={c} active={(draft.order ?? "arrival") === "arrival"} onClick={() => setDraft(d => ({ ...d, order: "arrival" }))} title="Posts that newly made a top list go first">newest in feed</Chip>
             <Chip c={c} active={draft.order === "date"} onClick={() => setDraft(d => ({ ...d, order: "date" }))} title="By when the post was made">post date</Chip>
           </div>
@@ -516,11 +519,11 @@ export default function RedditWidget({
                         onChange={e => setSubLimit(sub.name, Math.max(1, Math.min(25, parseInt(e.target.value) || 1)))}
                         className="w-10 text-center bg-white/60 rounded-md px-1 py-0.5 outline-none border border-current/20 text-xs"
                       />
-                      <span className="opacity-60 font-normal">posts</span>
+                      <span className="opacity-70 font-normal">posts</span>
                       <button
                         onClick={() => setDraft(d => ({ ...d, subreddits: d.subreddits.filter(s => s.name !== sub.name) }))}
                         aria-label={`Remove r/${sub.name}`}
-                        className={`opacity-60 hover:opacity-100 leading-none ml-1 ${HIT_AREA} ${FOCUS_RING}`}
+                        className={`opacity-70 hover:opacity-100 leading-none ml-1 ${HIT_AREA} ${FOCUS_RING}`}
                       >
                         ×
                       </button>

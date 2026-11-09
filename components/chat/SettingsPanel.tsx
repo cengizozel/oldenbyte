@@ -153,10 +153,10 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
     <div className="flex flex-col gap-3 flex-1 min-h-0 p-4">
       <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
 
-        <p className={`text-[13px] font-ui opacity-60 ${c.label}`}>Model</p>
+        <p className={`text-xs opacity-70 ${c.label}`}>Model</p>
 
         <div>
-          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>API URL</p>
+          <p className={`text-xs mb-1 opacity-70 ${c.label}`}>API URL</p>
           <SettingsInput
             autoFocus
             type="url"
@@ -175,7 +175,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className={`text-xs opacity-60 ${c.label}`}>Model</p>
+            <p className={`text-xs opacity-70 ${c.label}`}>Model</p>
             <SmallButton c={c} onClick={() => fetchModels(draft)} disabled={loadingModels} title="Load models from server">
               {loadingModels ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Load models
@@ -203,10 +203,10 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
           {modelsError && <p className="text-red-400 text-xs mt-1">{modelsError}</p>}
         </div>
 
-        <p className={`text-[13px] font-ui opacity-60 mt-1 ${c.label}`}>Behavior</p>
+        <p className={`text-xs opacity-70 mt-1 ${c.label}`}>Behavior</p>
 
         <div>
-          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>System prompt <span className="opacity-60">(optional)</span></p>
+          <p className={`text-xs mb-1 opacity-70 ${c.label}`}>System prompt <span className="opacity-70">(optional)</span></p>
           <SettingsTextarea
             value={draft.system}
             onChange={e => setDraft(d => ({ ...d, system: e.target.value }))}
@@ -216,7 +216,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
         </div>
 
         <div>
-          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Response style</p>
+          <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Response style</p>
           <div className="flex flex-wrap gap-1">
             {(Object.keys(LENGTH_PRESETS) as Length[]).map(key => (
               <Chip
@@ -233,7 +233,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
         </div>
 
         <div>
-          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Thinking <span className="opacity-60">(reasoning models)</span></p>
+          <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Thinking <span className="opacity-70">(reasoning models)</span></p>
           <div className="flex flex-wrap gap-1">
             {EFFORT_OPTIONS.map(opt => (
               <Chip
@@ -252,16 +252,16 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
         <div>
           <button
             onClick={() => setAdvancedOpen(o => !o)}
-            className={`flex items-center gap-1 text-xs opacity-60 hover:opacity-100 ${FOCUS_RING} ${c.label}`}
+            className={`flex items-center gap-1 text-xs opacity-70 hover:opacity-100 ${FOCUS_RING} ${c.label}`}
           >
             <ChevronRight size={12} className={`transition-transform ${advancedOpen ? "rotate-90" : ""}`} />
             Advanced
-            <span className="opacity-60">
+            <span className="opacity-70">
               (cap: {draft.maxTokens ? `${draft.maxTokens} tokens` : "none"}{draft.maxTokens !== LENGTH_PRESETS[draft.length].cap ? ", custom" : ""})
             </span>
           </button>
           {advancedOpen && (<div className="mt-1.5">
-          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Max response length <span className="opacity-60">(tokens, 0 = no limit; style presets set this)</span></p>
+          <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Max response length <span className="opacity-70">(tokens, 0 = no limit; style presets set this)</span></p>
           <SettingsInput
             type="number"
             min={0}
@@ -280,13 +280,13 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
           </div>)}
         </div>
 
-        <p className={`text-[13px] font-ui opacity-60 mt-1 ${c.label}`}>Data sources</p>
+        <p className={`text-xs opacity-70 mt-1 ${c.label}`}>Data sources</p>
 
-        <p className={`text-xs -mt-1 opacity-60 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
+        <p className={`text-xs -mt-1 opacity-70 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className={`text-xs opacity-60 ${c.label}`}>Kiwix library <span className="opacity-60">(all books are searched)</span></p>
+            <p className={`text-xs opacity-70 ${c.label}`}>Kiwix library <span className="opacity-70">(all books are searched)</span></p>
             <SmallButton c={c} onClick={() => loadKiwixSources(draft.kiwixUrl)} disabled={loadingKiwix || !draft.kiwixUrl.startsWith("http")} title="List the books on the server">
               {loadingKiwix ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Check server
@@ -308,7 +308,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
         </div>
 
         <div>
-          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Anytype</p>
+          <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Anytype</p>
           <SettingsInput
             type="url"
             value={draft.anytypeUrl}
@@ -357,7 +357,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className={`text-xs opacity-60 ${c.label}`}>Anytype write bridge <span className="opacity-60">(optional, enables creating notes)</span></p>
+            <p className={`text-xs opacity-70 ${c.label}`}>Anytype write bridge <span className="opacity-70">(optional, enables creating notes)</span></p>
             <SmallButton
               c={c}
               onClick={async () => {
@@ -398,7 +398,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
         </div>
 
         <div>
-          <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Assistant writes</p>
+          <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Assistant writes</p>
           {([
             ["calendarWriteMode", "Calendar"],
             ["anytypeWriteMode", "Anytype"],

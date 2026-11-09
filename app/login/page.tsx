@@ -134,10 +134,10 @@ export default function LoginPage() {
       >
         <div className="flex flex-col items-center gap-2 mb-2 text-center">
           <Logo />
-          <span className="text-2xl leading-none text-[var(--text-primary)] font-[family-name:var(--font-playfair)]">
+          <span className="text-2xl leading-none text-[var(--text-primary)]">
             oldenbyte
           </span>
-          <span className="text-[13px] tracking-[0.2em] text-[var(--text-muted)] font-ui">
+          <span className="text-xs tracking-[0.2em] text-[var(--text-muted)]">
             {subtitle}
           </span>
         </div>

@@ -22,7 +22,7 @@ function ThinkBlock({ content, active, labelClass }: { content: string; active: 
     <div className="my-1">
       <button
         onClick={() => { toggled.current = true; setOpen(o => !o); }}
-        className={`flex items-center gap-1 text-xs ${labelClass} opacity-60 hover:opacity-100 ${FOCUS_RING}`}
+        className={`flex items-center gap-1 min-h-6 text-xs ${labelClass} opacity-70 hover:opacity-100 ${FOCUS_RING}`}
       >
         <ChevronRight size={12} className={`transition-transform ${open ? "rotate-90" : ""}`} />
         {/[\u{1F50E}\u{1F4D6}\u{1F4CA}\u{1F9E9}]/u.test(content)
@@ -30,7 +30,7 @@ function ThinkBlock({ content, active, labelClass }: { content: string; active: 
           : (active ? "Thinking…" : "Thinking")}
       </button>
       {open && (
-        <div className="mt-1 ml-1 pl-3 border-l-2 border-black/15 dark:border-white/20 text-xs opacity-60">
+        <div className="mt-1 ml-1 pl-3 border-l-2 border-black/15 dark:border-white/20 text-xs opacity-70">
           <Markdown text={content} />
         </div>
       )}
@@ -63,7 +63,7 @@ function SourcesList({ sources, labelClass, textClass }: { sources: Source[]; la
     <div className="mt-1">
       <button
         onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1 text-xs ${labelClass} opacity-60 hover:opacity-100 ${FOCUS_RING}`}
+        className={`flex items-center gap-1 min-h-6 text-xs ${labelClass} opacity-70 hover:opacity-100 ${FOCUS_RING}`}
       >
         <ChevronRight size={12} className={`transition-transform ${open ? "rotate-90" : ""}`} />
         {sources.length} source{sources.length === 1 ? "" : "s"}
@@ -73,7 +73,7 @@ function SourcesList({ sources, labelClass, textClass }: { sources: Source[]; la
           {sources.map(s => (
             <li key={s.n} className={`text-xs ${textClass} opacity-80`}>
               <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:opacity-80">
-                <span className="opacity-60">[{s.n}]</span> <span className="underline underline-offset-2">{s.title}</span>
+                <span className="opacity-70">[{s.n}]</span> <span className="underline underline-offset-2">{s.title}</span>
               </a>
             </li>
           ))}
@@ -129,7 +129,7 @@ function ProposalCards({ proposals, c, onResolve }: { proposals: Proposal[]; c: 
                 <SmallButton c={c} onClick={() => onResolve(j, false)}>Dismiss</SmallButton>
               </span>
             ) : (
-              <span className={`text-xs ${pr.status === "added" ? "text-emerald-600 dark:text-emerald-400" : pr.status === "failed" ? "text-red-500" : "opacity-60 text-[var(--text-secondary)]"}`}>
+              <span className={`text-xs ${pr.status === "added" ? "text-emerald-600 dark:text-emerald-400" : pr.status === "failed" ? "text-red-500" : "opacity-70 text-[var(--text-secondary)]"}`}>
                 {pr.status === "added" ? doneLabel : pr.status === "failed" ? failLabel : "dismissed"}
               </span>
             )}
@@ -146,14 +146,14 @@ function ProposalCards({ proposals, c, onResolve }: { proposals: Proposal[]; c: 
 // indicator once the answer flows.
 function LiveStatus({ content, c, live }: { content: string; c: ColorClasses; live: LiveInfo }) {
   if (!content) {
-    return <span className={`px-1 text-xs ${c.text} opacity-60`}>{live.waitingLabel}… <ElapsedSeconds start={live.start} active={live.active} /></span>;
+    return <span className={`px-1 text-xs ${c.text} opacity-70`}>{live.waitingLabel}… <ElapsedSeconds start={live.start} active={live.active} /></span>;
   }
   const openIdx = content.lastIndexOf("<think>");
   if (openIdx > content.lastIndexOf("</think>")) {
     const tail = content.slice(openIdx);
     const researching = /\u{1F50E}|\u{1F4D6}|\u{1F4CA}|\u{1F9E9}|checking calendar|adding "/u.test(tail);
     return (
-      <span className={`px-1 text-xs ${c.text} opacity-60`}>
+      <span className={`px-1 text-xs ${c.text} opacity-70`}>
         {researching ? "researching" : "thinking"}… <ElapsedSeconds start={live.start} active={live.active} />
       </span>
     );
@@ -203,7 +203,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
     <Fragment>
       {daySep && (
         <div className="self-center my-1">
-          <span className={`px-2 py-0.5 rounded-full text-[13px] font-ui opacity-60 ${c.label} bg-black/5 dark:bg-white/10`}>
+          <span className={`px-2 py-0.5 rounded-full text-xs opacity-80 ${c.label} bg-black/5 dark:bg-white/10`}>
             {daySep}
           </span>
         </div>
@@ -254,7 +254,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
           <button
             onClick={onOpenMemory}
             title="Open this character's memories"
-            className={`flex flex-col items-start gap-0.5 px-1 text-left opacity-60 hover:opacity-100 transition-opacity ${FOCUS_RING} ${c.label}`}
+            className={`flex flex-col items-start gap-0.5 px-1 min-h-6 text-left opacity-70 hover:opacity-100 transition-opacity ${FOCUS_RING} ${c.label}`}
           >
             {m.memory!.map((line, k) => (
               <span key={k} className="flex items-center gap-1 text-xs">
@@ -267,10 +267,10 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
         {live && <LiveStatus content={m.content} c={c} live={live} />}
         <div className="flex items-center gap-2 px-1">
           {!inProgress && m.at != null && (
-            <span className={`text-xs tabular-nums ${c.text} opacity-60`}>{msgTime(m.at)}</span>
+            <span className={`text-xs tabular-nums ${c.text} opacity-70`}>{msgTime(m.at)}</span>
           )}
           {!inProgress && m.role === "assistant" && m.stats && m.stats.tokens > 0 && (
-            <span className={`text-xs ${c.text} opacity-0 group-hover/msg:opacity-60 [@media(hover:none)]:opacity-60 transition-opacity`}>
+            <span className={`text-xs ${c.text} opacity-0 group-hover/msg:opacity-70 [@media(hover:none)]:opacity-70 transition-opacity`}>
               {m.stats.tps.toFixed(1)} tok/s · {m.stats.tokens} tokens · {m.stats.total.toFixed(1)}s
               {m.stats.ttft >= 0.05 ? ` · ${m.stats.ttft.toFixed(1)}s to first` : ""}
             </span>
@@ -280,7 +280,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
               onClick={() => onEdit(i)}
               title={m.role === "user" ? "Edit message (reruns from here)" : "Edit reply"}
               aria-label={m.role === "user" ? "Edit message" : "Edit reply"}
-              className={`opacity-0 group-hover/msg:opacity-60 [@media(hover:none)]:!opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+              className={`opacity-0 group-hover/msg:opacity-70 [@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
             >
               <Pencil size={14} />
             </button>
@@ -290,7 +290,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
               onClick={() => onRetry(i)}
               title="Regenerate the reply from here"
               aria-label="Regenerate the reply"
-              className={`opacity-0 group-hover/msg:opacity-60 [@media(hover:none)]:!opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+              className={`opacity-0 group-hover/msg:opacity-70 [@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
             >
               <RefreshCw size={14} />
             </button>
@@ -300,7 +300,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
               onClick={() => onContinue(i)}
               title="Continue this reply where it left off"
               aria-label="Continue this reply"
-              className={`opacity-0 group-hover/msg:opacity-60 [@media(hover:none)]:!opacity-60 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+              className={`opacity-0 group-hover/msg:opacity-70 [@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
             >
               <ChevronsRight size={14} />
             </button>

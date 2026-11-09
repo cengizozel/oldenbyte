@@ -462,7 +462,7 @@ export default function ScheduleWidget({
             {Array.from({ length: hours + 1 }, (_, h) => (
               <span
                 key={h}
-                className={`absolute right-1.5 text-xs font-mono opacity-60 ${c.label}`}
+                className={`absolute right-1.5 text-xs font-mono opacity-70 ${c.label}`}
                 style={{ top: h * HOUR_PX, transform: h === 0 ? "none" : h === hours ? "translateY(-100%)" : "translateY(-50%)" }}
               >
                 {fmt((startHour + h) * 60)}
@@ -472,7 +472,7 @@ export default function ScheduleWidget({
           {/* day columns */}
           {DAYS.map((_, dayIdx) => (
             <div key={dayIdx} className="flex-1 min-w-0">
-              <div className={`sticky top-0 z-10 h-6 flex items-center px-1.5 text-xs font-medium ${c.bg} ${dayIdx === todayIdx ? c.text : `${c.label} opacity-60`}`}>
+              <div className={`sticky top-0 z-10 h-6 flex items-center px-1.5 text-xs font-medium ${c.bg} ${dayIdx === todayIdx ? c.text : `${c.label} opacity-70`}`}>
                 {labels[dayIdx]}
               </div>
               <div
@@ -598,7 +598,7 @@ export default function ScheduleWidget({
         {/* Entry editor */}
         {editor && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 overflow-y-auto ${c.bg}`}>
-            <p className={`text-[13px] font-ui opacity-60 ${c.label}`}>
+            <p className={`text-xs opacity-70 ${c.label}`}>
               {editor.id ? "Edit entry" : "New entry"}
             </p>
             <SettingsInput
@@ -645,7 +645,7 @@ export default function ScheduleWidget({
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <TimeField value={editor.start} onChange={v => setEditor({ ...editor, start: v })} />
-              <span className={`opacity-60 text-xs ${c.label}`}>to</span>
+              <span className={`opacity-70 text-xs ${c.label}`}>to</span>
               {editor.byDuration ? (
                 <DurationField value={editor.minutes} onChange={v => setEditor({ ...editor, minutes: v })} />
               ) : (
@@ -708,16 +708,16 @@ export default function ScheduleWidget({
         {/* Grid-hours settings */}
         {settingsOpen && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
-            <p className={`text-[13px] font-ui opacity-60 ${c.label}`}>Grid hours</p>
+            <p className={`text-xs opacity-70 ${c.label}`}>Grid hours</p>
             <div className="flex items-center gap-2">
               <div className="flex-1">
-                <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Day starts</p>
+                <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Day starts</p>
                 <SettingsSelect value={draftStart} onChange={e => setDraftStart(+e.target.value)}>
                   {Array.from({ length: 13 }, (_, h) => <option key={h} value={h}>{fmt(h * 60)}</option>)}
                 </SettingsSelect>
               </div>
               <div className="flex-1">
-                <p className={`text-xs mb-1 opacity-60 ${c.label}`}>Day ends</p>
+                <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Day ends</p>
                 <SettingsSelect value={draftEnd} onChange={e => setDraftEnd(+e.target.value)}>
                   {Array.from({ length: 15 }, (_, i) => {
                     const h = i + 12;
@@ -748,7 +748,7 @@ export default function ScheduleWidget({
         {exportOpen && (
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
             <div className="flex items-center justify-between">
-              <p className={`text-[13px] font-ui opacity-60 ${c.label}`}>Export</p>
+              <p className={`text-xs opacity-70 ${c.label}`}>Export</p>
               <SmallButton c={c} onClick={copyExport}>
                 {copied ? <Check size={12} /> : <Copy size={12} />}
                 {copied ? "copied" : "copy"}
@@ -772,7 +772,7 @@ export default function ScheduleWidget({
           const groupDays = src.days.map(d => DAYS_SHORT[d]).join(", ");
           return (
             <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
-              <p className={`text-[13px] font-ui opacity-60 ${c.label}`}>Split from group</p>
+              <p className={`text-xs opacity-70 ${c.label}`}>Split from group</p>
               <p className={`text-sm leading-relaxed ${c.text} opacity-80`}>
                 &ldquo;{src.title}&rdquo; repeats on {groupDays}. Moving this block pulls {DAYS[splitAsk.fromDay]} out of that group:
                 it becomes its own entry at {DAYS[splitAsk.toDay]} {fmt(splitAsk.toStartMin % 1440)}, and the others stay put.
@@ -780,7 +780,7 @@ export default function ScheduleWidget({
               <div className="flex items-center justify-end gap-2 mt-auto">
                 <button
                   onClick={() => setSplitAsk(null)}
-                  className={`h-7 px-2 text-xs ${c.label} opacity-60 hover:opacity-100 transition-opacity ${FOCUS_RING}`}
+                  className={`h-7 px-2 text-xs ${c.label} opacity-70 hover:opacity-100 transition-opacity ${FOCUS_RING}`}
                 >
                   Cancel
                 </button>
@@ -801,7 +801,7 @@ export default function ScheduleWidget({
         {expanded ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
             <CalendarRange size={16} className={`${c.label} opacity-50`} />
-            <p className={`text-xs ${c.text} opacity-60`}>schedule is open in fullscreen</p>
+            <p className={`text-xs ${c.text} opacity-70`}>schedule is open in fullscreen</p>
             <SmallButton c={c} onClick={() => setExpanded(false)}>Close</SmallButton>
           </div>
         ) : card(false)}

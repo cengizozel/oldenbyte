@@ -222,7 +222,7 @@ export default function CalendarWidget({
             ) : (
               [...byDay.entries()].map(([day, list]) => (
                 <div key={day} className="flex flex-col">
-                  <span className={`text-xs font-medium ${c.label} ${day === today ? "" : "opacity-60"}`}>
+                  <span className={`text-xs font-medium ${c.label} ${day === today ? "" : "opacity-70"}`}>
                     {dayHeading(day, today, tomorrow)}
                   </span>
                   {list.map((ev, i) => (
@@ -230,9 +230,9 @@ export default function CalendarWidget({
                       <span className="w-2 h-2 mt-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(ev.calendar).dot }} />
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm leading-snug truncate ${c.text}`}>{ev.title}</p>
-                        {ev.location && <p className={`text-xs opacity-60 truncate ${c.label}`}>{ev.location}</p>}
+                        {ev.location && <p className={`text-xs opacity-70 truncate ${c.label}`}>{ev.location}</p>}
                       </div>
-                      <span className={`shrink-0 text-xs tabular-nums opacity-60 ${c.text}`}>
+                      <span className={`shrink-0 text-xs tabular-nums opacity-70 ${c.text}`}>
                         {ev.allDay ? "all day" : ev.start.slice(11, 16)}
                       </span>
                     </div>
@@ -278,11 +278,11 @@ export default function CalendarWidget({
         </SmallButton>
         {available.length > 0 && (
           <div className="flex flex-col gap-1">
-            <p className={`text-xs opacity-60 ${c.label}`}>Calendars to show</p>
+            <p className={`text-xs opacity-70 ${c.label}`}>Calendars to show</p>
             {available.map(cal => {
               const on = draft.calendars.some(s => s.url === cal.url);
               return (
-                <label key={cal.url} className={`flex items-center gap-2 text-xs cursor-pointer ${c.text} ${on ? "opacity-80" : "opacity-60"}`}>
+                <label key={cal.url} className={`flex items-center gap-2 text-xs cursor-pointer ${c.text} ${on ? "opacity-80" : "opacity-70"}`}>
                   <input
                     type="checkbox"
                     checked={on}
@@ -296,14 +296,14 @@ export default function CalendarWidget({
                   />
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tagColor(cal.name).dot }} />
                   <span className="truncate">{cal.name}</span>
-                  {cal.readOnly && <span className={`text-[11px] opacity-60 ${c.label}`}>read-only</span>}
+                  {cal.readOnly && <span className={`text-xs opacity-70 ${c.label}`}>read-only</span>}
                 </label>
               );
             })}
           </div>
         )}
         <div className="flex items-center gap-2">
-          <span className={`text-xs opacity-60 ${c.label}`}>Days ahead</span>
+          <span className={`text-xs opacity-70 ${c.label}`}>Days ahead</span>
           {[7, 14, 30].map(n => (
             <Chip key={n} c={c} active={draft.days === n} onClick={() => setDraft(d => ({ ...d, days: n }))}>
               {n}

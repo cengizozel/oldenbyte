@@ -212,7 +212,7 @@ export default function KiwixWidget({
                     onClick={goHome}
                     title="Back to search home"
                     aria-label="Back to search home"
-                    className={`opacity-60 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+                    className={`opacity-70 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
                   >
                     <Home size={14} />
                   </button>
@@ -264,7 +264,7 @@ export default function KiwixWidget({
                                 <ExternalLink size={12} />
                               </a>
                             </div>
-                            {r.snippet && <p className={`text-xs mt-0.5 opacity-60 ${c.text} line-clamp-2`}>{r.snippet}</p>}
+                            {r.snippet && <p className={`text-xs mt-0.5 opacity-70 ${c.text} line-clamp-2`}>{r.snippet}</p>}
                           </li>
                         ))}
                       </ul>
@@ -281,11 +281,11 @@ export default function KiwixWidget({
                 {selected && (
                   <>
                     <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
-                      <button onClick={() => setSelected(null)} title="Back to results" aria-label="Back to results" className={`shrink-0 opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
+                      <button onClick={() => setSelected(null)} title="Back to results" aria-label="Back to results" className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
                         <ChevronLeft size={14} />
                       </button>
                       <span className="flex-1 min-w-0 text-sm font-medium truncate">{selected.title}</span>
-                      <a href={selected.url} target="_blank" rel="noopener noreferrer" className={`shrink-0 opacity-60 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`} title="Open in Kiwix" aria-label="Open in Kiwix">
+                      <a href={selected.url} target="_blank" rel="noopener noreferrer" className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`} title="Open in Kiwix" aria-label="Open in Kiwix">
                         <ExternalLink size={14} />
                       </a>
                     </div>
@@ -298,7 +298,7 @@ export default function KiwixWidget({
                         ) : extract ? (
                           <p className={`text-sm leading-relaxed opacity-80 whitespace-pre-line break-words ${c.text}`}>{extract}</p>
                         ) : (
-                          <p className={`text-xs opacity-60 ${c.text}`}>No preview available, open in Kiwix.</p>
+                          <p className={`text-xs opacity-70 ${c.text}`}>No preview available, open in Kiwix.</p>
                         )}
                       </div>
                       <ScrollFades c={c} top={articleFade.topFade} bottom={articleFade.bottomFade} />
@@ -315,7 +315,7 @@ export default function KiwixWidget({
       back={
         <>
           <div>
-            <p className={`text-xs mb-1.5 opacity-60 ${c.label}`}>Kiwix</p>
+            <p className={`text-xs mb-1.5 opacity-70 ${c.label}`}>Kiwix</p>
             <SettingsInput
               type="url"
               value={draft.baseUrl}
@@ -346,11 +346,11 @@ export default function KiwixWidget({
                 ))}
               </SettingsSelect>
             ) : (
-              <span className={`text-xs opacity-60 truncate min-w-0 ${c.text}`}>{draft.sourceTitle || "no source selected"}</span>
+              <span className={`text-xs opacity-70 truncate min-w-0 ${c.text}`}>{draft.sourceTitle || "no source selected"}</span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-60 ${c.label}`}>Results</span>
+            <span className={`text-xs opacity-70 ${c.label}`}>Results</span>
             {LIMITS.map((n) => (
               <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft((d) => ({ ...d, limit: n }))} className="w-8 tabular-nums">
                 {n}
