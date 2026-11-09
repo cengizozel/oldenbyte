@@ -828,8 +828,12 @@ export default function WidgetGrid({
                 if (!widget) return <div key={i} />;
                 const isGroupingSource = groupingSource === i;
                 const isGroupingTarget = groupingSource !== null && groupingSource !== i;
+                // A tab group's row has no background of its own: the tile is
+                // painted in the shown tab's color so the dashed border overlay
+                // above it stays visible along the top edge.
+                const groupC = (item.tabs?.length ?? 0) > 0 ? colorMap[instances[activeTabs[item.i] ?? item.i]?.color ?? "neutral"] : null;
                 return (
-                  <div key={i} className="relative rounded-2xl overflow-hidden flex flex-col h-full">
+                  <div key={i} className={`relative rounded-2xl overflow-hidden flex flex-col h-full ${groupC?.bg ?? ""}`}>
                     {(item.tabs?.length ?? 0) > 0 && (
                       <div
                         className="shrink-0 relative z-20"
@@ -837,15 +841,12 @@ export default function WidgetGrid({
                       >
                         {(() => {
                           const activeId = activeTabs[item.i] ?? item.i;
-                          const activeWidget = instances[activeId];
-                          const activeC = colorMap[activeWidget?.color ?? "neutral"];
                           return (
                             <TabStrip
                               order={[item.i, ...(item.tabs ?? [])]}
                               activeId={activeId}
                               instances={instances}
                               editing
-                              className={activeC.bg}
                               onSelect={tabId => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
                               onUngroup={tabId => handleUngroupTab(item.i, tabId)}
                               onReorder={order => handleReorderTabs(item.i, order)}
@@ -884,7 +885,7 @@ export default function WidgetGrid({
                         onClick={() => handleGroupWith(i)}
                         className="absolute inset-0 z-20 rounded-2xl bg-black/15 flex items-center justify-center cursor-pointer hover:bg-black/25 transition-colors"
                       >
-                        <div className="bg-white rounded-xl px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm flex items-center gap-1.5 pointer-events-none">
+                        <div className="bg-[var(--surface)] border border-[var(--surface-border)] rounded-xl px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] shadow-sm flex items-center gap-1.5 pointer-events-none">
                           <Layers size={12} />
                           Add as tab
                         </div>
@@ -899,25 +900,25 @@ export default function WidgetGrid({
                           aria-label={`Move ${widget.title} to another dashboard`}
                           aria-expanded={moveMenuFor === i}
                           title="Move to another dashboard"
-                          className={`absolute top-2 right-14 z-20 w-5 h-5 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
+                          className={`absolute top-2 right-16 z-20 w-6 h-6 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
                             moveMenuFor === i
-                              ? "bg-blue-100 border-blue-300 text-blue-600"
-                              : "bg-white border-neutral-200 text-neutral-400 hover:text-neutral-600"
+                              ? "bg-blue-100 border-blue-300 text-blue-600 dark:bg-blue-500/20 dark:border-blue-400/50 dark:text-blue-300"
+                              : "bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                           }`}
                         >
-                          <ArrowRightLeft size={12} />
+                          <ArrowRightLeft size={14} />
                         </button>
                         {moveMenuFor === i && (
                           <div
                             onMouseDown={e => e.stopPropagation()}
-                            className="absolute top-8 right-2 z-30 min-w-32 max-w-[80%] rounded-xl border border-neutral-200 bg-white shadow-md py-1 text-xs text-neutral-700"
+                            className="absolute top-9 right-2 z-30 min-w-32 max-w-[80%] rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-md py-1 text-sm text-[var(--text-primary)]"
                           >
-                            <div className="px-3 py-1 text-xs uppercase tracking-wide text-neutral-400">Move to</div>
+                            <div className="px-3 py-1 text-sm text-[var(--text-muted)]">Move to</div>
                             {otherDashboards.map(d => (
                               <button
                                 key={d.id}
                                 onClick={() => moveWidget(i, d.id)}
-                                className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 truncate"
+                                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 truncate"
                               >
                                 {d.name}
                               </button>
@@ -933,13 +934,13 @@ export default function WidgetGrid({
                       aria-label={isGroupingSource ? "Cancel grouping" : "Group with another widget as tabs"}
                       aria-pressed={isGroupingSource}
                       title={isGroupingSource ? "Cancel grouping" : "Group as tabs"}
-                      className={`absolute top-2 right-8 z-20 w-5 h-5 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
+                      className={`absolute top-2 right-9 z-20 w-6 h-6 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
                         isGroupingSource
-                          ? "bg-blue-100 border-blue-300 text-blue-600"
-                          : "bg-white border-neutral-200 text-neutral-400 hover:text-neutral-600"
+                          ? "bg-blue-100 border-blue-300 text-blue-600 dark:bg-blue-500/20 dark:border-blue-400/50 dark:text-blue-300"
+                          : "bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       }`}
                     >
-                      <Layers size={12} />
+                      <Layers size={14} />
                     </button>
                     {/* Remove button */}
                     <button
@@ -947,7 +948,7 @@ export default function WidgetGrid({
                       onClick={() => removeWidget(i)}
                       aria-label={`Remove ${widget.title}`}
                       title="Remove widget"
-                      className="absolute top-2 right-2 z-20 w-5 h-5 flex items-center justify-center rounded-full bg-white border border-neutral-200 text-neutral-400 hover:text-neutral-600 text-sm leading-none shadow-sm"
+                      className="absolute top-2 right-2 z-20 w-6 h-6 flex items-center justify-center rounded-full border bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm leading-none shadow-sm"
                     >
                       ×
                     </button>
