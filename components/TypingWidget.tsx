@@ -1158,17 +1158,23 @@ function Metronome({
 // Live counter above the text: seconds left (time mode) or words done, plus
 // wpm. Ticks on its own interval so only this element re-renders, never the
 // parent's words.
+// The countdown ticks four times a second so the seconds never look late; the
+// wpm is sampled once a second so it reads as a number, not a flicker.
 function LiveStats({ endsAt, progress, wpm }: { endsAt?: number; progress: string; wpm: () => number }) {
   const [, tick] = useState(0);
+  const [shownWpm, setShownWpm] = useState(() => wpm());
+  const wpmRef = useRef(wpm);
+  useEffect(() => { wpmRef.current = wpm; }, [wpm]);
   useEffect(() => {
     const id = setInterval(() => tick(n => n + 1), 250);
-    return () => clearInterval(id);
+    const sample = setInterval(() => setShownWpm(wpmRef.current()), 1000);
+    return () => { clearInterval(id); clearInterval(sample); };
   }, []);
   const left = endsAt !== undefined ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000)) : null;
   return (
     <>
       <span className="font-semibold">{left !== null ? left : progress}</span>
-      <span className="opacity-70">{wpm()} wpm</span>
+      <span className="opacity-70">{shownWpm} wpm</span>
     </>
   );
 }
