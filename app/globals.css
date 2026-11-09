@@ -120,6 +120,38 @@
   --clock-center:       #e879f9;
 }
 
+/* Grey: dark mode with every widget palette on the neutral one, for a screen
+   that is easy on the eyes rather than colorful. Applied as `.grey` next to
+   `.dark` (lib/theme.ts), so everything below only remaps variables. */
+.dark.grey {
+  --w-amber-bg:         var(--w-neutral-bg);
+  --w-amber-border:     var(--w-neutral-border);
+  --w-amber-label:      var(--w-neutral-label);
+  --w-amber-text:       var(--w-neutral-text);
+  --w-sky-bg:           var(--w-neutral-bg);
+  --w-sky-border:       var(--w-neutral-border);
+  --w-sky-label:        var(--w-neutral-label);
+  --w-sky-text:         var(--w-neutral-text);
+  --w-rose-bg:          var(--w-neutral-bg);
+  --w-rose-border:      var(--w-neutral-border);
+  --w-rose-label:       var(--w-neutral-label);
+  --w-rose-text:        var(--w-neutral-text);
+  --w-teal-bg:          var(--w-neutral-bg);
+  --w-teal-border:      var(--w-neutral-border);
+  --w-teal-label:       var(--w-neutral-label);
+  --w-teal-text:        var(--w-neutral-text);
+  --w-orange-bg:        var(--w-neutral-bg);
+  --w-orange-border:    var(--w-neutral-border);
+  --w-orange-label:     var(--w-neutral-label);
+  --w-orange-text:      var(--w-neutral-text);
+
+  --clock-face:         #d4d4d4;
+  --clock-hour:         #f5f5f5;
+  --clock-minute:       #a3a3a3;
+  --clock-second:       #8a8a8a;
+  --clock-center:       #f5f5f5;
+}
+
 /* ── Base ─────────────────────────────────────────────────────────────────── */
 
 /* The closed settings drawer waits just past the right edge. iOS browsers
@@ -158,6 +190,11 @@ body {
 .dark .w-rose-glow   { box-shadow: 0 0 6px rgba(253,164,175,0.9), 0 0 20px rgba(253,164,175,0.55), 0 0 55px rgba(253,164,175,0.22); }
 .dark .w-teal-glow   { box-shadow: 0 0 6px rgba(94,234,212,0.9),  0 0 20px rgba(94,234,212,0.55),  0 0 55px rgba(94,234,212,0.22);  }
 .dark .w-orange-glow { box-shadow: 0 0 6px rgba(253,186,116,0.9), 0 0 20px rgba(253,186,116,0.55), 0 0 55px rgba(253,186,116,0.22); }
+/* Grey keeps a soft, uniform glow. */
+.dark.grey .w-amber-glow, .dark.grey .w-sky-glow, .dark.grey .w-neutral-glow,
+.dark.grey .w-rose-glow, .dark.grey .w-teal-glow, .dark.grey .w-orange-glow {
+  box-shadow: 0 0 6px rgba(212,212,212,0.45), 0 0 20px rgba(212,212,212,0.2), 0 0 55px rgba(212,212,212,0.08);
+}
 
 /* ── react-grid-layout ────────────────────────────────────────────────────── */
 

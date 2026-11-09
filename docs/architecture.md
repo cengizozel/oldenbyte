@@ -65,7 +65,7 @@ components/
   chat/                 # Chat widget panels (history, characters, settings, messages)
   BankWidget.tsx        # Renders any declarative widget-bank definition
   SaveErrorNotice.tsx   # Notice shown when a settings write fails
-  ThemeHotkey.tsx       # Global Shift+D dark mode toggle
+  ThemeHotkey.tsx       # Global Shift+D theme hotkey (light, dark, grey)
   TopBar.tsx            # Header: editable fields, date/clock, dashboard switcher, settings panel
   WidgetCard.tsx        # Fallback/empty widget shell
   WidgetGrid.tsx        # Grid layout, view modes, drag-drop, persistence, WIDGET_COMPONENTS
@@ -98,7 +98,7 @@ lib/
   settingKeys.ts        # isCacheKey: which setting keys are disposable caches
   ssrf.ts               # SSRF guard: safeFetch, fetchForUser, capped body reads
   storage.ts            # Client-side storage API wrapper
-  theme.ts              # Shared light/dark toggle (TopBar button, Shift+D hotkey)
+  theme.ts              # Shared theme control: light, dark, grey (settings drawer, Shift+D hotkey)
   timezone.ts           # Timezone preference
   useScrollFade.ts      # Scroll-fade hook for widget scroll containers
   weather.ts            # WMO weather-code labels shared by widget/digest/chat
@@ -193,7 +193,7 @@ Tracks use `minmax(0, 1fr)` and cells `min-w-0` so a widget with intrinsically w
 
 ## Theming
 
-Dark/light mode is implemented via CSS custom properties on `:root` and `.dark`. The `.dark` class is toggled on `<html>` by the settings panel switch or Shift+D (`lib/theme.ts`), saved to the database under `theme`, and mirrored to `localStorage` for the pre-paint script. A `suppressHydrationWarning` attribute on `<html>` and an inline script in `<head>` prevent FOUC.
+Themes are CSS custom properties on `:root` (light) and `.dark`; the grey theme adds `.grey` next to `.dark` and remaps every widget palette to the neutral one. The `.dark` class is toggled on `<html>` by the settings panel switch or Shift+D (`lib/theme.ts`), saved to the database under `theme`, and mirrored to `localStorage` for the pre-paint script. A `suppressHydrationWarning` attribute on `<html>` and an inline script in `<head>` prevent FOUC.
 
 Tailwind v4 `dark:` utility variants are configured with `@variant dark (&:where(.dark, .dark *))` in `globals.css`, binding them to the `.dark` class rather than the default `prefers-color-scheme` media query.
 

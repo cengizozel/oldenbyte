@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef, type RefObject } from "react";
-import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, Plus, Pencil, Search, LogOut, Shield, GripVertical } from "lucide-react";
+import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, ChevronRight, Plus, Pencil, Search, LogOut, GripVertical } from "lucide-react";
 import * as storage from "@/lib/storage";
-import { isDark, toggleTheme, THEME_EVENT } from "@/lib/theme";
+import { applyTheme, currentTheme, readTheme, setThemeClasses, THEME_EVENT, THEMES, type Theme } from "@/lib/theme";
 import { layoutKey, instancesKey, PRELOAD_KEY, PRELOAD_EVENT, type DashboardsState } from "@/lib/dashboards";
 import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
 import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, TZ_AUTO } from "@/lib/timezone";
 import Toggle from "@/components/ui/Toggle";
 import { KeyboardSettings } from "@/components/KeyboardLayer";
 import { NEW_DASHBOARD_EVENT } from "@/lib/keyboard";
-import { FOCUS_RING } from "@/components/ui/Field";
+import { FOCUS_RING, HIT_AREA, SettingsRow, SettingsSection } from "@/components/ui/Field";
 
 // ── EditableField ─────────────────────────────────────────────────────────
 
@@ -533,44 +533,42 @@ function AccountSection({ open }: { open: boolean }) {
   if (!me) return null;
 
   return (
-    <section className="flex flex-col gap-3">
-      <span className="text-sm text-[var(--text-muted)]">Account</span>
-
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-[var(--text-secondary)] truncate" title={me.username}>{me.username}</span>
+    <SettingsSection title="Account">
+      <SettingsRow label={<span title={me.username}>{me.username}</span>} hint={me.role === "admin" ? "Administrator" : "Member"}>
         <button
           onClick={logout}
           title="Log out"
-          className="flex items-center gap-1 shrink-0 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          className={`flex items-center gap-1.5 min-h-7 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors ${FOCUS_RING}`}
         >
-          <LogOut size={12} />
+          <LogOut size={14} />
           Log out
         </button>
-      </div>
+      </SettingsRow>
 
       {me.role === "admin" && (
         <a
           href="/admin"
-          className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          className={`flex items-center justify-between gap-3 min-h-10 py-1.5 text-sm text-[var(--text-primary)] hover:text-[var(--text-secondary)] transition-colors ${FOCUS_RING}`}
         >
-          <Shield size={12} />
-          Admin
+          <span>Admin panel</span>
+          <ChevronRight size={14} className="text-[var(--text-muted)]" />
         </a>
       )}
 
       {me.mustChangePassword && (
-        <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-2.5 py-2 leading-relaxed">
+        <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-2.5 py-2 my-2 leading-relaxed">
           You are using a temporary password. Please change it below.
         </p>
       )}
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col py-1.5">
         <button
           onClick={() => { setPwOpen(o => !o); setError(""); setDone(false); }}
-          className="flex items-center justify-between text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          aria-expanded={pwOpen}
+          className={`flex items-center justify-between gap-3 min-h-7 text-sm text-[var(--text-primary)] ${FOCUS_RING}`}
         >
           <span>Change password</span>
-          <ChevronDown size={14} className={`transition-transform ${pwOpen ? "rotate-180" : ""}`} />
+          <ChevronDown size={14} className={`text-[var(--text-muted)] transition-transform ${pwOpen ? "rotate-180" : ""}`} />
         </button>
 
         {pwOpen && (
@@ -607,7 +605,7 @@ function AccountSection({ open }: { open: boolean }) {
           </div>
         )}
       </div>
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -616,8 +614,8 @@ function AccountSection({ open }: { open: boolean }) {
 function SettingsPanel({
   open,
   onClose,
-  dark,
-  onToggleDark,
+  theme,
+  onTheme,
   demo,
   onToggleDemo,
   timezone,
@@ -630,8 +628,8 @@ function SettingsPanel({
   onClose: () => void;
   // Gets focus back when the drawer closes (the settings button).
   returnFocusRef?: RefObject<HTMLElement | null>;
-  dark: boolean;
-  onToggleDark: () => void;
+  theme: Theme;
+  onTheme: (t: Theme) => void;
   demo: boolean;
   onToggleDemo: () => void;
   timezone: string;
@@ -672,65 +670,61 @@ function SettingsPanel({
         aria-hidden={!open}
         inert={!open}
         tabIndex={-1}
-        className={`fixed top-0 right-0 h-full w-72 z-50 bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl flex flex-col outline-none duration-300 ease-in-out ${open ? "translate-x-0 visible transition-transform" : "translate-x-full invisible transition-[transform,visibility]"}`}
+        className={`fixed top-0 right-0 h-full w-80 max-w-full z-50 bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl flex flex-col outline-none duration-300 ease-in-out ${open ? "translate-x-0 visible transition-transform" : "translate-x-full invisible transition-[transform,visibility]"}`}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[var(--surface-border)]">
-          <span className="text-sm font-medium text-[var(--text-primary)]">Settings</span>
-          <button onClick={onClose} aria-label="Close settings" title="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors ${FOCUS_RING}`}>
-            <X size={14} />
+          <span className="text-base font-medium text-[var(--text-primary)]">Settings</span>
+          <button onClick={onClose} aria-label="Close settings" title="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors ${HIT_AREA} ${FOCUS_RING}`}>
+            <X size={16} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-6">
+        <div className="flex-1 overflow-y-auto px-5 pb-4 flex flex-col">
           <AccountSection open={open} />
 
-          <section className="flex flex-col gap-3">
-            <span className="text-sm text-[var(--text-muted)]">Appearance</span>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[var(--text-secondary)]">
-                Dark mode
-                <kbd className="ml-2 px-1.5 py-0.5 rounded-md border border-[var(--surface-border)] text-sm text-[var(--text-muted)] align-middle">⇧D</kbd>
-              </span>
-              <Toggle checked={dark} onChange={onToggleDark} label="Dark mode" title="Toggle dark mode (Shift+D)" />
-            </div>
-          </section>
+          <SettingsSection title="Appearance">
+            <SettingsRow label="Theme" hint="Shift+D switches">
+              <div role="radiogroup" aria-label="Theme" className="flex rounded-lg bg-black/5 dark:bg-white/10 p-0.5">
+                {THEMES.map(t => (
+                  <button
+                    key={t.id}
+                    role="radio"
+                    aria-checked={theme === t.id}
+                    onClick={() => onTheme(t.id)}
+                    className={`h-7 px-2.5 rounded-md text-sm transition-colors ${FOCUS_RING} ${
+                      theme === t.id
+                        ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
+                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </SettingsRow>
+          </SettingsSection>
 
-          <section className="flex flex-col gap-2">
-            <span className="text-sm text-[var(--text-muted)]">Time</span>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-[var(--text-secondary)] shrink-0">Timezone</span>
-              <TimezoneSelect value={timezone} onChange={onChangeTimezone} />
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <span className="text-sm text-[var(--text-muted)]">Performance</span>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[var(--text-secondary)]">Preload dashboards</span>
+          <SettingsSection title="Dashboards">
+            <SettingsRow label="Preload dashboards" hint="Load every dashboard at startup so switching is instant.">
               <Toggle
                 checked={preload}
                 onChange={onTogglePreload}
                 label="Preload dashboards"
                 title={preload ? "Load dashboards on first visit" : "Load every dashboard at startup"}
               />
-            </div>
-            <p className="text-sm text-[var(--text-muted)] leading-relaxed -mt-1">
-              Load every dashboard in the background when the page opens, so switching between them is instant. Uses more data and memory at startup.
-            </p>
-          </section>
+            </SettingsRow>
+            <SettingsRow label="Demo mode" hint="Sample dashboards. Nothing you change is saved.">
+              <Toggle checked={demo} onChange={onToggleDemo} label="Demo mode" title={demo ? "Exit demo mode" : "Enter demo mode"} />
+            </SettingsRow>
+          </SettingsSection>
 
           <KeyboardSettings />
 
-          <section className="flex flex-col gap-3">
-            <span className="text-sm text-[var(--text-muted)]">Preview</span>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[var(--text-secondary)]">Demo mode</span>
-              <Toggle checked={demo} onChange={onToggleDemo} label="Demo mode" title={demo ? "Exit demo mode" : "Enter demo mode"} />
-            </div>
-            <p className="text-sm text-[var(--text-muted)] leading-relaxed -mt-1">
-              Preview the first-run dashboards with sample data. Your own data is untouched and nothing you change in demo mode is saved.
-            </p>
-          </section>
+          <SettingsSection title="Time">
+            <SettingsRow label="Timezone">
+              <TimezoneSelect value={timezone} onChange={onChangeTimezone} />
+            </SettingsRow>
+          </SettingsSection>
         </div>
 
         <div className="shrink-0 px-5 py-3 border-t border-[var(--surface-border)]">
@@ -990,7 +984,7 @@ export default function TopBar({
   dashboards?: DashboardsState | null;
   onDashboardsChange?: (next: DashboardsState) => void;
 }) {
-  const [dark, setDark] = useState(false);
+  const [theme, setTheme] = useState<Theme>("light");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [demo, setDemo] = useState(false);
   const [timezone, setTz] = useState("");
@@ -1021,11 +1015,11 @@ export default function TopBar({
   // keep DB ↔ localStorage ↔ DOM consistent.
   useEffect(() => {
     storage.getItem("theme").then(saved => {
-      const startDark = saved ? saved === "dark" : isDark();
-      setDark(startDark);
-      document.documentElement.classList.toggle("dark", startDark);
+      const start = saved ? readTheme(saved) : currentTheme();
+      setTheme(start);
+      setThemeClasses(start);
       if (!isDemoMode()) {
-        try { localStorage.setItem("theme", startDark ? "dark" : "light"); } catch {}
+        try { localStorage.setItem("theme", start); } catch {}
       }
     });
   }, []);
@@ -1033,12 +1027,10 @@ export default function TopBar({
   // Theme can be toggled from here or the global Shift+D hotkey; sync the switch
   // UI from the shared `themechange` event.
   useEffect(() => {
-    const onChange = (e: Event) => setDark(!!(e as CustomEvent).detail);
+    const onChange = (e: Event) => setTheme(readTheme((e as CustomEvent).detail));
     window.addEventListener(THEME_EVENT, onChange);
     return () => window.removeEventListener(THEME_EVENT, onChange);
   }, []);
-
-  const toggleDark = toggleTheme;
 
   return (
     <>
@@ -1121,8 +1113,8 @@ export default function TopBar({
     <SettingsPanel
       open={settingsOpen}
       onClose={() => setSettingsOpen(false)}
-      dark={dark}
-      onToggleDark={toggleDark}
+      theme={theme}
+      onTheme={applyTheme}
       demo={demo}
       onToggleDemo={() => (demo ? exitDemoMode() : enterDemoMode())}
       timezone={timezone}

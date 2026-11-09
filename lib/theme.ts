@@ -1,22 +1,48 @@
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
 
-// Shared light/dark theme control, usable from anywhere (TopBar button, the
-// global Shift+D hotkey). Reads/writes the `.dark` class on <html>, mirrors it
-// to localStorage (for the pre-paint FOUC script) and the database, and emits a
-// `themechange` event so any mounted UI (e.g. the TopBar switch) can sync.
+// Shared theme control, usable from anywhere (the settings drawer, the global
+// Shift+D hotkey). Three themes: light, dark, and grey (dark with every widget
+// palette remapped to the neutral one, see app/globals.css). The theme lives
+// as classes on <html> (`dark`, plus `grey`), mirrored to localStorage for the
+// pre-paint script in app/layout.tsx and to the database, and a `themechange`
+// event tells mounted UI (the drawer's control) to sync.
+
+export type Theme = "light" | "dark" | "grey";
+
+export const THEMES: { id: Theme; label: string }[] = [
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+  { id: "grey", label: "Grey" },
+];
 
 export const THEME_EVENT = "themechange";
 
-export function isDark(): boolean {
-  return typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+export function readTheme(value: unknown): Theme {
+  return value === "dark" || value === "grey" ? value : "light";
 }
 
-export function applyTheme(next: boolean) {
-  document.documentElement.classList.toggle("dark", next);
+export function currentTheme(): Theme {
+  if (typeof document === "undefined") return "light";
+  const cl = document.documentElement.classList;
+  return cl.contains("grey") ? "grey" : cl.contains("dark") ? "dark" : "light";
+}
+
+export function isDark(): boolean {
+  return currentTheme() !== "light";
+}
+
+export function setThemeClasses(theme: Theme) {
+  const cl = document.documentElement.classList;
+  cl.toggle("dark", theme !== "light");
+  cl.toggle("grey", theme === "grey");
+}
+
+export function applyTheme(next: Theme) {
+  setThemeClasses(next);
 
   // Firefox doesn't repaint an SVG's `currentColor` when it isn't being painted
-  // — our action icons sit at opacity:0 until hover, so after a theme toggle the
+  // — our action icons sit at opacity:0 until hover, so after a theme change the
   // non-hovered ones keep the old color until something forces a redraw. Nudge
   // every lucide icon (display none → reflow → restore) so they recolor live.
   // Same synchronous turn, so the browser never paints the hidden state — no
@@ -27,18 +53,18 @@ export function applyTheme(next: boolean) {
     svg.style.display = "";
   });
 
-  const value = next ? "dark" : "light";
-  // The localStorage mirror feeds the pre-paint FOUC script, so a demo-session
-  // toggle must not touch it: it would survive exiting demo.
+  // The localStorage mirror feeds the pre-paint script, so a demo-session
+  // change must not touch it: it would survive exiting demo.
   if (!isDemoMode()) {
-    try { localStorage.setItem("theme", value); } catch { /* private mode */ }
+    try { localStorage.setItem("theme", next); } catch { /* private mode */ }
   }
-  storage.setItem("theme", value);
+  storage.setItem("theme", next);
   window.dispatchEvent(new CustomEvent(THEME_EVENT, { detail: next }));
 }
 
-// Read the live DOM class as the source of truth so this stays correct even
-// from a key handler bound once (no stale React state).
+// Shift+D: light, dark, grey, and round again. Reads the live DOM classes as
+// the source of truth so this stays correct from a key handler bound once.
 export function toggleTheme() {
-  applyTheme(!isDark());
+  const order: Theme[] = ["light", "dark", "grey"];
+  applyTheme(order[(order.indexOf(currentTheme()) + 1) % order.length]);
 }

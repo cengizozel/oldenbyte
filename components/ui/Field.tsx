@@ -1,6 +1,6 @@
 "use client";
 
-import type {
+import type { ReactNode,
   InputHTMLAttributes,
   Ref,
   SelectHTMLAttributes,
@@ -35,4 +35,28 @@ export function SettingsSelect({ className = "", ...props }: SelectHTMLAttribute
 
 export function SettingsTextarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={`${FIELD_CLASS} resize-none ${className}`} />;
+}
+
+// Settings drawer layout: a titled section of rows, each row a label (with an
+// optional one-line hint under it) on the left and its control on the right,
+// separated by hairlines. Rows are at least 40px tall so they are easy targets.
+export function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col">
+      <h3 className="text-sm text-[var(--text-muted)] pt-5 pb-1">{title}</h3>
+      <div className="flex flex-col divide-y divide-[var(--surface-border)]">{children}</div>
+    </section>
+  );
+}
+
+export function SettingsRow({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 min-h-10 py-1.5">
+      <div className="min-w-0 flex flex-col">
+        <span className="text-sm text-[var(--text-primary)] truncate">{label}</span>
+        {hint && <span className="text-sm text-[var(--text-muted)] leading-snug">{hint}</span>}
+      </div>
+      {children && <div className="shrink-0 flex items-center gap-2">{children}</div>}
+    </div>
+  );
 }

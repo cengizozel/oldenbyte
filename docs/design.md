@@ -133,5 +133,13 @@ the palette `label` color at 50% opacity.
 Top bar text, in the same face as the widgets: title and the right-hand field
 at `text-2xl font-medium` (`text-lg` on phones); the date at `text-lg`; the
 dashboard switcher at `text-base` (`text-sm` on phones) in the secondary text
-color; action icons at 16px in the secondary color. Settings sections use
-`text-sm` labels at 70% in normal case. No all-caps text anywhere.
+color; action icons at 16px in the secondary color. No all-caps text anywhere.
+
+The settings drawer is built from `SettingsSection` and `SettingsRow`
+(`components/ui/Field.tsx`): a muted `text-sm` section title, then rows at
+least 40px tall separated by hairlines, each with its label in the primary
+color, an optional one-line hint under it in the muted color, and its control
+on the right. Long lists (the key bindings) sit behind a disclosure row, so
+the drawer reads as a short list of decisions. Themes: light, dark and grey
+(dark with every widget palette on the neutral one), chosen with a segmented
+control and cycled with Shift+D.

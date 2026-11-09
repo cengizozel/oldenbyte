@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, ChevronDown } from "lucide-react";
 import type { DashboardsState } from "@/lib/dashboards";
 import {
   DEFAULT_KEYBOARD, KEYBOARD_ACTIONS, KEYBOARD_EVENT, NEW_DASHBOARD_EVENT, MAX_CELLS, MAX_TABS, TAB_LETTERS,
@@ -9,6 +9,7 @@ import {
   loadKeyboardConfig, saveKeyboardConfig, type KeyboardAction, type KeyboardConfig,
 } from "@/lib/keyboard";
 import Toggle from "@/components/ui/Toggle";
+import { FOCUS_RING, SettingsRow, SettingsSection } from "@/components/ui/Field";
 
 // Global keyboard layer: leader key, widget number badges, focus ring, cheat
 // sheet. It finds its targets through data attributes WidgetGrid puts on the
@@ -365,7 +366,7 @@ export default function KeyboardLayer({
           onMouseDown={e => { e.preventDefault(); finish(); }}
         >
           <div aria-label="Keyboard shortcuts" className="w-full max-w-sm bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-2xl p-5 flex flex-col gap-3">
-            <span className="text-xs text-[var(--text-muted)]">Keyboard shortcuts</span>
+            <span className="text-sm text-[var(--text-muted)]">Keyboard shortcuts</span>
             <ul className="flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
               <li className="flex items-center justify-between gap-3"><span>Focus widget 1 to 10</span><Kbd>{`${L} 1..9, 0`}</Kbd></li>
               <li className="flex items-center justify-between gap-3"><span>Then pick a tab</span><Kbd>1..9 or q w e r t</Kbd></li>
@@ -376,7 +377,7 @@ export default function KeyboardLayer({
               ))}
               <li className="flex items-center justify-between gap-3"><span>Cancel, or leave the widget</span><Kbd>Escape</Kbd></li>
             </ul>
-            <p className="text-xs text-[var(--text-muted)]">Press any key to close.</p>
+            <p className="text-sm text-[var(--text-muted)]">Press any key to close.</p>
           </div>
         </div>
       )}
@@ -409,13 +410,14 @@ function KeyField({ value, label, onCapture }: { value: string; label: string; o
         onCapture(e.key);
         setCapturing(false);
       }}
-      className={`w-24 shrink-0 text-center text-xs border rounded-lg px-2 py-1 outline-none cursor-pointer bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] ${capturing ? "border-[var(--text-muted)]" : "border-[var(--surface-border)]"}`}
+      className={`w-24 shrink-0 h-7 text-center text-sm border rounded-lg px-2 outline-none cursor-pointer bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] ${capturing ? "border-[var(--text-muted)]" : "border-[var(--surface-border)]"}`}
     />
   );
 }
 
 export function KeyboardSettings() {
   const [config, setConfig] = useState<KeyboardConfig>(DEFAULT_KEYBOARD);
+  const [showKeys, setShowKeys] = useState(false);
 
   useEffect(() => {
     loadKeyboardConfig().then(setConfig);
@@ -427,36 +429,43 @@ export function KeyboardSettings() {
   const update = (next: KeyboardConfig) => { setConfig(next); saveKeyboardConfig(next); };
 
   return (
-    <section className="flex flex-col gap-3">
-      <span className="text-xs text-[var(--text-muted)]">Keyboard</span>
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-[var(--text-secondary)]">Keyboard shortcuts</span>
+    <SettingsSection title="Keyboard">
+      <SettingsRow label="Shortcuts" hint={`${keyLabel(config.leader)}, then a widget number or a key. ? lists them.`}>
         <Toggle checked={config.enabled} onChange={() => update({ ...config, enabled: !config.enabled })} label="Keyboard shortcuts" />
-      </div>
-      <p className="text-xs text-[var(--text-muted)] leading-relaxed -mt-1">
-        Press the leader, then a widget&apos;s number to focus it, or a key below. Leader then ? lists them all. Works alongside Vimium.
-      </p>
+      </SettingsRow>
       {config.enabled && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-[var(--text-secondary)]">Leader</span>
-            <KeyField value={config.leader} label="Leader" onCapture={k => update({ ...config, leader: k })} />
-          </div>
-          {KEYBOARD_ACTIONS.map(a => (
-            <div key={a.id} className="flex items-center justify-between gap-3">
-              <span className="text-xs text-[var(--text-secondary)]">{a.label}</span>
-              <KeyField value={config.bindings[a.id]} label={a.label} onCapture={k => update(rebind(config, a.id, k))} />
-            </div>
-          ))}
+        <div className="flex flex-col py-1.5">
           <button
-            onClick={() => update(DEFAULT_KEYBOARD)}
-            className="self-start flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            onClick={() => setShowKeys(o => !o)}
+            aria-expanded={showKeys}
+            className={`flex items-center justify-between gap-3 min-h-7 text-sm text-[var(--text-primary)] ${FOCUS_RING}`}
           >
-            <RotateCcw size={12} />
-            Reset to defaults
+            <span>Change keys</span>
+            <ChevronDown size={14} className={`text-[var(--text-muted)] transition-transform ${showKeys ? "rotate-180" : ""}`} />
           </button>
+          {showKeys && (
+            <div className="flex flex-col gap-2 pt-2 pb-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-[var(--text-secondary)]">Leader</span>
+                <KeyField value={config.leader} label="Leader" onCapture={k => update({ ...config, leader: k })} />
+              </div>
+              {KEYBOARD_ACTIONS.map(a => (
+                <div key={a.id} className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-[var(--text-secondary)]">{a.label}</span>
+                  <KeyField value={config.bindings[a.id]} label={a.label} onCapture={k => update(rebind(config, a.id, k))} />
+                </div>
+              ))}
+              <button
+                onClick={() => update(DEFAULT_KEYBOARD)}
+                className={`self-start flex items-center gap-1.5 min-h-6 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors ${FOCUS_RING}`}
+              >
+                <RotateCcw size={14} />
+                Reset to defaults
+              </button>
+            </div>
+          )}
         </div>
       )}
-    </section>
+    </SettingsSection>
   );
 }
