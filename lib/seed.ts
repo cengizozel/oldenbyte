@@ -1,8 +1,15 @@
 // First-run seeding: a fresh install gets two demo-ready dashboards instead of
-// a blank grid. "Home" is the daily driver (notes, weather, feeds, tracker,
-// chat); "Research" is the learning surface (arXiv+HF tab group, YouTube,
-// community-bank widgets, research notes). Widgets arrive configured and with
-// believable recent content, so the product demos itself.
+// a blank grid. "Home" is the daily driver: a motto, daily notes, weather, F1,
+// the week's calendar, the tracker and upkeep siblings, and a feed group
+// (YouTube with Reddit and BBC News as tabs). "Study" is the learning surface:
+// study notes, reference bookmarks, a papers group (arXiv with HF Daily and
+// Hacker News as tabs), the weekly schedule with the typing trainer behind it,
+// the chat and a rhythm habit log. Both grids are 4 columns by 7 rows with
+// cards of different shapes (1x3, 1x4, 2x1, 2x3, 2x4), and every widget arrives
+// configured and with believable recent content, so the product demos itself.
+//
+// Demo mode (lib/demo.ts) shows exactly this seed from memory, plus a fake
+// calendar account that the Calendar widget answers with a synthesized agenda.
 //
 // Seeding runs ONLY when both the `dashboards` and legacy `widget-layout` keys
 // are absent, so existing installs (with or without multiple dashboards) are
@@ -10,6 +17,7 @@
 
 import * as storage from "@/lib/storage";
 import { DEFAULT_DASHBOARDS, layoutKey, instancesKey, saveDashboards, type DashboardsState } from "@/lib/dashboards";
+import { widgets, instanceOf, type Widget, type WidgetType } from "@/lib/widgets";
 
 const dayOffset = (n: number) => {
   const d = new Date(Date.now() + n * 86400000);
@@ -17,12 +25,27 @@ const dayOffset = (n: number) => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
 
+// Epoch ms of a local wall-clock time n days from today (n <= 0 for the past).
+const atLocal = (n: number, hour: number, minute = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  d.setHours(hour, minute, 0, 0);
+  return d.getTime();
+};
+
 const GRID = { minW: 1, minH: 1, maxW: 4, maxH: 6 };
+
+// A placed instance from the registry template of a built-in type.
+function inst(type: WidgetType, id: string, title?: string): Widget {
+  const template = widgets.find(w => w.type === type);
+  if (!template) throw new Error(`no widget template for ${type}`);
+  return instanceOf(template, id, title);
+}
 
 export const SEEDED_DASHBOARDS: DashboardsState = {
   list: [
     { id: "default", name: "Home" },
-    { id: "research", name: "Research" },
+    { id: "study", name: "Study" },
   ],
   activeId: "default",
 };
@@ -37,64 +60,96 @@ export function buildSeed(): Record<string, unknown> {
   const H = 3600000;
   const M = 60000;
 
+  // Upkeep checks, relative to now so each item's state is predictable: the
+  // latest check of every item but the plants is still running, so the score
+  // sits a little under 100 and the plants show as due.
+  const checks = (latestAgoH: number, everyH: number, count: number) =>
+    Array.from({ length: count }, (_, k) => now - (latestAgoH + k * everyH) * H).reverse();
+
+  // Rhythm taps over the last two weeks, at fixed times of day with a small
+  // per-day drift, dropping anything still in the future today.
+  const past = (ts: number[]) => ts.filter(t => t <= now);
+  const drift = (n: number) => ((((n * 7) % 5) + 5) % 5) - 2; // -2..2 minutes, deterministic
+  const waterTaps: number[] = [];
+  const stretchTaps: number[] = [];
+  const coffeeTaps: number[] = [];
+  const focusSessions: [number, number][] = [];
+  for (let n = -13; n <= 0; n++) {
+    const glasses = n % 3 === 0 ? [8.7, 10.5, 12.25, 14.8, 16.3] : [8.7, 10.5, 12.25, 14.8, 16.3, 19.1];
+    for (const h of glasses) waterTaps.push(atLocal(n, Math.floor(h), Math.round((h % 1) * 60) + drift(n)));
+    stretchTaps.push(atLocal(n, 7, 20 + drift(n)));
+    coffeeTaps.push(atLocal(n, 8, 5 + drift(n)), atLocal(n, 13, 40 + drift(n)));
+    if (n === -9 || n === -3) coffeeTaps.push(atLocal(n, 16, 30));
+    if (n !== -13 && n !== -6) focusSessions.push([atLocal(n, 9, 30 + drift(n)), atLocal(n, 11, 5 + drift(n))]);
+    if (n % 2 === 0) focusSessions.push([atLocal(n, 15, 0), atLocal(n, 16, 10)]);
+  }
+
   return {
-    // ── Home dashboard: a clean 4x2 grid of equal cells ─────────────────────
+    // ── Home dashboard: 4 columns by 7 rows ─────────────────────────────────
+    //   cols 0-1: text 2x1 over notebook 2x3, then tracker 1x3 and upkeep 1x3
+    //   col 2:    weather 1x2, f1 1x2        col 3: calendar 1x4
+    //   cols 2-3: youtube 2x3 with reddit and rss as tabs
     "widget-layout": [
-      { i: "notebook-home", x: 0, y: 0, w: 1, h: 3, ...GRID },
-      { i: "weather-home",  x: 1, y: 0, w: 1, h: 3, ...GRID },
-      { i: "tracker-home",  x: 2, y: 0, w: 1, h: 3, ...GRID },
-      { i: "chat-home",     x: 3, y: 0, w: 1, h: 3, ...GRID },
-      { i: "rss-home",      x: 0, y: 3, w: 1, h: 3, ...GRID },
-      { i: "reddit-home",   x: 1, y: 3, w: 1, h: 3, ...GRID },
-      { i: "text-home",     x: 2, y: 3, w: 1, h: 3, ...GRID },
-      { i: "calendar-home", x: 3, y: 3, w: 1, h: 3, ...GRID },
+      { i: "text-home",     x: 0, y: 0, w: 2, h: 1, ...GRID },
+      { i: "notebook-home", x: 0, y: 1, w: 2, h: 3, ...GRID },
+      { i: "tracker-home",  x: 0, y: 4, w: 1, h: 3, ...GRID },
+      { i: "upkeep-home",   x: 1, y: 4, w: 1, h: 3, ...GRID },
+      { i: "weather-home",  x: 2, y: 0, w: 1, h: 2, ...GRID },
+      { i: "f1-home",       x: 2, y: 2, w: 1, h: 2, ...GRID },
+      { i: "calendar-home", x: 3, y: 0, w: 1, h: 4, ...GRID },
+      { i: "youtube-home",  x: 2, y: 4, w: 2, h: 3, ...GRID, tabs: ["reddit-home", "rss-home"] },
     ],
     "widget-instances": {
-      "notebook-home": { id: "notebook-home", type: "notebook", color: "amber",  title: "Notepad",  description: "A simple place for temporary notes.", digestable: false },
-      "weather-home":  { id: "weather-home",  type: "weather",  color: "sky",    title: "Weather",  description: "Current conditions and forecast for a place." },
-      "tracker-home":  { id: "tracker-home",  type: "tracker",  color: "teal",   title: "Tracker",  description: "Time how long you spend on each activity.", digestable: false },
-      "chat-home":     { id: "chat-home",     type: "chat",     color: "sky",    title: "Chat",     description: "Chat with a local or OpenAI-compatible model.", digestable: false },
-      "rss-home":      { id: "rss-home",      type: "rss",      color: "teal",   title: "Feed",     description: "Headlines from any RSS feed." },
-      "reddit-home":   { id: "reddit-home",   type: "reddit",   color: "orange", title: "Reddit",   description: "Top posts from your chosen subreddits." },
-      "text-home":     { id: "text-home",     type: "text",     color: "rose",   title: "Text",     description: "A word, quote, or live string." },
-      "calendar-home": { id: "calendar-home", type: "calendar", color: "amber",  title: "Calendar", description: "Upcoming events from a CalDAV server (Nextcloud, Radicale)." },
+      "text-home":     inst("text",     "text-home"),
+      "notebook-home": inst("notebook", "notebook-home"),
+      "tracker-home":  inst("tracker",  "tracker-home"),
+      "upkeep-home":   inst("upkeep",   "upkeep-home"),
+      "weather-home":  inst("weather",  "weather-home"),
+      "f1-home":       inst("f1",       "f1-home"),
+      "calendar-home": inst("calendar", "calendar-home"),
+      "youtube-home":  inst("youtube",  "youtube-home"),
+      "reddit-home":   inst("reddit",   "reddit-home"),
+      "rss-home":      inst("rss",      "rss-home"),
     },
 
-    // ── Research dashboard: a clean 4x2 grid of equal cells ─────────────────
-    [layoutKey("research")]: [
-      { i: "notebook-research", x: 0, y: 0, w: 1, h: 3, ...GRID },
-      { i: "arxiv-research",    x: 1, y: 0, w: 1, h: 3, ...GRID, tabs: ["hf-research"] },
-      { i: "youtube-research",  x: 2, y: 0, w: 1, h: 3, ...GRID },
-      { i: "hn-research",       x: 3, y: 0, w: 1, h: 3, ...GRID },
-      { i: "xkcd-research",     x: 0, y: 3, w: 1, h: 3, ...GRID },
-      { i: "kiwix-research",    x: 1, y: 3, w: 1, h: 3, ...GRID },
-      { i: "anytype-research",  x: 2, y: 3, w: 1, h: 3, ...GRID },
-      { i: "text-research",     x: 3, y: 3, w: 1, h: 3, ...GRID },
+    // ── Study dashboard: 4 columns by 7 rows ────────────────────────────────
+    //   col 0:    notebook 1x3 over bookmarks 1x4
+    //   cols 1-2: arxiv 2x3 (hf and hacker news as tabs) over schedule 2x4 (typing as tab)
+    //   col 3:    chat 1x4 over rhythm 1x3
+    [layoutKey("study")]: [
+      { i: "notebook-study",  x: 0, y: 0, w: 1, h: 3, ...GRID },
+      { i: "bookmarks-study", x: 0, y: 3, w: 1, h: 4, ...GRID },
+      { i: "arxiv-study",     x: 1, y: 0, w: 2, h: 3, ...GRID, tabs: ["hf-study", "hn-study"] },
+      { i: "schedule-study",  x: 1, y: 3, w: 2, h: 4, ...GRID, tabs: ["typing-study"] },
+      { i: "chat-study",      x: 3, y: 0, w: 1, h: 4, ...GRID },
+      { i: "rhythm-study",    x: 3, y: 4, w: 1, h: 3, ...GRID },
     ],
-    [instancesKey("research")]: {
-      "notebook-research": { id: "notebook-research", type: "notebook", color: "amber",  title: "Notepad",  description: "A simple place for temporary notes.", digestable: false },
-      "arxiv-research":    { id: "arxiv-research",    type: "arxiv",    color: "sky",    title: "arXiv",    description: "Latest papers from a chosen research field." },
-      "hf-research":       { id: "hf-research",       type: "hf",       color: "orange", title: "HF Daily", description: "Trending AI papers curated by Hugging Face." },
-      "youtube-research":  { id: "youtube-research",  type: "youtube",  color: "rose",   title: "YouTube",  description: "Latest videos from your chosen channels." },
-      "hn-research":       { id: "hn-research",       type: "custom",   bankId: "hacker-news", color: "orange",  title: "Hacker News", description: "Front page stories right now.", digestable: false },
-      "xkcd-research":     { id: "xkcd-research",     type: "custom",   bankId: "xkcd", color: "neutral", title: "xkcd", description: "Today's xkcd comic.", digestable: false },
-      "kiwix-research":    { id: "kiwix-research",    type: "kiwix",    color: "teal",   title: "Kiwix",   description: "Search an offline Kiwix library (Wikipedia, etc.).", digestable: false },
-      "anytype-research":  { id: "anytype-research",  type: "anytype",  color: "sky",    title: "Anytype", description: "Browse and search your Anytype spaces.", digestable: false },
-      "text-research":     { id: "text-research",     type: "text",     color: "rose",   title: "Text",    description: "A word, quote, or live string." },
+    [instancesKey("study")]: {
+      "notebook-study":  inst("notebook",  "notebook-study"),
+      "bookmarks-study": inst("bookmarks", "bookmarks-study"),
+      "arxiv-study":     inst("arxiv",     "arxiv-study"),
+      "hf-study":        inst("hf",        "hf-study"),
+      "hn-study":        { id: "hn-study", type: "custom", bankId: "hacker-news", color: "orange", title: "Hacker News", description: "Front page stories right now.", digestable: false },
+      "schedule-study":  inst("schedule",  "schedule-study"),
+      "typing-study":    inst("typing",    "typing-study"),
+      "chat-study":      inst("chat",      "chat-study"),
+      "rhythm-study":    inst("rhythm",    "rhythm-study"),
     },
 
     // ── Widget content: make it look lived-in ────────────────────────────────
-    "notepad-registry": ["notebook-home", "notebook-research"],
+    "notepad-registry": ["notebook-home", "notebook-study"],
     "notebook-notebook-home-name": "Daily notes",
     "notebook-notebook-home-days": [d3, d1, today],
     [`notebook-notebook-home-day-${today}`]: "groceries after work: <b>coffee beans</b>, olive oil, lemons<div>call the bike shop about the <u>rear brake</u></div>",
     [`notebook-notebook-home-day-${d1}`]: "really good walk in the evening, <i>should make that a habit</i><div>the balcony plants need bigger pots</div>",
     [`notebook-notebook-home-day-${d3}`]: "weekend plan:<ul><li>try the new bakery</li><li>finish the bookshelf</li><li><b>backup the NAS</b></li></ul>",
-    "notebook-notebook-research-name": "Research notes",
-    "notebook-notebook-research-days": [d4, d2, today],
-    [`notebook-notebook-research-day-${today}`]: "reading about <b>retrieval-augmented agents</b>, the tool-use evals look weak<div><i>idea: compare embedding models on my own notes</i></div>",
-    [`notebook-notebook-research-day-${d2}`]: "watched the new 3blue1brown video, the attention visualization is <u>the clearest I have seen</u><div>queued two papers from HF daily</div>",
-    [`notebook-notebook-research-day-${d4}`]: "to re-read monthly:<ul><li>attention is all you need</li><li>lost in the middle</li></ul>",
+    "notebook-notebook-study-name": "Study notes",
+    "notebook-notebook-study-days": [d4, d2, today],
+    [`notebook-notebook-study-day-${today}`]: "reading about <b>retrieval-augmented agents</b>, the tool-use evals look weak<div><i>idea: compare embedding models on my own notes</i></div>",
+    [`notebook-notebook-study-day-${d2}`]: "watched the new 3blue1brown video, the attention visualization is <u>the clearest I have seen</u><div>queued two papers from HF daily</div>",
+    [`notebook-notebook-study-day-${d4}`]: "to re-read monthly:<ul><li>attention is all you need</li><li>lost in the middle</li></ul>",
+
+    "text-widget-text-home": { source: { type: "text", value: "make something small every day" }, font: "serif" },
 
     "tracker-config-tracker-home": {
       items: [
@@ -113,6 +168,24 @@ export function buildSeed(): Record<string, unknown> {
       [today]: { "seed-read": 900 },
     },
 
+    "upkeep-config-upkeep-home": {
+      items: [
+        { id: "seed-teeth",   name: "brush teeth",   weight: 10, hours: 12 },
+        { id: "seed-shower",  name: "shower",        weight: 10, hours: 36 },
+        { id: "seed-plants",  name: "water plants",  weight: 5,  hours: 72 },
+        { id: "seed-laundry", name: "laundry",       weight: 5,  hours: 168 },
+        { id: "seed-sheets",  name: "change sheets", weight: 5,  hours: 336 },
+      ],
+      order: "custom",
+    },
+    "upkeep-log-upkeep-home": {
+      "seed-teeth":   checks(3, 12, 20),
+      "seed-shower":  checks(20, 34, 7),
+      "seed-plants":  checks(80, 70, 5),
+      "seed-laundry": checks(96, 168, 4),
+      "seed-sheets":  checks(240, 336, 2),
+    },
+
     "weather-widget-weather-home": { name: "Istanbul", region: "Türkiye", lat: 41.0082, lon: 28.9784, unit: "c" },
     "rss-widget-rss-home": { url: "https://feeds.bbci.co.uk/news/rss.xml", limit: 5, name: "BBC News" },
     "reddit-widget-reddit-home": {
@@ -125,8 +198,90 @@ export function buildSeed(): Record<string, unknown> {
         { name: "todayilearned", limit: 5, period: "week" },
       ],
     },
-    "chat-widget-chat-home": {
-      config: { sourcesVersion: 2 },
+    "youtube-widget-youtube-home": {
+      view: "thumbs",
+      channels: [
+        { channelId: "UCHnyfMqiRRG1u-2MsSQLbXA", name: "Veritasium", limit: 3 },
+        { channelId: "UCsXVk37bltHxD1rDPwtNM8Q", name: "Kurzgesagt", limit: 3 },
+        { channelId: "UCYO_jab_esuFRV4b17AJtAw", name: "3Blue1Brown", limit: 3 },
+        { channelId: "UCBa659QWEk1AI4Tg--mrJ2A", name: "Tom Scott", limit: 3 },
+        { channelId: "UCY1kMZp36IQSyNx_9h4mpCg", name: "Mark Rober", limit: 3 },
+        { channelId: "UC9-y-6csu5WGm29I7JiwpnA", name: "Computerphile", limit: 3 },
+      ],
+    },
+
+    "bookmarks-config-bookmarks-study": {
+      view: "grid",
+      iconSize: 44,
+      bookmarks: [
+        { id: "seed-bm-wikipedia", url: "https://en.wikipedia.org",       name: "Wikipedia" },
+        { id: "seed-bm-arxiv",     url: "https://arxiv.org",              name: "arXiv" },
+        { id: "seed-bm-scholar",   url: "https://scholar.google.com",     name: "Scholar" },
+        { id: "seed-bm-github",    url: "https://github.com",             name: "GitHub" },
+        { id: "seed-bm-hn",        url: "https://news.ycombinator.com",   name: "Hacker News" },
+        { id: "seed-bm-so",        url: "https://stackoverflow.com",      name: "Stack Overflow" },
+        { id: "seed-bm-mdn",       url: "https://developer.mozilla.org",  name: "MDN" },
+        { id: "seed-bm-hf",        url: "https://huggingface.co",         name: "Hugging Face" },
+        { id: "seed-bm-gutenberg", url: "https://www.gutenberg.org",      name: "Gutenberg" },
+        { id: "seed-bm-archive",   url: "https://archive.org",            name: "Internet Archive" },
+      ],
+    },
+
+    "arxiv-widget-arxiv-study": { category: "cs.AI" },
+    "hf-widget-hf-study": { limit: 25 },
+
+    "schedule-widget-schedule-study": {
+      startHour: 6,
+      endHour: 24,
+      entries: [
+        { id: "seed-sch-gym",      title: "Gym",            days: [0, 2, 4],       start: 7 * 60,       end: 8 * 60,       color: "#7fc8a9" },
+        { id: "seed-sch-standup",  title: "Standup",        days: [0, 1, 2, 3, 4], start: 9 * 60 + 30,  end: 9 * 60 + 45,  color: "#8ab4e8" },
+        { id: "seed-sch-focus",    title: "Deep work",      description: "phone in the drawer", days: [0, 1, 2, 3, 4], start: 10 * 60, end: 12 * 60, color: "#c39be0" },
+        { id: "seed-sch-lunch",    title: "Lunch",          days: [0, 1, 2, 3, 4], start: 12 * 60 + 30, end: 13 * 60 + 15, color: "#d9c26e" },
+        { id: "seed-sch-reading",  title: "Reading group",  description: "room 2.14", days: [1], start: 17 * 60, end: 18 * 60, color: "#e8b04b" },
+        { id: "seed-sch-language", title: "Portuguese",     days: [0, 2],          start: 19 * 60,      end: 20 * 60,      color: "#e08a9b" },
+        { id: "seed-sch-climb",    title: "Climbing",       days: [3],             start: 18 * 60 + 30, end: 20 * 60,      color: "#7fd0d6" },
+        { id: "seed-sch-run",      title: "Long run",       days: [6],             start: 8 * 60,       end: 9 * 60 + 30,  color: "#7fd0d6" },
+        { id: "seed-sch-dinner",   title: "Family dinner",  days: [6],             start: 18 * 60,      end: 20 * 60,      color: "#a8b0bd" },
+      ],
+    },
+
+    "typing-config-typing-study": {
+      mode: "words", length: 25, drill: "weak", custom: "zxc", customScramble: true, customWords: false,
+      pool: "varied", countdown: 3, bpm: 100, sound: true, dynamic: false, endless: false,
+    },
+    "typing-stats-typing-study": {
+      best: 72,
+      runs: 14,
+      keyHit: {
+        e: 1420, t: 1010, a: 910, o: 860, i: 790, n: 760, s: 720, h: 690, r: 680, d: 480, l: 450, u: 310,
+        c: 300, m: 270, w: 260, f: 250, g: 220, y: 210, p: 200, b: 160, v: 110, k: 85, j: 18, x: 16, q: 12, z: 9,
+      },
+      keyMiss: { e: 24, r: 21, t: 15, y: 22, p: 31, b: 19, c: 14, g: 12, w: 11, m: 9, v: 9, n: 8, q: 4, x: 3, z: 3 },
+    },
+
+    "rhythm-config-rhythm-study": {
+      items: [
+        { id: "seed-water",   name: "water",     kind: "moment",  mode: "build",  target: 6 },
+        { id: "seed-stretch", name: "stretch",   kind: "moment",  mode: "build",  target: 1 },
+        { id: "seed-focus",   name: "deep work", kind: "session", mode: "build" },
+        { id: "seed-coffee",  name: "coffee",    kind: "moment",  mode: "reduce", target: 2 },
+      ],
+      open: {},
+    },
+    "rhythm-log-rhythm-study": {
+      events: {
+        "seed-water":   past(waterTaps),
+        "seed-stretch": past(stretchTaps),
+        "seed-coffee":  past(coffeeTaps),
+      },
+      sessions: {
+        "seed-focus": focusSessions.filter(([, end]) => end <= now),
+      },
+    },
+
+    "chat-widget-chat-study": {
+      config: { sourcesVersion: 3 },
       activeId: "seed-chat-2",
       conversations: [
         {
@@ -155,20 +310,6 @@ export function buildSeed(): Record<string, unknown> {
         },
       ],
     },
-    "text-widget-text-home": { source: { type: "text", value: "make something small every day" }, font: "serif" },
-    "text-widget-text-research": { source: { type: "text", value: "read greedily, take notes, connect things" }, font: "serif" },
-
-    "arxiv-widget-arxiv-research": { category: "cs.AI" },
-    "hf-widget-hf-research": { limit: 25 },
-    "youtube-widget-youtube-research": {
-      channels: [
-        { channelId: "UCYO_jab_esuFRV4b17AJtAw", name: "3Blue1Brown", limit: 3 },
-        { channelId: "UCbfYPyITQ-7l4upoX8nvctg", name: "Two Minute Papers", limit: 3 },
-        { channelId: "UCHnyfMqiRRG1u-2MsSQLbXA", name: "Veritasium", limit: 3 },
-        { channelId: "UC9-y-6csu5WGm29I7JiwpnA", name: "Computerphile", limit: 3 },
-        { channelId: "UCsBjURrPoezykLs9EqgamOA", name: "Fireship", limit: 3 },
-      ],
-    },
   };
 }
 
@@ -182,7 +323,7 @@ export async function maybeSeedFirstRun(): Promise<DashboardsState | null> {
     storage.getItemResult("widget-layout"),
   ]);
   // Only seed when the store is CONFIRMED empty. If either read failed (server
-  // restarting during a deploy, network blip), do nothing — seeding here would
+  // restarting during a deploy, network blip), do nothing: seeding here would
   // overwrite a real dashboard with the demo default.
   if (!dashboards.ok || !legacyLayout.ok) return null;
   if (dashboards.value !== null || legacyLayout.value !== null) return null;
