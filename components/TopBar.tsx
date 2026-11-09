@@ -18,7 +18,7 @@ type FieldConfig = { type: "text" | "url"; value: string };
 
 const URL_EXAMPLES = [
   { label: "Public IP address", url: "https://icanhazip.com" },
-  { label: "Weather",           url: "https://wttr.in/Istanbul?format=3" },
+  { label: "Weather",           url: "https://wttr.in/London?format=3" },
 ];
 
 function EditableField({

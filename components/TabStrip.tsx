@@ -99,18 +99,19 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   // Host elements for the members' header parts: an icon slot in every tab
   // and the actions slot at the right end. The ref callbacks are stable (one
   // per tab) so React only calls them when the element itself changes.
-  const hosts = useRef<TabGroupHosts>({ icons: {}, actions: null });
+  const hosts = useRef<TabGroupHosts>({ icons: {}, titles: {}, actions: null });
   const onHostsRef = useRef(onHosts);
   useEffect(() => { onHostsRef.current = onHosts; }, [onHosts]);
-  const iconRefs = useRef(new Map<string, (el: HTMLElement | null) => void>());
-  const iconHost = useCallback((tabId: string) => {
-    let fn = iconRefs.current.get(tabId);
+  const slotRefs = useRef(new Map<string, (el: HTMLElement | null) => void>());
+  const slotHost = useCallback((kind: "icons" | "titles", tabId: string) => {
+    const key = `${kind}:${tabId}`;
+    let fn = slotRefs.current.get(key);
     if (!fn) {
       fn = (el: HTMLElement | null) => {
-        hosts.current = { ...hosts.current, icons: { ...hosts.current.icons, [tabId]: el } };
+        hosts.current = { ...hosts.current, [kind]: { ...hosts.current[kind], [tabId]: el } };
         onHostsRef.current(hosts.current);
       };
-      iconRefs.current.set(tabId, fn);
+      slotRefs.current.set(key, fn);
     }
     return fn;
   }, []);
@@ -162,14 +163,17 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
                 onClick={() => onSelect(tabId)}
                 onKeyDown={e => onKeyDown(e, tabId)}
                 title={editing ? "Drag to reorder" : undefined}
-                className={`relative flex items-center gap-1.5 h-6 px-1 rounded-md text-sm whitespace-nowrap transition-opacity ${c.label} ${FOCUS_RING} ${
+                className={`relative flex items-center gap-1.5 h-6 px-1 rounded-md text-sm whitespace-nowrap transition-opacity [&:has([data-slot=title]:not(:empty))_[data-fallback]]:hidden ${c.label} ${FOCUS_RING} ${
                   isActive
                     ? "font-medium opacity-100 after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:rounded-full after:bg-current"
                     : "opacity-70 hover:opacity-100 after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:rounded-full after:bg-current after:opacity-0 hover:after:opacity-30 after:transition-opacity"
                 }`}
               >
-                <span ref={iconHost(tabId)} className="flex items-center shrink-0 empty:hidden" />
-                <span className="truncate">{w?.title ?? tabId}</span>
+                <span ref={slotHost("icons", tabId)} className="flex items-center shrink-0 empty:hidden" />
+                {/* The header's title lands in the first span; the instance
+                    title stands in until it does. */}
+                <span ref={slotHost("titles", tabId)} data-slot="title" className="truncate empty:hidden" />
+                <span data-fallback className="truncate">{w?.title ?? tabId}</span>
                 {editing && tabId !== order[0] && (
                   <span
                     role="button"

@@ -144,10 +144,12 @@ export function WidgetHeader({
   const group = useTabGroup();
   if (group) {
     // Inside a tab group the tab row is the header: every tab carries its
-    // widget's icon, and the shown tab's actions sit at the row's right end.
+    // widget's icon and title, and the shown tab's actions sit at the row's
+    // right end.
     return (
       <>
         {group.iconHost && createPortal(<Icon size={14} className="opacity-50 shrink-0" />, group.iconHost)}
+        {group.titleHost && createPortal(<>{title}</>, group.titleHost)}
         {group.active && group.actionsHost && (after || right) && createPortal(
           <div className={`flex items-center gap-2 shrink-0 ${className}`}>
             {after}

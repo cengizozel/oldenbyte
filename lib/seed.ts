@@ -56,6 +56,8 @@ export function buildSeed(): Record<string, unknown> {
   const d2 = dayOffset(-2);
   const d3 = dayOffset(-3);
   const d4 = dayOffset(-4);
+  const d5 = dayOffset(-5);
+  const d6 = dayOffset(-6);
   const now = Date.now();
   const H = 3600000;
   const M = 60000;
@@ -139,17 +141,36 @@ export function buildSeed(): Record<string, unknown> {
     // ── Widget content: make it look lived-in ────────────────────────────────
     "notepad-registry": ["notebook-home", "notebook-study"],
     "notebook-notebook-home-name": "Daily notes",
-    "notebook-notebook-home-days": [d3, d1, today],
-    [`notebook-notebook-home-day-${today}`]: "groceries after work: <b>coffee beans</b>, olive oil, lemons<div>call the bike shop about the <u>rear brake</u></div>",
-    [`notebook-notebook-home-day-${d1}`]: "really good walk in the evening, <i>should make that a habit</i><div>the balcony plants need bigger pots</div>",
-    [`notebook-notebook-home-day-${d3}`]: "weekend plan:<ul><li>try the new bakery</li><li>finish the bookshelf</li><li><b>backup the NAS</b></li></ul>",
+    "notebook-notebook-home-days": [d5, d3, d1, today],
+    [`notebook-notebook-home-day-${today}`]:
+      "<b>Today</b><div>groceries after work: <b>coffee beans</b>, olive oil, lemons, <i>and flowers for the table</i></div>"
+      + "<div>call the bike shop about the <u>rear brake</u>, they close at six</div>"
+      + "<div><br></div><div><b>Server</b></div>"
+      + "<ul><li>move the photo backup to the new drive</li><li>check why the <i>nightly</i> job skipped Tuesday</li><li><u>rotate the API keys</u> before the weekend</li></ul>"
+      + "<div><br></div><div><i>mood: quiet, productive</i></div>",
+    [`notebook-notebook-home-day-${d1}`]:
+      "really good walk in the evening, <i>should make that a habit</i><div>the balcony plants need bigger pots</div>"
+      + "<div><br></div><div><b>Read</b></div><ul><li>finished <i>The Shallows</i>, the chapter on memory is the one to keep</li><li>started <i>Piranesi</i></li></ul>",
+    [`notebook-notebook-home-day-${d3}`]:
+      "<b>Weekend plan</b><ul><li>try the new bakery on the corner</li><li>finish the bookshelf, <u>two more coats</u></li><li><b>backup the NAS</b></li><li>long run if it stays dry</li></ul>"
+      + "<div><br></div><div>ideas for the dashboard: a <i>reading streak</i> widget, a smaller weather card</div>",
+    [`notebook-notebook-home-day-${d5}`]:
+      "<b>Trip notes</b><div>Lisbon in early July, three days: Alfama and the castle, Belem and the MAAT, a day in Sintra</div>"
+      + "<ul><li>book the Sintra train early</li><li><u>Viva Viagem</u> card with zapping credit</li><li>pasteis at the original place, go before nine</li></ul>",
     "notebook-notebook-study-name": "Study notes",
-    "notebook-notebook-study-days": [d4, d2, today],
-    [`notebook-notebook-study-day-${today}`]: "reading about <b>retrieval-augmented agents</b>, the tool-use evals look weak<div><i>idea: compare embedding models on my own notes</i></div>",
-    [`notebook-notebook-study-day-${d2}`]: "watched the new 3blue1brown video, the attention visualization is <u>the clearest I have seen</u><div>queued two papers from HF daily</div>",
-    [`notebook-notebook-study-day-${d4}`]: "to re-read monthly:<ul><li>attention is all you need</li><li>lost in the middle</li></ul>",
+    "notebook-notebook-study-days": [d6, d4, d2, today],
+    [`notebook-notebook-study-day-${today}`]:
+      "reading about <b>retrieval-augmented agents</b>, the tool-use evals look weak<div><i>idea: compare embedding models on my own notes</i></div>"
+      + "<div><br></div><div><b>Questions</b></div><ul><li>does reranking help at small corpus sizes?</li><li>how do they handle <u>stale</u> chunks?</li></ul>",
+    [`notebook-notebook-study-day-${d2}`]:
+      "watched the new 3blue1brown video, the attention visualization is <u>the clearest I have seen</u><div>queued two papers from HF daily</div>"
+      + "<div><br></div><div><i>flashcards to add:</i> softmax temperature, KV cache, rotary embeddings</div>",
+    [`notebook-notebook-study-day-${d4}`]:
+      "<b>To re-read monthly</b><ul><li>attention is all you need</li><li>lost in the middle</li><li>the bitter lesson</li></ul>",
+    [`notebook-notebook-study-day-${d6}`]:
+      "<b>Portuguese</b><div>lesson 4: past tense of <i>ir</i> and <i>ser</i> are the same, <u>fui</u></div><ul><li>practice with the restaurant dialogue</li><li>ten new words a day</li></ul>",
 
-    "text-widget-text-home": { source: { type: "text", value: "make something small every day" }, font: "serif" },
+    "text-widget-text-home": { source: { type: "text", value: "memento mori" }, font: "serif" },
 
     "tracker-config-tracker-home": {
       items: [
@@ -186,27 +207,28 @@ export function buildSeed(): Record<string, unknown> {
       "seed-sheets":  checks(240, 336, 2),
     },
 
-    "weather-widget-weather-home": { name: "Istanbul", region: "Türkiye", lat: 41.0082, lon: 28.9784, unit: "c" },
-    "rss-widget-rss-home": { url: "https://feeds.bbci.co.uk/news/rss.xml", limit: 5, name: "BBC News" },
+    "weather-widget-weather-home": { name: "Lisbon", region: "Portugal", lat: 38.7223, lon: -9.1393, unit: "c" },
+    "rss-widget-rss-home": { url: "https://feeds.bbci.co.uk/news/rss.xml", limit: 8, name: "BBC News" },
     "reddit-widget-reddit-home": {
       subreddits: [
-        { name: "selfhosted", limit: 5, period: "week" },
-        { name: "programming", limit: 5, period: "week" },
-        { name: "technology", limit: 5, period: "week" },
-        { name: "MachineLearning", limit: 5, period: "week" },
-        { name: "dataisbeautiful", limit: 5, period: "week" },
-        { name: "todayilearned", limit: 5, period: "week" },
+        { name: "selfhosted", limit: 3, period: "week" },
+        { name: "programming", limit: 3, period: "week" },
+        { name: "technology", limit: 3, period: "week" },
+        { name: "MachineLearning", limit: 3, period: "week" },
+        { name: "space", limit: 3, period: "week" },
+        { name: "todayilearned", limit: 3, period: "week" },
       ],
+      images: true,
     },
     "youtube-widget-youtube-home": {
       view: "thumbs",
       channels: [
-        { channelId: "UCHnyfMqiRRG1u-2MsSQLbXA", name: "Veritasium", limit: 3 },
-        { channelId: "UCsXVk37bltHxD1rDPwtNM8Q", name: "Kurzgesagt", limit: 3 },
-        { channelId: "UCYO_jab_esuFRV4b17AJtAw", name: "3Blue1Brown", limit: 3 },
-        { channelId: "UCBa659QWEk1AI4Tg--mrJ2A", name: "Tom Scott", limit: 3 },
-        { channelId: "UCY1kMZp36IQSyNx_9h4mpCg", name: "Mark Rober", limit: 3 },
-        { channelId: "UC9-y-6csu5WGm29I7JiwpnA", name: "Computerphile", limit: 3 },
+        { channelId: "UCHnyfMqiRRG1u-2MsSQLbXA", name: "Veritasium", limit: 2 },
+        { channelId: "UCsXVk37bltHxD1rDPwtNM8Q", name: "Kurzgesagt", limit: 2 },
+        { channelId: "UCYO_jab_esuFRV4b17AJtAw", name: "3Blue1Brown", limit: 2 },
+        { channelId: "UCBa659QWEk1AI4Tg--mrJ2A", name: "Tom Scott", limit: 2 },
+        { channelId: "UCY1kMZp36IQSyNx_9h4mpCg", name: "Mark Rober", limit: 2 },
+        { channelId: "UC9-y-6csu5WGm29I7JiwpnA", name: "Computerphile", limit: 2 },
       ],
     },
 

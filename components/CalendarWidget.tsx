@@ -37,7 +37,7 @@ function demoEvents(): CalEvent[] {
     { uid: "demo-3", calendar: "Work", title: "Sprint planning", start: `${day(1)}T13:00`, end: `${day(1)}T14:00`, allDay: false },
     { uid: "demo-4", calendar: "Personal", title: "Rent due", start: day(2), end: day(2), allDay: true },
     { uid: "demo-5", calendar: "Work", title: "Design review", start: `${day(3)}T11:00`, end: `${day(3)}T11:45`, allDay: false },
-    { uid: "demo-6", calendar: "Personal", title: "Dinner with Deniz", start: `${day(4)}T19:30`, end: `${day(4)}T21:00`, allDay: false, location: "Karakoy" },
+    { uid: "demo-6", calendar: "Personal", title: "Dinner with Sam", start: `${day(4)}T19:30`, end: `${day(4)}T21:00`, allDay: false, location: "Riverside" },
   ];
 }
 

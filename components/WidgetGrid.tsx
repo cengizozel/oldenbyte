@@ -238,8 +238,9 @@ export default function WidgetGrid({
   const [, setTabHostsVersion] = useState(0);
   const setTabHostsFor = useCallback((containerId: string, hosts: TabGroupHosts) => {
     const prev = tabHosts.current.get(containerId);
-    const same = prev && prev.actions === hosts.actions
-      && Object.keys({ ...prev.icons, ...hosts.icons }).every(k => (prev.icons[k] ?? null) === (hosts.icons[k] ?? null));
+    const sameMap = (a: Record<string, HTMLElement | null>, b: Record<string, HTMLElement | null>) =>
+      Object.keys({ ...a, ...b }).every(k => (a[k] ?? null) === (b[k] ?? null));
+    const same = prev && prev.actions === hosts.actions && sameMap(prev.icons, hosts.icons) && sameMap(prev.titles, hosts.titles);
     if (same) return;
     tabHosts.current.set(containerId, hosts);
     setTabHostsVersion(v => v + 1);
@@ -1045,6 +1046,7 @@ export default function WidgetGrid({
               containerId: group,
               active: (activeTabs[group] ?? group) === id,
               iconHost: tabHosts.current.get(group)?.icons[id] ?? null,
+              titleHost: tabHosts.current.get(group)?.titles[id] ?? null,
               actionsHost: tabHosts.current.get(group)?.actions ?? null,
             }}
           >

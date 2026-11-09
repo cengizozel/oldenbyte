@@ -105,7 +105,9 @@ the palette `label` color at 50% opacity.
   for counts and small actions. Every widget shows its title.
 - Tab groups: the tab row is the header, in the same place and size as a
   single widget's header. The shown tab is the title (`text-sm font-medium`,
-  with its widget's icon in front), the other tabs follow as icon and name at 70%,
+  with its widget's icon in front), the other tabs follow as icon and name at 70%.
+  A tab's icon and name are the ones its widget's header would show (a feed
+  tab reads "BBC News", a weather tab its city), not the registry title;
   and the shown widget's header actions sit at the row's right end. Members
   do not draw their own header row: `WidgetHeader` renders into the tab row
   through `lib/tabGroup.ts`, and they lose their top padding, so the first
