@@ -129,7 +129,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
             onKeyDown={e => onKeyDown(e, tabId)}
             style={{ touchAction: editing ? "none" : undefined }}
             title={editing ? "Drag to reorder" : undefined}
-            className={`flex items-center gap-1 px-2 min-h-6 rounded-full text-xs font-medium whitespace-nowrap transition-all border ${
+            className={`flex items-center gap-1 px-2.5 min-h-7 rounded-full text-sm font-medium whitespace-nowrap transition-all border ${
               editing ? (isDragging ? "cursor-grabbing" : "cursor-grab") : ""
             } ${
               isActive || isDragging

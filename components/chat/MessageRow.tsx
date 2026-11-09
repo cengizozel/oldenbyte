@@ -203,7 +203,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
     <Fragment>
       {daySep && (
         <div className="self-center my-1">
-          <span className={`px-2 py-0.5 rounded-full text-xs opacity-80 ${c.label} bg-black/5 dark:bg-white/10`}>
+          <span className={`px-2.5 py-0.5 rounded-full text-sm opacity-80 ${c.label} bg-black/5 dark:bg-white/10`}>
             {daySep}
           </span>
         </div>

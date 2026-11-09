@@ -84,7 +84,7 @@ export function LoadingState({ c }: { c: ColorClasses }) {
 export function EmptyState({ c, action, children }: { c: ColorClasses; action?: string; children?: ReactNode }) {
   return (
     <div className="flex-1 h-full min-h-0 flex items-center justify-center text-center px-4">
-      <p className={`text-xs opacity-70 ${c.text}`}>
+      <p className={`text-sm opacity-70 ${c.text}`}>
         {children ?? `hover and click the pencil to ${action}`}
       </p>
     </div>
@@ -142,7 +142,7 @@ export function WidgetHeader({
     <div className={`flex items-center justify-between gap-2 mb-3 shrink-0 ${className}`}>
       <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
         <Icon size={14} className="opacity-50 shrink-0" />
-        <span className="text-xs font-medium truncate">{title}</span>
+        <span className="text-sm font-medium truncate">{title}</span>
         {after}
       </div>
       {right && <div className="flex items-center gap-2 shrink-0">{right}</div>}
@@ -151,7 +151,7 @@ export function WidgetHeader({
 }
 
 // A small toggle for modes and options: the active one has the translucent
-// fill, the rest sit at 60% and brighten on hover.
+// fill, the rest sit at 70% and brighten on hover.
 export function Chip({
   c, active = false, onClick, title, children, className = "",
 }: {
@@ -168,7 +168,7 @@ export function Chip({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`h-6 px-2 rounded-md text-xs leading-none transition-colors ${FOCUS_RING} ${
+      className={`h-7 px-2.5 rounded-md text-sm leading-none transition-colors ${FOCUS_RING} ${
         active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-70 hover:opacity-100`
       } ${className}`}
     >
@@ -194,7 +194,7 @@ export function SmallButton({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 disabled:opacity-40 transition-colors ${FOCUS_RING} ${c.label} ${className}`}
+      className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-sm bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 disabled:opacity-40 transition-colors ${FOCUS_RING} ${c.label} ${className}`}
     >
       {children}
     </button>
@@ -204,7 +204,7 @@ export function SmallButton({
 // Shows the active "only this source" filter in a widget header; the x clears it.
 export function FilterChip({ c, label, onClear }: { c: ColorClasses; label: string; onClear: () => void }) {
   return (
-    <span className={`inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-full text-xs bg-black/10 dark:bg-white/15 ${c.text} min-w-0`}>
+    <span className={`inline-flex items-center gap-1 h-7 pl-2.5 pr-1.5 rounded-full text-sm bg-black/10 dark:bg-white/15 ${c.text} min-w-0`}>
       <span className="truncate">{label}</span>
       <button type="button" onClick={onClear} aria-label="Clear filter" title="Show everything (Esc)" className={`shrink-0 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/15 ${FOCUS_RING}`}>
         <X size={12} />

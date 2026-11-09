@@ -821,7 +821,7 @@ export default function TypingWidget({
             onClick={() => setShowOptions(true)}
             aria-expanded={false}
             title="Change the test"
-            className={`self-start flex items-center gap-1 min-h-6 mb-3 shrink-0 text-xs opacity-70 hover:opacity-100 ${c.label} ${FOCUS_RING} ${fade}`}
+            className={`self-start flex items-center gap-1 min-h-6 mb-3 shrink-0 text-sm opacity-70 hover:opacity-100 ${c.label} ${FOCUS_RING} ${fade}`}
           >
             <span>{describeConfig(config, DRILLS)}</span>
             <ChevronDown size={12} />
@@ -978,7 +978,7 @@ export default function TypingWidget({
                     steal the first click's focus and unmount mid-click, eating
                     the click; let it fall through to the field itself. */}
                 {!focused && counting === null && (
-                  <div className={`absolute inset-0 flex items-center justify-center text-xs ${c.label} opacity-80 pointer-events-none`}>
+                  <div className={`absolute inset-0 flex items-center justify-center text-sm ${c.label} opacity-80 pointer-events-none`}>
                     {running ? "click here to continue" : config.countdown > 0 ? "click, then press space to start" : "click here, then type"}
                   </div>
                 )}

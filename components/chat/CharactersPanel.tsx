@@ -100,15 +100,15 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
         ) : (
           <>
             <div>
-              <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Persona <span className="opacity-70">(its system prompt)</span></p>
+              <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Persona <span className="opacity-70">(its system prompt)</span></p>
               <SettingsTextarea value={charDraft.persona} onChange={e => set({ persona: e.target.value })} rows={4} placeholder="You are my education coach. Help me plan, stay accountable, and learn effectively." />
             </div>
             <div>
-              <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Remembers <span className="opacity-70">(what it cares about; empty = no memory)</span></p>
+              <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Remembers <span className="opacity-70">(what it cares about; empty = no memory)</span></p>
               <SettingsInput value={charDraft.focus} onChange={e => set({ focus: e.target.value })} placeholder="my education, goals, academic background" />
             </div>
             <div>
-              <p className={`text-xs mb-1 opacity-70 ${c.label}`}>Memories <span className="opacity-70">({charDraft.memories.length})</span></p>
+              <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Memories <span className="opacity-70">({charDraft.memories.length})</span></p>
               <div className="flex flex-col gap-1">
                 {charDraft.memories.map((m, i) => (
                   <div key={i} className="flex items-center gap-2">

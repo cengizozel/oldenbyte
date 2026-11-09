@@ -7,13 +7,14 @@ a widget should not restyle what they already provide.
 
 Three sizes plus display numbers, nothing in between, all in the one system sans face (the feed
 page is the exception: it sets its headlines and labels in Playfair Display).
-Sizes are fixed pixels so a widget looks the same at every card size; the
-floor is 12px for anything meant to be read.
+Sizes are fixed pixels so a widget looks the same at every card size. The rule
+of thumb is Discord's: names, labels and controls are body size, and only
+timestamps, counts and badges go small.
 
 | Size | Tailwind | Used for |
 |---|---|---|
-| 12px | `text-xs` | Badges, meta text (times, counts, labels), widget titles, chips, settings section labels, empty states |
-| 14px | `text-sm` | Body text: list item titles, notes, chat, settings fields |
+| 12px | `text-xs` | Meta only: times, counts, badges, the small eyebrow label over a section |
+| 14px | `text-sm` | Everything meant to be read or pressed: body text, widget titles, tabs, chips, buttons, settings labels and fields, empty states |
 | 16px+ | `text-base`, `text-lg`, `text-2xl` | Numbers meant to be read at a glance (temperature, timers, scores) |
 
 Weight: `font-medium` for titles and list item titles, regular for everything
@@ -55,11 +56,11 @@ an opacity step should be re-measured, not assumed.
 - Non-text contrast (1.4.11): focus rings and control boundaries are drawn in
   the secondary or muted text color, both at 3:1 or better on the page.
 - Target size (2.5.8): every control is at least 24 by 24 CSS pixels (icon
-  buttons through `HIT_AREA`, chips and tabs through `min-h-6`, detail views
+  buttons through `HIT_AREA`, chips and tabs at 28px, detail views
   through `BackButton`); neighbouring icon buttons keep `gap-3` so the areas
   do not overlap.
-- Text size: the floor is 12px for anything meant to be read, 14px for body
-  text, 15px for the feed page's serif labels; the page zooms to 200% without
+- Text size: 14px for anything meant to be read or pressed, 12px only for
+  meta such as times and counts, 15px for the feed page's serif labels; the page zooms to 200% without
   loss (1.4.4), and touch devices get 16px fields so iOS does not zoom in on
   focus.
 - Focus visible (2.4.7) and names: every icon button has an `aria-label`, the
@@ -100,12 +101,12 @@ the palette `label` color at 50% opacity.
 ## Controls
 
 - Header: `WidgetHeader` from `components/ui/WidgetChrome.tsx`: icon, title
-  (`text-xs font-medium`, palette label color) and an optional right-hand slot
+  (`text-sm font-medium`, palette label color) and an optional right-hand slot
   for counts and small actions. Every widget shows its title.
-- Chip (`Chip`): the small toggle used for modes and options. 24px tall,
-  `text-xs`, `rounded-md`; the active chip has the translucent fill, inactive
+- Chip (`Chip`): the small toggle used for modes and options. 28px tall,
+  `text-sm`, `rounded-md`; the active chip has the translucent fill, inactive
   chips sit at 70% opacity.
-- Button (`SmallButton`): the standard small action. 28px tall, `text-xs`,
+- Button (`SmallButton`): the standard small action. 28px tall, `text-sm`,
   `rounded-lg`, palette label color on a translucent fill.
 - Icon buttons: 24px hit area (`HIT_AREA` from `ui/Field.tsx`), visible focus
   ring (`FOCUS_RING`, which sets no radius), `aria-label`. Neighbouring icon
@@ -117,7 +118,7 @@ the palette `label` color at 50% opacity.
   36px wide `rounded-xl` translucent fill with a 16px chevron, so it is an easy
   target on phones. The row above it keeps the truncated title and the
   open-externally link.
-- Empty states: `EmptyState`, centered, 12px at 70%. Never inside a styled
+- Empty states: `EmptyState`, centered, 14px at 70%. Never inside a styled
   frame (a player area, a dashed box) unless the frame is the control itself.
 
 ## Page chrome
@@ -126,4 +127,4 @@ Top bar text, in the same face as the widgets: title and the right-hand field
 at `text-2xl font-medium` (`text-lg` on phones); the date at `text-lg`; the
 dashboard switcher at `text-base` (`text-sm` on phones) in the secondary text
 color; action icons at 16px in the secondary color. Settings sections use
-`text-xs` labels at 70% in normal case. No all-caps text anywhere.
+`text-sm` labels at 70% in normal case. No all-caps text anywhere.

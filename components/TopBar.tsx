@@ -128,7 +128,7 @@ function EditableField({
               <button
                 key={t}
                 onClick={() => setDraft(d => ({ ...d, type: t }))}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                   draft.type === t ? "bg-[var(--surface-border)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                 }`}
               >
@@ -153,7 +153,7 @@ function EditableField({
                 <button
                   key={ex.url}
                   onClick={() => setDraft(d => ({ ...d, value: ex.url }))}
-                  className="text-left px-2 py-1 rounded-lg text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-border)] transition-colors"
+                  className="text-left px-2 py-1 rounded-lg text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-border)] transition-colors"
                 >
                   {ex.label}
                 </button>
@@ -161,7 +161,7 @@ function EditableField({
             </div>
           )}
 
-          {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+          {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
 
           <div className="flex items-center justify-between mt-3">
             <button
@@ -353,7 +353,7 @@ function DateDisplay({ timezone }: { timezone: string }) {
               <button
                 key={opt.value}
                 onClick={() => setDraft(opt.value)}
-                className={`flex items-center gap-2 text-left px-3 py-1.5 rounded-xl text-xs transition-colors ${
+                className={`flex items-center gap-2 text-left px-3 py-1.5 rounded-xl text-sm transition-colors ${
                   draft === opt.value
                     ? "bg-[var(--surface-border)] text-[var(--text-primary)] font-medium"
                     : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-border)]"
@@ -416,7 +416,7 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: str
     <div ref={ref} className="relative">
       <button
         onClick={() => { setOpen(o => !o); setQuery(""); }}
-        className="flex items-center gap-1 max-w-[11rem] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+        className="flex items-center gap-1 max-w-[11rem] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         title="Change timezone"
       >
         <span className="truncate">{value || "Automatic"}</span>
@@ -438,7 +438,7 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: str
                 }
               }}
               placeholder="Search zones"
-              className="w-full bg-transparent text-xs outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
+              className="w-full bg-transparent text-sm outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
             />
           </div>
           {/* Plain block flow, not flex: a capped flex column would shrink the
@@ -448,7 +448,7 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: str
             {autoMatches && (
               <button
                 onClick={() => pick(TZ_AUTO)}
-                className={`block w-full text-left text-xs leading-normal px-2 py-2 rounded-lg text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 ${value === "" ? "bg-black/5 dark:bg-white/10 font-medium" : ""}`}
+                className={`block w-full text-left text-sm leading-normal px-2 py-2 rounded-lg text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 ${value === "" ? "bg-black/5 dark:bg-white/10 font-medium" : ""}`}
               >
                 Automatic
               </button>
@@ -457,13 +457,13 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: str
               <button
                 key={z}
                 onClick={() => pick(z)}
-                className={`block w-full text-left text-xs leading-normal px-2 py-2 rounded-lg truncate text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 ${z === value ? "bg-black/5 dark:bg-white/10 font-medium" : ""}`}
+                className={`block w-full text-left text-sm leading-normal px-2 py-2 rounded-lg truncate text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 ${z === value ? "bg-black/5 dark:bg-white/10 font-medium" : ""}`}
               >
                 {z}
               </button>
             ))}
             {!autoMatches && filtered.length === 0 && (
-              <p className="text-xs text-[var(--text-muted)] px-2 py-2">no matches</p>
+              <p className="text-sm text-[var(--text-muted)] px-2 py-2">no matches</p>
             )}
           </div>
         </div>
@@ -534,14 +534,14 @@ function AccountSection({ open }: { open: boolean }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <span className="text-xs text-[var(--text-muted)]">Account</span>
+      <span className="text-sm text-[var(--text-muted)]">Account</span>
 
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-[var(--text-secondary)] truncate" title={me.username}>{me.username}</span>
         <button
           onClick={logout}
           title="Log out"
-          className="flex items-center gap-1 shrink-0 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          className="flex items-center gap-1 shrink-0 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         >
           <LogOut size={12} />
           Log out
@@ -551,7 +551,7 @@ function AccountSection({ open }: { open: boolean }) {
       {me.role === "admin" && (
         <a
           href="/admin"
-          className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         >
           <Shield size={12} />
           Admin
@@ -559,7 +559,7 @@ function AccountSection({ open }: { open: boolean }) {
       )}
 
       {me.mustChangePassword && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-2.5 py-2 leading-relaxed">
+        <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-2.5 py-2 leading-relaxed">
           You are using a temporary password. Please change it below.
         </p>
       )}
@@ -593,13 +593,13 @@ function AccountSection({ open }: { open: boolean }) {
               className="w-full text-sm border border-[var(--surface-border)] rounded-xl px-3 py-2 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
             />
 
-            {error && <p className="text-red-400 text-xs">{error}</p>}
-            {done && <p className="text-xs text-[var(--text-secondary)]">Password changed.</p>}
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {done && <p className="text-sm text-[var(--text-secondary)]">Password changed.</p>}
 
             <button
               onClick={changePassword}
               disabled={saving}
-              className="self-end flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 transition-colors"
+              className="self-end flex items-center gap-1 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 transition-colors"
             >
               {saving ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
               Save
@@ -685,18 +685,18 @@ function SettingsPanel({
           <AccountSection open={open} />
 
           <section className="flex flex-col gap-3">
-            <span className="text-xs text-[var(--text-muted)]">Appearance</span>
+            <span className="text-sm text-[var(--text-muted)]">Appearance</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">
                 Dark mode
-                <kbd className="ml-2 px-1.5 py-0.5 rounded-md border border-[var(--surface-border)] text-xs text-[var(--text-muted)] align-middle">⇧D</kbd>
+                <kbd className="ml-2 px-1.5 py-0.5 rounded-md border border-[var(--surface-border)] text-sm text-[var(--text-muted)] align-middle">⇧D</kbd>
               </span>
               <Toggle checked={dark} onChange={onToggleDark} label="Dark mode" title="Toggle dark mode (Shift+D)" />
             </div>
           </section>
 
           <section className="flex flex-col gap-2">
-            <span className="text-xs text-[var(--text-muted)]">Time</span>
+            <span className="text-sm text-[var(--text-muted)]">Time</span>
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-[var(--text-secondary)] shrink-0">Timezone</span>
               <TimezoneSelect value={timezone} onChange={onChangeTimezone} />
@@ -704,7 +704,7 @@ function SettingsPanel({
           </section>
 
           <section className="flex flex-col gap-3">
-            <span className="text-xs text-[var(--text-muted)]">Performance</span>
+            <span className="text-sm text-[var(--text-muted)]">Performance</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">Preload dashboards</span>
               <Toggle
@@ -714,7 +714,7 @@ function SettingsPanel({
                 title={preload ? "Load dashboards on first visit" : "Load every dashboard at startup"}
               />
             </div>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed -mt-1">
+            <p className="text-sm text-[var(--text-muted)] leading-relaxed -mt-1">
               Load every dashboard in the background when the page opens, so switching between them is instant. Uses more data and memory at startup.
             </p>
           </section>
@@ -722,19 +722,19 @@ function SettingsPanel({
           <KeyboardSettings />
 
           <section className="flex flex-col gap-3">
-            <span className="text-xs text-[var(--text-muted)]">Preview</span>
+            <span className="text-sm text-[var(--text-muted)]">Preview</span>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--text-secondary)]">Demo mode</span>
               <Toggle checked={demo} onChange={onToggleDemo} label="Demo mode" title={demo ? "Exit demo mode" : "Enter demo mode"} />
             </div>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed -mt-1">
+            <p className="text-sm text-[var(--text-muted)] leading-relaxed -mt-1">
               Preview the first-run dashboards with sample data. Your own data is untouched and nothing you change in demo mode is saved.
             </p>
           </section>
         </div>
 
         <div className="shrink-0 px-5 py-3 border-t border-[var(--surface-border)]">
-          <p className="text-xs text-[var(--text-muted)]">
+          <p className="text-sm text-[var(--text-muted)]">
             oldenbyte © 2026{" "}
             <a
               href="https://github.com/cengizozel/oldenbyte"
@@ -901,12 +901,12 @@ function DashboardSwitcher({
                     if (e.key === "Escape") setRenamingId(null);
                   }}
                   onBlur={() => commitRename(d.id)}
-                  className="flex-1 min-w-0 text-xs px-2 py-1.5 bg-transparent outline-none text-[var(--text-primary)]"
+                  className="flex-1 min-w-0 text-sm px-2 py-1.5 bg-transparent outline-none text-[var(--text-primary)]"
                 />
               ) : (
                 <button
                   onClick={() => { onChange({ ...dashboards, activeId: d.id }); setOpen(false); }}
-                  className={`flex-1 min-w-0 truncate text-left text-xs px-2 py-1.5 ${
+                  className={`flex-1 min-w-0 truncate text-left text-sm px-2 py-1.5 ${
                     d.id === dashboards.activeId
                       ? "text-[var(--text-primary)] font-medium"
                       : "text-[var(--text-secondary)]"
@@ -949,7 +949,7 @@ function DashboardSwitcher({
                     if (e.key === "Escape") { setCreating(false); setNewName(""); }
                   }}
                   onBlur={() => { if (newName.trim()) addDashboard(); else { setCreating(false); setNewName(""); } }}
-                  className="flex-1 min-w-0 text-xs py-1.5 bg-transparent outline-none text-[var(--text-primary)] placeholder:opacity-40"
+                  className="flex-1 min-w-0 text-sm py-1.5 bg-transparent outline-none text-[var(--text-primary)] placeholder:opacity-40"
                 />
                 <button
                   onMouseDown={e => { e.preventDefault(); addDashboard(); }}
@@ -962,7 +962,7 @@ function DashboardSwitcher({
             ) : (
               <button
                 onClick={() => setCreating(true)}
-                className="w-full flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5"
+                className="w-full flex items-center gap-1.5 text-sm px-2 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5"
               >
                 <Plus size={12} />
                 New dashboard
@@ -1062,7 +1062,7 @@ export default function TopBar({
           {demo && (
             <button
               onClick={exitDemoMode}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-sm text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
               title="Exit demo mode"
             >
               demo

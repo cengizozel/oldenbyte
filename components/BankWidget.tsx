@@ -274,7 +274,7 @@ export default function BankWidget({
       <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
         {(def.config ?? []).map(f => (
           <div key={f.key}>
-            <p className={`text-xs mb-1 opacity-70 ${c.label}`}>{f.label}</p>
+            <p className={`text-sm mb-1 opacity-70 ${c.label}`}>{f.label}</p>
             {f.type === "select" ? (
               <SettingsSelect
                 value={String(draft[f.key] ?? "")}
