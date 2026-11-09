@@ -87,19 +87,23 @@ export function buildSeed(): Record<string, unknown> {
   }
 
   return {
-    // ── Home dashboard: 4 columns by 7 rows ─────────────────────────────────
-    //   cols 0-1: text 2x1 over notebook 2x3, then tracker 1x3 and upkeep 1x3
-    //   col 2:    weather 1x2, f1 1x2        col 3: calendar 1x4
-    //   cols 2-3: youtube 2x3 with reddit and rss as tabs
+    // ── Home dashboard: 4 columns by 9 rows ─────────────────────────────────
+    //   cols 0-1: notebook 2x4, then tracker 1x3 and upkeep 1x3, then rss 2x2
+    //   col 2:    weather 1x2, f1 1x2, youtube 1x3     col 3: calendar 1x4, reddit 1x3
+    //   cols 2-3: text 2x2 at the bottom
+    //   The three feeds each get their own cell so all of them are on show;
+    //   the tab groups live on the Study dashboard.
     "widget-layout": [
-      { i: "text-home",     x: 0, y: 0, w: 2, h: 1, ...GRID },
-      { i: "notebook-home", x: 0, y: 1, w: 2, h: 3, ...GRID },
+      { i: "notebook-home", x: 0, y: 0, w: 2, h: 4, ...GRID },
       { i: "tracker-home",  x: 0, y: 4, w: 1, h: 3, ...GRID },
       { i: "upkeep-home",   x: 1, y: 4, w: 1, h: 3, ...GRID },
+      { i: "rss-home",      x: 0, y: 7, w: 2, h: 2, ...GRID },
       { i: "weather-home",  x: 2, y: 0, w: 1, h: 2, ...GRID },
       { i: "f1-home",       x: 2, y: 2, w: 1, h: 2, ...GRID },
+      { i: "youtube-home",  x: 2, y: 4, w: 1, h: 3, ...GRID },
       { i: "calendar-home", x: 3, y: 0, w: 1, h: 4, ...GRID },
-      { i: "youtube-home",  x: 2, y: 4, w: 2, h: 3, ...GRID, tabs: ["reddit-home", "rss-home"] },
+      { i: "reddit-home",   x: 3, y: 4, w: 1, h: 3, ...GRID },
+      { i: "text-home",     x: 2, y: 7, w: 2, h: 2, ...GRID },
     ],
     "widget-instances": {
       "text-home":     inst("text",     "text-home"),
@@ -172,30 +176,45 @@ export function buildSeed(): Record<string, unknown> {
 
     "text-widget-text-home": { source: { type: "text", value: "memento mori" }, font: "serif" },
 
+    // Six activities, two weeks of history (reading every day for the streak),
+    // and the side project timer running since twenty minutes ago.
     "tracker-config-tracker-home": {
       items: [
-        { id: "seed-read",  name: "reading" },
-        { id: "seed-move",  name: "exercise" },
-        { id: "seed-build", name: "side project" },
+        { id: "seed-read",   name: "reading" },
+        { id: "seed-move",   name: "exercise" },
+        { id: "seed-build",  name: "side project" },
+        { id: "seed-guitar", name: "guitar" },
+        { id: "seed-lang",   name: "Portuguese" },
+        { id: "seed-walk",   name: "walk" },
       ],
-      activeId: null,
-      since: null,
+      activeId: "seed-build",
+      since: now - 20 * M,
     },
-    "tracker-days-tracker-home": {
-      [d4]: { "seed-read": 1860, "seed-build": 3540 },
-      [d3]: { "seed-read": 2400, "seed-move": 1500 },
-      [d2]: { "seed-read": 1740, "seed-move": 1320, "seed-build": 4920 },
-      [d1]: { "seed-read": 2940, "seed-build": 2280 },
-      [today]: { "seed-read": 900 },
-    },
+    "tracker-days-tracker-home": Object.fromEntries(
+      Array.from({ length: 14 }, (_, k) => {
+        const n = 13 - k; // days ago
+        const day: Record<string, number> = { "seed-read": 1500 + ((n * 7) % 5) * 300 };
+        if (n % 2 === 0) day["seed-move"] = 1800 + ((n * 3) % 4) * 300;
+        if (n % 3 !== 1) day["seed-build"] = 2400 + ((n * 5) % 6) * 600;
+        if (n % 2 === 1) day["seed-guitar"] = 900 + ((n * 11) % 3) * 300;
+        if (n % 4 !== 3) day["seed-lang"] = 600 + ((n * 13) % 3) * 300;
+        if (n % 3 === 0) day["seed-walk"] = 2100 + ((n * 17) % 4) * 300;
+        if (n === 0) { day["seed-read"] = 1320; day["seed-move"] = 1860; day["seed-lang"] = 720; delete day["seed-build"]; delete day["seed-walk"]; }
+        return [dayOffset(-n), day];
+      })
+    ),
 
     "upkeep-config-upkeep-home": {
       items: [
         { id: "seed-teeth",   name: "brush teeth",   weight: 10, hours: 12 },
         { id: "seed-shower",  name: "shower",        weight: 10, hours: 36 },
         { id: "seed-plants",  name: "water plants",  weight: 5,  hours: 72 },
+        { id: "seed-dishes",  name: "dishes",        weight: 5,  hours: 24 },
+        { id: "seed-vacuum",  name: "vacuum",        weight: 5,  hours: 168 },
         { id: "seed-laundry", name: "laundry",       weight: 5,  hours: 168 },
         { id: "seed-sheets",  name: "change sheets", weight: 5,  hours: 336 },
+        { id: "seed-filter",  name: "water filter",  weight: 3,  hours: 720 },
+        { id: "seed-backup",  name: "backup laptop", weight: 5,  hours: 168 },
       ],
       order: "custom",
     },
@@ -203,8 +222,12 @@ export function buildSeed(): Record<string, unknown> {
       "seed-teeth":   checks(3, 12, 20),
       "seed-shower":  checks(20, 34, 7),
       "seed-plants":  checks(80, 70, 5),
+      "seed-dishes":  checks(5, 24, 12),
+      "seed-vacuum":  checks(50, 168, 4),
       "seed-laundry": checks(96, 168, 4),
       "seed-sheets":  checks(240, 336, 2),
+      "seed-filter":  checks(300, 720, 2),
+      "seed-backup":  checks(30, 168, 6),
     },
 
     "weather-widget-weather-home": { name: "Lisbon", region: "Portugal", lat: 38.7223, lon: -9.1393, unit: "c" },
