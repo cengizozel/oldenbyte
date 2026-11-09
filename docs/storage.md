@@ -153,6 +153,7 @@ Per-widget keys (`<id>` is the instance ID):
 | Chat | `chat-<id>-index`, `chat-<id>-conv-<conversationId>` (legacy `chat-widget-<id>` is migrated by the widget); see [widgets/chat.md](widgets/chat.md) |
 | Community (bank) | `bank-widget-<id>` (user settings), cache `bank-widget-<id>-cache` (last response) |
 | Digest page | cache `digest-ai-sections-<YYYY-MM-DD>` |
+| Digest page | `digest-skip`: JSON array of widget instance ids left out of the digest (the sections row of its model panel) |
 
 `lib/settingKeys.instanceIdOf(key)` knows every family in this table and returns the instance id a key belongs to (null for caches, global keys and anything unlisted). A new per-widget key family must be added there, or its leftover data can never be cleaned up.
 

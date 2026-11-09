@@ -69,6 +69,18 @@ const defaultModelsFor = (url: string) => (/openai\.com/i.test(url) ? OPENAI_MOD
 export default function DigestPage() {
   const [mode] = useState<"digest" | "full" | "ai">("ai");
   const [sections, setSections]   = useState<Section[]>([]);
+  // Widgets left out of the digest (instance ids), chosen in the model panel.
+  const [skip, setSkip] = useState<string[]>([]);
+  useEffect(() => {
+    storage.getItem("digest-skip").then(raw => {
+      try { const v = JSON.parse(raw ?? "[]"); if (Array.isArray(v)) setSkip(v.filter(x => typeof x === "string")); } catch {}
+    });
+  }, []);
+  function toggleSkip(id: string) {
+    const next = skip.includes(id) ? skip.filter(x => x !== id) : [...skip, id];
+    setSkip(next);
+    storage.setItem("digest-skip", JSON.stringify(next));
+  }
   const [loading, setLoading]     = useState(true);
   // Any OpenAI-compatible endpoint (local Ollama/LM Studio/llama.cpp or a hosted
   // provider). Stored in localStorage, like the original key was.
@@ -199,6 +211,9 @@ export default function DigestPage() {
     { label: "llama.cpp", url: "http://localhost:8080/v1" },
   ];
 
+  const shown = sections.filter(sec => !skip.includes(sec.id));
+  const skippedLabels = new Set(sections.filter(sec => skip.includes(sec.id)).map(sec => sec.label));
+
   const CITABLE = new Set(["rss", "reddit", "youtube", "arxiv", "hf"]);
 
   function buildSectionContent(section: Section): { content: string; refs: Ref[] } {
@@ -249,13 +264,13 @@ export default function DigestPage() {
 
     if (streamingMode) {
       // Pre-populate sections so they appear immediately and fill in real-time
-      const initial = sections.map(s => ({ label: s.label, prose: "", refs: [] as Ref[] }));
+      const initial = shown.map(s => ({ label: s.label, prose: "", refs: [] as Ref[] }));
       setSectionSummaries(initial);
       setAiLoading(false);
 
       const finalSummaries = [...initial];
 
-      await Promise.allSettled(sections.map(async (section, idx) => {
+      await Promise.allSettled(shown.map(async (section, idx) => {
         const { content, refs } = buildSectionContent(section);
         try {
           const res = await fetch("/api/digest", {
@@ -289,7 +304,7 @@ export default function DigestPage() {
     } else {
       try {
         const results = await Promise.allSettled(
-          sections.map(async section => {
+          shown.map(async section => {
             const { content, refs } = buildSectionContent(section);
             const res = await fetch("/api/digest", {
               method: "POST",
@@ -793,6 +808,29 @@ export default function DigestPage() {
                 )}
               </div>
               {modelsError && <p className="font-ui text-[15px] text-red-400 leading-snug">{modelsError}</p>}
+              {/* Sections: every digestable widget on your dashboards; click one to leave it out */}
+              {sections.length > 0 && (
+                <div className="flex items-start gap-3">
+                  <span className="font-ui text-[15px] text-[var(--text-secondary)] w-20 shrink-0 min-h-6 flex items-center">sections</span>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    {sections.map(sec => {
+                      const off = skip.includes(sec.id);
+                      return (
+                        <button
+                          key={sec.id}
+                          onClick={() => toggleSkip(sec.id)}
+                          aria-pressed={!off}
+                          title={off ? "Left out of the digest, click to include" : "In the digest, click to leave out"}
+                          className={`inline-flex items-center min-h-6 font-ui text-[15px] transition-colors ${off ? "line-through text-[var(--text-muted)] hover:text-[var(--text-secondary)]" : "text-[var(--text-primary)] hover:text-[var(--text-secondary)]"}`}
+                        >
+                          {sec.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* API key — only for hosted providers that need one */}
               {NEEDS_KEY.test(draft.baseUrl) && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -831,7 +869,7 @@ export default function DigestPage() {
             <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-primary)] text-center mt-16">{aiError}</p>
           ) : sectionSummaries.length > 0 ? (
             <div>
-              {sectionSummaries.map((s, si) => (
+              {sectionSummaries.filter(s => !skippedLabels.has(s.label)).map((s, si) => (
                 <article key={s.label} className={si > 0 ? "mt-10" : ""}>
                   {/* Section flag — click to collapse/expand */}
                   <button
