@@ -220,7 +220,7 @@ export default function DeficitWidget({
       {!loaded ? null : !config || !p ? (
         <EmptyState c={c} action="set your profile and goal" />
       ) : (
-        <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto pr-1">
+        <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1">
           <div className="shrink-0 flex items-baseline justify-between gap-2">
             <div className="flex items-baseline gap-1.5 min-w-0">
               <span className={`text-2xl font-semibold tabular-nums leading-none ${p.reached ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>{fmtKg(p.estWeight)}</span>
@@ -252,16 +252,17 @@ export default function DeficitWidget({
               <span className={`text-xs font-medium ${c.label}`}>{fmtDay(viewDate)}{viewDate === today && " · today"}</span>
               <button onClick={() => setViewDate(d => shiftDay(d, 1))} disabled={viewDate >= today} title="Next day" aria-label="Next day" className={`opacity-70 hover:opacity-100 disabled:opacity-20 ${iconBtnCls} ${c.label}`}><ChevronRight size={14} /></button>
             </div>
-            <div className="flex items-center gap-1.5">
-              <label className={`flex-1 min-w-0 flex items-center gap-1 text-xs ${c.label}`} title="Calories eaten this day">
+            {/* Wraps to two lines in a narrow card instead of overflowing. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-xs ${c.label}`} title="Calories eaten this day">
                 <SettingsInput inputMode="numeric" value={ate} onChange={e => setAte(e.target.value.replace(/[^\d]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="ate" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
                 <span className="opacity-70 shrink-0">kcal</span>
               </label>
-              <label className={`flex-1 min-w-0 flex items-center gap-1 text-xs ${c.label}`} title="Extra calories burned by exercise this day">
+              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-xs ${c.label}`} title="Extra calories burned by exercise this day">
                 <SettingsInput inputMode="numeric" value={burned} onChange={e => setBurned(e.target.value.replace(/[^\d]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="burned" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
                 <span className="opacity-70 shrink-0">kcal</span>
               </label>
-              <label className={`flex-1 min-w-0 flex items-center gap-1 text-xs ${c.label}`} title="Weigh-in this day, optional">
+              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-xs ${c.label}`} title="Weigh-in this day, optional">
                 <SettingsInput inputMode="decimal" value={weight} onChange={e => setWeight(e.target.value.replace(/[^\d.]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="weigh" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
                 <span className="opacity-70 shrink-0">kg</span>
               </label>
