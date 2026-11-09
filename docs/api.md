@@ -377,7 +377,10 @@ Handles CDATA sections, HTML entity decoding, and both RSS `<item>` and Atom `<e
 ## Reddit
 
 ### `GET /api/reddit?subreddit=<name>&period=<period>&limit=<n>`
-Top posts of one subreddit from Reddit's RSS feed (`/r/<name>/top.rss?t=<period>`). `subreddit` must match `[A-Za-z0-9_]{1,50}` (`400` otherwise), `period` defaults to `week`, `limit` is 1 to 25 (default 5).
+Top posts of one subreddit. Uses the official API (`oauth.reddit.com`, app-only OAuth) when the account has saved a Reddit app's credentials in the `reddit-api` setting, and Reddit's RSS feed (`/r/<name>/top.rss?t=<period>`) otherwise or as the fallback. `subreddit` must match `[A-Za-z0-9_]{1,50}` (`400` otherwise), `period` defaults to `week`, `limit` is 1 to 25 (default 5).
+
+### `POST /api/reddit`
+Body `{ clientId, clientSecret }`. Fetches an app-only token with those credentials and answers `{ ok: true }`, `400` when a field is missing, or `503` with `error` when Reddit rejected them or could not be reached. Nothing is stored; the widget saves the credentials itself.
 
 ```json
 [{ "title": "...", "link": "...", "pubDate": "...", "score": 0, "subreddit": "programming", "content": "<html>", "thumbnail": "...", "image": "..." }]

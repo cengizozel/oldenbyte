@@ -12,6 +12,7 @@ import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
 import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip, BackButton } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
+import { REDDIT_API_KEY, parseRedditApi, type RedditApiConfig } from "@/lib/reddit";
 import { useFirstSeen } from "@/lib/useFirstSeen";
 import { redditCacheKey } from "@/lib/cacheKeys";
 
@@ -97,6 +98,37 @@ export default function RedditWidget({
   }, [settingsOpen]);
   const [draft, setDraft]               = useState<RedditConfig>(DEFAULT);
   const [subInput, setSubInput]         = useState("");
+  // Optional Reddit app credentials, one setting shared by every Reddit widget
+  // (lib/reddit.ts). Loaded when the settings face opens, saved with Save.
+  const blankApi: RedditApiConfig = { clientId: "", clientSecret: "" };
+  const [api, setApi]                   = useState<RedditApiConfig>(blankApi);
+  const [apiSaved, setApiSaved]         = useState<RedditApiConfig | null>(null);
+  const [apiStatus, setApiStatus]       = useState<{ ok: boolean; msg: string }>({ ok: true, msg: "" });
+  useEffect(() => {
+    if (!settingsOpen) return;
+    storage.getItem(REDDIT_API_KEY).then(raw => {
+      const saved = parseRedditApi(raw);
+      setApiSaved(saved);
+      setApi(saved ?? blankApi);
+      setApiStatus({ ok: true, msg: "" });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsOpen]);
+
+  async function testApi() {
+    setApiStatus({ ok: true, msg: "testing..." });
+    try {
+      const res = await fetch("/api/reddit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: api.clientId.trim(), clientSecret: api.clientSecret.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      setApiStatus(res.ok ? { ok: true, msg: "Reddit accepted the app." } : { ok: false, msg: body.error || `Test failed (${res.status})` });
+    } catch {
+      setApiStatus({ ok: false, msg: "Could not reach the dashboard server." });
+    }
+  }
   const [selected, setSelected]         = useState<Post | null>(null);
   const [filter, setFilter, toggleFilter] = useFeedFilter();
   const { firstSeen, lastVisit } = useFirstSeen(
@@ -269,6 +301,12 @@ export default function RedditWidget({
     // Flip back right away; the front paints feeds as they arrive.
     setConfig(draft);
     await storage.setItem(storageKey, JSON.stringify(draft));
+    const creds = parseRedditApi(JSON.stringify(api));
+    if (JSON.stringify(creds) !== JSON.stringify(apiSaved)) {
+      if (creds) await storage.setItem(REDDIT_API_KEY, JSON.stringify(creds));
+      else await storage.removeItem(REDDIT_API_KEY);
+      setApiSaved(creds);
+    }
     setSettingsOpen(false);
     void fetchPosts(draft, cacheKeyFor(draft));
   }
@@ -500,6 +538,35 @@ export default function RedditWidget({
             <span className={`text-xs opacity-70 ${c.label}`}>Order</span>
             <Chip c={c} active={(draft.order ?? "arrival") === "arrival"} onClick={() => setDraft(d => ({ ...d, order: "arrival" }))} title="Posts that newly made a top list go first">newest in feed</Chip>
             <Chip c={c} active={draft.order === "date"} onClick={() => setDraft(d => ({ ...d, order: "date" }))} title="By when the post was made">post date</Chip>
+          </div>
+
+          {/* Reddit app credentials (optional, shared by every Reddit widget) */}
+          <div className="flex flex-col gap-2 pt-3 border-t border-black/10 dark:border-white/10">
+            <span className={`text-sm opacity-70 ${c.label}`}>Reddit API (optional)</span>
+            <SettingsInput
+              type="text"
+              value={api.clientId}
+              onChange={e => { setApiStatus({ ok: true, msg: "" }); setApi(a => ({ ...a, clientId: e.target.value })); }}
+              placeholder="Client ID"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <SettingsInput
+              type="password"
+              value={api.clientSecret}
+              onChange={e => { setApiStatus({ ok: true, msg: "" }); setApi(a => ({ ...a, clientSecret: e.target.value })); }}
+              placeholder="Client secret"
+              autoComplete="new-password"
+            />
+            <div className="flex items-center gap-2 min-w-0">
+              <SmallButton c={c} onClick={testApi} disabled={!api.clientId.trim() || !api.clientSecret.trim()}>Test</SmallButton>
+              {apiStatus.msg && (
+                <span className={`text-sm min-w-0 break-words ${apiStatus.ok ? `opacity-70 ${c.label}` : "text-red-400"}`}>{apiStatus.msg}</span>
+              )}
+            </div>
+            <p className={`text-sm opacity-70 leading-snug ${c.label}`}>
+              A script app from reddit.com/prefs/apps lifts the limit to 100 requests a minute and adds vote counts. Without it the public feed is used, which Reddit limits to about one request a minute.
+            </p>
           </div>
 
           {/* Selected subreddits with per-sub limit and period */}

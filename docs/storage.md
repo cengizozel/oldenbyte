@@ -122,6 +122,7 @@ Global keys:
 | `topbar-date-format` | Clock/date format selection |
 | `notepad-registry` | JSON array of every notepad instance ID ever created |
 | `youtube-tubearchivist` | TubeArchivist connection shared by every YouTube widget |
+| `reddit-api` | Reddit app credentials shared by every Reddit widget |
 
 Per-widget keys (`<id>` is the instance ID):
 

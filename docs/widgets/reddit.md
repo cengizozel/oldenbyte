@@ -8,6 +8,7 @@ Displays top posts from one or more subreddits with per-subreddit time period an
 |---|---|
 | `reddit-widget-{id}` | JSON: `{ subreddits: SubEntry[]; images?: boolean }` |
 | `reddit-widget-{id}-v3-{YYYY-MM-DD}-{sub:period:limit,...}` | Daily cache of the combined post list |
+| `reddit-api` | JSON `{ clientId, clientSecret }` of a Reddit script app, one per account, shared by every Reddit widget (optional) |
 
 `SubEntry` is `{ name: string; limit: number; period: "day" | "week" | "month" | "year" | "all" }`. New subreddits default to 5 posts per `week`. `images` turns on list thumbnails.
 
@@ -15,7 +16,10 @@ The cache key encodes the date and the full configuration, so any change to subr
 
 ## Feed Fetching
 
-Posts come from `GET /api/reddit?subreddit=…&period=…&limit=…`, which reads Reddit's public RSS endpoint server-side:
+Posts come from `GET /api/reddit?subreddit=…&period=…&limit=…`. The server has two ways to Reddit, best first:
+
+1. **The official API**, when the account has saved a Reddit app's client ID and secret in the settings card (setting `reddit-api`, shared by every Reddit widget). Create a "script" app at reddit.com/prefs/apps; the dashboard uses app-only OAuth (`client_credentials`, no Reddit login) against `https://oauth.reddit.com/r/{name}/top.json?t={period}&limit={limit}&raw_json=1`, which allows 100 requests a minute and includes vote counts. Tokens last a day and are cached per client ID. The **Test** button (`POST /api/reddit`) fetches a token with the typed credentials and reports whether Reddit accepted them.
+2. **The public RSS feed** otherwise, and as the fallback when an API call fails for any reason other than a rate limit:
 
 ```
 https://www.reddit.com/r/{name}/top.rss?t={period}&limit={limit}
@@ -25,7 +29,7 @@ Reddit rate-limits logged-out clients hard (about one request a minute per IP as
 
 The widget fires one request per subreddit at once, feeds with nothing shown yet going first. Each subreddit paints as it arrives instead of the whole widget waiting for the slowest one. The combined list is sorted newest first by publish date. While loading, or when a feed failed, a counter in the header shows how many subreddits have loaded; tap it for the per-feed breakdown. The refresh button refetches with `refresh=1`.
 
-RSS carries no vote counts, so scores are not shown.
+RSS carries no vote counts, so scores are only shown when the API is configured.
 
 ## Post Detail View
 

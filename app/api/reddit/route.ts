@@ -2,25 +2,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
 import { feedTtlMs } from "@/lib/feedCache";
 import { decodeEntities } from "@/lib/text";
+import { readSetting } from "@/lib/migrations";
+import { REDDIT_API_KEY, mapListing, parseRedditApi, type RedditApiConfig, type RedditPost as Post } from "@/lib/reddit";
 import { mkdir, readFile, writeFile, rename } from "fs/promises";
 import path from "path";
 
-// Reddit blocks its JSON endpoints for non-browser clients (403), but the RSS
-// feeds still serve with a browser User-Agent. RSS carries no vote counts;
-// `score` stays 0 and the widget hides it.
+// Two ways in, best first:
 //
-// The real constraint is the rate limit: logged-out requests get a small
-// per-IP budget (about one request a minute as of October 2026), so all
-// upstream fetches go through ONE queue that follows Reddit's own budget
-// headers. Results are cached (in memory and on disk, see CACHE_FILE), and a
-// rate-limited refresh serves the last good result instead of nothing
-// (stale-while-revalidate).
+// 1. The official API, when the account has saved a Reddit script app's
+//    client id and secret (setting `reddit-api`, lib/reddit.ts). App-only
+//    OAuth (client_credentials) gives 100 requests a minute and vote counts.
+// 2. The public RSS feed otherwise, or when the API call fails. Reddit blocks
+//    its JSON endpoints for non-browser clients, but RSS still serves with a
+//    browser User-Agent. It carries no vote counts (`score` stays 0 and the
+//    widget hides it), and logged-out requests get a small per-IP budget
+//    (about one request a minute as of October 2026).
+//
+// Either way all upstream fetches go through ONE queue that follows Reddit's
+// own budget headers. Results are cached (in memory and on disk, see
+// CACHE_FILE), and a rate-limited refresh serves the last good result instead
+// of nothing (stale-while-revalidate).
 const UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0";
-
-type Post = { title: string; link: string; pubDate: string; score: number; subreddit: string; content: string; thumbnail: string; image: string };
+// Reddit wants API clients to identify themselves.
+const APP_UA = "oldenbyte/1.0 (self-hosted dashboard; https://github.com/cengizozel/oldenbyte)";
 
 const STALE_MS = 24 * 60 * 60 * 1000; // still better than an empty feed
-const MIN_SPACING_MS = 2000;          // floor between upstream fetches
+const MIN_SPACING_MS = 2000;          // floor between public-feed fetches
+const API_SPACING_MS = 300;           // floor between API fetches (100 a minute allowed)
 const RETRY_FOR_MS = 30 * 60 * 1000;  // keep a rate-limited subreddit queued this long
 const WAIT_FOR_MS = 20 * 1000;        // longest a request waits before answering "queued"
 
@@ -62,14 +70,14 @@ function saveCacheSoon() {
 // Logged-out feed requests currently get about one per minute per IP.
 let queueTail: Promise<unknown> = Promise.resolve();
 let nextAllowedAt = 0;
-function noteBudget(res: Response) {
+function noteBudget(res: Response, spacing = MIN_SPACING_MS) {
   const remaining = Number(res.headers.get("x-ratelimit-remaining"));
   const reset = Number(res.headers.get("x-ratelimit-reset") ?? res.headers.get("retry-after"));
   const waitMs = Number.isFinite(reset) && reset > 0 ? reset * 1000 + 500 : 60_000;
   if (res.status === 429 || (Number.isFinite(remaining) && remaining < 1)) {
     nextAllowedAt = Math.max(nextAllowedAt, Date.now() + waitMs);
   } else {
-    nextAllowedAt = Math.max(nextAllowedAt, Date.now() + MIN_SPACING_MS);
+    nextAllowedAt = Math.max(nextAllowedAt, Date.now() + spacing);
   }
 }
 function throttled<T>(fn: () => Promise<T>): Promise<T> {
@@ -87,6 +95,49 @@ function tag(xml: string, name: string): string {
   return m ? m[1].trim() : "";
 }
 
+
+// App-only OAuth tokens last a day; one per client id, refreshed a minute early.
+const tokens = new Map<string, { token: string; exp: number }>();
+async function appToken(c: RedditApiConfig): Promise<string> {
+  const hit = tokens.get(c.clientId);
+  if (hit && hit.exp > Date.now()) return hit.token;
+  const res = await fetch("https://www.reddit.com/api/v1/access_token", {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + Buffer.from(`${c.clientId}:${c.clientSecret}`).toString("base64"),
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": APP_UA,
+    },
+    body: "grant_type=client_credentials",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Reddit app token ${res.status}`);
+  const body = (await res.json()) as { access_token?: string; expires_in?: number; error?: string };
+  if (!body.access_token) throw new Error(`Reddit app token: ${body.error ?? "no token"}`);
+  tokens.set(c.clientId, { token: body.access_token, exp: Date.now() + Math.max(60, (body.expires_in ?? 3600) - 60) * 1000 });
+  return body.access_token;
+}
+
+async function fetchSubredditApi(c: RedditApiConfig, subreddit: string, period: string, limit: number): Promise<Post[]> {
+  const token = await appToken(c);
+  const url = `https://oauth.reddit.com/r/${encodeURIComponent(subreddit)}/top.json?t=${encodeURIComponent(period)}&limit=${limit}&raw_json=1`;
+  const res = await fetch(url, { headers: { Authorization: `bearer ${token}`, "User-Agent": APP_UA }, cache: "no-store" });
+  noteBudget(res, API_SPACING_MS);
+  if (res.status === 401) tokens.delete(c.clientId); // expired or revoked: the next call gets a new one
+  if (!res.ok) throw new Error(`Reddit ${res.status}`);
+  return mapListing(await res.json(), subreddit, limit);
+}
+
+// The API when credentials are set, the public feed as the fallback. A 429
+// is not a reason to fall back (the queue handles it); anything else is.
+function fetchEither(c: RedditApiConfig | null, subreddit: string, period: string, limit: number): Promise<Post[]> {
+  if (!c) return fetchSubreddit(subreddit, period, limit);
+  return fetchSubredditApi(c, subreddit, period, limit).catch(err => {
+    if (String(err).includes("429")) throw err;
+    console.warn(`[reddit] API failed for r/${subreddit}, using the public feed:`, String(err));
+    return fetchSubreddit(subreddit, period, limit);
+  });
+}
 
 async function fetchSubreddit(subreddit: string, period: string, limit: number): Promise<Post[]> {
   const url = `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/top.rss?t=${encodeURIComponent(period)}&limit=${limit}`;
@@ -130,14 +181,14 @@ async function fetchSubreddit(subreddit: string, period: string, limit: number):
 // Queued fetch shared by identical concurrent requests, cached on success.
 // A 429 goes back into the queue (which now waits for Reddit's reset) and is
 // retried until RETRY_FOR_MS has passed; other errors (403, 404) fail at once.
-function refresh(key: string, subreddit: string, period: string, limit: number): Promise<Post[]> {
+function refresh(key: string, subreddit: string, period: string, limit: number, creds: RedditApiConfig | null): Promise<Post[]> {
   const running = inflight.get(key);
   if (running) return running;
   const p = (async () => {
     const deadline = Date.now() + RETRY_FOR_MS;
     for (;;) {
       try {
-        const posts = await throttled(() => fetchSubreddit(subreddit, period, limit));
+        const posts = await throttled(() => fetchEither(creds, subreddit, period, limit));
         cache.set(key, { at: Date.now(), posts });
         saveCacheSoon();
         return posts;
@@ -164,6 +215,7 @@ export async function GET(request: NextRequest) {
   }
 
   await loadCache();
+  const creds = parseRedditApi((await readSetting(auth.id, REDDIT_API_KEY)).value);
   const force = request.nextUrl.searchParams.get("refresh") === "1";
   const key = `${subreddit.toLowerCase()}|${period}|${limit}`;
   const hit = cache.get(key);
@@ -176,14 +228,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(hit.posts);
   }
   if (!force && hit && Date.now() - hit.at < STALE_MS) {
-    void refresh(key, subreddit, period, limit).catch(() => {});
+    void refresh(key, subreddit, period, limit, creds).catch(() => {});
     return NextResponse.json(hit.posts);
   }
 
   // Nothing usable cached: wait a little for the queue, then answer "queued"
   // (the fetch keeps going in the background and fills the cache) so the
   // widget can retry instead of a request hanging for many minutes.
-  const job = refresh(key, subreddit, period, limit);
+  const job = refresh(key, subreddit, period, limit, creds);
   job.catch(() => {});
   try {
     const posts = await Promise.race([
@@ -197,5 +249,26 @@ export async function GET(request: NextRequest) {
     // Even a forced refresh prefers yesterday's posts over an empty panel.
     if (hit && Date.now() - hit.at < STALE_MS) return NextResponse.json(hit.posts);
     return NextResponse.json({ error: String(err) }, { status: 503 });
+  }
+}
+
+// Tries the given app credentials (the settings card's Test button): fetches
+// a fresh token and reports whether Reddit accepted them.
+export async function POST(request: NextRequest) {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+  const body = (await request.json().catch(() => null)) as { clientId?: unknown; clientSecret?: unknown } | null;
+  const creds = parseRedditApi(JSON.stringify(body ?? {}));
+  if (!creds) return NextResponse.json({ error: "Client ID and secret are both required." }, { status: 400 });
+  tokens.delete(creds.clientId);
+  try {
+    await appToken(creds);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const msg = String(err);
+    return NextResponse.json(
+      { error: msg.includes("401") || msg.includes("invalid") ? "Reddit rejected the client ID or secret." : `Could not reach Reddit: ${msg}` },
+      { status: 503 }
+    );
   }
 }
