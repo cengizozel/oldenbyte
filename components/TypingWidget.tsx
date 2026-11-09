@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Keyboard, RotateCcw, Target, Maximize2, Minimize2, Volume2, VolumeX, Music } from "lucide-react";
+import { Keyboard, RotateCcw, Target, Maximize2, Minimize2, Volume2, VolumeX, Music, ChevronDown } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import { TYPING_WORDS } from "@/lib/typingWords";
 import { SIMPLE_WORDS } from "@/lib/simpleWords";
@@ -64,6 +64,20 @@ const WORD_LENGTHS = [10, 25, 50];
 const TIME_LENGTHS = [15, 30, 60];
 const METRO_LENGTHS = [15, 25, 40];
 const COUNTDOWNS = [0, 3, 5];
+
+// The one-line summary of the next test, shown instead of the config bar.
+function describeConfig(cfg: Config, drills: { id: DrillId; label: string }[]): string {
+  const parts: string[] = [];
+  if (cfg.mode === "words") parts.push(`${cfg.length} words`, cfg.pool);
+  else if (cfg.mode === "time") parts.push(`${cfg.length}s`, cfg.pool);
+  else if (cfg.mode === "drill") {
+    const d = drills.find(x => x.id === cfg.drill);
+    parts.push(`drill: ${d?.label ?? cfg.drill}`);
+    if (cfg.drill === "custom" && cfg.custom.trim()) parts.push(cfg.custom.trim());
+  } else parts.push(`metronome ${cfg.bpm} bpm`, cfg.endless ? "endless" : `${cfg.length} words`);
+  if (cfg.countdown > 0) parts.push(`${cfg.countdown}s countdown`);
+  return parts.join(" · ");
+}
 
 // Word pools. "simple" is the classic 200 most common words (the Monkeytype
 // default feel); "varied" is the top 1000 of the bundled frequency-ranked
@@ -277,7 +291,7 @@ const Word = memo(function Word({ wi, word, typed, done, text }: {
     let cls: string;
     let display = word[j];
     if (j < word.length) {
-      if (tch === undefined) cls = `${text} opacity-40`;
+      if (tch === undefined) cls = `${text} opacity-60`;
       else if (tch === word[j]) cls = text;
       else cls = "text-red-500 dark:text-red-400";
     } else {
@@ -317,6 +331,7 @@ export default function TypingWidget({
   const [finished, setFinished] = useState(false);
   const [focused, setFocused] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [showOptions, setShowOptions] = useState(false); // the config bar, folded into one line until asked for
   const [counting, setCounting] = useState<number | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [caret, setCaret] = useState<{ x: number; y: number; h: number; show: boolean }>({ x: 0, y: 0, h: 0, show: false });
@@ -779,7 +794,7 @@ export default function TypingWidget({
           className={fade}
           right={
             <>
-              {stats.best > 0 && <span className={`text-xs tabular-nums opacity-60 ${c.text}`}>best {stats.best}</span>}
+              {stats.best > 0 && <span className={`text-xs tabular-nums opacity-70 ${c.text}`}>best {stats.best}</span>}
               <button
                 onClick={restart}
                 title="Restart (Tab)"
@@ -800,8 +815,19 @@ export default function TypingWidget({
           }
         />
 
-        {/* Config bar */}
-        <div className={`flex items-center flex-wrap gap-x-2 gap-y-1 mb-3 shrink-0 ${fade}`}>
+        {/* Config: one line that says what the next test is; opens the full bar */}
+        {!showOptions && (
+          <button
+            onClick={() => setShowOptions(true)}
+            aria-expanded={false}
+            title="Change the test"
+            className={`self-start flex items-center gap-1 min-h-6 mb-3 shrink-0 text-xs opacity-70 hover:opacity-100 ${c.label} ${FOCUS_RING} ${fade}`}
+          >
+            <span>{describeConfig(config, DRILLS)}</span>
+            <ChevronDown size={12} />
+          </button>
+        )}
+        {showOptions && <div className={`flex items-center flex-wrap gap-x-2 gap-y-1 mb-3 shrink-0 ${fade}`}>
           {(["words", "time", "drill", "metro"] as Mode[]).map(m => (
             <Chip key={m} c={c} active={config.mode === m} onClick={() => setMode(m)}>{m}</Chip>
           ))}
@@ -855,7 +881,7 @@ export default function TypingWidget({
           {config.mode === "metro" && <span className={`opacity-20 ${c.label}`}>|</span>}
           {config.mode === "metro" && (
             <span className="flex items-center gap-1">
-              <Music size={12} className={`${c.label} opacity-60`} />
+              <Music size={12} className={`${c.label} opacity-70`} />
               <Chip c={c} onClick={() => applyConfig({ ...config, bpm: Math.max(BPM_MIN, config.bpm - 5) })} title="Slower">−</Chip>
               <span className={`text-xs tabular-nums w-16 text-center ${c.text}`}>{config.bpm} bpm{config.dynamic ? " start" : ""}</span>
               <Chip c={c} onClick={() => applyConfig({ ...config, bpm: Math.min(BPM_MAX, config.bpm + 5) })} title="Faster">+</Chip>
@@ -865,7 +891,7 @@ export default function TypingWidget({
                 onClick={() => applyConfig({ ...config, sound: !config.sound })}
                 title={config.sound ? "Mute" : "Unmute"}
                 aria-label={config.sound ? "Mute" : "Unmute"}
-                className={`${HIT_AREA} ${FOCUS_RING} ${c.icon} opacity-60 hover:opacity-100`}
+                className={`${HIT_AREA} ${FOCUS_RING} ${c.icon} opacity-70 hover:opacity-100`}
               >
                 {config.sound ? <Volume2 size={14} /> : <VolumeX size={14} />}
               </button>
@@ -873,14 +899,15 @@ export default function TypingWidget({
           )}
           {/* get-ready countdown */}
           <span className="flex items-center gap-1 ml-auto">
-            <span className={`text-xs opacity-60 ${c.label}`} title="Count down before the test starts">countdown</span>
+            <span className={`text-xs opacity-70 ${c.label}`} title="Count down before the test starts">countdown</span>
             {COUNTDOWNS.map(n => (
               <Chip key={n} c={c} active={config.countdown === n} onClick={() => applyConfig({ ...config, countdown: n })}>
                 {n === 0 ? "off" : `${n}s`}
               </Chip>
             ))}
+            <SmallButton c={c} onClick={() => setShowOptions(false)}>done</SmallButton>
           </span>
-        </div>
+        </div>}
 
         {/* Body */}
         <div
@@ -959,8 +986,8 @@ export default function TypingWidget({
 
               {/* footer: start hint, metronome cue, or the endless stop button */}
               <div className={`h-7 shrink-0 mt-1 flex items-center gap-3 text-xs ${c.label}`}>
-                {idle && focused && config.countdown > 0 && <span className="opacity-60">press space to start</span>}
-                {running && config.mode === "metro" && !autoRefills(config) && <span className="opacity-60">strike a key on each beat</span>}
+                {idle && focused && config.countdown > 0 && <span className="opacity-70">press space to start</span>}
+                {running && config.mode === "metro" && !autoRefills(config) && <span className="opacity-70">strike a key on each beat</span>}
                 {running && config.mode === "metro" && autoRefills(config) && (
                   <SmallButton c={c} onClick={() => finish()}>stop (enter)</SmallButton>
                 )}
@@ -978,7 +1005,7 @@ export default function TypingWidget({
         {expanded ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
             <Keyboard size={22} className={`${c.label} opacity-40`} />
-            <p className={`text-xs ${c.label} opacity-60`}>Typing trainer is open in fullscreen</p>
+            <p className={`text-xs ${c.label} opacity-70`}>Typing trainer is open in fullscreen</p>
             <SmallButton c={c} onClick={() => setExpanded(false)}>Close</SmallButton>
           </div>
         ) : card(false)}
@@ -1115,7 +1142,7 @@ function LiveStats({ endsAt, progress, wpm }: { endsAt?: number; progress: strin
   return (
     <>
       <span className="font-semibold">{left !== null ? left : progress}</span>
-      <span className="opacity-60">{wpm()} wpm</span>
+      <span className="opacity-70">{wpm()} wpm</span>
     </>
   );
 }
@@ -1130,13 +1157,13 @@ function Results({
 }) {
   const big = (value: React.ReactNode, label: string, cls = c.text) => (
     <div>
-      <div className={`text-xs opacity-60 mb-1 ${c.label}`}>{label}</div>
+      <div className={`text-xs opacity-70 mb-1 ${c.label}`}>{label}</div>
       <div className={`text-3xl font-semibold tabular-nums leading-none ${cls}`}>{value}</div>
     </div>
   );
   const small = (value: React.ReactNode, label: string, title?: string) => (
     <div title={title}>
-      <div className={`text-xs opacity-60 ${c.label}`}>{label}</div>
+      <div className={`text-xs opacity-70 ${c.label}`}>{label}</div>
       <div className={`text-sm tabular-nums ${c.text}`}>{value}</div>
     </div>
   );
@@ -1157,7 +1184,7 @@ function Results({
             <span>{ch.correct}</span><span className="opacity-40">/</span>
             <span className={ch.incorrect ? "text-red-500 dark:text-red-400" : ""}>{ch.incorrect}</span><span className="opacity-40">/</span>
             <span className={ch.extra ? "text-red-800 dark:text-red-400/55" : ""}>{ch.extra}</span><span className="opacity-40">/</span>
-            <span className={ch.missed ? "opacity-60" : ""}>{ch.missed}</span>
+            <span className={ch.missed ? "opacity-70" : ""}>{ch.missed}</span>
           </>,
           "characters",
           "correct / incorrect / extra / missed",
@@ -1176,10 +1203,10 @@ function Results({
 
       {r.weak.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={`text-xs opacity-60 ${c.label}`}>missed</span>
+          <span className={`text-xs opacity-70 ${c.label}`}>missed</span>
           {r.weak.map(w => (
-            <span key={w.k} className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-red-500/10 text-red-500 dark:text-red-400" title={`${w.miss}/${w.total} wrong`}>
-              {w.k === " " ? "space" : w.k}<span className="opacity-60"> {w.miss}</span>
+            <span key={w.k} className="px-2 py-0.5 rounded-full text-xs font-mono bg-red-500/10 text-red-500 dark:text-red-400" title={`${w.miss}/${w.total} wrong`}>
+              {w.k === " " ? "space" : w.k}<span className="opacity-70"> {w.miss}</span>
             </span>
           ))}
         </div>
@@ -1194,7 +1221,7 @@ function Results({
             <Target size={12} /> practice these
           </SmallButton>
         )}
-        <span className={`ml-auto text-xs opacity-60 ${c.label}`}>tab or enter to restart</span>
+        <span className={`ml-auto text-xs opacity-70 ${c.label}`}>tab or enter to restart</span>
       </div>
     </div>
   );

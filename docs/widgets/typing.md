@@ -2,6 +2,8 @@
 
 A Monkeytype-style typing trainer. It shows three lines of text at a time, tracks which keys you miss and how you slip, and can drill exactly those keys.
 
+The front shows the next test as one line (for example "50 words · varied · 3s countdown"); clicking it opens the full row of mode, length, word pool, drill, metronome and countdown options, and "done" folds it away again.
+
 ## Storage Keys
 
 | Key | Value |
