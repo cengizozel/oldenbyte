@@ -14,7 +14,11 @@ import { FOCUS_RING, HIT_AREA, SettingsRow, SettingsSection } from "@/components
 
 // ── EditableField ─────────────────────────────────────────────────────────
 
-type FieldConfig = { type: "text" | "url"; value: string };
+// icon: optional, shown before the text. An emoji or short string, an image
+// URL, or the built-in mark at /logo.svg.
+type FieldConfig = { type: "text" | "url"; value: string; icon?: string };
+const LOGO_ICON = "/logo.svg";
+const isImageIcon = (icon: string) => /^(https?:\/\/|\/)/.test(icon);
 
 const URL_EXAMPLES = [
   { label: "Public IP address", url: "https://icanhazip.com" },
@@ -98,7 +102,8 @@ function EditableField({
     } else {
       setDisplay(draft.value.trim() || defaultValue);
     }
-    const next = { type: draft.type, value: draft.value };
+    const icon = draft.icon?.trim();
+    const next: FieldConfig = { type: draft.type, value: draft.value, ...(icon ? { icon } : {}) };
     setConfig(next);
     await storage.setItem(storageKey, JSON.stringify(next));
     setOpen(false);
@@ -110,7 +115,7 @@ function EditableField({
         role="button"
         tabIndex={0}
         aria-expanded={open}
-        className={`${className} cursor-pointer block truncate whitespace-nowrap pb-[0.2em] ${FOCUS_RING}`}
+        className={`${className} cursor-pointer flex items-center gap-2 min-w-0 whitespace-nowrap pb-[0.2em] ${align === "right" ? "justify-end" : ""} ${FOCUS_RING}`}
         onClick={() => { setDraft(config); setOpen(o => !o); setError(""); }}
         onKeyDown={e => {
           if (e.key !== "Enter" && e.key !== " ") return;
@@ -118,7 +123,11 @@ function EditableField({
           setDraft(config); setOpen(o => !o); setError("");
         }}
       >
-        {display}
+        {config.icon && (isImageIcon(config.icon)
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={config.icon} alt="" className="h-[1em] w-[1em] shrink-0 rounded-md object-contain" />
+          : <span className="shrink-0">{config.icon}</span>)}
+        <span className="truncate">{display}</span>
       </span>
 
       {open && (
@@ -146,6 +155,31 @@ function EditableField({
             placeholder={draft.type === "url" ? "https://..." : defaultValue}
             className="w-full text-sm border border-[var(--surface-border)] rounded-xl px-3 py-2 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
           />
+
+          {/* Icon before the text: emoji, image URL, or the oldenbyte mark */}
+          <div className="mt-2 flex items-center gap-1.5">
+            <input
+              type="text"
+              value={draft.icon ?? ""}
+              onChange={e => setDraft(d => ({ ...d, icon: e.target.value }))}
+              onKeyDown={e => e.key === "Enter" && handleSave()}
+              placeholder="Icon: emoji or image URL"
+              aria-label="Icon"
+              className="flex-1 min-w-0 text-sm border border-[var(--surface-border)] rounded-xl px-3 py-2 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
+            />
+            <button
+              type="button"
+              onClick={() => setDraft(d => ({ ...d, icon: d.icon === LOGO_ICON ? "" : LOGO_ICON }))}
+              aria-pressed={draft.icon === LOGO_ICON}
+              title="Use the oldenbyte logo"
+              className={`shrink-0 h-9 w-9 flex items-center justify-center rounded-xl border transition-colors ${FOCUS_RING} ${
+                draft.icon === LOGO_ICON ? "border-[var(--text-secondary)]" : "border-[var(--surface-border)] hover:border-[var(--surface-border-focus)]"
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={LOGO_ICON} alt="oldenbyte logo" className="h-5 w-5 rounded-md" />
+            </button>
+          </div>
 
           {draft.type === "url" && (
             <div className="mt-2 flex flex-col gap-0.5">

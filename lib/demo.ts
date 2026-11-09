@@ -50,9 +50,12 @@ function demoStore(): Map<string, string> {
       store.set(key, typeof value === "string" ? value : JSON.stringify(value));
     }
     store.set("dashboards", JSON.stringify(SEEDED_DASHBOARDS));
-    // Demo-only keys that must never reach a real first-run install: the
-    // calendar gets a fake "demo" account that CalendarWidget answers with a
-    // synthesized agenda instead of a CalDAV fetch.
+    // Demo-only keys that must never reach a real first-run install: the top
+    // bar shows the mark next to its name and London's weather on the right,
+    // and the calendar gets a fake "demo" account that CalendarWidget answers
+    // with a synthesized agenda instead of a CalDAV fetch.
+    store.set("topbar-phrase", JSON.stringify({ type: "text", value: "oldenbyte", icon: "/logo.svg" }));
+    store.set("topbar-mood", JSON.stringify({ type: "url", value: "https://wttr.in/London?format=3" }));
     store.set(
       "calendar-widget-calendar-home",
       JSON.stringify({
