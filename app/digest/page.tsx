@@ -770,7 +770,7 @@ export default function DigestPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-ui text-[15px] text-[var(--text-secondary)] w-20 shrink-0">model</span>
                 {loadingModels ? (
-                  <span className="flex-1 min-w-[12rem] text-[15px] italic text-[var(--text-secondary)] py-0.5 font-ui animate-pulse">searching models…</span>
+                  <span className="flex-1 min-w-[12rem] text-[15px] italic text-[var(--text-primary)] py-0.5 font-ui animate-pulse">searching models…</span>
                 ) : models.length > 0 ? (
                   <select value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} className="flex-1 min-w-[12rem] min-h-6 text-sm bg-transparent text-[var(--text-primary)] border-b border-[var(--surface-border)] focus:border-[var(--text-secondary)] outline-none py-0.5 font-mono">
                     <option value="" disabled>select a model…</option>
@@ -811,7 +811,7 @@ export default function DigestPage() {
         {/* Body */}
         <main className="mt-8">
           {!configured ? (
-            <p className="font-[family-name:var(--font-playfair)] text-base italic text-[var(--text-secondary)] text-center mt-16">
+            <p className="font-[family-name:var(--font-playfair)] text-base italic text-[var(--text-primary)] text-center mt-16">
               Set a model above to generate today&apos;s briefing, with a local one (Ollama, LM Studio, llama.cpp) or a hosted provider with an API key.
             </p>
           ) : aiLoading ? (
@@ -819,7 +819,7 @@ export default function DigestPage() {
               composing briefing…
             </p>
           ) : aiError ? (
-            <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-secondary)] text-center mt-16">{aiError}</p>
+            <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-primary)] text-center mt-16">{aiError}</p>
           ) : sectionSummaries.length > 0 ? (
             <div>
               {sectionSummaries.map((s, si) => (
@@ -842,7 +842,7 @@ export default function DigestPage() {
                         ? renderProse(s.prose, s.refs)
                         : generating
                           ? <p className="font-ui text-[15px] text-[var(--text-secondary)] animate-pulse">composing…</p>
-                          : <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-secondary)]">no content.</p>}
+                          : <p className="font-[family-name:var(--font-playfair)] text-sm italic text-[var(--text-primary)]">no content.</p>}
                     </div>
                   )}
                 </article>

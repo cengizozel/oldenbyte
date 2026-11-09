@@ -288,14 +288,14 @@ export default function KeyboardLayer({
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target instanceof Element ? e.target : null;
 
-      // Escape drops keyboard focus from the ringed widget. With nothing
-      // focused at all, it leaves demo mode (a reload does too).
+      // Escape drops keyboard focus from the ringed widget. Otherwise, outside
+      // a field or a dialog, it leaves demo mode (a reload does too).
       if (e.key === "Escape") {
         const ring = ringRef.current;
         const active = document.activeElement;
         if (ring && active instanceof HTMLElement && ring.contains(active)) { active.blur(); setRing(null); return; }
         setRing(null);
-        if (isDemoMode() && (!active || active === document.body) && !target?.closest('[role="dialog"], [aria-modal="true"], dialog')) exitDemoMode();
+        if (isDemoMode() && !isEditableTarget(target) && !target?.closest('[role="dialog"], [aria-modal="true"], dialog')) exitDemoMode();
         return;
       }
 
