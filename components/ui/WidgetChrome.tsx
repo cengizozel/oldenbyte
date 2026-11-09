@@ -143,18 +143,17 @@ export function WidgetHeader({
 }) {
   const group = useTabGroup();
   if (group) {
-    // Inside a tab group the tab row is the header: the shown tab carries the
-    // icon, and the actions sit at the row's right end. Hidden tabs draw nothing.
-    if (!group.active) return null;
+    // Inside a tab group the tab row is the header: every tab carries its
+    // widget's icon, and the shown tab's actions sit at the row's right end.
     return (
       <>
-        {group.hosts.icon && createPortal(<Icon size={14} className="opacity-50 shrink-0" />, group.hosts.icon)}
-        {group.hosts.actions && (after || right) && createPortal(
+        {group.iconHost && createPortal(<Icon size={14} className="opacity-50 shrink-0" />, group.iconHost)}
+        {group.active && group.actionsHost && (after || right) && createPortal(
           <div className={`flex items-center gap-2 shrink-0 ${className}`}>
             {after}
             {right}
           </div>,
-          group.hosts.actions
+          group.actionsHost
         )}
       </>
     );

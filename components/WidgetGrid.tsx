@@ -238,7 +238,9 @@ export default function WidgetGrid({
   const [, setTabHostsVersion] = useState(0);
   const setTabHostsFor = useCallback((containerId: string, hosts: TabGroupHosts) => {
     const prev = tabHosts.current.get(containerId);
-    if (prev && prev.icon === hosts.icon && prev.actions === hosts.actions) return;
+    const same = prev && prev.actions === hosts.actions
+      && Object.keys({ ...prev.icons, ...hosts.icons }).every(k => (prev.icons[k] ?? null) === (hosts.icons[k] ?? null));
+    if (same) return;
     tabHosts.current.set(containerId, hosts);
     setTabHostsVersion(v => v + 1);
   }, []);
@@ -1038,7 +1040,12 @@ export default function WidgetGrid({
       {mounted.map(({ id, extraClass, group }) => createPortal(
         group ? (
           <TabGroupContext.Provider
-            value={{ containerId: group, active: (activeTabs[group] ?? group) === id, hosts: tabHosts.current.get(group) ?? { icon: null, actions: null } }}
+            value={{
+              containerId: group,
+              active: (activeTabs[group] ?? group) === id,
+              iconHost: tabHosts.current.get(group)?.icons[id] ?? null,
+              actionsHost: tabHosts.current.get(group)?.actions ?? null,
+            }}
           >
             {renderWidget(instances[id], extraClass, bankDefs)}
           </TabGroupContext.Provider>

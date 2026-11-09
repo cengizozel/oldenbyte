@@ -10,7 +10,8 @@ import type { TabGroupHosts } from "@/lib/tabGroup";
 // header sits (same title baseline, same gap to the content, header actions on
 // the right): the shown tab is drawn as the title, with its widget's icon in
 // front and a 2px underline that marks it as the open tab, and the other tabs
-// follow as dimmed names in the same color, so the row reads as one palette.
+// follow as dimmed icon and name pairs in the same color, so the row reads as
+// one palette.
 // The shown widget's header renders its icon and actions into this row through
 // lib/tabGroup.ts.
 //
@@ -54,12 +55,24 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   const shown = preview ?? order;
   const c = colorMap[instances[activeId]?.color ?? "neutral"];
 
-  // Host elements for the shown widget's header parts. The callbacks are
-  // stable so React only calls them when the element itself changes.
-  const hosts = useRef<TabGroupHosts>({ icon: null, actions: null });
+  // Host elements for the members' header parts: an icon slot in every tab
+  // and the actions slot at the right end. The ref callbacks are stable (one
+  // per tab) so React only calls them when the element itself changes.
+  const hosts = useRef<TabGroupHosts>({ icons: {}, actions: null });
   const onHostsRef = useRef(onHosts);
   useEffect(() => { onHostsRef.current = onHosts; }, [onHosts]);
-  const iconHost = useCallback((el: HTMLElement | null) => { hosts.current = { ...hosts.current, icon: el }; onHostsRef.current(hosts.current); }, []);
+  const iconRefs = useRef(new Map<string, (el: HTMLElement | null) => void>());
+  const iconHost = useCallback((tabId: string) => {
+    let fn = iconRefs.current.get(tabId);
+    if (!fn) {
+      fn = (el: HTMLElement | null) => {
+        hosts.current = { ...hosts.current, icons: { ...hosts.current.icons, [tabId]: el } };
+        onHostsRef.current(hosts.current);
+      };
+      iconRefs.current.set(tabId, fn);
+    }
+    return fn;
+  }, []);
   const actionsHost = useCallback((el: HTMLElement | null) => { hosts.current = { ...hosts.current, actions: el }; onHostsRef.current(hosts.current); }, []);
 
   useEffect(() => {
@@ -158,7 +171,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
                   : "opacity-70 hover:opacity-100 after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:rounded-full after:bg-current after:opacity-0 hover:after:opacity-30 after:transition-opacity"
               } ${isDragging ? "bg-black/5 dark:bg-white/10" : ""}`}
             >
-              {isActive && <span ref={iconHost} className="flex items-center shrink-0 empty:hidden" />}
+              <span ref={iconHost(tabId)} className="flex items-center shrink-0 empty:hidden" />
               <span className="truncate">{w?.title ?? tabId}</span>
               {editing && tabId !== order[0] && (
                 <span
