@@ -127,7 +127,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
 
   return (
     <div className={`shrink-0 flex items-center gap-3 px-5 pt-5 pb-3 ${className}`}>
-      <div className="flex items-center gap-3 min-w-0 overflow-x-auto">
+      <div className="flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {shown.map((tabId, index) => {
           const w = instances[tabId];
           const c = colorMap[w?.color ?? "neutral"];
@@ -148,7 +148,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
               onKeyDown={e => onKeyDown(e, tabId)}
               style={{ touchAction: editing ? "none" : undefined }}
               title={editing ? "Drag to reorder" : undefined}
-              className={`flex items-center gap-1.5 min-h-6 -my-0.5 px-1 -mx-1 rounded-md text-sm whitespace-nowrap transition-[opacity,background-color] ${c.label} ${FOCUS_RING} ${
+              className={`flex items-center gap-1.5 h-6 px-1 rounded-md text-sm whitespace-nowrap transition-[opacity,background-color] ${c.label} ${FOCUS_RING} ${
                 editing ? (isDragging ? "cursor-grabbing" : "cursor-grab") : ""
               } ${isActive ? "font-medium opacity-100" : "opacity-70 hover:opacity-100"} ${isDragging ? "bg-black/5 dark:bg-white/10" : ""}`}
             >
