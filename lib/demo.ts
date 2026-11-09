@@ -7,6 +7,10 @@
 import { buildSeed, SEEDED_DASHBOARDS } from "@/lib/seed";
 
 const FLAG = "oldenbyte-demo";
+// Set together with FLAG when entering, consumed by the first page load after
+// it. A later reload finds FLAG without it and leaves demo mode, so a refresh
+// (or following a link to another page) is all it takes to get back.
+const ARMED = "oldenbyte-demo-armed";
 
 let store: Map<string, string> | null = null;
 
@@ -21,7 +25,14 @@ export function isDemoMode(): boolean {
   if (typeof window === "undefined") return false;
   if (mode === null) {
     try {
-      mode = window.sessionStorage.getItem(FLAG) === "1";
+      const ss = window.sessionStorage;
+      if (ss.getItem(FLAG) === "1" && ss.getItem(ARMED) === "1") {
+        ss.removeItem(ARMED);
+        mode = true;
+      } else {
+        ss.removeItem(FLAG);
+        mode = false;
+      }
     } catch {
       mode = false;
     }
@@ -32,6 +43,7 @@ export function isDemoMode(): boolean {
 export function enterDemoMode(): void {
   try {
     window.sessionStorage.setItem(FLAG, "1");
+    window.sessionStorage.setItem(ARMED, "1");
   } catch {}
   window.location.reload();
 }
@@ -39,6 +51,7 @@ export function enterDemoMode(): void {
 export function exitDemoMode(): void {
   try {
     window.sessionStorage.removeItem(FLAG);
+    window.sessionStorage.removeItem(ARMED);
   } catch {}
   window.location.reload();
 }

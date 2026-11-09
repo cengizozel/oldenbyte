@@ -1085,16 +1085,6 @@ export default function TopBar({
           {dashboards && onDashboardsChange && (
             <DashboardSwitcher dashboards={dashboards} onChange={onDashboardsChange} />
           )}
-          {demo && (
-            <button
-              onClick={exitDemoMode}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-sm text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
-              title="Exit demo mode"
-            >
-              demo
-              <X size={12} />
-            </button>
-          )}
           {editing && onCancelEdit && (
             <button
               onClick={onCancelEdit}
@@ -1111,17 +1101,15 @@ export default function TopBar({
           >
             {editing ? <Check size={16} /> : <LayoutGrid size={16} />}
           </button>
-          {/* The digest page reads real data and keeps its own settings outside
-              the demo sandbox, so it stays out of reach while demoing. */}
-          {!demo && (
-            <a
-              href="/digest"
-              className="transition-opacity text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-[5px] -m-[5px] rounded-md"
-              title="Morning digest"
-            >
-              <Newspaper size={16} />
-            </a>
-          )}
+          {/* A full navigation: in demo mode it lands on the digest page out of
+              demo (lib/demo.ts), since the digest reads real data. */}
+          <a
+            href="/digest"
+            className="transition-opacity text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-[5px] -m-[5px] rounded-md"
+            title="Morning digest"
+          >
+            <Newspaper size={16} />
+          </a>
           <button
             ref={settingsButtonRef}
             onClick={() => setSettingsOpen(o => !o)}

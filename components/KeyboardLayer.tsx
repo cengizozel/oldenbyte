@@ -9,6 +9,7 @@ import {
   loadKeyboardConfig, saveKeyboardConfig, type KeyboardAction, type KeyboardConfig,
 } from "@/lib/keyboard";
 import Toggle from "@/components/ui/Toggle";
+import { exitDemoMode, isDemoMode } from "@/lib/demo";
 import { FOCUS_RING, SettingsRow, SettingsSection } from "@/components/ui/Field";
 
 // Global keyboard layer: leader key, widget number badges, focus ring, cheat
@@ -287,12 +288,14 @@ export default function KeyboardLayer({
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target instanceof Element ? e.target : null;
 
-      // Escape drops keyboard focus from the ringed widget.
+      // Escape drops keyboard focus from the ringed widget. With nothing
+      // focused at all, it leaves demo mode (a reload does too).
       if (e.key === "Escape") {
         const ring = ringRef.current;
         const active = document.activeElement;
-        if (ring && active instanceof HTMLElement && ring.contains(active)) active.blur();
+        if (ring && active instanceof HTMLElement && ring.contains(active)) { active.blur(); setRing(null); return; }
         setRing(null);
+        if (isDemoMode() && (!active || active === document.body) && !target?.closest('[role="dialog"], [aria-modal="true"], dialog')) exitDemoMode();
         return;
       }
 
