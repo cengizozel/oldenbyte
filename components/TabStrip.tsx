@@ -7,10 +7,12 @@ import { FOCUS_RING } from "@/components/ui/Field";
 import type { TabGroupHosts } from "@/lib/tabGroup";
 
 // The header row of a tab group. It sits exactly where a single widget's
-// header sits (card padding, 14px medium title, header actions on the right):
-// the shown tab is drawn as the title, with its widget's icon in front, and
-// the other tabs follow as dimmed names. The shown widget's header renders its
-// icon and actions into this row through lib/tabGroup.ts.
+// header sits (same title baseline, same gap to the content, header actions on
+// the right): the shown tab is drawn as the title, with its widget's icon in
+// front and a 2px underline that marks it as the open tab, and the other tabs
+// follow as dimmed names in the same color, so the row reads as one palette.
+// The shown widget's header renders its icon and actions into this row through
+// lib/tabGroup.ts.
 //
 // Clicking a tab shows it. In layout edit mode a tab can be dragged along the
 // row to reorder the group (Shift with the left or right arrow key does the
@@ -50,6 +52,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   const skipClick = useRef(false);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const shown = preview ?? order;
+  const c = colorMap[instances[activeId]?.color ?? "neutral"];
 
   // Host elements for the shown widget's header parts. The callbacks are
   // stable so React only calls them when the element itself changes.
@@ -126,11 +129,10 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   }
 
   return (
-    <div className={`shrink-0 flex items-center gap-3 px-5 pt-5 pb-3 ${className}`}>
+    <div className={`shrink-0 flex items-center gap-3 px-5 pt-[18px] pb-2.5 ${className}`}>
       <div className="flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {shown.map((tabId, index) => {
           const w = instances[tabId];
-          const c = colorMap[w?.color ?? "neutral"];
           const isActive = tabId === activeId;
           const isDragging = tabId === dragId;
           return (
@@ -148,9 +150,13 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
               onKeyDown={e => onKeyDown(e, tabId)}
               style={{ touchAction: editing ? "none" : undefined }}
               title={editing ? "Drag to reorder" : undefined}
-              className={`flex items-center gap-1.5 h-6 px-1 rounded-md text-sm whitespace-nowrap transition-[opacity,background-color] ${c.label} ${FOCUS_RING} ${
+              className={`relative flex items-center gap-1.5 h-6 px-1 rounded-md text-sm whitespace-nowrap transition-[opacity,background-color] ${c.label} ${FOCUS_RING} ${
                 editing ? (isDragging ? "cursor-grabbing" : "cursor-grab") : ""
-              } ${isActive ? "font-medium opacity-100" : "opacity-70 hover:opacity-100"} ${isDragging ? "bg-black/5 dark:bg-white/10" : ""}`}
+              } ${
+                isActive
+                  ? "font-medium opacity-100 after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:rounded-full after:bg-current"
+                  : "opacity-70 hover:opacity-100 after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:rounded-full after:bg-current after:opacity-0 hover:after:opacity-30 after:transition-opacity"
+              } ${isDragging ? "bg-black/5 dark:bg-white/10" : ""}`}
             >
               {isActive && <span ref={iconHost} className="flex items-center shrink-0 empty:hidden" />}
               <span className="truncate">{w?.title ?? tabId}</span>
