@@ -235,8 +235,10 @@ export default function KeyboardLayer({
     const phase = phaseRef.current;
     if (!phase || e.nativeEvent.isComposing) return;
     if (MODIFIERS.includes(e.key)) return;
-    // Browser and Vimium shortcuts with modifiers are left alone.
-    if (e.ctrlKey || e.metaKey || e.altKey) { finish(); return; }
+    // Browser and Vimium shortcuts with Ctrl or Meta are left alone. Alt is
+    // allowed: on many layouts brackets and other symbols are typed with
+    // AltGr, which reports as Alt, and only the pending leader is listening.
+    if (e.ctrlKey || e.metaKey) { finish(); return; }
     e.preventDefault();
     e.stopPropagation();
     if (phase.kind === "help" || e.key === "Escape") { finish(); return; }
