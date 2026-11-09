@@ -13,6 +13,7 @@ import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
 import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip, BackButton } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { REDDIT_API_KEY, parseRedditApi, type RedditApiConfig } from "@/lib/reddit";
+import { isDemoMode } from "@/lib/demo";
 import { useFirstSeen } from "@/lib/useFirstSeen";
 import { redditCacheKey } from "@/lib/cacheKeys";
 
@@ -182,6 +183,11 @@ export default function RedditWidget({
           for (const sub of parsed.subreddits) {
             const mine = posts.filter(p => p.subreddit === sub.name);
             if (mine.length) receivedRef.current.set(`${sub.name}|${sub.period}|${sub.limit}`, mine);
+          }
+          // Demo mode ships its posts in the seed; do not wait on Reddit.
+          if (isDemoMode() && posts.length) {
+            setSubStatus(parsed.subreddits.map(sub => ({ name: sub.name, ok: posts.some(p => p.subreddit === sub.name) })));
+            return;
           }
         }
         fetchPosts(parsed, cacheKey);

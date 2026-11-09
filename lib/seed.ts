@@ -17,6 +17,7 @@
 
 import * as storage from "@/lib/storage";
 import { DEFAULT_DASHBOARDS, layoutKey, instancesKey, saveDashboards, type DashboardsState } from "@/lib/dashboards";
+import { redditCacheKey } from "@/lib/cacheKeys";
 import { widgets, instanceOf, type Widget, type WidgetType } from "@/lib/widgets";
 
 const dayOffset = (n: number) => {
@@ -36,6 +37,108 @@ const atLocal = (n: number, hour: number, minute = 0) => {
 const GRID = { minW: 1, minH: 1, maxW: 4, maxH: 6 };
 
 // A placed instance from the registry template of a built-in type.
+// One post each, so the list never shows the same subreddit twice in a row.
+const REDDIT_SUBS = ["selfhosted", "programming", "technology", "MachineLearning", "space", "todayilearned", "science", "history", "Futurology", "EarthPorn"]
+  .map(name => ({ name, limit: 1, period: "week" as const }));
+
+// Sample posts for the demo Reddit widget, one per subreddit, taken from the
+// live top-of-the-week lists on 2026-11-10. Demo mode paints these from the
+// day cache instead of fetching: Reddit's public feed is slow and rate
+// limited, and a demo should not wait on it. ageHours keeps the times
+// relative, so the list reads as recent whenever the demo is opened.
+const DEMO_REDDIT = [
+  {
+    subreddit: "selfhosted",
+    title: "FileRun canceled my lifetime license after I requested a receipt",
+    link: "https://www.reddit.com/r/selfhosted/comments/1xqyhfz/filerun_canceled_my_lifetime_license_after_i/",
+    ageHours: 32,
+    thumbnail: "",
+    image: "",
+    content: "<div class=\"md\"><p>I thought I&#39;d share my recent experience with FileRun, as I suspect some people here are using it or considering buying a license.</p><p>I have used FileRun since 2023. On September 11, 2026, I paid €49 for a personal license. All was well; I got the license key and the software was working properly.</p><p>I recently reached out to FileRun Support to request an invoice or simply proof of purchase. What could be wrong with this?</p><p>Here are their responses:</p><p>If we provide you one, we will convert the license to a commercial one. Obviously.</p></div>",
+  },
+  {
+    subreddit: "programming",
+    title: "openssh on musl linux has been letting people into password-less accounts since 2016",
+    link: "https://www.reddit.com/r/programming/comments/1xojg3s/openssh_on_musl_linux_has_been_letting_people/",
+    ageHours: 103,
+    thumbnail: "",
+    image: "",
+    content: "",
+  },
+  {
+    subreddit: "technology",
+    title: "Texas just went blue, and the tech bros are sad",
+    link: "https://www.reddit.com/r/technology/comments/1xnrp17/texas_just_went_blue_and_the_tech_bros_are_sad/",
+    ageHours: 125,
+    thumbnail: "https://external-preview.redd.it/rBamd598cMa-CshX5S_tgwP9DD461eEP9hrtYNr5yxY.jpeg?width=640&crop=smart&auto=webp&s=9a38761dca36a43656747d82651df86cf30c58ec",
+    image: "",
+    content: "",
+  },
+  {
+    subreddit: "MachineLearning",
+    title: "The most scathing reviewer 2 review I have ever read",
+    link: "https://www.reddit.com/r/MachineLearning/comments/1xpu1eq/the_most_scathing_reviewer_2_review_i_have_ever/",
+    ageHours: 68,
+    thumbnail: "",
+    image: "",
+    content: "<div class=\"md\"><p>This is not my paper. Not my review either. </p></div>",
+  },
+  {
+    subreddit: "space",
+    title: "My HDR Total Solar Eclipse from Spain this year - details in the comments",
+    link: "https://www.reddit.com/r/space/comments/1xqx8gv/my_hdr_total_solar_eclipse_from_spain_this_year/",
+    ageHours: 33,
+    thumbnail: "https://preview.redd.it/sta5qrj3td0i1.jpeg?width=640&crop=smart&auto=webp&s=69b92c41003d8626f86e2fb3eac0a9bec3c422ee",
+    image: "https://i.redd.it/sta5qrj3td0i1.jpeg",
+    content: "",
+  },
+  {
+    subreddit: "todayilearned",
+    title: "TIL Google pays Mozilla roughly $400 – 500 million USD a year to be Firefox’s default search engine, a deal that makes up over 80% of Mozilla’s revenue and that its executives have testified Firefox might not survive without.",
+    link: "https://www.reddit.com/r/todayilearned/comments/1xmhsrv/til_google_pays_mozilla_roughly_400_500_million/",
+    ageHours: 162,
+    thumbnail: "https://external-preview.redd.it/6TM5EF3pT6KyL6lHcoCLD9wURu_RQfCJ-LL5CMIwqz8.jpeg?width=640&crop=smart&auto=webp&s=7d34e4dc01538c987dd0dec6e9e73e3165b8d37b",
+    image: "",
+    content: "",
+  },
+  {
+    subreddit: "science",
+    title: "Scientists found a way to help the brain wash out waste while we're awake, which it mostly does while we sleep: a short-acting blood pressure drug plus whole-body vibration. In 29 healthy adults, Alzheimer's-linked proteins like beta-amyloid rose in the blood, a sign they were cleared from the brain",
+    link: "https://www.reddit.com/r/science/comments/1xq2mxe/scientists_found_a_way_to_help_the_brain_wash_out/",
+    ageHours: 59,
+    thumbnail: "https://external-preview.redd.it/_-JB0QFjynlH8r0jUoMzS9lgtDTuFV_WWQTjr5r1Uos.jpeg?width=640&crop=smart&auto=webp&s=2a5e476e153f644848ba7cb20f3fbc2f1f59e7c7",
+    image: "",
+    content: "",
+  },
+  {
+    subreddit: "history",
+    title: "Incan children were given hallucinogens before they were sacrificed to the gods",
+    link: "https://www.reddit.com/r/history/comments/1xmx6m5/incan_children_were_given_hallucinogens_before/",
+    ageHours: 149,
+    thumbnail: "",
+    image: "",
+    content: "",
+  },
+  {
+    subreddit: "Futurology",
+    title: "Hegseth’s ‘Project Meridian’ will be investigated and sued for stacking the group with tech contractors who stand to profit, including Musk and Axon Cameras CEO",
+    link: "https://www.reddit.com/r/Futurology/comments/1xnsegp/hegseths_project_meridian_will_be_investigated/",
+    ageHours: 125,
+    thumbnail: "https://external-preview.redd.it/XHAqb_2azR9-dTlAUoqVDb-T-f9lIdXu2wFUrO7q5KE.jpeg?width=640&crop=smart&auto=webp&s=c9d9db752b4794e5340538e97d2396aac88b6074",
+    image: "",
+    content: "",
+  },
+  {
+    subreddit: "EarthPorn",
+    title: "“The Tree” (Portland Japanese Garden) in two-tone glory [2048x1365] [OC]",
+    link: "https://www.reddit.com/r/EarthPorn/comments/1xngq81/the_tree_portland_japanese_garden_in_twotone/",
+    ageHours: 135,
+    thumbnail: "https://preview.redd.it/ss4e9fkgejzh1.jpeg?width=640&crop=smart&auto=webp&s=bb24f6c271fcd9e32ffa8728d77f37e842e1299e",
+    image: "https://i.redd.it/ss4e9fkgejzh1.jpeg",
+    content: "",
+  },
+];
+
 function inst(type: WidgetType, id: string, title?: string): Widget {
   const template = widgets.find(w => w.type === type);
   if (!template) throw new Error(`no widget template for ${type}`);
@@ -233,22 +336,15 @@ export function buildSeed(): Record<string, unknown> {
 
     "weather-widget-weather-home": { name: "Lisbon", region: "Portugal", lat: 38.7223, lon: -9.1393, unit: "c" },
     "rss-widget-rss-home": { url: "https://feeds.bbci.co.uk/news/rss.xml", limit: 8, name: "BBC News" },
-    "reddit-widget-reddit-home": {
-      subreddits: [
-        // One post each, so the list never shows the same subreddit twice in a row.
-        { name: "selfhosted", limit: 1, period: "week" },
-        { name: "programming", limit: 1, period: "week" },
-        { name: "technology", limit: 1, period: "week" },
-        { name: "MachineLearning", limit: 1, period: "week" },
-        { name: "space", limit: 1, period: "week" },
-        { name: "todayilearned", limit: 1, period: "week" },
-        { name: "science", limit: 1, period: "week" },
-        { name: "history", limit: 1, period: "week" },
-        { name: "Futurology", limit: 1, period: "week" },
-        { name: "EarthPorn", limit: 1, period: "week" },
-      ],
-      images: true,
-    },
+    "reddit-widget-reddit-home": { subreddits: REDDIT_SUBS, images: true },
+    // Today's day cache for that exact configuration, so demo mode shows
+    // posts at once (the widget skips its refetch in demo when the cache
+    // is there). A real first run fetches live, as the key is for today only.
+    [redditCacheKey("reddit-home", today, REDDIT_SUBS)]: DEMO_REDDIT.map(p => ({
+      title: p.title, link: p.link, subreddit: p.subreddit, content: p.content,
+      thumbnail: p.thumbnail, image: p.image, score: 0,
+      pubDate: new Date(now - p.ageHours * H).toISOString(),
+    })),
     "youtube-widget-youtube-home": {
       view: "thumbs",
       channels: [
