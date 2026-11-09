@@ -79,6 +79,7 @@ export default function DigestPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [models, setModels]     = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [modelsError, setModelsError] = useState("");
   const [sectionSummaries, setSectionSummaries] = useState<{ label: string; prose: string; refs: Ref[] }[]>([]);
   const [aiLoading, setAiLoading]       = useState(false);
   const [generating, setGenerating]     = useState(false); // true while sections stream in
@@ -137,18 +138,25 @@ export default function DigestPage() {
       return;
     }
     setLoadingModels(true);
+    setModelsError("");
     setModels([]);
     setDraft(d => ({ ...d, model: "" })); // empty while searching
     try {
       const params = new URLSearchParams({ baseUrl: url });
       const res = await fetch(`/api/chat?${params.toString()}`, { headers: key ? { "X-Api-Key": key } : {} });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       const list: string[] = res.ok && Array.isArray(data.models) ? data.models : [];
       setModels(list);
       setDraft(d => ({ ...d, model: pick(list) }));
+      if (!list.length) {
+        // The dashboard server makes this request, so "localhost" means the
+        // server's own machine, a common surprise when the model runs elsewhere.
+        setModelsError((data.error ? String(data.error) : `No models listed at ${url}.`) + " The dashboard server fetches this list, so the address must work from there, not from your browser.");
+      }
     } catch {
       setModels([]);
       setDraft(d => ({ ...d, model: "" }));
+      setModelsError("Could not reach the dashboard server.");
     } finally {
       setLoadingModels(false);
     }
@@ -759,7 +767,7 @@ export default function DigestPage() {
                 <span className="font-ui text-[15px] text-[var(--text-secondary)] w-20 shrink-0">endpoint</span>
                 <input
                   value={draft.baseUrl}
-                  onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, baseUrl: v })); setModels(defaultModelsFor(v)); }}
+                  onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, baseUrl: v })); setModels(defaultModelsFor(v)); setModelsError(""); }}
                   placeholder="http://localhost:11434/v1"
                   className="flex-1 min-w-[12rem] min-h-6 text-sm bg-transparent text-[var(--text-primary)] border-b border-[var(--surface-border)] focus:border-[var(--text-secondary)] outline-none py-0.5 placeholder:text-[var(--text-placeholder)] font-mono"
                 />
@@ -784,6 +792,7 @@ export default function DigestPage() {
                   <button onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey, draft.model || model)} className="inline-flex items-center min-h-6 text-[15px] font-ui text-[var(--text-secondary)] hover:text-[var(--text-primary)]">load models</button>
                 )}
               </div>
+              {modelsError && <p className="font-ui text-[15px] text-red-400 leading-snug">{modelsError}</p>}
               {/* API key — only for hosted providers that need one */}
               {NEEDS_KEY.test(draft.baseUrl) && (
                 <div className="flex flex-wrap items-center gap-2">
