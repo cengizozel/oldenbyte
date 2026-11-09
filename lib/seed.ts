@@ -251,12 +251,25 @@ export function buildSeed(): Record<string, unknown> {
     "youtube-widget-youtube-home": {
       view: "thumbs",
       channels: [
-        { channelId: "UCHnyfMqiRRG1u-2MsSQLbXA", name: "Veritasium", limit: 2 },
-        { channelId: "UCsXVk37bltHxD1rDPwtNM8Q", name: "Kurzgesagt", limit: 2 },
-        { channelId: "UCYO_jab_esuFRV4b17AJtAw", name: "3Blue1Brown", limit: 2 },
-        { channelId: "UCBa659QWEk1AI4Tg--mrJ2A", name: "Tom Scott", limit: 2 },
-        { channelId: "UCY1kMZp36IQSyNx_9h4mpCg", name: "Mark Rober", limit: 2 },
-        { channelId: "UC9-y-6csu5WGm29I7JiwpnA", name: "Computerphile", limit: 2 },
+        // One video per channel, so the list is a spread of channels rather
+        // than whoever uploaded most this week. Channel ids verified against
+        // youtube.com/feeds/videos.xml?channel_id=...
+        { channelId: "UCHnyfMqiRRG1u-2MsSQLbXA", name: "Veritasium", limit: 1 },
+        { channelId: "UCsXVk37bltHxD1rDPwtNM8Q", name: "Kurzgesagt", limit: 1 },
+        { channelId: "UCYO_jab_esuFRV4b17AJtAw", name: "3Blue1Brown", limit: 1 },
+        { channelId: "UCBa659QWEk1AI4Tg--mrJ2A", name: "Tom Scott", limit: 1 },
+        { channelId: "UCY1kMZp36IQSyNx_9h4mpCg", name: "Mark Rober", limit: 1 },
+        { channelId: "UC9-y-6csu5WGm29I7JiwpnA", name: "Computerphile", limit: 1 },
+        { channelId: "UCoxcjq-8xIDTYp3uz647V5A", name: "Numberphile", limit: 1 },
+        { channelId: "UC6107grRI4m0o2-emgoDnAA", name: "SmarterEveryDay", limit: 1 },
+        { channelId: "UC6nSFpj9HTCZ5t-N3Rm3-HA", name: "Vsauce", limit: 1 },
+        { channelId: "UC2C_jShtL725hvbm1arSV9w", name: "CGP Grey", limit: 1 },
+        { channelId: "UCXuqSBlHAE6Xw-yeJA0Tunw", name: "Linus Tech Tips", limit: 1 },
+        { channelId: "UCAL3JXZSzSm8AlZyD3nQdBA", name: "Primitive Technology", limit: 1 },
+        { channelId: "UCEIwxahdLz7bap-VDs9h35A", name: "Steve Mould", limit: 1 },
+        { channelId: "UCj1VqrHhDte54oLgPG4xpuQ", name: "Stuff Made Here", limit: 1 },
+        { channelId: "UCy0tKL1T7wFoYcxCe0xjN6Q", name: "Technology Connections", limit: 1 },
+        { channelId: "UC9RM-iSvTu1uPJb8X5yp3EQ", name: "Wendover Productions", limit: 1 },
       ],
     },
 

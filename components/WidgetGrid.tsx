@@ -674,7 +674,10 @@ export default function WidgetGrid({
     const activeWidget = instances[activeId];
     const activeC = colorMap[activeWidget?.color ?? "neutral"];
     return (
-      <div className={`group flex flex-col h-full rounded-2xl overflow-hidden border ${activeC.border} ${activeC.bg} ${activeC.glow}`}>
+      <div className={`group flex flex-col h-full rounded-2xl border ${activeC.border} ${activeC.bg} ${activeC.glow}`}>
+       {/* The clip lives one level in, with the radius minus the border, so the
+           border and the clipped corner are not anti-aliased against each other. */}
+       <div className="flex flex-col h-full rounded-[15px] overflow-hidden">
         <TabStrip
           order={[item.i, ...(item.tabs ?? [])]}
           activeId={activeId}
@@ -696,6 +699,7 @@ export default function WidgetGrid({
             );
           })}
         </div>
+       </div>
       </div>
     );
   }
