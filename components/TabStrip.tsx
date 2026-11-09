@@ -94,7 +94,13 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
       rects.current = order.map(id => buttons.current.get(id)?.getBoundingClientRect() ?? new DOMRect());
       e.currentTarget.setPointerCapture(e.pointerId);
     }
-    const next = { idx: p.idx, over: slotFromPointer(e.clientX, p.idx), dx };
+    // The tab stays inside the row: no further left than the first tab's
+    // edge, no further right than the last tab's.
+    const r = rects.current;
+    const me = r[p.idx];
+    const lo = (r[0]?.left ?? me.left) - me.left;
+    const hi = (r[r.length - 1]?.right ?? me.right) - me.right;
+    const next = { idx: p.idx, over: slotFromPointer(e.clientX, p.idx), dx: Math.max(lo, Math.min(hi, dx)) };
     dragRef.current = next;
     setDrag(next);
   }
