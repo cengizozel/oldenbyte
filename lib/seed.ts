@@ -87,23 +87,24 @@ export function buildSeed(): Record<string, unknown> {
   }
 
   return {
-    // ── Home dashboard: 4 columns by 9 rows ─────────────────────────────────
-    //   col 0: notebook 1x4, tracker 1x3      col 1: calendar 1x4, upkeep 1x3
-    //   col 2: weather 1x2, f1 1x2, rss 1x5   col 3: youtube 1x4, reddit 1x5
+    // ── Home dashboard: 4 columns by 14 rows ────────────────────────────────
+    //   col 0: notebook 1x6, tracker 1x6      col 1: calendar 1x6, upkeep 1x6
+    //   col 2: weather 1x4, f1 1x4, rss 1x6   col 3: youtube 1x6, reddit 1x8
     //   cols 0-1: text 2x2 across the bottom
     //   The three feeds each get their own cell so all of them are on show;
-    //   the tab groups live on the Study dashboard.
+    //   the tab groups live on the Study dashboard. The view mode fits the
+    //   whole grid to the viewport, so only the proportions matter here.
     "widget-layout": [
-      { i: "notebook-home", x: 0, y: 0, w: 1, h: 4, ...GRID },
-      { i: "tracker-home",  x: 0, y: 4, w: 1, h: 3, ...GRID },
-      { i: "calendar-home", x: 1, y: 0, w: 1, h: 4, ...GRID },
-      { i: "upkeep-home",   x: 1, y: 4, w: 1, h: 3, ...GRID },
-      { i: "text-home",     x: 0, y: 7, w: 2, h: 2, ...GRID },
-      { i: "weather-home",  x: 2, y: 0, w: 1, h: 2, ...GRID },
-      { i: "f1-home",       x: 2, y: 2, w: 1, h: 2, ...GRID },
-      { i: "rss-home",      x: 2, y: 4, w: 1, h: 5, ...GRID },
-      { i: "youtube-home",  x: 3, y: 0, w: 1, h: 4, ...GRID },
-      { i: "reddit-home",   x: 3, y: 4, w: 1, h: 5, ...GRID },
+      { i: "notebook-home", x: 0, y: 0,  w: 1, h: 6, ...GRID },
+      { i: "tracker-home",  x: 0, y: 6,  w: 1, h: 6, ...GRID },
+      { i: "calendar-home", x: 1, y: 0,  w: 1, h: 6, ...GRID },
+      { i: "upkeep-home",   x: 1, y: 6,  w: 1, h: 6, ...GRID },
+      { i: "text-home",     x: 0, y: 12, w: 2, h: 2, ...GRID },
+      { i: "weather-home",  x: 2, y: 0,  w: 1, h: 4, ...GRID },
+      { i: "f1-home",       x: 2, y: 4,  w: 1, h: 4, ...GRID },
+      { i: "rss-home",      x: 2, y: 8,  w: 1, h: 6, ...GRID },
+      { i: "youtube-home",  x: 3, y: 0,  w: 1, h: 6, ...GRID },
+      { i: "reddit-home",   x: 3, y: 6,  w: 1, h: 8, ...GRID, maxH: 8 },
     ],
     "widget-instances": {
       "text-home":     inst("text",     "text-home"),
