@@ -7,6 +7,7 @@ import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { SettingsInput, SettingsSelect, SettingsTextarea, HIT_AREA, FOCUS_RING } from "./ui/Field";
 import { WidgetHeader, Chip, SmallButton, EmptyState } from "./ui/WidgetChrome";
+import { TabGroupContext } from "@/lib/tabGroup";
 
 // A fixed weekly schedule: the same seven-day time grid every week (classes,
 // gym, standing calls), as opposed to the Calendar widget's dated events.
@@ -813,7 +814,8 @@ export default function ScheduleWidget({
           onMouseDown={e => { if (e.target === e.currentTarget) setExpanded(false); }}
         >
           <div className={`tw-overlay-in group w-[80vw] h-[80vh] max-w-[1400px] rounded-2xl border shadow-2xl relative flex flex-col p-6 ${c.bg} ${c.border}`}>
-            {card(true)}
+            {/* The overlay draws its own header even when the widget is a tab. */}
+            <TabGroupContext.Provider value={null}>{card(true)}</TabGroupContext.Provider>
           </div>
         </div>,
         document.body

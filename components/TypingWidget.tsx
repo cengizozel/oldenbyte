@@ -8,6 +8,7 @@ import { TYPING_WORDS } from "@/lib/typingWords";
 import { SIMPLE_WORDS } from "@/lib/simpleWords";
 import * as storage from "@/lib/storage";
 import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
+import { TabGroupContext } from "@/lib/tabGroup";
 import { WidgetHeader, Chip, SmallButton } from "@/components/ui/WidgetChrome";
 
 // A Monkeytype-style typing trainer. Input is word-based: you type a word and
@@ -1018,7 +1019,8 @@ export default function TypingWidget({
           onMouseMove={onMouseMove}
         >
           <div className={`tw-overlay-in group w-[80vw] h-[80vh] max-w-[1200px] rounded-2xl border shadow-2xl relative flex flex-col p-6 ${c.bg} ${c.border}`}>
-            {card(true)}
+            {/* The overlay draws its own header even when the widget is a tab. */}
+            <TabGroupContext.Provider value={null}>{card(true)}</TabGroupContext.Provider>
           </div>
         </div>,
         document.body

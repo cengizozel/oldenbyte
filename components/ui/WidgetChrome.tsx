@@ -1,6 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useTabGroup } from "@/lib/tabGroup";
 import { Pencil, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, type LucideIcon } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { FOCUS_RING, HIT_AREA } from "./Field";
@@ -126,7 +128,8 @@ export function SaveCancelRow({
 }
 
 // The one widget header: icon, title, and a right-hand slot for counts and
-// small actions (docs/design.md). `after` renders inline after the title, for
+// small actions (docs/design.md). In a tab group it renders into the tab row
+// instead, see lib/tabGroup.ts. `after` renders inline after the title, for
 // a badge such as the arXiv category.
 export function WidgetHeader({
   c, icon: Icon, title, after, right, className = "",
@@ -138,6 +141,24 @@ export function WidgetHeader({
   right?: ReactNode;
   className?: string;
 }) {
+  const group = useTabGroup();
+  if (group) {
+    // Inside a tab group the tab row is the header: the shown tab carries the
+    // icon, and the actions sit at the row's right end. Hidden tabs draw nothing.
+    if (!group.active) return null;
+    return (
+      <>
+        {group.hosts.icon && createPortal(<Icon size={14} className="opacity-50 shrink-0" />, group.hosts.icon)}
+        {group.hosts.actions && (after || right) && createPortal(
+          <div className={`flex items-center gap-2 shrink-0 ${className}`}>
+            {after}
+            {right}
+          </div>,
+          group.hosts.actions
+        )}
+      </>
+    );
+  }
   return (
     <div className={`flex items-center justify-between gap-2 mb-3 shrink-0 ${className}`}>
       <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>

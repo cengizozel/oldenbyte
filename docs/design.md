@@ -103,6 +103,13 @@ the palette `label` color at 50% opacity.
 - Header: `WidgetHeader` from `components/ui/WidgetChrome.tsx`: icon, title
   (`text-sm font-medium`, palette label color) and an optional right-hand slot
   for counts and small actions. Every widget shows its title.
+- Tab groups: the tab row is the header, in the same place and size as a
+  single widget's header. The shown tab is the title (`text-sm font-medium`,
+  with its widget's icon in front), the other tabs follow as names at 70%,
+  and the shown widget's header actions sit at the row's right end. Members
+  do not draw their own header row: `WidgetHeader` renders into the tab row
+  through `lib/tabGroup.ts`, and they lose their top padding, so the first
+  content line sits at the same height in a group as in a single widget.
 - Chip (`Chip`): the small toggle used for modes and options. 28px tall,
   `text-sm`, `rounded-md`; the active chip has the translucent fill, inactive
   chips sit at 70% opacity.

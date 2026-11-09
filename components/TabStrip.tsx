@@ -1,22 +1,31 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { Widget } from "@/lib/widgets";
 import { colorMap } from "@/lib/widgets";
+import { FOCUS_RING } from "@/components/ui/Field";
+import type { TabGroupHosts } from "@/lib/tabGroup";
 
-// The tab row of a tab group. Clicking a tab shows it. In layout edit mode a
-// tab can be dragged along the row to reorder the group (Shift with the left
-// or right arrow key does the same from the keyboard), and every tab after the
-// first has a cross that ungroups it back into its own cell.
+// The header row of a tab group. It sits exactly where a single widget's
+// header sits (card padding, 14px medium title, header actions on the right):
+// the shown tab is drawn as the title, with its widget's icon in front, and
+// the other tabs follow as dimmed names. The shown widget's header renders its
+// icon and actions into this row through lib/tabGroup.ts.
+//
+// Clicking a tab shows it. In layout edit mode a tab can be dragged along the
+// row to reorder the group (Shift with the left or right arrow key does the
+// same from the keyboard), and every tab after the first has a cross that
+// ungroups it back into its own cell.
 type Props = {
   order: string[];                // the cell's own widget first, then its tabs
   activeId: string;
   instances: Record<string, Widget>;
   editing: boolean;
-  className: string;              // the row's background and bottom border
+  className?: string;
   onSelect: (id: string) => void;
   onUngroup: (id: string) => void;
   onReorder: (order: string[]) => void;
+  onHosts: (hosts: TabGroupHosts) => void;   // where the shown widget's icon and actions go
 };
 
 // Pointer travel before a press on a tab counts as a drag rather than a click.
@@ -33,7 +42,7 @@ function movedTo(order: string[], id: string, index: number): string[] {
   return rest;
 }
 
-export default function TabStrip({ order, activeId, instances, editing, className, onSelect, onUngroup, onReorder }: Props) {
+export default function TabStrip({ order, activeId, instances, editing, className = "", onSelect, onUngroup, onReorder, onHosts }: Props) {
   const [preview, setPreview] = useState<string[] | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const press = useRef<{ id: string; x: number; y: number; dragging: boolean; order: string[] } | null>(null);
@@ -41,6 +50,14 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   const skipClick = useRef(false);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const shown = preview ?? order;
+
+  // Host elements for the shown widget's header parts. The callbacks are
+  // stable so React only calls them when the element itself changes.
+  const hosts = useRef<TabGroupHosts>({ icon: null, actions: null });
+  const onHostsRef = useRef(onHosts);
+  useEffect(() => { onHostsRef.current = onHosts; }, [onHosts]);
+  const iconHost = useCallback((el: HTMLElement | null) => { hosts.current = { ...hosts.current, icon: el }; onHostsRef.current(hosts.current); }, []);
+  const actionsHost = useCallback((el: HTMLElement | null) => { hosts.current = { ...hosts.current, actions: el }; onHostsRef.current(hosts.current); }, []);
 
   useEffect(() => {
     const id = pendingFocus.id;
@@ -109,48 +126,49 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   }
 
   return (
-    <div className={`shrink-0 flex gap-1 px-2 pt-1.5 pb-1 overflow-x-auto ${className}`}>
-      {shown.map((tabId, index) => {
-        const w = instances[tabId];
-        const c = colorMap[w?.color ?? "neutral"];
-        const isActive = tabId === activeId;
-        const isDragging = tabId === dragId;
-        return (
-          <button
-            key={tabId}
-            ref={el => { if (el) buttons.current.set(tabId, el); else buttons.current.delete(tabId); }}
-            data-tab-index={index}
-            onMouseDown={e => e.stopPropagation()}
-            onPointerDown={e => onPointerDown(e, tabId)}
-            onPointerMove={onPointerMove}
-            onPointerUp={() => endDrag(true)}
-            onPointerCancel={() => endDrag(false)}
-            onClick={() => onClick(tabId)}
-            onKeyDown={e => onKeyDown(e, tabId)}
-            style={{ touchAction: editing ? "none" : undefined }}
-            title={editing ? "Drag to reorder" : undefined}
-            className={`flex items-center gap-1 px-2.5 min-h-7 rounded-full text-sm font-medium whitespace-nowrap transition-all border ${
-              editing ? (isDragging ? "cursor-grabbing" : "cursor-grab") : ""
-            } ${
-              isActive || isDragging
-                ? `${c.bg} ${c.border} opacity-100`
-                : "bg-transparent border-transparent opacity-70 hover:opacity-100"
-            } ${isDragging ? "shadow-md scale-105" : ""}`}
-          >
-            <span className={c.label}>{w?.title ?? tabId}</span>
-            {editing && tabId !== order[0] && (
-              <span
-                role="button"
-                aria-label="Ungroup"
-                onMouseDown={e => e.stopPropagation()}
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); onUngroup(tabId); }}
-                className="ml-0.5 leading-none text-neutral-400 hover:text-neutral-700"
-              >×</span>
-            )}
-          </button>
-        );
-      })}
+    <div className={`shrink-0 flex items-center gap-3 px-5 pt-5 pb-3 ${className}`}>
+      <div className="flex items-center gap-3 min-w-0 overflow-x-auto">
+        {shown.map((tabId, index) => {
+          const w = instances[tabId];
+          const c = colorMap[w?.color ?? "neutral"];
+          const isActive = tabId === activeId;
+          const isDragging = tabId === dragId;
+          return (
+            <button
+              key={tabId}
+              ref={el => { if (el) buttons.current.set(tabId, el); else buttons.current.delete(tabId); }}
+              data-tab-index={index}
+              aria-pressed={isActive}
+              onMouseDown={e => e.stopPropagation()}
+              onPointerDown={e => onPointerDown(e, tabId)}
+              onPointerMove={onPointerMove}
+              onPointerUp={() => endDrag(true)}
+              onPointerCancel={() => endDrag(false)}
+              onClick={() => onClick(tabId)}
+              onKeyDown={e => onKeyDown(e, tabId)}
+              style={{ touchAction: editing ? "none" : undefined }}
+              title={editing ? "Drag to reorder" : undefined}
+              className={`flex items-center gap-1.5 min-h-6 -my-0.5 px-1 -mx-1 rounded-md text-sm whitespace-nowrap transition-[opacity,background-color] ${c.label} ${FOCUS_RING} ${
+                editing ? (isDragging ? "cursor-grabbing" : "cursor-grab") : ""
+              } ${isActive ? "font-medium opacity-100" : "opacity-70 hover:opacity-100"} ${isDragging ? "bg-black/5 dark:bg-white/10" : ""}`}
+            >
+              {isActive && <span ref={iconHost} className="flex items-center shrink-0 empty:hidden" />}
+              <span className="truncate">{w?.title ?? tabId}</span>
+              {editing && tabId !== order[0] && (
+                <span
+                  role="button"
+                  aria-label="Ungroup"
+                  onMouseDown={e => e.stopPropagation()}
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); onUngroup(tabId); }}
+                  className="ml-0.5 leading-none opacity-70 hover:opacity-100"
+                >×</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div ref={actionsHost} className="ml-auto flex items-center gap-2 shrink-0 empty:hidden" />
     </div>
   );
 }

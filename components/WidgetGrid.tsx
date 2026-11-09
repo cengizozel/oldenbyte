@@ -16,6 +16,7 @@ import { isDemoMode } from "@/lib/demo";
 import WidgetCard from "./WidgetCard";
 import WidgetShelf from "./WidgetShelf";
 import TabStrip from "./TabStrip";
+import { TabGroupContext, type TabGroupHosts } from "@/lib/tabGroup";
 import NotebookWidget from "./NotepadWidget";
 import TextWidget from "./TextWidget";
 import RssWidget from "./RssWidget";
@@ -230,6 +231,17 @@ export default function WidgetGrid({
   const [moveMenuFor, setMoveMenuFor] = useState<string | null>(null);
   const otherDashboards = (dashboards ?? []).filter(d => d.id !== dashboardId);
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
+  // Where each tab group's row wants the shown widget's header icon and
+  // actions (lib/tabGroup.ts). The state bump re-renders the members when a
+  // row mounts or its shown tab changes, so their headers re-portal.
+  const tabHosts = useRef(new Map<string, TabGroupHosts>());
+  const [, setTabHostsVersion] = useState(0);
+  const setTabHostsFor = useCallback((containerId: string, hosts: TabGroupHosts) => {
+    const prev = tabHosts.current.get(containerId);
+    if (prev && prev.icon === hosts.icon && prev.actions === hosts.actions) return;
+    tabHosts.current.set(containerId, hosts);
+    setTabHostsVersion(v => v + 1);
+  }, []);
 
   // ── Edit-session history (undo/redo) and cancel-revert ────────────────────
   type Snap = { layout: TabLayoutItem[]; instances: Record<string, Widget>; activeTabs: Record<string, string> };
@@ -665,10 +677,10 @@ export default function WidgetGrid({
           activeId={activeId}
           instances={instances}
           editing={isEditMode}
-          className={`border-b ${activeC.border}`}
           onSelect={tabId => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
           onUngroup={tabId => handleUngroupTab(item.i, tabId)}
           onReorder={order => handleReorderTabs(item.i, order)}
+          onHosts={hosts => setTabHostsFor(item.i, hosts)}
         />
         <div className="flex-1 min-h-0 relative">
           {[item.i, ...(item.tabs ?? [])].map(tabId => {
@@ -689,7 +701,7 @@ export default function WidgetGrid({
   // classes it renders with. Tab members drop their own card chrome because the
   // tab container draws it. This list, not the layout variant, decides what is
   // mounted, so a widget only unmounts when it leaves the dashboard.
-  const mounted: { id: string; extraClass: string }[] = [];
+  const mounted: { id: string; extraClass: string; group?: string }[] = [];
   if (loaded) {
     const seen = new Set<string>();
     for (const item of layout) {
@@ -697,7 +709,11 @@ export default function WidgetGrid({
       for (const id of [item.i, ...(item.tabs ?? [])]) {
         if (seen.has(id) || !instances[id]) continue;
         seen.add(id);
-        mounted.push({ id, extraClass: tabbed ? "!rounded-none !border-0 !shadow-none" : "" });
+        mounted.push({
+          id,
+          extraClass: tabbed ? "!rounded-none !border-0 !shadow-none !pt-0" : "",
+          group: tabbed ? item.i : undefined,
+        });
       }
     }
   }
@@ -827,10 +843,11 @@ export default function WidgetGrid({
                               activeId={activeId}
                               instances={instances}
                               editing
-                              className={`${activeC.bg} border-b ${activeC.border}`}
+                              className={activeC.bg}
                               onSelect={tabId => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
                               onUngroup={tabId => handleUngroupTab(item.i, tabId)}
                               onReorder={order => handleReorderTabs(item.i, order)}
+                              onHosts={hosts => setTabHostsFor(item.i, hosts)}
                             />
                           );
                         })()}
@@ -1018,7 +1035,17 @@ export default function WidgetGrid({
         nodes before widget layout effects run. Also parks nodes between
         slots. Never moves in the tree, so widgets never remount. */}
     <div ref={parkingRef} aria-hidden className="fixed w-0 h-0 overflow-hidden invisible pointer-events-none">
-      {mounted.map(({ id, extraClass }) => createPortal(renderWidget(instances[id], extraClass, bankDefs), getNode(id), id))}
+      {mounted.map(({ id, extraClass, group }) => createPortal(
+        group ? (
+          <TabGroupContext.Provider
+            value={{ containerId: group, active: (activeTabs[group] ?? group) === id, hosts: tabHosts.current.get(group) ?? { icon: null, actions: null } }}
+          >
+            {renderWidget(instances[id], extraClass, bankDefs)}
+          </TabGroupContext.Provider>
+        ) : renderWidget(instances[id], extraClass, bankDefs),
+        getNode(id),
+        id
+      ))}
     </div>
     </WidgetActiveContext.Provider>
   );
