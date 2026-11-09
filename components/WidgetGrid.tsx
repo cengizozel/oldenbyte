@@ -15,6 +15,7 @@ import { layoutKey, instancesKey, DASHBOARD_RELOAD_EVENT, type DashboardMeta } f
 import { isDemoMode } from "@/lib/demo";
 import WidgetCard from "./WidgetCard";
 import WidgetShelf from "./WidgetShelf";
+import TabStrip from "./TabStrip";
 import NotebookWidget from "./NotepadWidget";
 import TextWidget from "./TextWidget";
 import RssWidget from "./RssWidget";
@@ -626,6 +627,28 @@ export default function WidgetGrid({
     });
   }
 
+  // A new tab order for a cell. The first tab is the cell's id, so a new first
+  // renames the cell: its active tab and grouping state carry over, and the
+  // grid's entrance slide is skipped for the remounted tile.
+  function handleReorderTabs(containerId: string, order: string[]) {
+    const [first, ...rest] = order;
+    if (!first) return;
+    pushHistory();
+    setLayout(prev => prev.map(item => item.i === containerId ? { ...item, i: first, tabs: rest } : item));
+    if (first === containerId) return;
+    setActiveTabs(prev => {
+      const next = { ...prev };
+      const active = next[containerId] ?? containerId;
+      delete next[containerId];
+      if (active !== first) next[first] = active;
+      return next;
+    });
+    if (groupingSource === containerId) setGroupingSource(first);
+    if (moveMenuFor === containerId) setMoveMenuFor(first);
+    setGridReady(false);
+    setTimeout(() => setGridReady(true), 250);
+  }
+
   function renderWithTabs(item: TabLayoutItem, isEditMode: boolean) {
     const hasTabs = (item.tabs?.length ?? 0) > 0;
     if (!hasTabs) {
@@ -637,35 +660,16 @@ export default function WidgetGrid({
     const activeC = colorMap[activeWidget?.color ?? "neutral"];
     return (
       <div className={`flex flex-col h-full rounded-2xl overflow-hidden border ${activeC.border} ${activeC.bg} ${activeC.glow}`}>
-        <div className={`shrink-0 flex gap-1 px-2 pt-1.5 pb-1 overflow-x-auto border-b ${activeC.border}`}>
-          {[item.i, ...(item.tabs ?? [])].map((tabId, tabIndex) => {
-            const w = instances[tabId];
-            const c = colorMap[w?.color ?? "neutral"];
-            const isActive = tabId === activeId;
-            return (
-              <button
-                key={tabId}
-                data-tab-index={tabIndex}
-                onMouseDown={e => e.stopPropagation()}
-                onClick={() => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-all border ${
-                  isActive
-                    ? `${c.bg} ${c.border} opacity-100`
-                    : "bg-transparent border-transparent opacity-40 hover:opacity-70"
-                }`}
-              >
-                <span className={`${c.label}`}>{w?.title ?? tabId}</span>
-                {isEditMode && tabId !== item.i && (
-                  <span
-                    onMouseDown={e => e.stopPropagation()}
-                    onClick={e => { e.stopPropagation(); handleUngroupTab(item.i, tabId); }}
-                    className="ml-0.5 leading-none text-neutral-400 hover:text-neutral-700"
-                  >×</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <TabStrip
+          order={[item.i, ...(item.tabs ?? [])]}
+          activeId={activeId}
+          instances={instances}
+          editing={isEditMode}
+          className={`border-b ${activeC.border}`}
+          onSelect={tabId => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
+          onUngroup={tabId => handleUngroupTab(item.i, tabId)}
+          onReorder={order => handleReorderTabs(item.i, order)}
+        />
         <div className="flex-1 min-h-0 relative">
           {[item.i, ...(item.tabs ?? [])].map(tabId => {
             const w = instances[tabId];
@@ -818,34 +822,16 @@ export default function WidgetGrid({
                           const activeWidget = instances[activeId];
                           const activeC = colorMap[activeWidget?.color ?? "neutral"];
                           return (
-                            <div className={`flex gap-1 px-2 pt-1.5 pb-1 overflow-x-auto ${activeC.bg} border-b ${activeC.border}`}>
-                              {[item.i, ...(item.tabs ?? [])].map(tabId => {
-                                const w = instances[tabId];
-                                const c = colorMap[w?.color ?? "neutral"];
-                                const isActive = tabId === activeId;
-                                return (
-                                  <button
-                                    key={tabId}
-                                    onMouseDown={e => e.stopPropagation()}
-                                    onClick={() => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
-                                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-all border ${
-                                      isActive
-                                        ? `${c.bg} ${c.border} opacity-100`
-                                        : "bg-transparent border-transparent opacity-40 hover:opacity-70"
-                                    }`}
-                                  >
-                                    <span className={`${c.label}`}>{w?.title ?? tabId}</span>
-                                    {tabId !== item.i && (
-                                      <span
-                                        onMouseDown={e => e.stopPropagation()}
-                                        onClick={e => { e.stopPropagation(); handleUngroupTab(item.i, tabId); }}
-                                        className="ml-0.5 leading-none text-neutral-400 hover:text-neutral-700"
-                                      >×</span>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
+                            <TabStrip
+                              order={[item.i, ...(item.tabs ?? [])]}
+                              activeId={activeId}
+                              instances={instances}
+                              editing
+                              className={`${activeC.bg} border-b ${activeC.border}`}
+                              onSelect={tabId => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
+                              onUngroup={tabId => handleUngroupTab(item.i, tabId)}
+                              onReorder={order => handleReorderTabs(item.i, order)}
+                            />
                           );
                         })()}
                       </div>
@@ -907,7 +893,7 @@ export default function WidgetGrid({
                             onMouseDown={e => e.stopPropagation()}
                             className="absolute top-8 right-2 z-30 min-w-32 max-w-[80%] rounded-xl border border-neutral-200 bg-white shadow-md py-1 text-xs text-neutral-700"
                           >
-                            <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-neutral-400">Move to</div>
+                            <div className="px-3 py-1 text-xs uppercase tracking-wide text-neutral-400">Move to</div>
                             {otherDashboards.map(d => (
                               <button
                                 key={d.id}
