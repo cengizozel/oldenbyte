@@ -585,7 +585,9 @@ export default function TabStrip({ order, activeId, instances, editing, hidden =
           style={{
             width: glow.size,
             opacity: glow.alpha,
-            background: `radial-gradient(${glow.size}px 400% at ${glow.side} center, currentColor, transparent 100%)`,
+            // An ellipse just taller than the strip, so the glow rounds off
+            // toward its top and bottom corners (a lens, not a clipped band).
+            background: `radial-gradient(${glow.size}px 60% at ${glow.side} center, currentColor 0%, color-mix(in srgb, currentColor 75%, transparent) 40%, transparent 100%)`,
             transition: glow.held ? "opacity 60ms linear, width 60ms linear" : "opacity 320ms ease-out, width 320ms ease-out",
           }}
         />
