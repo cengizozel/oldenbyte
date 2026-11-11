@@ -916,6 +916,37 @@ export default function WidgetGrid({
             ))}
           </div>
         )}
+        {/* Rulers for planning: columns numbered along the top, rows down the
+            left, each tick spanning its cell, and the grid's total size at the
+            end of the top one. They sit in the page's own gutters and take no
+            pointer events. */}
+        {editing && size.width > 0 && !isMobile && (
+          <>
+            <div
+              aria-hidden
+              className="absolute left-0 right-0 -top-[18px] h-4 pointer-events-none text-xs tabular-nums text-[var(--text-muted)]"
+              style={{ display: "grid", gridTemplateColumns: `repeat(${COLS}, 1fr)`, gap: GAP }}
+            >
+              {Array.from({ length: COLS }).map((_, i) => (
+                <div key={i} className="relative flex items-start justify-center border-b border-x border-[var(--surface-border)] rounded-b-sm">
+                  <span className="leading-none">{i + 1}</span>
+                </div>
+              ))}
+              <span className="absolute right-1.5 top-0 leading-none text-[var(--text-secondary)]" title="Columns by rows">{COLS} × {numRows}</span>
+            </div>
+            <div
+              aria-hidden
+              className="absolute top-0 -left-[18px] w-4 pointer-events-none text-xs tabular-nums text-[var(--text-muted)]"
+              style={{ display: "grid", gridTemplateRows: `repeat(${numRows}, ${rowHeight}px)`, gap: GAP }}
+            >
+              {Array.from({ length: numRows }).map((_, i) => (
+                <div key={i} className="flex items-center justify-start border-r border-y border-[var(--surface-border)] rounded-r-sm">
+                  <span className="leading-none">{i + 1}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         {!loaded ? null : editing ? (
           size.width > 0 && (
             <GridLayout
@@ -1012,6 +1043,10 @@ export default function WidgetGrid({
                         });
                       })()}
                     </div>
+                    {/* This tile's size in cells, columns by rows. */}
+                    <span aria-hidden className="absolute bottom-2 left-2 z-20 pointer-events-none px-1.5 py-0.5 rounded-md text-xs tabular-nums bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-secondary)] shadow-sm">
+                      {item.w} × {item.h}
+                    </span>
                     {/* Border overlay, highlighted when this is the grouping source.
                         Pointer-transparent: presses fall through the tile's
                         non-interactive content to the grid item (the drag
