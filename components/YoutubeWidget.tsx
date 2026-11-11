@@ -11,7 +11,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, SettingsError, ROW_ACTION } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, SettingsInfo, SettingsError, ROW_ACTION, SettingsAddRow } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { youtubeCacheKey } from "@/lib/cacheKeys";
@@ -572,9 +572,9 @@ export default function YoutubeWidget({
                 </div>
                 {!draft.ta?.only && (
                   <div className="flex items-center justify-between gap-3 min-h-7">
-                    <span className={`text-sm opacity-70 ${c.label}`}>Mark</span>
+                    <span className={`text-sm opacity-70 ${c.label}`}>Badge on</span>
                     <div className="flex items-center gap-1.5">
-                      {([["ta", "Archived (TA)"], ["yt", "Not archived (YouTube)"]] as const).map(([id, label]) => (
+                      {([["ta", "Archived"], ["yt", "Not archived"]] as const).map(([id, label]) => (
                         <Chip key={id} c={c} active={(draft.ta?.mark ?? "ta") === id} onClick={() => setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), mark: id } }))}>
                           {label}
                         </Chip>
@@ -584,39 +584,25 @@ export default function YoutubeWidget({
                 )}
                 {taActive(config.ta) && videos.length > 0 && archivedLoaded && (() => {
                   const missing = videos.filter(v => !archived.has(videoId(v.link)));
-                  if (missing.length === 0) return <SettingsNote c={c}>All {videos.length} videos here are in your archive.</SettingsNote>;
+                  if (missing.length === 0) return <SettingsInfo c={c} title={`All ${videos.length} videos here are archived`} />;
                   const shown = missing.slice(0, 6);
                   return (
-                    <div className="flex flex-col gap-1">
-                      <SettingsNote c={c}>{missing.length} of {videos.length} videos here are not archived yet:</SettingsNote>
-                      <ul className="flex flex-col gap-0.5">
-                        {shown.map(v => (
-                          <li key={v.link} className="flex items-baseline gap-1.5 min-w-0 text-sm">
-                            <a href={v.link} target="_blank" rel="noopener noreferrer" className={`min-w-0 truncate underline underline-offset-2 decoration-current/40 hover:decoration-current ${c.text} ${FOCUS_RING}`}>{v.title}</a>
-                            <span className={`shrink-0 opacity-70 ${c.label}`}>{v.channelName}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      {missing.length > shown.length && <SettingsNote c={c}>and {missing.length - shown.length} more</SettingsNote>}
-                    </div>
+                    <SettingsInfo
+                      c={c}
+                      title={`${missing.length} of ${videos.length} not archived yet`}
+                      items={shown.map(v => (
+                        <a key={v.link} href={v.link} target="_blank" rel="noopener noreferrer" className={`hover:underline underline-offset-2 ${FOCUS_RING}`}>
+                          <span className="opacity-70">{v.channelName}</span> - <span className={c.text}>{v.title}</span>
+                        </a>
+                      ))}
+                      more={missing.length > shown.length ? `and ${missing.length - shown.length} more` : undefined}
+                    />
                   );
                 })()}
               </>
             )}
           </SettingsField>
-          <div className="flex gap-1.5">
-            <SettingsInput
-              type="text"
-              value={chInput}
-              onChange={e => setChInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addChannel()}
-              placeholder="@handle or channel URL"
-              className="flex-1 min-w-0"
-            />
-            <SmallButton c={c} onClick={addChannel} disabled={resolving} title="Add channel" className="self-center">
-              {resolving ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-            </SmallButton>
-          </div>
+          <SettingsAddRow c={c} value={chInput} onChange={setChInput} onAdd={addChannel} placeholder="@handle or channel URL" busy={resolving} />
           {draft.channels.length > 0 && (
             <div className="flex flex-col gap-1.5">
               {draft.channels.map(ch => (

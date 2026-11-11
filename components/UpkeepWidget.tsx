@@ -17,7 +17,7 @@ import {
 } from "@/lib/upkeep";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING, Stepper } from "./ui/Field";
-import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION, Chip } from "./ui/WidgetChrome";
+import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION, Chip, SettingsAddRow } from "./ui/WidgetChrome";
 
 // Upkeep is Tracker and Rhythm's third sibling. Tracker answers "how long?",
 // Rhythm answers "when, and how often?" — Upkeep answers "am I keeping up with
@@ -379,19 +379,7 @@ export default function UpkeepWidget({
 
   const back = (
     <SettingsFace c={c} onReset={() => setDraft([])} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }}>
-      <div className="flex gap-1.5">
-        <SettingsInput
-          type="text"
-          value={nameInput}
-          onChange={e => setNameInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && addItem()}
-          placeholder="e.g. teeth clean, showered"
-          className="flex-1"
-        />
-        <SmallButton c={c} onClick={addItem} title="Add item" className="self-center">
-          <Plus size={14} />
-        </SmallButton>
-      </div>
+      <SettingsAddRow c={c} value={nameInput} onChange={setNameInput} onAdd={addItem} placeholder="e.g. teeth clean, showered" />
       <SettingsField c={c} label="Order" inline>
         {([["custom", "As arranged"], ["need", "By need"]] as [Order, string][]).map(([key, label]) => (
           <Chip key={key} c={c} active={order === key} onClick={() => changeOrder(key)} title={key === "need" ? "Off items first, heaviest first, then running items soonest to run out first" : "The order below, drag the dots to arrange"}>

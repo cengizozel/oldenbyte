@@ -9,7 +9,7 @@ import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING, Stepper } from "./ui/Field";
-import { EmptyState, WidgetHeader, Chip, SmallButton, SettingsFace, SettingsListRow, SettingsListControl, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION } from "./ui/WidgetChrome";
+import { EmptyState, WidgetHeader, Chip, SmallButton, SettingsFace, SettingsListRow, SettingsListControl, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION, SettingsAddRow } from "./ui/WidgetChrome";
 
 // Rhythm is Tracker's sibling. Tracker answers "how long?" with a live
 // stopwatch; Rhythm answers "when, and how often?" — each tap stamps a moment,
@@ -556,19 +556,7 @@ export default function RhythmWidget({
   // ── Settings (back) ────────────────────────────────────────────────────────
   const back = (
     <SettingsFace c={c} onReset={() => setDraft([])} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }}>
-      <div className="flex gap-1.5">
-        <SettingsInput
-          type="text"
-          value={nameInput}
-          onChange={e => setNameInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && addItem()}
-          placeholder="e.g. brushed teeth, slept"
-          className="flex-1"
-        />
-        <SmallButton c={c} onClick={addItem} title="Add item" className="self-center">
-          <Plus size={14} />
-        </SmallButton>
-      </div>
+      <SettingsAddRow c={c} value={nameInput} onChange={setNameInput} onAdd={addItem} placeholder="e.g. brushed teeth, slept" />
       {draft.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {draft.map(it => (

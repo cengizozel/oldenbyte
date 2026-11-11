@@ -5,9 +5,9 @@ import { FaceShownContext } from "./FlipCard";
 import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
 import { useWidgetFrame } from "@/lib/widgetFrame";
-import { Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Maximize2, Minimize2, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { Plus, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Maximize2, Minimize2, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
-import { FOCUS_RING, HIT_AREA } from "./Field";
+import { FOCUS_RING, HIT_AREA, SettingsInput } from "./Field";
 
 // Small shared pieces of widget chrome: the hover pencil, scroll fades, the
 // loading spinner, empty-state copy, and the settings save/cancel row.
@@ -418,6 +418,55 @@ export function SettingsField({ c, label, hint, children, inline = false }: { c:
 export function SettingsNote({ c, children }: { c: ColorClasses; children: ReactNode }) {
   return <p className={`${SETTINGS_HINT} ${c.label}`}>{children}</p>;
 }
+// The row that adds an item to a collection: a field, then the one "Add"
+// button (plus glyph and the word). Enter adds too. Every collection uses
+// this, so the row cannot differ between widgets.
+export function SettingsAddRow({
+  c, value, onChange, onAdd, placeholder, busy = false, inputRef,
+}: {
+  c: ColorClasses;
+  value: string;
+  onChange: (value: string) => void;
+  onAdd: () => void;
+  placeholder: string;
+  busy?: boolean;
+  inputRef?: Ref<HTMLInputElement>;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <SettingsInput
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") onAdd(); }}
+        placeholder={placeholder}
+        className="flex-1 min-w-0"
+      />
+      <SmallButton c={c} onClick={onAdd} disabled={busy} title="Add">
+        {busy ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
+        Add
+      </SmallButton>
+    </div>
+  );
+}
+
+// Read-only information inside a face (a status, a list of things found):
+// an inset block with its own small heading and bullets, so it never reads
+// as another setting.
+export function SettingsInfo({ c, title, items, more }: { c: ColorClasses; title: ReactNode; items?: ReactNode[]; more?: ReactNode }) {
+  return (
+    <div className={`rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 flex flex-col gap-1.5 ${c.label}`}>
+      <p className="text-xs font-semibold uppercase tracking-wider opacity-70">{title}</p>
+      {items && items.length > 0 && (
+        <ul className="flex flex-col gap-1 list-disc pl-4 text-sm marker:opacity-50">
+          {items.map((it, i) => <li key={i} className="min-w-0 break-words">{it}</li>)}
+        </ul>
+      )}
+      {more && <p className="text-sm opacity-70">{more}</p>}
+    </div>
+  );
+}
 export function SettingsError({ children }: { children: ReactNode }) {
   return <p className="text-sm text-red-400 break-words">{children}</p>;
 }
@@ -488,7 +537,7 @@ export function Chip({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`h-7 px-2.5 rounded-md text-sm leading-none transition-colors ${FOCUS_RING} ${
+      className={`h-7 px-2.5 rounded-md text-sm leading-none whitespace-nowrap shrink-0 transition-colors ${FOCUS_RING} ${
         active ? "bg-black/75 text-white dark:bg-white/85 dark:text-black font-medium" : `bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${c.text}`
       } ${className}`}
     >

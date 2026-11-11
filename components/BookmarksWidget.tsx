@@ -8,7 +8,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { WidgetHeader, EmptyState, ScrollFades, SmallButton, SettingsFace, SettingsListRow, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION } from "./ui/WidgetChrome";
+import { WidgetHeader, EmptyState, ScrollFades, SmallButton, SettingsFace, SettingsListRow, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION, SettingsAddRow } from "./ui/WidgetChrome";
 
 // A bookmarks board. Each link shows its site favicon (with a tidy colored
 // letter tile when the favicon is missing, or a custom emoji/image override),
@@ -393,20 +393,7 @@ export default function BookmarksWidget({
   // ── Settings (back) ──────────────────────────────────────────────────────
   const back = (
     <SettingsFace c={c} onReset={() => setDraft([])} onSave={handleSave} onCancel={() => { setDraft(bookmarks); setUrlInput(""); setSettingsOpen(false); }}>
-      <div className="flex items-center gap-1.5">
-        <SettingsInput
-          type="text"
-          value={urlInput}
-          onChange={e => setUrlInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && addDraft()}
-          placeholder="Paste a link, e.g. github.com"
-          className="flex-1"
-        />
-        <SmallButton c={c} onClick={addDraft} title="Add bookmark">
-          <Plus size={14} />
-          Add
-        </SmallButton>
-      </div>
+      <SettingsAddRow c={c} value={urlInput} onChange={setUrlInput} onAdd={addDraft} placeholder="Paste a link, e.g. github.com" />
 
       {draft.length > 0 && (
         <div

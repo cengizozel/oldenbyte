@@ -11,7 +11,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsError, ROW_ACTION } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsError, ROW_ACTION, SettingsAddRow } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { REDDIT_API_KEY, parseRedditApi, type RedditApiConfig } from "@/lib/reddit";
 import { isDemoMode } from "@/lib/demo";
@@ -521,20 +521,7 @@ export default function RedditWidget({
               )}
             </div>
           </SettingsField>
-          <div className="flex gap-1.5">
-            <SettingsInput
-              ref={subInputRef}
-              type="text"
-              value={subInput}
-              onChange={e => setSubInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addSub()}
-              placeholder="subreddit name"
-              className="flex-1"
-            />
-            <SmallButton c={c} onClick={addSub} title="Add subreddit" className="self-center">
-              <Plus size={14} />
-            </SmallButton>
-          </div>
+          <SettingsAddRow c={c} value={subInput} onChange={setSubInput} onAdd={addSub} placeholder="subreddit name" inputRef={subInputRef} />
           {draft.subreddits.length > 0 && (
             <div className="flex flex-col gap-1.5">
               {draft.subreddits.map(sub => (
