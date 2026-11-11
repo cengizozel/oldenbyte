@@ -11,7 +11,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, SettingsInfo, SettingsError, ROW_ACTION, SettingsAddRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, SettingsInfo, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { youtubeCacheKey } from "@/lib/cacheKeys";
@@ -526,7 +526,7 @@ export default function YoutubeWidget({
               </Chip>
             ))}
           </SettingsField>
-          <SettingsField c={c} label="TubeArchivist" hint="Shared by all YouTube widgets. Archived videos then open there, marked TA.">
+          <SettingsGroup c={c} label="TubeArchivist" summary={draft.ta?.url ? (draft.ta.open === "ta" ? "Videos open there" : "Connected") : "Not set up"} hint="Shared by all YouTube widgets. Archived videos can open there instead of on YouTube.">
             <SettingsInput
               type="url"
               value={draft.ta?.url ?? ""}
@@ -605,7 +605,7 @@ export default function YoutubeWidget({
                 })()}
               </>
             )}
-          </SettingsField>
+          </SettingsGroup>
           <SettingsAddRow c={c} value={chInput} onChange={setChInput} onAdd={addChannel} placeholder="@handle or channel URL" busy={resolving} />
           {draft.channels.length > 0 && (
             <div className="flex flex-col gap-1.5">

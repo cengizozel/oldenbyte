@@ -417,6 +417,30 @@ export function SettingsField({ c, label, hint, children, inline = false }: { c:
   );
 }
 
+// A collapsible group of related settings (a connection, an optional
+// integration): one row with the name, a one-line summary of its state and a
+// chevron; the fields open under it. Closed by default, so a face stays short.
+export function SettingsGroup({ c, label, summary, hint, children, defaultOpen = false }: { c: ColorClasses; label: ReactNode; summary?: ReactNode; hint?: ReactNode; children: ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className={`flex items-center justify-between gap-3 min-h-7 text-left rounded-md ${FOCUS_RING}`}>
+        <span className={`${SETTINGS_LABEL} shrink-0 ${c.text}`}>{label}</span>
+        <span className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
+          {!open && summary && <span className="text-sm opacity-70 truncate">{summary}</span>}
+          <ChevronLeft size={14} className={`shrink-0 opacity-70 transition-transform ${open ? "rotate-90" : "-rotate-90"}`} />
+        </span>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-1.5 pl-3 border-l border-black/10 dark:border-white/10">
+          {hint && <p className={`${SETTINGS_HINT} ${c.label}`}>{hint}</p>}
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Explanatory copy and errors inside a face.
 export function SettingsNote({ c, children }: { c: ColorClasses; children: ReactNode }) {
   return <p className={`${SETTINGS_HINT} ${c.label}`}>{children}</p>;

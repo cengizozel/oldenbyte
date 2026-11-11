@@ -218,6 +218,10 @@ the palette `label` color at 50% opacity.
 - Empty states: `EmptyState`, centered, 14px at 70%. Never inside a styled
   frame (a player area, a dashed box) unless the frame is the control itself.
 
+- Setting groups: a connection or optional integration (TubeArchivist,
+  the Reddit API) is a `SettingsGroup`, one row with its name, a one-line
+  summary of its state and a chevron, closed by default; its fields open
+  indented under it.
 - Narrow settings: the face is a size container. Under 26rem a group of
   three or more options moves under its label and aligns left like text; a
   toggle, a stepper or a two-way choice stays beside the label. Adding to a

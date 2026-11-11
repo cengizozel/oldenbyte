@@ -11,7 +11,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsError, ROW_ACTION, SettingsAddRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { REDDIT_API_KEY, parseRedditApi, type RedditApiConfig } from "@/lib/reddit";
 import { isDemoMode } from "@/lib/demo";
@@ -498,7 +498,7 @@ export default function RedditWidget({
             <Chip c={c} active={(draft.order ?? "arrival") === "arrival"} onClick={() => setDraft(d => ({ ...d, order: "arrival" }))} title="Posts that newly made a top list go first">newest</Chip>
             <Chip c={c} active={draft.order === "date"} onClick={() => setDraft(d => ({ ...d, order: "date" }))} title="By when the post was made">post date</Chip>
           </SettingsField>
-          <SettingsField c={c} label="Reddit API (optional)" hint="A script app from reddit.com/prefs/apps lifts the limit to 100 requests a minute and adds vote counts. Without it the public feed is used, which Reddit limits to about one request a minute. Shared by every Reddit widget.">
+          <SettingsGroup c={c} label="Reddit API" summary={api.clientId ? "Set up" : "Not set up"} hint="A script app from reddit.com/prefs/apps lifts the limit to 100 requests a minute and adds vote counts. Without it the public feed is used, which Reddit limits to about one request a minute. Shared by every Reddit widget.">
             <SettingsInput
               type="text"
               value={api.clientId}
@@ -520,7 +520,7 @@ export default function RedditWidget({
                 <span className={`text-sm min-w-0 break-words ${apiStatus.ok ? `opacity-70 ${c.label}` : "text-red-400"}`}>{apiStatus.msg}</span>
               )}
             </div>
-          </SettingsField>
+          </SettingsGroup>
           <SettingsAddRow c={c} value={subInput} onChange={setSubInput} onAdd={addSub} placeholder="subreddit name" inputRef={subInputRef} />
           {draft.subreddits.length > 0 && (
             <div className="flex flex-col gap-1.5">
