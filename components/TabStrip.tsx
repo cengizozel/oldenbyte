@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { Widget } from "@/lib/widgets";
 import { colorMap } from "@/lib/widgets";
 import { FOCUS_RING } from "@/components/ui/Field";
@@ -10,8 +10,12 @@ import type { TabGroupHosts } from "@/lib/tabGroup";
 // header sits (same title baseline, same gap to the content, header actions on
 // the right): the shown tab is drawn as the title, with its widget's icon in
 // front and a 2px underline that marks it as the open tab, and the other tabs
-// follow as dimmed icon and name pairs in the same color, so the row reads as
-// one palette. Every member's header renders its icon (and the shown one its
+// follow as dimmed icon and name pairs in the same color and weight (so nothing
+// shifts when the open tab changes), and the row reads as one palette. The
+// underline is one element that travels to the open tab on a spring: the
+// leading edge sets off at full strength and the trailing edge lags, so it
+// stretches toward the target and settles with a little overshoot. Reduced
+// motion gets a plain short slide. Every member's header renders its icon (and the shown one its
 // actions) into this row through lib/tabGroup.ts.
 //
 // Clicking a tab shows it. In layout edit mode a tab can be dragged along the
@@ -37,6 +41,15 @@ type Props = {
 const GAP = 12;
 // Pointer travel before a press on a tab counts as a drag rather than a click.
 const DRAG_THRESHOLD = 5;
+
+// The underline's spring: stiffness, damping, and how much the trailing edge
+// lags the leading one (the "smooth" tuning from the try-out page).
+const SPRING = { k: 260, c: 26, stretch: 0.45 };
+type Edge = { x: number; v: number; target: number };
+function integrate(s: Edge, k: number, c: number, h: number) {
+  s.v += (-k * (s.x - s.target) - c * s.v) * h;
+  s.x += s.v * h;
+}
 
 // A reorder that makes another tab first renames the cell, which remounts the
 // whole tile (and this strip), so the tab to refocus is remembered outside the
@@ -153,6 +166,80 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     }
   });
 
+  // The travelling underline. Edges are measured against the tab list, the
+  // first paint is instant, every later change of open tab or order animates.
+  const listRef = useRef<HTMLDivElement>(null);
+  const inkRef = useRef<HTMLSpanElement>(null);
+  const edges = useRef<{ l: Edge; r: Edge; raf: number | null; painted: boolean }>({
+    l: { x: 0, v: 0, target: 0 }, r: { x: 0, v: 0, target: 0 }, raf: null, painted: false,
+  });
+  const orderKey = order.join("|");
+  useLayoutEffect(() => {
+    const ink = inkRef.current, list = listRef.current, btn = buttons.current.get(activeId);
+    if (!ink || !list || !btn) return;
+    const st = edges.current;
+    const measure = () => {
+      const b = btn.getBoundingClientRect(), base = list.getBoundingClientRect();
+      st.l.target = b.left - base.left + list.scrollLeft + 4;
+      st.r.target = b.right - base.left + list.scrollLeft - 4;
+    };
+    const paint = () => {
+      ink.style.transform = `translateX(${st.l.x}px)`;
+      ink.style.width = `${Math.max(2, st.r.x - st.l.x)}px`;
+    };
+    measure();
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!st.painted || reduced) {
+      // First paint, or reduced motion: no spring. Reduced motion still gets a
+      // short CSS slide between positions.
+      ink.style.transition = st.painted ? "transform 150ms ease-out, width 150ms ease-out" : "none";
+      st.l.x = st.l.target; st.r.x = st.r.target; st.l.v = st.r.v = 0;
+      paint();
+      st.painted = true;
+      return;
+    }
+    ink.style.transition = "none";
+    if (st.raf) cancelAnimationFrame(st.raf);
+    let last = performance.now();
+    const step = (now: number) => {
+      const dt = Math.min(0.032, (now - last) / 1000) || 0.016;
+      last = now;
+      const forward = st.r.target - st.r.x + (st.l.target - st.l.x) >= 0;
+      const lead = forward ? st.r : st.l, trail = forward ? st.l : st.r;
+      const h = dt / 4;
+      for (let i = 0; i < 4; i++) {
+        integrate(lead, SPRING.k, SPRING.c, h);
+        integrate(trail, SPRING.k * (1 - SPRING.stretch), SPRING.c * (1 - SPRING.stretch * 0.5), h);
+      }
+      const settled = [st.l, st.r].every(e => Math.abs(e.x - e.target) < 0.05 && Math.abs(e.v) < 0.5);
+      if (settled) { st.l.x = st.l.target; st.r.x = st.r.target; st.l.v = st.r.v = 0; paint(); st.raf = null; return; }
+      paint();
+      st.raf = requestAnimationFrame(step);
+    };
+    st.raf = requestAnimationFrame(step);
+    return () => { if (st.raf) { cancelAnimationFrame(st.raf); st.raf = null; } };
+    // orderKey and the instance titles change where the tabs sit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, orderKey, editing]);
+  // Re-measure when the row changes size (fonts, titles arriving, resizes).
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const ro = new ResizeObserver(() => {
+      const st = edges.current, btn = buttons.current.get(activeId), ink = inkRef.current;
+      if (!btn || !ink || st.raf) return;
+      const b = btn.getBoundingClientRect(), base = list.getBoundingClientRect();
+      st.l.x = st.l.target = b.left - base.left + list.scrollLeft + 4;
+      st.r.x = st.r.target = b.right - base.left + list.scrollLeft - 4;
+      ink.style.transition = "none";
+      ink.style.transform = `translateX(${st.l.x}px)`;
+      ink.style.width = `${Math.max(2, st.r.x - st.l.x)}px`;
+    });
+    ro.observe(list);
+    for (const b of buttons.current.values()) ro.observe(b);
+    return () => ro.disconnect();
+  }, [activeId, orderKey]);
+
   function onKeyDown(e: ReactKeyboardEvent<HTMLButtonElement>, id: string) {
     if (!editing || !e.shiftKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     e.preventDefault();
@@ -165,7 +252,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
 
   return (
     <div className={`shrink-0 flex items-center gap-3 px-5 pt-[18px] pb-2.5 ${className}`}>
-      <div className="flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div ref={listRef} className="relative flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {order.map((tabId, index) => {
           const isActive = tabId === activeId;
           const isDragged = drag?.idx === index;
@@ -188,10 +275,8 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
                 onClick={() => onClick(tabId)}
                 onKeyDown={e => onKeyDown(e, tabId)}
                 title={editing ? "Drag to reorder" : undefined}
-                className={`relative flex items-center gap-1.5 h-6 px-1 rounded-md text-sm whitespace-nowrap transition-opacity ${c.label} ${FOCUS_RING} ${
-                  isActive
-                    ? "font-medium opacity-100 after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:rounded-full after:bg-current"
-                    : "opacity-70 hover:opacity-100 after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:rounded-full after:bg-current after:opacity-0 hover:after:opacity-30 after:transition-opacity"
+                className={`flex items-center gap-1.5 h-6 px-1 rounded-md text-sm font-medium whitespace-nowrap transition-opacity ${c.label} ${FOCUS_RING} ${
+                  isActive ? "opacity-100" : "opacity-70 hover:opacity-100"
                 }`}
               >
                 <span ref={slotHost("icons", tabId)} className="flex items-center shrink-0 empty:hidden" />
@@ -211,6 +296,11 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
             </div>
           );
         })}
+        <span
+          ref={inkRef}
+          aria-hidden
+          className={`absolute bottom-0 left-0 h-0.5 w-10 rounded-full bg-current pointer-events-none ${c.label} ${drag ? "opacity-0" : "opacity-100"} transition-opacity`}
+        />
       </div>
       <div ref={actionsHost} className="ml-auto flex items-center gap-2 shrink-0 empty:hidden" />
     </div>
