@@ -471,8 +471,8 @@ export default function ScheduleWidget({
           {/* day columns */}
           {DAYS.map((_, dayIdx) => (
             <div key={dayIdx} className="flex-1 min-w-0">
-              <div className={`sticky top-0 z-10 h-6 flex items-center px-1.5 text-sm font-medium ${c.bg} ${dayIdx === todayIdx ? c.text : `${c.label} opacity-70`}`}>
-                {labels[dayIdx]}
+              <div className={`sticky top-0 z-10 h-6 flex items-center px-1.5 text-sm font-medium ${c.bg}`}>
+                <span className={dayIdx === todayIdx ? c.text : `${c.label} opacity-70`}>{labels[dayIdx]}</span>
               </div>
               <div
                 className="relative border-l border-black/5 dark:border-white/10 cursor-pointer"
