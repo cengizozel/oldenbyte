@@ -196,9 +196,14 @@ export default function KiwixWidget({
       setSearched(false);
       setSelected(null);
     }
+    // Choosing "random" (or changing the source under it) takes effect at
+    // once, not on the next page load.
+    const wantsRandom = draft.home === "random" && (config.home !== "random" || draft.source !== config.source || draft.baseUrl !== config.baseUrl);
     setConfig(draft);
     await storage.setItem(storageKey, JSON.stringify(draft));
     setSettingsOpen(false);
+    if (wantsRandom) openRandom(draft);
+    else if (draft.home === "search" && config.home !== "search") setSelected(null);
   }
 
 
