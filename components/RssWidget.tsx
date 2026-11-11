@@ -146,9 +146,10 @@ export default function RssWidget({
             onSettings={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
             c={c}
             icon={Rss}
-            title={favView ? "Favorites" : feedName}
+            title={feedName}
             right={
               <>
+                <RefreshButton c={c} busy={loading} onClick={() => fetchFeed(config.url, config.limit, `${storageKey}-${today}`, true)} />
                 <button
                   type="button"
                   onClick={() => setFavView(v => (v ? null : favs))}
@@ -159,7 +160,6 @@ export default function RssWidget({
                 >
                   <Heart size={14} fill={favView ? "currentColor" : "none"} />
                 </button>
-                {!favView && <RefreshButton c={c} busy={loading} onClick={() => fetchFeed(config.url, config.limit, `${storageKey}-${today}`, true)} />}
               </>
             }
           />
@@ -168,6 +168,7 @@ export default function RssWidget({
               {favView ? (
                 favList.length ? (
                   <ul className="flex flex-col">
+                    <li className={`pb-1 text-sm font-medium ${c.label}`}>Favorites</li>
                     {favList.map((f, i) => (
                       <li key={f.id} className={`group/item flex items-start gap-2 py-2 first:pt-0 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                         <div className="flex-1 min-w-0">
