@@ -42,7 +42,7 @@ export function CharactersPanel({ c, characters, activeCharId, onCreate, onClose
             <div
               key={ch.id}
               onClick={() => onActivate(ch.id)}
-              className={`group/row flex items-start gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isActive ? `${c.bg} ring-1 ring-[var(--surface-border-focus)]` : "hover:bg-black/5 dark:hover:bg-white/5"}`}
+              className={`group/row flex items-start gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isActive ? `${c.bg} ring-1 ring-inset ring-[var(--surface-border-focus)]` : "hover:bg-black/5 dark:hover:bg-white/5"}`}
             >
               <span className="text-base leading-none mt-0.5 shrink-0">{ch.id === DEFAULT_CHARACTER_ID ? "🤖" : ch.emoji}</span>
               <div className="flex-1 min-w-0">
