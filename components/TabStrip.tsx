@@ -5,6 +5,7 @@ import type { Widget } from "@/lib/widgets";
 import { colorMap } from "@/lib/widgets";
 import { FOCUS_RING } from "@/components/ui/Field";
 import type { TabGroupHosts } from "@/lib/tabGroup";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 // The header row of a tab group. It sits exactly where a single widget's
 // header sits (same title baseline, same gap to the content, header actions on
@@ -104,7 +105,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     if (glowTimer.current) { clearTimeout(glowTimer.current); glowTimer.current = null; }
     const d = Math.min(distance, 160);
     glowHeld.current = true;
-    setGlow({ side, alpha: 0.12 + (d / 160) * 0.45, size: 24 + d * 0.6, held: true });
+    setGlow({ side, alpha: 0.12 + (d / 160) * 0.45, size: 8 + d * 0.2, held: true });
   }
   function releaseGlow() {
     if (!glowHeld.current) return;
@@ -114,7 +115,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   }
   function absorbGlow(side: "left" | "right", speed: number) {
     glowHeld.current = false;
-    setGlow({ side, alpha: Math.min(0.55, 0.15 + speed * 0.5), size: 40 + Math.min(speed, 1) * 60, held: false });
+    setGlow({ side, alpha: Math.min(0.55, 0.15 + speed * 0.5), size: 14 + Math.min(speed, 1) * 20, held: false });
     requestAnimationFrame(() => requestAnimationFrame(() => setGlow(g => (g && !g.held ? { ...g, alpha: 0 } : g))));
     clearGlowLater();
   }
@@ -418,6 +419,32 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     // orderKey and the instance titles change where the tabs sit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, orderKey, editing]);
+  // In edit mode a press on a tab reorders and a press on the row's empty
+  // space moves the tile, so the row cannot be dragged sideways: arrows at
+  // either end take over whenever tabs are cut off (view mode drags and
+  // flings instead, and the shown tab scrolls itself into view).
+  const [cut, setCut] = useState({ left: false, right: false });
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || !editing) return;
+    const measure = () => {
+      const max = list.scrollWidth - list.clientWidth;
+      const next = { left: list.scrollLeft > 1, right: list.scrollLeft < max - 1 };
+      setCut(c => c.left === next.left && c.right === next.right ? c : next);
+    };
+    measure();
+    list.addEventListener("scroll", measure, { passive: true });
+    const ro = new ResizeObserver(measure);
+    ro.observe(list);
+    return () => { list.removeEventListener("scroll", measure); ro.disconnect(); };
+  }, [editing, orderKey]);
+  function page(dir: -1 | 1) {
+    const list = listRef.current;
+    if (!list) return;
+    stopFling();
+    list.scrollTo({ left: list.scrollLeft + dir * Math.max(80, list.clientWidth * 0.6), behavior: "smooth" });
+  }
+
   // Re-measure when the row changes size (fonts, titles arriving, resizes).
   useEffect(() => {
     const list = listRef.current;
@@ -506,11 +533,32 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
           style={{
             width: glow.size,
             opacity: glow.alpha,
-            background: `radial-gradient(ellipse at ${glow.side} center, currentColor, transparent 70%)`,
+            background: `radial-gradient(${glow.size}px 400% at ${glow.side} center, currentColor, transparent 100%)`,
             transition: glow.held ? "opacity 60ms linear, width 60ms linear" : "opacity 320ms ease-out, width 320ms ease-out",
           }}
         />
       )}
+      {editing && (cut.left || cut.right) && (["left", "right"] as const).map(side => {
+        const Icon = side === "left" ? ChevronLeft : ChevronRight;
+        return (
+          <button
+            key={side}
+            type="button"
+            data-tab-nav
+            aria-label={side === "left" ? "Earlier tabs" : "More tabs"}
+            title={side === "left" ? "Earlier tabs" : "More tabs"}
+            disabled={!cut[side]}
+            onMouseDown={e => e.stopPropagation()}
+            onPointerDown={e => e.stopPropagation()}
+            onClick={() => page(side === "left" ? -1 : 1)}
+            className={`absolute top-0 bottom-0 ${side === "left" ? "left-0" : "right-0"} w-6 flex items-center justify-center rounded-md transition-opacity ${c.label} ${c.bg} ${FOCUS_RING} ${
+              cut[side] ? "opacity-100 cursor-pointer" : "opacity-0 pointer-events-none"
+            }`}
+          >
+            <Icon size={16} strokeWidth={2.25} />
+          </button>
+        );
+      })}
       </div>
       <div ref={actionsHost} className="ml-auto flex items-center gap-2 shrink-0 empty:hidden" />
     </div>
