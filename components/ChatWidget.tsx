@@ -1082,7 +1082,7 @@ export default function ChatWidget({
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 px-4">
                 <Bot size={20} className={`opacity-40 ${c.text}`} />
                 <p className={`text-xs opacity-70 ${c.text}`}>
-                  hover and click the pencil to connect a local or OpenAI-compatible model
+                  connect a local or OpenAI-compatible model in settings
                 </p>
               </div>
             ) : messages.length === 0 ? (

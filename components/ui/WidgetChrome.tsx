@@ -91,7 +91,7 @@ export function LoadingState({ c }: { c: ColorClasses }) {
 
 // Standard empty-state copy, one style everywhere: centered in the widget
 // body, lowercase, no trailing punctuation. Pass `action` for the canonical
-// "hover and click the pencil to {action}" phrasing, or children for custom
+// the action phrase alone ("add bookmarks"), or children for custom
 // copy (which should follow the same casing rules).
 export function EmptyState({ c, action, children }: { c: ColorClasses; action?: string; children?: ReactNode }) {
   return (

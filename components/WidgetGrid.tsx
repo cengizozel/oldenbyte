@@ -489,17 +489,24 @@ export default function WidgetGrid({
     return () => ro.disconnect();
   }, []);
 
+  // Layout edits are a draft until confirmed: nothing is written while edit
+  // mode is on, so a reload (or the cross) leaves the saved layout untouched.
+  // Leaving edit mode writes both at once: the check saves the new
+  // arrangement, the cross has already put the old one back. Changes made
+  // outside edit mode (a widget's color) save as they happen.
   useEffect(() => {
     if (!loaded) return;
     if (!layoutHydrated.current) { layoutHydrated.current = true; return; }
+    if (editing) return;
     storage.setItem(LAYOUT_KEY, JSON.stringify(layout));
-  }, [layout, loaded, LAYOUT_KEY]);
+  }, [layout, loaded, LAYOUT_KEY, editing]);
 
   useEffect(() => {
     if (!loaded) return;
     if (!instancesHydrated.current) { instancesHydrated.current = true; return; }
+    if (editing) return;
     storage.setItem(INSTANCES_KEY, JSON.stringify(instances));
-  }, [instances, loaded, INSTANCES_KEY]);
+  }, [instances, loaded, INSTANCES_KEY, editing]);
 
   // Cancel grouping mode and close the move menu when edit mode is turned off
   useEffect(() => {
@@ -612,6 +619,12 @@ export default function WidgetGrid({
     });
     applySnap(drop(takeSnap()));
     if (editStartRef.current) editStartRef.current = drop(editStartRef.current);
+    // The move itself is immediate (the other dashboard already has the
+    // widget), so this dashboard's saved copy drops it now too; the rest of
+    // the session's edits stay a draft.
+    const saved = editStartRef.current ?? drop(takeSnap());
+    storage.setItem(INSTANCES_KEY, JSON.stringify(saved.instances));
+    storage.setItem(LAYOUT_KEY, JSON.stringify(saved.layout));
     historyRef.current = { past: [], future: [] };
     setHistVersion(v => v + 1);
     setMoveMenuFor(null);
