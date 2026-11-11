@@ -127,3 +127,13 @@ key would be saved with the rest of the config in the database; move it to
 `localStorage` first if that matters.)
 
 This widget is not `digestable`.
+
+## Finding the model server
+
+The settings help with the server address in three ways, since the request is made by the dashboard's server and `localhost` therefore rarely means what a user expects.
+
+- **Reuse.** Connections other Assistant widgets already use are offered under the address field (`listModelConnections` in `lib/dashboardContext.ts`); one click fills the address and model.
+- **Default for new widgets.** The last connection saved by any Assistant is kept under the global key `chat-last-connection`; a widget with no connection starts from it.
+- **Find servers.** `GET /api/chat?discover=1&hosts=a,b` probes the usual ports (11434 Ollama, 1234 LM Studio, 8080 llama.cpp) on this server, the Docker host, and up to eight hosts the caller's other widgets already use, with a 1.5 second limit each and through the same guarded fetch as a normal model listing. It returns the servers that answered with their models.
+
+When listing models fails because nothing answered, the error says so and explains the `localhost` case instead of reporting "fetch failed".

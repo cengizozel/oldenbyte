@@ -36,6 +36,30 @@ export async function GET(request: NextRequest) {
   if (user instanceof NextResponse) return user;
   actAs(user);
 
+  // ?discover=1&hosts=a,b: look for model servers on the usual ports of a
+  // short list of hosts (this server, the Docker host, and hosts the caller
+  // already uses in other widgets). Each probe goes through the same guarded
+  // fetch as a normal model listing, capped in count and time.
+  if (request.nextUrl.searchParams.get("discover")) {
+    const extra = (request.nextUrl.searchParams.get("hosts") ?? "").split(",").map(h => h.trim().toLowerCase())
+      .filter(h => /^[a-z0-9.\-]{1,253}$/.test(h)).slice(0, 8);
+    const hosts = [...new Set(["localhost", "host.docker.internal", "172.17.0.1", ...extra])];
+    const ports: [number, string][] = [[11434, "Ollama"], [1234, "LM Studio"], [8080, "llama.cpp"]];
+    const probes = hosts.flatMap(host => ports.map(async ([port, kind]) => {
+      const url = `http://${host}:${port}/v1`;
+      try {
+        const res = await userFetch(`${url}/models`, { signal: AbortSignal.timeout(1500) });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const raw: unknown[] = data.data ?? data.models ?? [];
+        const models = raw.map(m => (typeof m === "string" ? m : (m as { id?: string; name?: string }).id ?? (m as { name?: string }).name)).filter((m): m is string => Boolean(m));
+        return models.length ? { url, kind, models: models.slice(0, 50) } : null;
+      } catch { return null; }
+    }));
+    const found = (await Promise.all(probes)).filter(Boolean);
+    return NextResponse.json({ servers: found });
+  }
+
   const baseUrl = request.nextUrl.searchParams.get("baseUrl");
   const apiKey = request.headers.get("x-api-key") ?? "";
 
@@ -55,7 +79,16 @@ export async function GET(request: NextRequest) {
       .filter((m): m is string => Boolean(m));
     return NextResponse.json({ models });
   } catch (err) {
-    return NextResponse.json({ error: `Could not list models: ${String(err)}` }, { status: 503 });
+    // "fetch failed" tells the user nothing; the usual cause is an address
+    // that only makes sense from their own computer.
+    const host = (() => { try { return new URL(baseUrl).hostname; } catch { return ""; } })();
+    const local = host === "localhost" || host === "127.0.0.1";
+    const why = /fetch failed|ECONNREFUSED|ENOTFOUND|timeout/i.test(String(err))
+      ? (local
+          ? "Nothing answered there. \"localhost\" here means the dashboard's server, not your computer: use the address of the machine running the model (for example its LAN or Tailscale address)."
+          : `Nothing answered at ${host}. Check that the model server is running, listening on that address (not only on localhost), and reachable from the dashboard's server.`)
+      : `Could not list models: ${String(err)}`;
+    return NextResponse.json({ error: why }, { status: 503 });
   }
 }
 

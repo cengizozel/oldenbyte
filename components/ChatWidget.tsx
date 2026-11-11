@@ -40,6 +40,9 @@ function settleStreamed(msgs: ChatMessage[]): ChatMessage[] {
     : [...msgs.slice(0, -1), { ...last, at: last.at ?? Date.now() }];
 }
 
+// The most recently saved model connection, shared by every Assistant.
+const LAST_CONNECTION_KEY = "chat-last-connection";
+
 export default function ChatWidget({
   widget,
   className = "",
@@ -137,6 +140,19 @@ export default function ChatWidget({
       const chat = res.chat;
       cacheRef.current = new Map(chat.messages);
       commitConfig(chat.config);
+      // A widget with no connection yet starts from the last one that was
+      // saved anywhere, so a newly dropped Assistant works without setup.
+      if (!chat.config.baseUrl) {
+        storage.getItem(LAST_CONNECTION_KEY).then(raw => {
+          if (cancelled || configRef.current.baseUrl) return;
+          try {
+            const last = raw ? JSON.parse(raw) : null;
+            if (typeof last?.baseUrl === "string" && typeof last?.model === "string" && last.baseUrl && last.model) {
+              saveConfig({ ...configRef.current, baseUrl: last.baseUrl, model: last.model });
+            }
+          } catch { /* ignore a bad value */ }
+        });
+      }
       commitCharacters(chat.characters);
       commitActiveCharacter(chat.activeCharacterId);
       commitConversations(chat.conversations);
@@ -173,6 +189,7 @@ export default function ChatWidget({
   function saveConfig(next: ChatConfig) {
     commitConfig(next);
     saveIndex();
+    if (next.baseUrl && next.model) storage.setItem(LAST_CONNECTION_KEY, JSON.stringify({ baseUrl: next.baseUrl, model: next.model }));
   }
 
   // Save when only the characters / active character changed.
@@ -1051,7 +1068,7 @@ export default function ChatWidget({
       )}
 
       {settingsOpen ? (
-        <SettingsPanel c={c} config={config} onCancel={() => setSettingsOpen(false)} onSave={saveSettings} />
+        <SettingsPanel c={c} config={config} widgetId={widget.id} onCancel={() => setSettingsOpen(false)} onSave={saveSettings} />
       ) : (
         /* Chat view */
         <>

@@ -129,3 +129,41 @@ export async function listAnytypeConnections(): Promise<KnownAnytype[]> {
   }
   return [...byKey.values()].sort((a, b) => b.widgets - a.widgets);
 }
+
+/**
+ * Model connections the user's other Assistant widgets already use (address
+ * and model), newest first, so a new one can offer them instead of asking
+ * again. Same address and model is one entry.
+ */
+export type KnownModelServer = { url: string; model: string };
+export async function listModelConnections(exceptWidgetId?: string): Promise<KnownModelServer[]> {
+  const dashboards = await readJSON<DashboardsState>("dashboards");
+  const ids = dashboards?.list?.length ? dashboards.list.map(d => d.id) : ["default"];
+  const out: (KnownModelServer & { at: number })[] = [];
+  const seen = new Set<string>();
+  for (const dashId of ids) {
+    const instances = await readJSON<Record<string, WidgetInstance>>(instancesKey(dashId));
+    for (const w of Object.values(instances ?? {})) {
+      if (w.type !== "chat" || w.id === exceptWidgetId) continue;
+      const idx = await readJSON<{ config?: { baseUrl?: string; model?: string }; conversations?: { updatedAt?: number }[] }>(`chat-${w.id}-index`);
+      const url = (idx?.config?.baseUrl ?? "").trim().replace(/\/+$/, "");
+      const model = (idx?.config?.model ?? "").trim();
+      if (!/^https?:\/\//i.test(url) || !model) continue;
+      const key = `${url.toLowerCase()}|${model}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ url, model, at: Math.max(0, ...(idx?.conversations ?? []).map(c => c.updatedAt ?? 0)) });
+    }
+  }
+  return out.sort((a, b) => b.at - a.at).map(({ url, model }) => ({ url, model }));
+}
+
+/** Hosts the user's widgets already talk to, for model-server discovery. */
+export async function knownHosts(): Promise<string[]> {
+  const hosts = new Set<string>();
+  const add = (u?: string) => { try { if (u) hosts.add(new URL(u).hostname.toLowerCase()); } catch { /* not a URL */ } };
+  for (const k of await listKiwixServers()) add(k.url);
+  for (const a of await listAnytypeConnections()) add(a.url);
+  for (const m of await listModelConnections()) add(m.url);
+  return [...hosts].slice(0, 8);
+}
