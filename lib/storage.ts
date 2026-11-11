@@ -90,6 +90,8 @@ export function pendingSaves(): number {
 // running total stays under the cap (a page load writes several keys at once).
 const KEEPALIVE_BUDGET = 60_000;
 let keepaliveInFlight = 0;
+const GATEWAY_DOWN = new Set([502, 503, 504]);
+const RESTART_RETRIES = [1000, 2000, 4000, 8000, 15000];
 
 async function post(body: string, keepalive: boolean): Promise<Response> {
   return check401(
@@ -109,15 +111,24 @@ async function send(key: string, value: string): Promise<boolean> {
   const keepalive = keepaliveInFlight + body.length < KEEPALIVE_BUDGET;
   if (keepalive) keepaliveInFlight += body.length;
   try {
-    let res: Response;
+    let res: Response | null;
     try {
       res = await post(body, keepalive);
-    } catch (err) {
+    } catch {
       // A keepalive rejection is the browser's quota, not the network: retry
       // once as a normal request before calling it a failure.
-      if (!keepalive) throw err;
-      res = await post(body, false);
+      res = keepalive ? await post(body, false).catch(() => null) : null;
     }
+    // While the app restarts (a deploy takes a few seconds) the proxy answers
+    // 502/503/504 or the connection fails. The write never reached the app,
+    // so it is safe to send again: retry for about half a minute before
+    // reporting a failure.
+    for (const wait of RESTART_RETRIES) {
+      if (res && !GATEWAY_DOWN.has(res.status)) break;
+      await new Promise(r => setTimeout(r, wait));
+      res = await post(body, false).catch(() => null);
+    }
+    if (!res) throw new Error("network");
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       if (typeof data.version === "number") versions.set(key, data.version);
