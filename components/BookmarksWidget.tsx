@@ -2,7 +2,7 @@
 
 import { useT } from "@/lib/useT";
 import { useEffect, useRef, useState } from "react";
-import { Bookmark, Plus, Minus, X, GripVertical, LayoutGrid, Grid2x2, LayoutList, AlignJustify, ExternalLink, Eye, EyeOff } from "lucide-react";
+import { Bookmark, Plus, Minus, X, GripVertical, LayoutGrid, Grid2x2, LayoutList, AlignJustify, Eye, EyeOff } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { tagColor } from "@/lib/colors";
@@ -362,7 +362,6 @@ export default function BookmarksWidget({
                   >
                     <Favicon bm={bm} size={22} />
                     <span className={`flex-1 min-w-0 truncate text-sm font-medium ${c.text}`}>{displayName(bm)}</span>
-                    <ExternalLink size={12} className={`shrink-0 opacity-40 ${c.label}`} />
                   </a>
                 ))}
               </div>
