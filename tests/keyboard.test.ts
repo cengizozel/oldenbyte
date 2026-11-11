@@ -9,12 +9,16 @@ describe("widget and tab numbers", () => {
     expect(cellFromKey("3")).toBe(2);
     expect(cellFromKey("a")).toBeNull();
   });
-  it("maps digits and q w e r t to tabs", () => {
+  it("maps digits 1..9 to tabs, nothing else", () => {
     expect(tabFromKey("1")).toBe(0);
-    expect(tabFromKey("w")).toBe(1);
-    expect(tabFromKey("t")).toBe(4);
+    expect(tabFromKey("9")).toBe(8);
     expect(tabFromKey("0")).toBeNull();
-    expect(tabFromKey("y")).toBeNull();
+    expect(tabFromKey("w")).toBeNull();
+  });
+  it("keeps a stored timeout within range", () => {
+    expect(parseKeyboardConfig(JSON.stringify({ timeout: 4 })).timeout).toBe(4);
+    expect(parseKeyboardConfig(JSON.stringify({ timeout: 99 })).timeout).toBe(10);
+    expect(parseKeyboardConfig(JSON.stringify({ timeout: "x" })).timeout).toBe(1.5);
   });
 });
 
