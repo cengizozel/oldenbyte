@@ -252,23 +252,32 @@ export default function DeficitWidget({
               <span className={`text-sm font-medium ${c.label}`}>{fmtDay(viewDate)}{viewDate === today && " · today"}</span>
               <button onClick={() => setViewDate(d => shiftDay(d, 1))} disabled={viewDate >= today} title="Next day" aria-label="Next day" className={`opacity-70 hover:opacity-100 disabled:opacity-20 ${iconBtnCls} ${c.label}`}><ChevronRight size={14} /></button>
             </div>
-            {/* Wraps to two lines in a narrow card instead of overflowing. */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-sm ${c.label}`} title="Calories eaten this day">
-                <SettingsInput inputMode="numeric" value={ate} onChange={e => setAte(e.target.value.replace(/[^\d]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="ate" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
-                <span className="opacity-70 shrink-0">kcal</span>
-              </label>
-              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-sm ${c.label}`} title="Extra calories burned by exercise this day">
-                <SettingsInput inputMode="numeric" value={burned} onChange={e => setBurned(e.target.value.replace(/[^\d]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="burned" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
-                <span className="opacity-70 shrink-0">kcal</span>
-              </label>
-              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-sm ${c.label}`} title="Weigh-in this day, optional">
-                <SettingsInput inputMode="decimal" value={weight} onChange={e => setWeight(e.target.value.replace(/[^\d.]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="weigh" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
-                <span className="opacity-70 shrink-0">kg</span>
-              </label>
+            {/* Three equal boxes: what it is above, the unit inside. */}
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                { label: "Ate", title: "Calories eaten this day", value: ate, set: (v: string) => setAte(v.replace(/[^\d]/g, "")), unit: "kcal", mode: "numeric" },
+                { label: "Burned", title: "Extra calories burned by exercise this day", value: burned, set: (v: string) => setBurned(v.replace(/[^\d]/g, "")), unit: "kcal", mode: "numeric" },
+                { label: "Weight", title: "Weigh-in this day, optional", value: weight, set: (v: string) => setWeight(v.replace(/[^\d.]/g, "")), unit: "kg", mode: "decimal" },
+              ] as const).map(f => (
+                <label key={f.label} title={f.title} className="min-w-0 flex flex-col gap-1">
+                  <span className={`text-sm ${c.label}`}>{f.label}</span>
+                  <span className="flex items-center h-9 px-2.5 gap-1 rounded-lg border border-[var(--surface-border)] bg-[var(--surface)] focus-within:border-[var(--surface-border-focus)]">
+                    <input
+                      inputMode={f.mode}
+                      value={f.value}
+                      onChange={e => f.set(e.target.value)}
+                      onBlur={commitDay}
+                      onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                      placeholder="0"
+                      className="min-w-0 flex-1 bg-transparent outline-none text-sm tabular-nums text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
+                    />
+                    <span className="shrink-0 text-sm text-[var(--text-secondary)]">{f.unit}</span>
+                  </span>
+                </label>
+              ))}
             </div>
-            <div className={`text-sm tabular-nums ${c.label} opacity-70`}>
-              burns <span className="font-medium">{fmtKcal(viewBurn)}</span>
+            <div className={`text-sm tabular-nums ${c.label}`}>
+              Burns <span className="font-medium">{fmtKcal(viewBurn)}</span>
               {viewDeficit !== null && <> · <span className={`font-medium ${viewDeficit >= 0 ? "" : "text-red-500"}`}>{fmtKcal(Math.abs(viewDeficit))}</span> {viewDeficit >= 0 ? "deficit" : "surplus"} · {fmtKg(Math.abs(viewDeficit) / KCAL_PER_KG * 1000)} g</>}
             </div>
           </div>
