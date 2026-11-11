@@ -232,11 +232,11 @@ export default function TvWidget({
                   className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70 hover:text-white transition-colors"
                 >
                   <Play size={28} />
-                  <span className="text-xs">{config.channelName}</span>
+                  <span className="text-sm">{config.channelName}</span>
                 </button>
               )}
               {videoError && (
-                <p className="absolute bottom-2 inset-x-2 text-center text-red-400 text-xs">{videoError}</p>
+                <p className="absolute bottom-2 inset-x-2 text-center text-red-400 text-sm">{videoError}</p>
               )}
               {pickerOpen && config.channels.length > 0 && (
                 <div className="absolute inset-0 z-10 overflow-y-auto bg-[var(--surface)]">

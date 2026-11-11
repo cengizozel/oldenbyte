@@ -341,7 +341,7 @@ export default function RedditWidget({
                 <button
                   onClick={() => setStatusOpen(o => !o)}
                   title="Which subreddits loaded"
-                  className={`text-xs tabular-nums font-medium ${subStatus.some(s => s.ok === false) ? "text-red-500/80" : `${c.label} opacity-70`} hover:opacity-100 transition-opacity ${FOCUS_RING}`}
+                  className={`text-sm tabular-nums font-medium ${subStatus.some(s => s.ok === false) ? "text-red-500/80" : `${c.label} opacity-70`} hover:opacity-100 transition-opacity ${FOCUS_RING}`}
                 >
                   {subStatus.filter(s => s.ok).length}/{subStatus.length}
                 </button>
@@ -351,7 +351,7 @@ export default function RedditWidget({
                   <div className="fixed inset-0 z-40" onClick={() => setStatusOpen(false)} />
                   <div className={`absolute right-0 top-5 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2 flex flex-col gap-1`}>
                     {subStatus.map(s => (
-                      <span key={s.name} className="flex items-center justify-between gap-2 text-xs">
+                      <span key={s.name} className="flex items-center justify-between gap-2 text-sm">
                         <span className={`truncate ${c.text} opacity-80`}>r/{s.name}</span>
                         <span className={`shrink-0 ${s.ok === true ? "text-emerald-600 dark:text-emerald-400" : s.ok === false ? "text-red-500" : `${c.label} opacity-70`}`}>
                           {s.ok === true ? "loaded" : s.ok === false ? "failed" : "waiting"}
@@ -384,18 +384,18 @@ export default function RedditWidget({
                             type="button"
                             onClick={() => toggleFilter(post.subreddit.toLowerCase())}
                             title={filter ? "Show everything" : `Show only r/${post.subreddit}`}
-                            className={`inline-block min-w-0 truncate text-xs font-medium px-1.5 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
+                            className={`inline-block min-w-0 truncate text-sm font-medium px-1.5 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
                           >
                             r/{post.subreddit}
                           </button>
                           {isNew && (
-                            <span title="New since your last visit" className={`shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/15 ${c.text}`}>new</span>
+                            <span title="New since your last visit" className={`shrink-0 text-sm font-medium px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/15 ${c.text}`}>new</span>
                           )}
                           {post.pubDate && (
-                            <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>{timeAgo(post.pubDate)}</span>
+                            <span className={`shrink-0 text-sm opacity-70 ${c.text}`}>{timeAgo(post.pubDate)}</span>
                           )}
                           {post.score > 0 && (
-                            <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>▲ {formatCount(post.score)}</span>
+                            <span className={`shrink-0 text-sm opacity-70 ${c.text}`}>▲ {formatCount(post.score)}</span>
                           )}
                         </span>
                         <div className="flex items-start gap-1 group/title">
@@ -438,7 +438,7 @@ export default function RedditWidget({
             {selected && (
               <>
                 <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
-                  <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
+                  <span className="flex-1 min-w-0 text-sm font-medium truncate opacity-80">{selected.title}</span>
                   <a href={selected.link} target="_blank" rel="noopener noreferrer" aria-label="Open on Reddit" className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
                     <ExternalLink size={12} />
                   </a>
@@ -475,13 +475,13 @@ export default function RedditWidget({
                         [&_hr]:my-3 [&_hr]:border-black/10 dark:border-white/10
                         [&_a]:underline [&_a]:opacity-80 [&_a:hover]:opacity-100
                         [&_blockquote]:pl-3 [&_blockquote]:border-l-2 [&_blockquote]:border-current/30 [&_blockquote]:italic [&_blockquote]:opacity-70
-                        [&_code]:font-mono [&_code]:text-xs [&_code]:bg-black/5 [&_code]:px-1 [&_code]:rounded-md
+                        [&_code]:font-mono [&_code]:text-sm [&_code]:bg-black/5 [&_code]:px-1 [&_code]:rounded-md
                         [&_pre]:overflow-x-auto [&_pre]:max-w-full
                         [&_strong]:font-semibold [&_em]:italic`}
                       dangerouslySetInnerHTML={{ __html: sanitizeRedditHtml(selected.content) }}
                     />
                   ) : (
-                    <p className={`text-xs opacity-70 ${c.text}`}>No text content: this is a link post.</p>
+                    <p className={`text-sm opacity-70 ${c.text}`}>No text content: this is a link post.</p>
                   )}
                 </div>
                 <ScrollFades c={c} top={detail.topFade} bottom={detail.bottomFade} />

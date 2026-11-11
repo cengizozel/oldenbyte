@@ -22,7 +22,7 @@ function ThinkBlock({ content, active, labelClass }: { content: string; active: 
     <div className="my-1">
       <button
         onClick={() => { toggled.current = true; setOpen(o => !o); }}
-        className={`flex items-center gap-1 min-h-6 text-xs ${labelClass} opacity-70 hover:opacity-100 ${FOCUS_RING}`}
+        className={`flex items-center gap-1 min-h-6 text-sm ${labelClass} opacity-70 hover:opacity-100 ${FOCUS_RING}`}
       >
         <ChevronRight size={12} className={`transition-transform ${open ? "rotate-90" : ""}`} />
         {/[\u{1F50E}\u{1F4D6}\u{1F4CA}\u{1F9E9}]/u.test(content)
@@ -30,7 +30,7 @@ function ThinkBlock({ content, active, labelClass }: { content: string; active: 
           : (active ? "Thinking…" : "Thinking")}
       </button>
       {open && (
-        <div className="mt-1 ml-1 pl-3 border-l-2 border-black/15 dark:border-white/20 text-xs opacity-70">
+        <div className="mt-1 ml-1 pl-3 border-l-2 border-black/15 dark:border-white/20 text-sm opacity-70">
           <Markdown text={content} />
         </div>
       )}
@@ -73,7 +73,7 @@ function SourcesList({ sources, labelClass, textClass }: { sources: Source[]; la
     <div className="mt-1">
       <button
         onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1 min-h-6 text-xs ${labelClass} opacity-70 hover:opacity-100 ${FOCUS_RING}`}
+        className={`flex items-center gap-1 min-h-6 text-sm ${labelClass} opacity-70 hover:opacity-100 ${FOCUS_RING}`}
       >
         <ChevronRight size={12} className={`transition-transform ${open ? "rotate-90" : ""}`} />
         {sources.length} source{sources.length === 1 ? "" : "s"}
@@ -81,7 +81,7 @@ function SourcesList({ sources, labelClass, textClass }: { sources: Source[]; la
       {open && (
         <ol className="mt-1 ml-1 pl-3 border-l-2 border-black/15 dark:border-white/20 flex flex-col gap-0.5">
           {sources.map(s => (
-            <li key={s.n} className={`text-xs ${textClass} opacity-80`}>
+            <li key={s.n} className={`text-sm ${textClass} opacity-80`}>
               <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:opacity-80">
                 <span className="opacity-70">[{shown.get(s.n) ?? s.n}]</span> <span className="underline underline-offset-2">{s.title}</span>
               </a>
@@ -115,31 +115,31 @@ function ProposalCards({ proposals, c, onResolve }: { proposals: Proposal[]; c: 
         const preview = !isCalendar && typeof p.payload.markdown === "string" ? String(p.payload.markdown) : "";
         return (
           <div key={j} className={`rounded-xl border ${c.border} bg-[var(--surface)] px-3 py-2 flex flex-col gap-1`}>
-            <span className="flex items-center gap-1.5 text-xs text-[var(--text-primary)]">
+            <span className="flex items-center gap-1.5 text-sm text-[var(--text-primary)]">
               {isCalendar
                 ? <CalendarDays size={12} className={`shrink-0 ${isDelete ? "text-red-500/80" : c.label}`} />
                 : <Database size={12} className={`shrink-0 ${c.label}`} />}
               <span className="font-medium truncate">{p.summary}</span>
             </span>
-            {p.detail && <span className="text-xs text-[var(--text-secondary)]">{p.detail}</span>}
+            {p.detail && <span className="text-sm text-[var(--text-secondary)]">{p.detail}</span>}
             {preview && (
-              <details className="text-xs text-[var(--text-secondary)]">
+              <details className="text-sm text-[var(--text-secondary)]">
                 <summary className="cursor-pointer select-none opacity-80 hover:opacity-100">content</summary>
-                <pre className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap font-[inherit] text-xs leading-relaxed">{preview}</pre>
+                <pre className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap font-[inherit] text-sm leading-relaxed">{preview}</pre>
               </details>
             )}
             {pr.status === "pending" ? (
               <span className="flex items-center gap-2 mt-0.5">
                 <button
                   onClick={() => onResolve(j, true)}
-                  className={`inline-flex items-center h-7 px-2.5 text-xs text-white transition-colors ${FOCUS_RING} !rounded-lg ${isDelete ? "bg-red-600/90 hover:bg-red-600" : "bg-emerald-600/90 hover:bg-emerald-600"}`}
+                  className={`inline-flex items-center h-7 px-2.5 text-sm text-white transition-colors ${FOCUS_RING} !rounded-lg ${isDelete ? "bg-red-600/90 hover:bg-red-600" : "bg-emerald-600/90 hover:bg-emerald-600"}`}
                 >
                   {acceptLabel}
                 </button>
                 <SmallButton c={c} onClick={() => onResolve(j, false)}>Dismiss</SmallButton>
               </span>
             ) : (
-              <span className={`text-xs ${pr.status === "added" ? "text-emerald-600 dark:text-emerald-400" : pr.status === "failed" ? "text-red-500" : "opacity-70 text-[var(--text-secondary)]"}`}>
+              <span className={`text-sm ${pr.status === "added" ? "text-emerald-600 dark:text-emerald-400" : pr.status === "failed" ? "text-red-500" : "opacity-70 text-[var(--text-secondary)]"}`}>
                 {pr.status === "added" ? doneLabel : pr.status === "failed" ? failLabel : "dismissed"}
               </span>
             )}
@@ -156,14 +156,14 @@ function ProposalCards({ proposals, c, onResolve }: { proposals: Proposal[]; c: 
 // indicator once the answer flows.
 function LiveStatus({ content, c, live }: { content: string; c: ColorClasses; live: LiveInfo }) {
   if (!content) {
-    return <span className={`px-1 text-xs ${c.text} opacity-70`}>{live.waitingLabel}… <ElapsedSeconds start={live.start} active={live.active} /></span>;
+    return <span className={`px-1 text-sm ${c.text} opacity-70`}>{live.waitingLabel}… <ElapsedSeconds start={live.start} active={live.active} /></span>;
   }
   const openIdx = content.lastIndexOf("<think>");
   if (openIdx > content.lastIndexOf("</think>")) {
     const tail = content.slice(openIdx);
     const researching = /\u{1F50E}|\u{1F4D6}|\u{1F4CA}|\u{1F9E9}|checking calendar|adding "/u.test(tail);
     return (
-      <span className={`px-1 text-xs ${c.text} opacity-70`}>
+      <span className={`px-1 text-sm ${c.text} opacity-70`}>
         {researching ? "researching" : "thinking"}… <ElapsedSeconds start={live.start} active={live.active} />
       </span>
     );
@@ -254,7 +254,7 @@ function MessageRow({ m, index: i, c, textClass = "text-sm", daySep, canEdit, is
         {!inProgress && m.role === "assistant" && (m.actions?.length ?? 0) > 0 && (
           <div className="flex flex-col gap-0.5 max-w-[85%] px-1">
             {m.actions!.map((a, j) => (
-              <span key={j} className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+              <span key={j} className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400">
                 <Check size={12} className="shrink-0" />
                 <span className="truncate">{a.summary}{a.detail ? ` · ${a.detail}` : ""}</span>
               </span>
@@ -268,7 +268,7 @@ function MessageRow({ m, index: i, c, textClass = "text-sm", daySep, canEdit, is
             className={`flex flex-col items-start gap-0.5 px-1 min-h-6 text-left opacity-70 hover:opacity-100 transition-opacity ${FOCUS_RING} ${c.label}`}
           >
             {m.memory!.map((line, k) => (
-              <span key={k} className="flex items-center gap-1 text-xs">
+              <span key={k} className="flex items-center gap-1 text-sm">
                 <Brain size={12} className="shrink-0" />
                 <span className="truncate max-w-[260px]">{line}</span>
               </span>
@@ -279,7 +279,7 @@ function MessageRow({ m, index: i, c, textClass = "text-sm", daySep, canEdit, is
         {/* One quiet line under the message: when, how fast, then the actions.
             The speed is the one figure worth a glance; the rest (tokens, total
             time, time to first token) is in its tooltip. Nothing wraps. */}
-        <div className={`flex items-center gap-2 px-1 whitespace-nowrap text-xs tabular-nums ${c.text}`}>
+        <div className={`flex items-center gap-2 px-1 whitespace-nowrap text-sm tabular-nums ${c.text}`}>
           {!inProgress && m.at != null && <span className="opacity-70">{msgTime(m.at)}</span>}
           {!inProgress && m.role === "assistant" && m.stats && m.stats.tokens > 0 && (
             <span

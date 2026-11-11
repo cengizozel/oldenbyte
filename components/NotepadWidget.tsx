@@ -502,7 +502,7 @@ export default function NotebookWidget({
         <div className="flex flex-col flex-1 min-h-0 min-w-0">
           {!isToday && (
             <div className="mb-2 shrink-0">
-              <p className={`text-xs opacity-70 ${c.label}`}>
+              <p className={`text-sm opacity-70 ${c.label}`}>
                 {fmtDate(viewDate)}
                 {" · "}
                 <button onClick={() => setViewDate(today)} className={`underline underline-offset-2 ${FOCUS_RING}`}>back to today</button>
@@ -520,7 +520,7 @@ export default function NotebookWidget({
           )}
 
           {isToday && (loadState === "error" || saveError) && (
-            <p className="mb-2 shrink-0 text-red-400 text-xs">
+            <p className="mb-2 shrink-0 text-red-400 text-sm">
               {loadState === "error" ? "Could not load notes. Editing is off until a reload." : saveError}
             </p>
           )}
@@ -542,13 +542,13 @@ export default function NotebookWidget({
 
           <div className="flex items-center justify-between">
             <button onClick={prevMonth} aria-label="Previous month" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><ChevronLeft size={14} /></button>
-            <span className={`text-xs font-medium ${c.label} opacity-80`}>{monthLabel}</span>
+            <span className={`text-sm font-medium ${c.label} opacity-80`}>{monthLabel}</span>
             <button onClick={nextMonth} aria-label="Next month" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><ChevronRight size={14} /></button>
           </div>
 
           <div className="grid grid-cols-7 gap-px">
             {["S","M","T","W","T","F","S"].map((d, i) => (
-              <span key={i} className={`text-center text-xs font-medium opacity-70 ${c.label}`}>{d}</span>
+              <span key={i} className={`text-center text-sm font-medium opacity-70 ${c.label}`}>{d}</span>
             ))}
           </div>
 
@@ -568,7 +568,7 @@ export default function NotebookWidget({
                   key={day}
                   onClick={() => setViewDate(dateStr)}
                   className={`
-                    relative flex items-center justify-center rounded-md text-xs aspect-square min-h-6 ${FOCUS_RING}
+                    relative flex items-center justify-center rounded-md text-sm aspect-square min-h-6 ${FOCUS_RING}
                     ${isSelected ? `${c.label} font-medium opacity-100` : `${c.text} opacity-80 hover:opacity-100`}
                     ${isTodayCell ? "underline underline-offset-2" : ""}
                   `}
@@ -608,9 +608,9 @@ export default function NotebookWidget({
                 <button onClick={() => openDate(e.date)} className={`flex-1 min-w-0 text-left hover:opacity-70 transition-opacity ${FOCUS_RING}`}>
                   <div className="flex items-center gap-2">
                     <span className={`text-sm font-medium shrink-0 ${c.label}`}>{fmtDate(e.date)}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full bg-white/50 truncate ${c.label} opacity-80`}>{e.name}</span>
+                    <span className={`text-sm px-1.5 py-0.5 rounded-full bg-white/50 truncate ${c.label} opacity-80`}>{e.name}</span>
                   </div>
-                  <p className={`text-xs opacity-70 truncate mt-1 ${c.text}`}>{e.snippet}</p>
+                  <p className={`text-sm opacity-70 truncate mt-1 ${c.text}`}>{e.snippet}</p>
                 </button>
                 <button
                   onClick={() => deleteEntry(e.id, e.date)}

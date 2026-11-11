@@ -7,17 +7,22 @@ a widget should not restyle what they already provide.
 
 Never all caps: no `uppercase` anywhere, in headings, labels, badges or buttons. Hierarchy comes from weight, size and strength.
 
-Three sizes plus display numbers, nothing in between, all in the one system sans face (the feed
+Two sizes plus display numbers, nothing in between, all in the one system sans face (the feed
 page is the exception: it sets its headlines and labels in Playfair Display).
-Sizes are fixed pixels so a widget looks the same at every card size. The rule
-of thumb is Discord's: names, labels and controls are body size, and only
-timestamps, counts and badges go small.
+Sizes are fixed pixels so a widget looks the same at every card size.
+**Nothing readable is smaller than 14px**: times, counts, captions, badges,
+snippets, errors and empty states are body size too, and hierarchy comes from
+weight and the opacity steps below, never from shrinking.
 
 | Size | Tailwind | Used for |
 |---|---|---|
-| 12px | `text-xs` | Meta only: times, counts, badges, the small eyebrow label over a section |
-| 14px | `text-sm` | Everything meant to be read or pressed: body text, widget titles, tabs, chips, buttons, settings labels and fields, empty states |
-| 16px+ | `text-base`, `text-lg`, `text-2xl` | Numbers meant to be read at a glance (temperature, timers, scores) |
+| 14px | `text-sm` | Everything meant to be read or pressed: body text, item titles, meta (times, counts, captions, badges), widget titles, tabs, chips, buttons, settings labels and fields, empty states |
+| 16px+ | `text-base`, `text-lg`, `text-2xl` | Headings of a detail view (a race name) and numbers read at a glance (temperature, timers, scores) |
+
+`text-xs` (12px) is only for labels that annotate a picture rather than being
+read on their own: chart and time-grid ticks (the Schedule hours and the text
+inside its time slots), the edit-mode rulers and size badge, the keyboard
+target badges, and the remove bubble on an attachment thumbnail.
 
 Weight: `font-medium` for titles and list item titles, regular for everything
 else. `font-semibold` is reserved for big numbers.
@@ -32,7 +37,7 @@ Emphasis is done with opacity on the palette color, in three steps only:
 
 | Opacity | Role |
 |---|---|
-| 100% | Primary content |
+| 100% | Primary content, and every item's title or name (a video title, a bookmark name, a feed headline, a driver) |
 | 80% | Secondary content (descriptions, body under a title) |
 | 70% | Meta (timestamps, counts, labels, empty states, inactive chips) |
 

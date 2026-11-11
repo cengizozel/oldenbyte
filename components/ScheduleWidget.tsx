@@ -131,7 +131,7 @@ function DurationField({ value, onChange }: { value: string; onChange: (v: strin
         inputMode="numeric"
         className="w-10 text-center text-sm font-mono bg-transparent outline-none text-[var(--text-primary)] py-1.5"
       />
-      <span className="pr-1 text-xs text-[var(--text-muted)]">min</span>
+      <span className="pr-1 text-sm text-[var(--text-muted)]">min</span>
       <button onClick={() => shift(15)} className={`px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] ${FOCUS_RING}`} aria-label="15 minutes more">+</button>
     </div>
   );
@@ -471,7 +471,7 @@ export default function ScheduleWidget({
           {/* day columns */}
           {DAYS.map((_, dayIdx) => (
             <div key={dayIdx} className="flex-1 min-w-0">
-              <div className={`sticky top-0 z-10 h-6 flex items-center px-1.5 text-xs font-medium ${c.bg} ${dayIdx === todayIdx ? c.text : `${c.label} opacity-70`}`}>
+              <div className={`sticky top-0 z-10 h-6 flex items-center px-1.5 text-sm font-medium ${c.bg} ${dayIdx === todayIdx ? c.text : `${c.label} opacity-70`}`}>
                 {labels[dayIdx]}
               </div>
               <div
@@ -634,7 +634,7 @@ export default function ScheduleWidget({
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <TimeField value={editor.start} onChange={v => setEditor({ ...editor, start: v })} />
-              <span className={`opacity-70 text-xs ${c.label}`}>to</span>
+              <span className={`opacity-70 text-sm ${c.label}`}>to</span>
               {editor.byDuration ? (
                 <DurationField value={editor.minutes} onChange={v => setEditor({ ...editor, minutes: v })} />
               ) : (
@@ -676,7 +676,7 @@ export default function ScheduleWidget({
                 );
               })()}
             </div>
-            {editor.error && <p className="text-red-400 text-xs">{editor.error}</p>}
+            {editor.error && <p className="text-red-400 text-sm">{editor.error}</p>}
             <div className="flex items-center gap-3 mt-auto">
               {editor.id && (
                 <button onClick={deleteEntry} title="Delete entry" aria-label="Delete entry" className={`text-red-400/80 hover:text-red-400 ${iconBtnCls}`}>
@@ -734,7 +734,7 @@ export default function ScheduleWidget({
                 {copied ? "copied" : "copy"}
               </SmallButton>
             </div>
-            <pre className={`flex-1 min-h-0 overflow-auto text-xs leading-relaxed font-mono whitespace-pre rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-primary)] p-3`}>
+            <pre className={`flex-1 min-h-0 overflow-auto text-sm leading-relaxed font-mono whitespace-pre rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-primary)] p-3`}>
               {exportText()}
             </pre>
             <div className="flex items-center justify-end">
@@ -760,7 +760,7 @@ export default function ScheduleWidget({
               <div className="flex items-center justify-end gap-2 mt-auto">
                 <button
                   onClick={() => setSplitAsk(null)}
-                  className={`h-7 px-2 text-xs ${c.label} opacity-70 hover:opacity-100 transition-opacity ${FOCUS_RING}`}
+                  className={`h-7 px-2 text-sm ${c.label} opacity-70 hover:opacity-100 transition-opacity ${FOCUS_RING}`}
                 >
                   Cancel
                 </button>

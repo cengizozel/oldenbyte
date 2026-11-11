@@ -974,7 +974,7 @@ export default function ChatWidget({
                     {/* click-away backdrop */}
                     <div className="fixed inset-0 z-40" onClick={() => setPowerOpen(false)} />
                     <div className={`absolute left-0 top-6 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2.5 flex flex-col gap-2`}>
-                      <p className={`text-xs opacity-70 ${c.label} flex items-center gap-1`}>
+                      <p className={`text-sm opacity-70 ${c.label} flex items-center gap-1`}>
                         <Power size={12} /> Keep model loaded
                       </p>
                       <div className="flex flex-wrap gap-1">
@@ -1000,7 +1000,7 @@ export default function ChatWidget({
                         {powerBusy ? <Loader size={12} className="animate-spin" /> : <Power size={12} />}
                         Unload now
                       </SmallButton>
-                      <p className={`text-xs opacity-70 ${c.label} leading-snug`}>
+                      <p className={`text-sm opacity-70 ${c.label} leading-snug`}>
                         {config.keepAlive === "-1"
                           ? "Stays loaded until you unload."
                           : config.keepAlive
@@ -1084,7 +1084,7 @@ export default function ChatWidget({
                           <row.icon size={14} className={`shrink-0 opacity-70 ${c.label}`} />
                           <span className="flex-1 min-w-0 truncate">
                             {row.label}
-                            {row.caption && <span className={`ml-1.5 text-xs opacity-70 ${c.label}`}>{row.caption}</span>}
+                            {row.caption && <span className={`ml-1.5 text-sm opacity-70 ${c.label}`}>{row.caption}</span>}
                           </span>
                           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.on && row.ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
                         </button>
@@ -1159,13 +1159,13 @@ export default function ChatWidget({
           <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 min-h-0 overflow-y-auto px-4 pb-3 flex flex-col gap-3">
             {loadState === "failed" ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 px-4">
-                <p className={`text-xs opacity-70 ${c.text}`}>Could not load saved chats.</p>
+                <p className={`text-sm opacity-70 ${c.text}`}>Could not load saved chats.</p>
                 <SmallButton c={c} onClick={() => setLoadAttempt(n => n + 1)}>Retry</SmallButton>
               </div>
             ) : !configured && messages.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 px-4">
                 <Bot size={20} className={`opacity-40 ${c.text}`} />
-                <p className={`text-xs opacity-70 ${c.text}`}>
+                <p className={`text-sm opacity-70 ${c.text}`}>
                   connect a local or OpenAI-compatible model in settings
                 </p>
               </div>
@@ -1240,7 +1240,7 @@ export default function ChatWidget({
               })}
               </>
             )}
-            {error && <p className="text-red-400 text-xs">{error}</p>}
+            {error && <p className="text-red-400 text-sm">{error}</p>}
           </div>
 
           {/* Pending image attachments */}

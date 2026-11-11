@@ -152,11 +152,11 @@ export default function HuggingFaceWidget({
                   >
                     <div className="flex flex-col gap-2">
                       {selected.authors.length > 0 && (
-                        <p className={`text-xs opacity-70 leading-snug break-words ${c.text}`}>
+                        <p className={`text-sm opacity-70 leading-snug break-words ${c.text}`}>
                           {selected.authors.join(", ")}
                         </p>
                       )}
-                      <div className={`flex items-center gap-2 text-xs opacity-70 ${c.text}`}>
+                      <div className={`flex items-center gap-2 text-sm opacity-70 ${c.text}`}>
                         {selected.publishedAt && (
                           <span>{formatDate(selected.publishedAt)}</span>
                         )}
@@ -170,7 +170,7 @@ export default function HuggingFaceWidget({
                       {selected.abstract && (
                         <>
                           <div className="border-t border-black/10 dark:border-white/10" />
-                          <p className={`text-xs leading-relaxed opacity-80 break-words ${c.text}`}>{selected.abstract}</p>
+                          <p className={`text-sm leading-relaxed opacity-80 break-words ${c.text}`}>{selected.abstract}</p>
                         </>
                       )}
                     </div>

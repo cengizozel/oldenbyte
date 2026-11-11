@@ -232,7 +232,7 @@ function PdfViewer({
           >
             <ChevronLeft size={16} />
           </button>
-          <span className={`text-neutral-500 tabular-nums ${fullscreen ? "text-sm" : "text-xs"}`}>
+          <span className={`text-neutral-500 tabular-nums text-sm`}>
             {page} / {numPages || "…"}
           </span>
           <button
@@ -254,7 +254,7 @@ function PdfViewer({
             </button>
             <button
               onClick={() => setZoom(1)}
-              className={`text-neutral-400 hover:text-neutral-700 tabular-nums text-xs ${FOCUS_RING}`}
+              className={`text-neutral-400 hover:text-neutral-700 tabular-nums text-sm ${FOCUS_RING}`}
               title="Reset zoom"
             >
               {Math.round(zoom * 100)}%
@@ -493,7 +493,7 @@ function EpubViewer({
           >
             <ChevronLeft size={16} />
           </button>
-          <span className={`text-neutral-500 tabular-nums ${fullscreen ? "text-sm" : "text-xs"}`}>
+          <span className={`text-neutral-500 tabular-nums text-sm`}>
             {percentage !== null ? `${percentage}%` : "…"}
           </span>
           <button
@@ -551,7 +551,7 @@ function FullscreenOverlay({
         <div className="flex items-center justify-between px-5 py-3 shrink-0 border-b border-[var(--surface-border)]">
           <div className="min-w-0">
             <p className="text-sm font-medium text-[var(--text-primary)] truncate">{config.displayName}</p>
-            <span className="text-xs text-[var(--text-secondary)] opacity-70">{config.fileType}</span>
+            <span className="text-sm text-[var(--text-secondary)] opacity-70">{config.fileType}</span>
           </div>
           <button onClick={onClose} aria-label="Close" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-4 ${HIT_AREA} ${FOCUS_RING}`}>
             <X size={16} />
@@ -748,11 +748,11 @@ export default function ReaderWidget({
             {compact ? "Upload new file" : "Upload PDF or EPUB"}
           </SmallButton>
           {!compact && (
-            <p className={`text-xs opacity-70 ${c.text}`}>or drag and drop</p>
+            <p className={`text-sm opacity-70 ${c.text}`}>or drag and drop</p>
           )}
         </>
       )}
-      {error && <p className="text-red-400 text-xs text-center px-2">{error}</p>}
+      {error && <p className="text-red-400 text-sm text-center px-2">{error}</p>}
       <input
         ref={fileInputRef}
         type="file"
@@ -824,7 +824,7 @@ export default function ReaderWidget({
           <>
             <div className="flex flex-col gap-2 flex-1 min-h-0">
               {/* Current folder + actions */}
-              <div className={`flex items-center gap-1.5 shrink-0 text-xs ${c.label}`}>
+              <div className={`flex items-center gap-1.5 shrink-0 text-sm ${c.label}`}>
                 {dir && (
                   <button
                     onClick={() => loadDir(dir.split("/").slice(0, -1).join("/"))}
@@ -862,7 +862,7 @@ export default function ReaderWidget({
                     onChange={e => setNewFolder(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && makeFolder()}
                     placeholder="folder name"
-                    className={`flex-1 min-w-0 text-xs rounded-md px-2 py-1 outline-none bg-black/5 dark:bg-white/10 ${c.text} placeholder:opacity-40`}
+                    className={`flex-1 min-w-0 text-sm rounded-md px-2 py-1 outline-none bg-black/5 dark:bg-white/10 ${c.text} placeholder:opacity-40`}
                   />
                   <SmallButton c={c} onClick={makeFolder} className="shrink-0">
                     Create
@@ -913,7 +913,7 @@ export default function ReaderWidget({
                 )}
               </div>
 
-              {error && <p className="text-red-400 text-xs shrink-0">{error}</p>}
+              {error && <p className="text-red-400 text-sm shrink-0">{error}</p>}
             </div>
 
             <input

@@ -396,12 +396,12 @@ export default function YoutubeWidget({
                                 type="button"
                                 onClick={() => toggleFilter(v.channelId)}
                                 title={filter ? "Show everything" : `Show only ${v.channelName}`}
-                                className={`inline-block min-w-0 truncate text-xs font-medium px-1 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
+                                className={`inline-block min-w-0 truncate text-sm font-medium px-1 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
                               >
                                 {v.channelName}
                               </button>
                               {v.published && (
-                                <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>{timeAgo(v.published)}</span>
+                                <span className={`shrink-0 text-sm opacity-70 ${c.text}`}>{timeAgo(v.published)}</span>
                               )}
                               
                             </span>
@@ -441,12 +441,12 @@ export default function YoutubeWidget({
                               type="button"
                               onClick={() => toggleFilter(v.channelId)}
                               title={filter ? "Show everything" : `Show only ${v.channelName}`}
-                              className={`inline-block min-w-0 truncate text-xs font-medium px-1.5 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
+                              className={`inline-block min-w-0 truncate text-sm font-medium px-1.5 py-0.5 rounded-md hover:opacity-80 transition-opacity ${sc.bg} ${sc.label} ${FOCUS_RING}`}
                             >
                               {v.channelName}
                             </button>
                             {v.published && (
-                              <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>{timeAgo(v.published)}</span>
+                              <span className={`shrink-0 text-sm opacity-70 ${c.text}`}>{timeAgo(v.published)}</span>
                             )}
                             {!thumb && badgeFor(v)}
                           </span>
@@ -492,11 +492,11 @@ export default function YoutubeWidget({
                     {loadingDetails ? (
                       <LoadingState c={c} />
                     ) : detailsError ? (
-                      <p className="text-red-400 text-xs">{detailsError}</p>
+                      <p className="text-red-400 text-sm">{detailsError}</p>
                     ) : details ? (
                       <div className="flex flex-col gap-2">
                         <p className={`text-sm font-medium leading-snug break-words ${c.text}`}>{details.title || selected.title}</p>
-                        <p className={`text-xs opacity-70 ${c.text}`}>
+                        <p className={`text-sm opacity-70 ${c.text}`}>
                           {[
                             details.author,
                             details.viewCount ? `${formatCount(details.viewCount)} views` : "",
@@ -509,7 +509,7 @@ export default function YoutubeWidget({
                             <p className={`text-sm leading-relaxed opacity-80 whitespace-pre-line break-words ${c.text}`}>{details.description}</p>
                           </>
                         ) : (
-                          <p className={`text-xs opacity-70 ${c.text}`}>No description.</p>
+                          <p className={`text-sm opacity-70 ${c.text}`}>No description.</p>
                         )}
                       </div>
                     ) : null}

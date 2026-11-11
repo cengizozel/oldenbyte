@@ -154,7 +154,7 @@ export default function BankWidget({
                 <li key={j} className={`py-2 ${j > 0 ? `border-t ${c.border}` : ""}`}>
                   <div className="flex items-baseline gap-2">
                     <div className="flex-1 min-w-0">{head}</div>
-                    {meta && <span className={`shrink-0 text-xs tabular-nums opacity-70 ${c.label}`}>{meta}</span>}
+                    {meta && <span className={`shrink-0 text-sm tabular-nums opacity-70 ${c.label}`}>{meta}</span>}
                   </div>
                   {subtitle && <p className={`mt-0.5 text-sm leading-snug opacity-70 line-clamp-2 ${c.text}`}>{subtitle}</p>}
                 </li>
@@ -198,7 +198,7 @@ export default function BankWidget({
               if (!text) return null;
               const tc = tagColor(text.toLowerCase());
               return (
-                <span key={j} className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${tc.bg} ${tc.label}`}>
+                <span key={j} className={`px-1.5 py-0.5 rounded-full text-sm font-medium ${tc.bg} ${tc.label}`}>
                   {text}
                 </span>
               );

@@ -229,7 +229,7 @@ export default function TextWidget({
                   <Chip c={c} active={draft.font === f} onClick={() => setDraft(d => ({ ...d, font: f }))} className={FONT_PREVIEW_CLASS[f]}>
                     Aa
                   </Chip>
-                  <span className={`text-xs opacity-70 ${c.label} ${FONT_PREVIEW_CLASS[f]}`}>
+                  <span className={`text-sm opacity-70 ${c.label} ${FONT_PREVIEW_CLASS[f]}`}>
                     {f.charAt(0).toUpperCase() + f.slice(1)}
                   </span>
                 </div>

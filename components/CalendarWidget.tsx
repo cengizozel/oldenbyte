@@ -206,7 +206,7 @@ export default function CalendarWidget({
       ) : loading && !events.length ? (
         <LoadingState c={c} />
       ) : error && !events.length ? (
-        <p className="text-red-400 text-xs">{error}</p>
+        <p className="text-red-400 text-sm">{error}</p>
       ) : (
         <div className="flex-1 min-h-0 relative">
           <div ref={ref} onScroll={onScroll} className="absolute inset-0 overflow-y-auto pr-3 flex flex-col gap-3">
@@ -215,7 +215,7 @@ export default function CalendarWidget({
             ) : (
               [...byDay.entries()].map(([day, list]) => (
                 <div key={day} className="flex flex-col">
-                  <span className={`text-xs font-medium ${c.label} ${day === today ? "" : "opacity-70"}`}>
+                  <span className={`text-sm font-medium ${c.label} ${day === today ? "" : "opacity-70"}`}>
                     {dayHeading(day, today, tomorrow)}
                   </span>
                   {list.map((ev, i) => (
@@ -223,9 +223,9 @@ export default function CalendarWidget({
                       <span className="w-2 h-2 mt-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(ev.calendar).dot }} />
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm leading-snug truncate ${c.text}`}>{ev.title}</p>
-                        {ev.location && <p className={`text-xs opacity-70 truncate ${c.label}`}>{ev.location}</p>}
+                        {ev.location && <p className={`text-sm opacity-70 truncate ${c.label}`}>{ev.location}</p>}
                       </div>
-                      <span className={`shrink-0 text-xs tabular-nums opacity-70 ${c.text}`}>
+                      <span className={`shrink-0 text-sm tabular-nums opacity-70 ${c.text}`}>
                         {ev.allDay ? "all day" : ev.start.slice(11, 16)}
                       </span>
                     </div>

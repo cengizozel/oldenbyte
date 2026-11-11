@@ -256,7 +256,7 @@ export default function ArxivWidget({
             icon={BookOpen}
             title="arXiv"
             after={
-              <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full opacity-70 truncate ${c.bg} border ${c.border}`}>
+              <span className={`text-sm font-medium px-1.5 py-0.5 rounded-full opacity-70 truncate ${c.bg} border ${c.border}`}>
                 {config.category}
               </span>
             }
@@ -319,10 +319,10 @@ export default function ArxivWidget({
                     >
                       <div className="flex flex-col gap-2">
                         {p.authors && (
-                          <p className={`text-xs opacity-70 leading-snug break-words ${c.text}`}>{p.authors}</p>
+                          <p className={`text-sm opacity-70 leading-snug break-words ${c.text}`}>{p.authors}</p>
                         )}
                         {selected.pubDate && (
-                          <p className={`text-xs opacity-70 ${c.text}`}>
+                          <p className={`text-sm opacity-70 ${c.text}`}>
                             {formatDate(selected.pubDate)}
                             {" · "}{config.category}
                           </p>
@@ -330,7 +330,7 @@ export default function ArxivWidget({
                         {p.abstract && (
                           <>
                             <div className="border-t border-black/10 dark:border-white/10" />
-                            <p className={`text-xs leading-relaxed opacity-80 break-words ${c.text}`}>{p.abstract}</p>
+                            <p className={`text-sm leading-relaxed opacity-80 break-words ${c.text}`}>{p.abstract}</p>
                           </>
                         )}
                       </div>

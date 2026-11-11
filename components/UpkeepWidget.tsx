@@ -317,7 +317,7 @@ export default function UpkeepWidget({
                   <span className={`text-2xl font-semibold tabular-nums leading-none ${perfect ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>
                     {pct ?? "-"}
                   </span>
-                  <span className={`mt-1 text-xs opacity-70 ${c.label}`}>
+                  <span className={`mt-1 text-sm opacity-70 ${c.label}`}>
                     {perfect ? "perfect" : "/ 100"}
                   </span>
                 </>
@@ -326,12 +326,12 @@ export default function UpkeepWidget({
           </div>
 
           {perfect && since != null ? (
-            <div className={`shrink-0 flex items-center justify-center gap-1 text-xs tabular-nums ${c.label} opacity-70`}>
+            <div className={`shrink-0 flex items-center justify-center gap-1 text-sm tabular-nums ${c.label} opacity-70`}>
               <Flame size={12} />
               <span>at 100 for {formatSpan(at - since)}</span>
             </div>
           ) : next ? (
-            <div className={`shrink-0 flex items-center justify-center gap-1 text-xs tabular-nums ${c.label} opacity-70 truncate px-2`}>
+            <div className={`shrink-0 flex items-center justify-center gap-1 text-sm tabular-nums ${c.label} opacity-70 truncate px-2`}>
               <span className="truncate">{next.item.name} runs out in {formatSpan(next.at - at)}</span>
             </div>
           ) : null}
@@ -346,8 +346,8 @@ export default function UpkeepWidget({
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color, opacity: r.on ? 1 : 0.4 }} />
                   <span className={`flex-1 min-w-0 truncate text-sm ${c.text} ${r.on ? "" : "opacity-80"}`}>{r.name}</span>
-                  {r.on && <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-70`}>{formatSpan(r.left)}</span>}
-                  <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-70`}>{r.weight}</span>
+                  {r.on && <span className={`text-sm tabular-nums shrink-0 ${c.label} opacity-70`}>{formatSpan(r.left)}</span>}
+                  <span className={`text-sm tabular-nums shrink-0 ${c.label} opacity-70`}>{r.weight}</span>
                 </button>
                 {r.on ? (
                   <button
@@ -362,7 +362,7 @@ export default function UpkeepWidget({
                   <button
                     onClick={undoOff}
                     title="Undo turning this off"
-                    className={`shrink-0 flex items-center gap-1 pl-1 pr-2 py-2 text-xs ${c.label} opacity-80 hover:opacity-100 ${FOCUS_RING}`}
+                    className={`shrink-0 flex items-center gap-1 pl-1 pr-2 py-2 text-sm ${c.label} opacity-80 hover:opacity-100 ${FOCUS_RING}`}
                   >
                     <Undo2 size={13} />
                     <span>undo</span>
@@ -512,7 +512,7 @@ export default function UpkeepWidget({
             <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
               <button onClick={() => setDetailDate(null)} title="Back to insights" className={`opacity-70 hover:opacity-100 flex items-center gap-1 min-w-0 ${iconBtnCls} ${c.label}`}>
                 <ChevronLeft size={14} />
-                <span className="text-xs font-medium truncate">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
+                <span className="text-sm font-medium truncate">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
               </button>
               <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`shrink-0 opacity-70 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
                 <X size={14} />
@@ -539,7 +539,7 @@ export default function UpkeepWidget({
                 const checks = dayChecks(items, log, detailDate);
                 return (
                   <>
-                    <div className={`shrink-0 text-xs ${c.text} opacity-80`}>
+                    <div className={`shrink-0 text-sm ${c.text} opacity-80`}>
                       {avg == null ? "no score this day" : <>average <span className="tabular-nums font-medium">{avg}</span> / 100</>}
                       {checks.length > 0 && <> · <span className="tabular-nums font-medium">{checks.length}</span> {checks.length === 1 ? "check" : "checks"}</>}
                     </div>
@@ -551,7 +551,7 @@ export default function UpkeepWidget({
                           <div key={`${ch.item.id}-${ch.at}`} className={`group/row flex items-center gap-2 px-2 py-2 rounded-lg ${FOCUS_RING} hover:bg-black/5 dark:hover:bg-white/10`}>
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorOf(ch.item.id) }} />
                             <span className={`flex-1 min-w-0 truncate text-sm ${c.text}`}>{ch.item.name}</span>
-                            <span className={`text-xs tabular-nums shrink-0 ${c.label} opacity-70`}>{fmtTime(ch.at)}{ch.stoppedAt != null && ` off ${fmtTime(ch.stoppedAt)}`}</span>
+                            <span className={`text-sm tabular-nums shrink-0 ${c.label} opacity-70`}>{fmtTime(ch.at)}{ch.stoppedAt != null && ` off ${fmtTime(ch.stoppedAt)}`}</span>
                             <button
                               onClick={() => persistLog(removeCheck(log, ch.item.id, ch.at))}
                               aria-label={`Remove this ${ch.item.name} check`}
@@ -578,9 +578,9 @@ export default function UpkeepWidget({
                   <div className="shrink-0">
                     <div className="flex items-center justify-between mb-1">
                       {scrub ? (
-                        <span className={`text-xs tabular-nums whitespace-nowrap ${c.text}`}>{whenLabel(scrub.t)} · <span className="font-medium">{scrub.pct}</span><span className="opacity-70"> / 100</span></span>
+                        <span className={`text-sm tabular-nums whitespace-nowrap ${c.text}`}>{whenLabel(scrub.t)} · <span className="font-medium">{scrub.pct}</span><span className="opacity-70"> / 100</span></span>
                       ) : (
-                        <span className={`text-xs ${c.label} opacity-70`}>score over time</span>
+                        <span className={`text-sm ${c.label} opacity-70`}>score over time</span>
                       )}
                       {/* The range chips step aside while the reading is shown, so it never wraps. */}
                       {!scrub && <div className="flex gap-1">
@@ -588,7 +588,7 @@ export default function UpkeepWidget({
                           <button
                             key={r.key}
                             onClick={() => setRange(r.key)}
-                            className={`text-xs px-1.5 py-0.5 rounded-md ${FOCUS_RING} ${range === r.key ? `bg-black/10 dark:bg-white/15 ${c.text}` : `opacity-70 hover:opacity-100 ${c.label}`}`}
+                            className={`text-sm px-1.5 py-0.5 rounded-md ${FOCUS_RING} ${range === r.key ? `bg-black/10 dark:bg-white/15 ${c.text}` : `opacity-70 hover:opacity-100 ${c.label}`}`}
                           >
                             {r.label}
                           </button>
@@ -619,14 +619,14 @@ export default function UpkeepWidget({
                         <circle cx={x(scrub.t)} cy={y(scrub.pct)} r={3} className={`${c.text} fill-current`} />
                       )}
                     </svg>
-                    <div className={`flex justify-between text-xs opacity-70 ${c.label}`}>
+                    <div className={`flex justify-between text-sm opacity-70 ${c.label}`}>
                       <span>{fmtDay(shiftDay(today, -(rangeDef.days - 1)))}</span>
                       <span>now</span>
                     </div>
                   </div>
 
                   {/* Insights */}
-                  <div className={`shrink-0 flex flex-col gap-1 text-xs ${c.text} opacity-80`}>
+                  <div className={`shrink-0 flex flex-col gap-1 text-sm ${c.text} opacity-80`}>
                     {week.avg != null && (
                       <span>last 7 days: <span className="tabular-nums font-medium">{week.avg}</span> average · at 100 <span className="tabular-nums font-medium">{week.perfectShare}%</span> of the time</span>
                     )}
@@ -660,7 +660,7 @@ export default function UpkeepWidget({
                         );
                       })}
                     </div>
-                    <div className={`flex justify-between text-xs opacity-70 ${c.label} mt-1`}>
+                    <div className={`flex justify-between text-sm opacity-70 ${c.label} mt-1`}>
                       <span>{fmtDay(gridDates[0])}</span>
                       <span>{fmtDay(today)}</span>
                     </div>

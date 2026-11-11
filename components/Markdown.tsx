@@ -84,7 +84,7 @@ function parseBlocks(src: string, cites: Cites = {}, image: ImageRenderer = defa
       while (i < lines.length && !/^```\s*$/.test(lines[i].trim())) { buf.push(lines[i]); i++; }
       i++; // closing fence
       out.push(
-        <pre key={k++} className="my-1.5 p-2 rounded-lg bg-black/10 dark:bg-white/10 overflow-x-auto text-xs font-mono leading-relaxed">
+        <pre key={k++} className="my-1.5 p-2 rounded-lg bg-black/10 dark:bg-white/10 overflow-x-auto text-sm font-mono leading-relaxed">
           <code>{buf.join("\n")}</code>
         </pre>
       );

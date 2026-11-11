@@ -929,7 +929,7 @@ export default function TypingWidget({
                     {config.dynamic && liveBpm !== null && (
                       <span
                         key={liveBpm}
-                        className={`tw-pop text-xs tabular-nums font-medium ${levelDir === "up" ? "text-emerald-600 dark:text-emerald-400" : levelDir === "down" ? "text-red-500 dark:text-red-400" : c.text} `}
+                        className={`tw-pop text-sm tabular-nums font-medium ${levelDir === "up" ? "text-emerald-600 dark:text-emerald-400" : levelDir === "down" ? "text-red-500 dark:text-red-400" : c.text} `}
                         style={{ animationDuration: "0.3s" }}
                       >
                         {levelDir === "up" ? "▲ " : levelDir === "down" ? "▼ " : ""}{liveBpm} bpm
@@ -964,7 +964,7 @@ export default function TypingWidget({
               </div>
 
               {/* footer: start hint, metronome cue, or the endless stop button */}
-              <div className={`h-7 shrink-0 mt-1 flex items-center gap-3 text-xs ${c.label}`}>
+              <div className={`h-7 shrink-0 mt-1 flex items-center gap-3 text-sm ${c.label}`}>
                 {idle && focused && config.countdown > 0 && <span className="opacity-70">press space to start</span>}
                 {running && config.mode === "metro" && !autoRefills(config) && <span className="opacity-70">strike a key on each beat</span>}
                 {running && config.mode === "metro" && autoRefills(config) && (
@@ -1121,13 +1121,13 @@ function Results({
 }) {
   const big = (value: React.ReactNode, label: string, cls = c.text) => (
     <div>
-      <div className={`text-xs opacity-70 mb-1 ${c.label}`}>{label}</div>
+      <div className={`text-sm opacity-70 mb-1 ${c.label}`}>{label}</div>
       <div className={`text-3xl font-semibold tabular-nums leading-none ${cls}`}>{value}</div>
     </div>
   );
   const small = (value: React.ReactNode, label: string, title?: string) => (
     <div title={title}>
-      <div className={`text-xs opacity-70 ${c.label}`}>{label}</div>
+      <div className={`text-sm opacity-70 ${c.label}`}>{label}</div>
       <div className={`text-sm tabular-nums ${c.text}`}>{value}</div>
     </div>
   );
@@ -1158,7 +1158,7 @@ function Results({
         {small(r.test, "test")}
       </div>
 
-      <div className={`text-xs leading-relaxed opacity-80 ${c.text}`}>
+      <div className={`text-sm leading-relaxed opacity-80 ${c.text}`}>
         {r.neighbor > 0 && <span>{r.neighbor} neighbour slip{r.neighbor > 1 ? "s" : ""}</span>}
         {r.neighbor > 0 && r.transposition > 0 && <span> · </span>}
         {r.transposition > 0 && <span>{r.transposition} transposition{r.transposition > 1 ? "s" : ""}</span>}
@@ -1167,9 +1167,9 @@ function Results({
 
       {r.weak.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={`text-xs opacity-70 ${c.label}`}>missed</span>
+          <span className={`text-sm opacity-70 ${c.label}`}>missed</span>
           {r.weak.map(w => (
-            <span key={w.k} className="px-2 py-0.5 rounded-full text-xs font-mono bg-red-500/10 text-red-500 dark:text-red-400" title={`${w.miss}/${w.total} wrong`}>
+            <span key={w.k} className="px-2 py-0.5 rounded-full text-sm font-mono bg-red-500/10 text-red-500 dark:text-red-400" title={`${w.miss}/${w.total} wrong`}>
               {w.k === " " ? "space" : w.k}<span className="opacity-70"> {w.miss}</span>
             </span>
           ))}
@@ -1185,7 +1185,7 @@ function Results({
             <Target size={12} /> practice these
           </SmallButton>
         )}
-        <span className={`ml-auto text-xs opacity-70 ${c.label}`}>tab or enter to restart</span>
+        <span className={`ml-auto text-sm opacity-70 ${c.label}`}>tab or enter to restart</span>
       </div>
     </div>
   );

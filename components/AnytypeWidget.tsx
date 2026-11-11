@@ -382,7 +382,7 @@ export default function AnytypeWidget({
                       {readerLoading ? (
                         <LoadingState c={c} />
                       ) : error ? (
-                        <p className="text-red-400 text-xs break-words">{error}</p>
+                        <p className="text-red-400 text-sm break-words">{error}</p>
                       ) : readerObj?.markdown ? (
                         <Markdown text={readerObj.markdown} className={`text-sm ${c.text}`} image={renderImage} />
                       ) : (
@@ -392,7 +392,7 @@ export default function AnytypeWidget({
                   ) : searching || loadingTypes ? (
                     <LoadingState c={c} />
                   ) : error ? (
-                    <p className="text-red-400 text-xs break-words">{error}</p>
+                    <p className="text-red-400 text-sm break-words">{error}</p>
                   ) : !searched && !activeType && config.home === "types" ? (
                     types.length ? (
                       <>
@@ -454,8 +454,8 @@ export default function AnytypeWidget({
                                   <ExternalLink size={12} />
                                 </a>
                               </div>
-                              {o.snippet && <p className={`text-xs mt-0.5 opacity-70 ${c.text} line-clamp-2 break-words`}>{o.snippet}</p>}
-                              {o.type && !activeType && <span className={`text-xs opacity-70 ${c.label}`}>{o.type}</span>}
+                              {o.snippet && <p className={`text-sm mt-0.5 opacity-70 ${c.text} line-clamp-2 break-words`}>{o.snippet}</p>}
+                              {o.type && !activeType && <span className={`text-sm opacity-70 ${c.label}`}>{o.type}</span>}
                             </li>
                           ))}
                         </ul>

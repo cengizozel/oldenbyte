@@ -66,7 +66,7 @@ export default function SaveErrorNotice() {
   return (
     <div
       role="status"
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full shadow-md text-xs bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--surface-border)]"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full shadow-md text-sm bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--surface-border)]"
     >
       <Loader size={12} className="animate-spin" />
       Saving...

@@ -80,7 +80,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, filte
                 ) : (
                   <p className={`text-sm font-medium truncate ${c.text} ${isActive ? "" : "opacity-80"}`}>{title}</p>
                 )}
-                <p className={`text-xs ${c.label} opacity-70`}>
+                <p className={`text-sm ${c.label} opacity-70`}>
                   {count} message{count === 1 ? "" : "s"}{cv.updatedAt ? ` · ${timeAgo(cv.updatedAt)}` : ""}
                 </p>
               </div>

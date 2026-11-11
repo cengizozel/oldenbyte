@@ -263,7 +263,7 @@ export default function KiwixWidget({
                     {searching ? (
                       <LoadingState c={c} />
                     ) : error ? (
-                      <p className="text-red-400 text-xs">{error}</p>
+                      <p className="text-red-400 text-sm">{error}</p>
                     ) : results.length ? (
                       <ul className="flex flex-col">
                         {results.map((r, i) => (
@@ -285,7 +285,7 @@ export default function KiwixWidget({
                                 <ExternalLink size={12} />
                               </a>
                             </div>
-                            {r.snippet && <p className={`text-xs mt-0.5 opacity-70 ${c.text} line-clamp-2`}>{r.snippet}</p>}
+                            {r.snippet && <p className={`text-sm mt-0.5 opacity-70 ${c.text} line-clamp-2`}>{r.snippet}</p>}
                           </li>
                         ))}
                       </ul>
@@ -325,11 +325,11 @@ export default function KiwixWidget({
                         {loadingArticle ? (
                           <LoadingState c={c} />
                         ) : articleError ? (
-                          <p className="text-red-400 text-xs">{articleError}</p>
+                          <p className="text-red-400 text-sm">{articleError}</p>
                         ) : extract ? (
                           <p className={`text-sm leading-relaxed opacity-80 whitespace-pre-line break-words ${c.text}`}>{extract}</p>
                         ) : (
-                          <p className={`text-xs opacity-70 ${c.text}`}>No preview available, open in Kiwix.</p>
+                          <p className={`text-sm opacity-70 ${c.text}`}>No preview available, open in Kiwix.</p>
                         )}
                       </div>
                       <ScrollFades c={c} top={articleFade.topFade} bottom={articleFade.bottomFade} />

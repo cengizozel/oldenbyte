@@ -82,7 +82,7 @@ function afterRender(fn: () => void) {
 
 function Kbd({ children }: { children: string }) {
   return (
-    <kbd className="px-1.5 py-0.5 rounded-md border border-[var(--surface-border)] text-xs text-[var(--text-muted)] whitespace-nowrap">
+    <kbd className="px-1.5 py-0.5 rounded-md border border-[var(--surface-border)] text-sm text-[var(--text-muted)] whitespace-nowrap">
       {children}
     </kbd>
   );
@@ -417,7 +417,7 @@ export default function KeyboardLayer({
       ))}
 
       {hint && (
-        <div role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-3 py-1.5 rounded-full shadow-lg text-xs bg-[var(--text-primary)] text-[var(--surface)]">
+        <div role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-3 py-1.5 rounded-full shadow-lg text-sm bg-[var(--text-primary)] text-[var(--surface)]">
           {hint}
         </div>
       )}

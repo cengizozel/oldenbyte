@@ -448,7 +448,7 @@ export default function RhythmWidget({
                 </line>
               ))}
             </svg>
-            <div className={`flex justify-between text-xs opacity-70 ${c.label} -mt-0.5`}>
+            <div className={`flex justify-between text-sm opacity-70 ${c.label} -mt-0.5`}>
               <span>0</span><span>6</span><span>12</span><span>18</span><span>24</span>
             </div>
           </div>
@@ -477,10 +477,10 @@ export default function RhythmWidget({
                     ? <span className="tabular-nums">{fmtTimeOfDay(bed.mean)} → {fmtTimeOfDay(wake.mean)}</span>
                     : <span>tap to start</span>;
                 primary = isOpen
-                  ? <span className={`text-xs tabular-nums font-medium ${c.label}`}>{formatClock((now - open[it.id]) / 1000)}</span>
+                  ? <span className={`text-sm tabular-nums font-medium ${c.label}`}>{formatClock((now - open[it.id]) / 1000)}</span>
                   : lastDur > 0
-                    ? <span className={`text-xs tabular-nums opacity-70 ${c.text}`}>{formatDuration(lastDur)}</span>
-                    : <span className={`text-xs opacity-70 ${c.text}`}>none yet</span>;
+                    ? <span className={`text-sm tabular-nums opacity-70 ${c.text}`}>{formatDuration(lastDur)}</span>
+                    : <span className={`text-sm opacity-70 ${c.text}`}>none yet</span>;
               } else if (it.mode === "reduce") {
                 const limitHit = it.target != null && count > it.target;
                 secondary = (
@@ -489,13 +489,13 @@ export default function RhythmWidget({
                   </span>
                 );
                 primary = last != null
-                  ? <span className={`text-xs tabular-nums font-medium ${c.text}`}>{agoLabel(now - last)}</span>
-                  : <span className={`text-xs opacity-70 ${c.text}`}>none yet</span>;
+                  ? <span className={`text-sm tabular-nums font-medium ${c.text}`}>{agoLabel(now - last)}</span>
+                  : <span className={`text-sm opacity-70 ${c.text}`}>none yet</span>;
               } else {
                 const met = metGoal(it, count);
                 secondary = last != null ? <span>{agoLabel(now - last)}</span> : <span>tap to log</span>;
                 primary = (
-                  <span className={`text-xs tabular-nums font-medium ${met && (it.target != null || count > 0) ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>
+                  <span className={`text-sm tabular-nums font-medium ${met && (it.target != null || count > 0) ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>
                     {count}{it.target != null ? `/${it.target}` : ""}
                   </span>
                 );
@@ -517,12 +517,12 @@ export default function RhythmWidget({
                         <span className="flex items-center gap-1.5">
                           <span className={`truncate text-sm ${c.text}`}>{it.name}</span>
                           {streak >= 2 && (
-                            <span className={`flex items-center gap-0.5 text-xs tabular-nums shrink-0 ${c.label} opacity-70`} title={`${streak}-day ${it.mode === "reduce" ? "clean " : ""}streak`}>
+                            <span className={`flex items-center gap-0.5 text-sm tabular-nums shrink-0 ${c.label} opacity-70`} title={`${streak}-day ${it.mode === "reduce" ? "clean " : ""}streak`}>
                               <Flame size={12} />{streak}
                             </span>
                           )}
                         </span>
-                        <span className={`block text-xs leading-tight ${c.label} opacity-70 truncate`}>{secondary}</span>
+                        <span className={`block text-sm leading-tight ${c.label} opacity-70 truncate`}>{secondary}</span>
                       </span>
                       {primary}
                     </button>
@@ -655,7 +655,7 @@ export default function RhythmWidget({
             <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
               <button onClick={() => setDetailDate(null)} title="Back to insights" className={`opacity-70 hover:opacity-100 flex items-center gap-1 min-w-0 ${iconBtnCls} ${c.label}`}>
                 <ChevronLeft size={14} />
-                <span className="text-xs font-medium truncate">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
+                <span className="text-sm font-medium truncate">{fmtDay(detailDate)}{detailDate === today && " · today"}</span>
               </button>
               <button onClick={() => { setHistoryOpen(false); setDetailDate(null); }} className={`shrink-0 opacity-70 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
                 <X size={14} />
@@ -684,7 +684,7 @@ export default function RhythmWidget({
                   <div key={`${r.id}-${r.kind}-${r.idx}`} className={`group/row flex items-center gap-2 px-1 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
                     <span className={`flex-1 min-w-0 truncate text-sm ${c.text}`}>{r.name}</span>
-                    <span className={`text-xs tabular-nums opacity-70 ${c.text}`}>
+                    <span className={`text-sm tabular-nums opacity-70 ${c.text}`}>
                       {fmtTimeOfDay(minutesOfDay(r.at))}{r.dur != null && ` · ${formatDuration(r.dur)}`}
                     </span>
                     <button
@@ -737,21 +737,21 @@ export default function RhythmWidget({
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dot }} />
                             <span className={`text-sm font-medium truncate ${c.text}`}>{it.name}</span>
                             {streak >= 2 && (
-                              <span className={`flex items-center gap-0.5 text-xs tabular-nums ${c.label} opacity-70`}>
+                              <span className={`flex items-center gap-0.5 text-sm tabular-nums ${c.label} opacity-70`}>
                                 <Flame size={12} />{streak}
                               </span>
                             )}
                           </span>
                           {!hasData ? (
-                            <span className={`text-xs opacity-70 ${c.text}`}>no taps yet</span>
+                            <span className={`text-sm opacity-70 ${c.text}`}>no taps yet</span>
                           ) : isSession ? (
-                            <span className={`text-xs opacity-80 ${c.text} tabular-nums`}>
+                            <span className={`text-sm opacity-80 ${c.text} tabular-nums`}>
                               avg {formatDuration(avgDur)}
                               {bed && wake && <> · {fmtTimeOfDay(bed.mean)} → {fmtTimeOfDay(wake.mean)}</>}
                               <span className="opacity-70"> · {sess.length} in {STATS_DAYS}d</span>
                             </span>
                           ) : (
-                            <span className={`text-xs opacity-80 ${c.text} tabular-nums`}>
+                            <span className={`text-sm opacity-80 ${c.text} tabular-nums`}>
                               ≈{perDay.toFixed(1)}×/day
                               {gap != null && <> · every {fmtGap(gap)}</>}
                             </span>
@@ -791,7 +791,7 @@ export default function RhythmWidget({
                         );
                       })}
                     </div>
-                    <div className={`flex justify-between text-xs opacity-70 ${c.label} mt-1 pl-2.5`}>
+                    <div className={`flex justify-between text-sm opacity-70 ${c.label} mt-1 pl-2.5`}>
                       <span>{fmtDay(gridDates[0])}</span>
                       <span>{fmtDay(today)}</span>
                     </div>

@@ -343,7 +343,7 @@ export default function BookmarksWidget({
                     className={`flex flex-col items-center gap-1 px-1 py-1.5 rounded-lg ${FOCUS_RING}`}
                   >
                     <Favicon bm={bm} size={iconSize} />
-                    <span className={`w-full text-center truncate text-xs leading-tight ${c.text} opacity-80`}>{displayName(bm)}</span>
+                    <span className={`w-full text-center truncate text-sm leading-tight ${c.text}`}>{displayName(bm)}</span>
                   </a>
                 ))}
               </div>

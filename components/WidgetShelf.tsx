@@ -153,7 +153,7 @@ export default function WidgetShelf({
         {collapsed ? (
           <button
             onClick={() => toggleCollapsed(false)}
-            className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors pr-0.5"
+            className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors pr-0.5"
             title="Expand the widget picker"
           >
             Widgets <ChevronUp size={14} />
@@ -167,7 +167,7 @@ export default function WidgetShelf({
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search widgets"
                 aria-label="Search widgets"
-                className="w-full bg-transparent text-xs outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
+                className="w-full bg-transparent text-sm outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
               />
             </div>
             <button
@@ -213,7 +213,7 @@ export default function WidgetShelf({
                     }}
                     className={`px-2.5 py-2 rounded-xl border cursor-grab select-none min-w-0 ${FOCUS_RING} !rounded-xl ${c.bg} ${c.border}`}
                   >
-                    <span className={`block truncate text-xs font-semibold ${c.label}`}>{template.title}</span>
+                    <span className={`block truncate text-sm font-semibold ${c.label}`}>{template.title}</span>
                   </div>
                 );
               })}
@@ -221,7 +221,7 @@ export default function WidgetShelf({
           </div>
         ))}
         {groups.length === 0 && (
-          <p className="text-xs text-[var(--text-muted)] py-2">No widgets match.</p>
+          <p className="text-sm text-[var(--text-muted)] py-2">No widgets match.</p>
         )}
       </div>
 

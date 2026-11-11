@@ -49,7 +49,7 @@ export function CharactersPanel({ c, characters, activeCharId, filter, onCreate,
               <span className="text-base leading-none mt-0.5 shrink-0">{ch.id === DEFAULT_CHARACTER_ID ? "🤖" : ch.emoji}</span>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium truncate ${c.text} ${isActive ? "" : "opacity-80"}`}>{ch.name}</p>
-                <p className={`text-xs ${c.label} opacity-70 truncate`}>
+                <p className={`text-sm ${c.label} opacity-70 truncate`}>
                   {ch.id === DEFAULT_CHARACTER_ID ? "default · no memory" : (ch.focus ? `remembers: ${ch.focus}` : "no focus, won't auto-remember")}
                   {ch.memories.length ? ` · ${ch.memories.length} ${ch.memories.length === 1 ? "memory" : "memories"}` : ""}
                 </p>
@@ -100,7 +100,7 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
           <SettingsInput value={charDraft.name} onChange={e => set({ name: e.target.value })} placeholder="Education Coach" className="flex-1" />
         </div>
         {charDraft.id === DEFAULT_CHARACTER_ID ? (
-          <p className="text-xs text-[var(--text-muted)] leading-relaxed">This is the default Assistant. Edit its system prompt in Settings; it doesn&apos;t keep memory. Create a new character for a persona with its own scoped memory.</p>
+          <p className="text-sm text-[var(--text-muted)] leading-relaxed">This is the default Assistant. Edit its system prompt in Settings; it doesn&apos;t keep memory. Create a new character for a persona with its own scoped memory.</p>
         ) : (
           <>
             <div>
@@ -122,7 +122,7 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
                 ))}
                 <SmallButton c={c} onClick={() => setCharDraft(d => ({ ...d, memories: [...d.memories, ""] }))} className="self-start mt-0.5"><Plus size={12} /> add memory</SmallButton>
               </div>
-              <p className="text-xs text-[var(--text-muted)] mt-1">It also adds to these automatically after chats, based on what you share that fits its focus.</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">It also adds to these automatically after chats, based on what you share that fits its focus.</p>
             </div>
           </>
         )}
