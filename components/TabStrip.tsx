@@ -146,12 +146,23 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     return 0;
   }
 
-  // Slot for a pointer at x; `scrolled` is how far the row has scrolled since
-  // the rects were taken, which moved every tab left by that much on screen.
-  function slotFromPointer(x: number, idx: number, scrolled = 0): number {
-    let slot = 0;
-    rects.current.forEach((r, i) => { if (i !== idx && x > r.left - scrolled + r.width / 2) slot++; });
-    return slot;
+  // The slot for a dragged tab whose left edge sits at `left` (in the
+  // coordinates the rects were taken in): the one whose resting position is
+  // nearest, the way Chrome's tab strip places a dragged tab. A neighbor
+  // steps aside only once the tab has travelled half the neighbor's width,
+  // whatever its own width and wherever it was grabbed, so nothing flips
+  // back and forth around the pointer.
+  function slotFor(left: number, idx: number): number {
+    const r = rects.current;
+    if (!r.length) return 0;
+    let x = r[0].left, slot = 0, best = 0, bestDist = Infinity;
+    for (let i = 0; i <= r.length; i++) {
+      if (i < r.length && i === idx) continue;
+      const dist = Math.abs(left - x);
+      if (dist < bestDist) { bestDist = dist; best = slot; }
+      if (i < r.length) { x += r[i].width + GAP; slot++; }
+    }
+    return best;
   }
 
   // Pointer handling lives on the row, so a press in the gap between tabs
@@ -237,10 +248,12 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     const scrolled = list.scrollLeft - p.startScroll;
     const r = rects.current;
     const me = r[p.idx];
+    // The tab's travel in rect coordinates: pointer travel plus the scroll
+    // since the press (that moved its resting spot), kept within the row.
     const lo = (r[0]?.left ?? me.left) - me.left;
     const hi = (r[r.length - 1]?.right ?? me.right) - me.right;
-    const d = Math.max(lo, Math.min(hi, x - p.x));
-    const next = { idx: p.idx, over: slotFromPointer(x, p.idx, scrolled), dx: d + scrolled };
+    const travel = Math.max(lo, Math.min(hi, x - p.x + scrolled));
+    const next = { idx: p.idx, over: slotFor(me.left + travel, p.idx), dx: travel };
     dragRef.current = next;
     setDrag(next);
   }
@@ -496,7 +509,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
             <div
               key={tabId}
               style={{ transform: shift ? `translateX(${shift}px)` : undefined }}
-              className={`shrink-0 ${isDragged ? "relative z-10 cursor-grabbing" : `transition-transform duration-150 ${editing ? "cursor-grab" : ""}`}`}
+              className={`shrink-0 ${isDragged ? "relative z-10 cursor-grabbing" : `transition-transform duration-200 ease-out ${editing ? "cursor-grab" : ""}`}`}
             >
               <button
                 ref={el => { if (el) buttons.current.set(tabId, el); else buttons.current.delete(tabId); }}

@@ -115,8 +115,12 @@ the palette `label` color at 50% opacity.
   do not draw their own header row: `WidgetHeader` renders into the tab row
   through `lib/tabGroup.ts`, and they lose their top padding, so the first
   content line sits at the same height in a group as in a single widget.
-  In layout edit mode a press on a tab drags it along the row to reorder,
-  and the row auto-scrolls while the tab is held near either end (slowly,
+  In layout edit mode a press on a tab drags it along the row to reorder.
+  The drop slot is the one whose resting position is nearest the dragged
+  tab's own left edge (Chrome's rule), so a neighbor steps aside only after
+  the tab has moved half the neighbor's width, wherever it was grabbed, and
+  slides over 200ms ease-out. The row auto-scrolls while the tab is held
+  near either end (slowly,
   faster the nearer the edge, so the drop can be aimed); a press
   anywhere else on the tile, the row's empty space included, moves the tile.
   Because neither press can scroll the row, edit mode shows a small arrow at
