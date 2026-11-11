@@ -526,8 +526,9 @@ export function SettingsListRow({
   rowRef?: Ref<HTMLDivElement>;
 }) {
   return (
-    <div ref={rowRef} style={style} className={`flex flex-col px-3 rounded-lg bg-black/5 dark:bg-white/10 divide-y divide-black/10 dark:divide-white/10 ${className}`}>
-      {/* The item's own row is a header band: a darker strip with the name in
+    <div ref={rowRef} style={style} className={`flex flex-col px-3 rounded-lg bg-black/5 dark:bg-white/10 divide-y divide-black/10 dark:divide-white/10 [&>*:nth-child(2)]:border-t-0 ${className}`}>
+      {/* The item's own row is a header band (the band itself separates it
+          from the first control, so no hairline under it): a darker strip with the name in
           semibold, so it never reads as one more control. */}
       <div className="flex items-center gap-2 min-h-9 py-1 -mx-3 px-3 rounded-t-lg bg-black/5 dark:bg-white/10 last:rounded-b-lg">
         {leading}
