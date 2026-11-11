@@ -32,6 +32,15 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
   const [anytypeCode, setAnytypeCode] = useState("");
   const [anytypeBusy, setAnytypeBusy] = useState(false);
   const [anytypeError, setAnytypeError] = useState("");
+  const [anytypeKeyInput, setAnytypeKeyInput] = useState("");
+  function connectAnytypeWithKey() {
+    const key = anytypeKeyInput.trim();
+    if (!key || !draft.anytypeUrl.startsWith("http")) return;
+    setAnytypeError("");
+    setDraft(d => ({ ...d, anytypeApiKey: key }));
+    setAnytypeKeyInput("");
+    loadAnytypeSpaces(draft.anytypeUrl, key, draft.anytypeSpaceId);
+  }
   // Write-bridge test result.
   const [bridgeStatus, setBridgeStatus] = useState<"" | "checking" | "ok" | "fail">("");
 
@@ -95,7 +104,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
       setAnytypePairing("awaiting-code");
       setAnytypeCode("");
     } catch (e) {
-      setAnytypeError(`Could not reach Anytype: ${String((e as Error).message ?? e)}. Is the desktop app running?`);
+      setAnytypeError(`Could not reach Anytype: ${String((e as Error).message ?? e)}. Is the Anytype client at that address running?`);
     } finally {
       setAnytypeBusy(false);
     }
@@ -308,7 +317,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
             type="url"
             value={draft.anytypeUrl}
             onChange={e => setDraft(d => ({ ...d, anytypeUrl: e.target.value, anytypeApiKey: "" }))}
-            placeholder="http://127.0.0.1:31009"
+            placeholder="http://server:31012"
           />
           {draft.anytypeApiKey ? (
             anytypeSpaces.length > 0 ? (
@@ -342,12 +351,32 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
               </SmallButton>
             </div>
           ) : (
-            <SmallButton c={c} onClick={startAnytypePairing} disabled={anytypeBusy || !draft.anytypeUrl.startsWith("http")} className="mt-1.5">
-              {anytypeBusy ? <><Loader size={12} className="animate-spin" /> contacting…</> : "Pair with Anytype"}
-            </SmallButton>
+            <>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <SettingsInput
+                  type="password"
+                  autoComplete="off"
+                  value={anytypeKeyInput}
+                  onChange={e => setAnytypeKeyInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && connectAnytypeWithKey()}
+                  placeholder="API key"
+                  aria-label="Anytype API key"
+                  className="flex-1 min-w-0"
+                />
+                <SmallButton c={c} onClick={connectAnytypeWithKey} disabled={!anytypeKeyInput.trim() || !draft.anytypeUrl.startsWith("http")} className="shrink-0">
+                  Connect
+                </SmallButton>
+              </div>
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className={`text-sm opacity-70 ${c.label}`}>or</span>
+                <SmallButton c={c} onClick={startAnytypePairing} disabled={anytypeBusy || !draft.anytypeUrl.startsWith("http")}>
+                  {anytypeBusy ? <><Loader size={12} className="animate-spin" /> contacting…</> : "Pair with the desktop app"}
+                </SmallButton>
+              </div>
+            </>
           )}
           {anytypeError && <p className="text-red-400 text-sm mt-1">{anytypeError}</p>}
-          <p className="text-sm text-[var(--text-muted)] mt-1">Pair, pick a space, then turn lookup on with the box icon by the send button.</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Connect with an API key from a headless client on a server (works from every device), or pair with the desktop app (only while it is open). Then pick a space and turn lookup on with the box icon by the send button.</p>
         </div>
 
         <div>

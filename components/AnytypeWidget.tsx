@@ -17,7 +17,7 @@ type HomeView = "recent" | "types";
 type ReaderObject = { name: string; markdown: string; type: string; modified: string };
 type AnytypeConfig = { baseUrl: string; apiKey: string; spaceId: string; spaceName: string; limit: number; home: HomeView };
 
-const DEFAULT: AnytypeConfig = { baseUrl: "http://127.0.0.1:31009", apiKey: "", spaceId: "", spaceName: "", limit: 25, home: "recent" };
+const DEFAULT: AnytypeConfig = { baseUrl: "", apiKey: "", spaceId: "", spaceName: "", limit: 25, home: "recent" };
 
 // Deep-link that opens an object in the Anytype desktop app.
 function deepLink(o: AnytypeObject): string {
@@ -70,6 +70,17 @@ export default function AnytypeWidget({
 
   // Pairing flow: idle → (Pair) → awaiting-code → (confirm) → paired.
   const [pairing, setPairing] = useState<"idle" | "awaiting-code">("idle");
+  // A key pasted from a headless client (anytype auth apikey create), the
+  // other way to connect besides pairing with the desktop app.
+  const [keyInput, setKeyInput] = useState("");
+  function connectWithKey() {
+    const key = keyInput.trim();
+    if (!key || !draft.baseUrl.startsWith("http")) return;
+    setError("");
+    setDraft(d => ({ ...d, apiKey: key }));
+    setKeyInput("");
+    loadSpaces(draft.baseUrl, key, draft.spaceId);
+  }
   const [challengeId, setChallengeId] = useState("");
   const [code, setCode] = useState("");
   const [pairBusy, setPairBusy] = useState(false);
@@ -201,7 +212,7 @@ export default function AnytypeWidget({
       setPairing("awaiting-code");
       setCode("");
     } catch (e) {
-      setError(`Could not reach Anytype: ${String((e as Error).message ?? e)}. Is the desktop app running?`);
+      setError(`Could not reach Anytype: ${String((e as Error).message ?? e)}. Is the Anytype client at that address running?`);
     } finally {
       setPairBusy(false);
     }
@@ -406,12 +417,12 @@ export default function AnytypeWidget({
       }
       back={
         <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={() => setDraft(DEFAULT)}>
-          <SettingsField c={c} label="Anytype API">
+          <SettingsField c={c} label="Anytype client" hint="The address of an Anytype client, as the dashboard's server reaches it. A headless client on a server (port 31012) works from every device; the desktop app (port 31009) only while it is open.">
             <SettingsInput
               type="url"
               value={draft.baseUrl}
               onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value, apiKey: "" }))}
-              placeholder="http://127.0.0.1:31009"
+              placeholder="http://server:31012"
             />
             {draft.apiKey ? (
               <div className="flex items-center gap-1.5">
@@ -454,9 +465,29 @@ export default function AnytypeWidget({
                 </div>
               </div>
             ) : (
-              <SmallButton c={c} onClick={startPairing} disabled={pairBusy || !draft.baseUrl.startsWith("http")} className="self-start">
-                {pairBusy ? <><Loader size={12} className="animate-spin" /> contacting Anytype…</> : "Pair with Anytype"}
-              </SmallButton>
+              <>
+                <div className="flex items-center gap-1.5">
+                  <SettingsInput
+                    type="password"
+                    autoComplete="off"
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && connectWithKey()}
+                    placeholder="API key"
+                    aria-label="Anytype API key"
+                    className="flex-1 min-w-0"
+                  />
+                  <SmallButton c={c} onClick={connectWithKey} disabled={!keyInput.trim() || !draft.baseUrl.startsWith("http")} className="shrink-0">
+                    Connect
+                  </SmallButton>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm opacity-70 ${c.label}`}>or</span>
+                  <SmallButton c={c} onClick={startPairing} disabled={pairBusy || !draft.baseUrl.startsWith("http")}>
+                    {pairBusy ? <><Loader size={12} className="animate-spin" /> contacting Anytype…</> : "Pair with the desktop app"}
+                  </SmallButton>
+                </div>
+              </>
             )}
           </SettingsField>
           <SettingsField c={c} label="Home" inline>

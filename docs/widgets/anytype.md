@@ -41,3 +41,12 @@ The Anytype API binds to `127.0.0.1`, so it's only reachable when the dashboard 
 Requests go through [`/api/anytype`](../api.md#anytype) (which shares search/read logic with the Chat widget's Anytype lookup via `lib/anytype.ts`) rather than directly from the browser, for the same reason as the Kiwix and Chat widgets: it avoids CORS and HTTPS mixed-content blocking against a plain-http local server. The route fetches through `userFetch` ([`lib/requestUser.ts`](../../lib/requestUser.ts)): admin accounts may reach LAN and tailnet addresses, every other account is limited to public addresses, so only an admin can point the widget at a private Anytype host.
 
 This widget is not `digestable`.
+
+## Connecting: server client or desktop app
+
+The widget talks to an Anytype client's local API; the dashboard's server makes the requests, so the address must be reachable from that server.
+
+- **Headless client on a server (recommended).** Run the Anytype CLI (`anytype serve`, github.com/anyproto/anytype-cli) on an always-on machine, create a bot account, join it to the space with an invite link, and create a key with `anytype auth apikey create <name> --all-spaces --read-write`. Enter the client's address (port 31012 by default) and paste the key under "API key". This works from every device and does not depend on a desktop being on. The dashboard calls API v1, which only accepts an all-spaces read-write key; make the bot a viewer of the space to keep it read-only in practice.
+- **Desktop app.** Enter the app's address (port 31009) and use "Pair with the desktop app": the app shows a 4-digit code to type in. It works only while the app is open on that machine.
+
+Sizing for the headless client: on a first sync of a modest space it used about 475MB of RAM plus the space data, and it needs a disk with reasonable synchronous write speed (it gives up after 5 seconds on account open; a slow, busy spinning disk fails that). On a small server, check headroom before enabling it.

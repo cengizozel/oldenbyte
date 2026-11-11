@@ -18,7 +18,7 @@ import { actAs, userFetch } from "@/lib/requestUser";
 function anytypeError(err: unknown, baseUrl: unknown): string {
   const msg = String(err instanceof Error ? err.message : err);
   return msg === "fetch failed" && typeof baseUrl === "string"
-    ? `Can't reach Anytype at ${root(baseUrl)}. Is the Anytype app running on that computer?`
+    ? `Can't reach Anytype at ${root(baseUrl)}. Is the Anytype client there running (the desktop app, or a headless client on a server)?`
     : msg;
 }
 
