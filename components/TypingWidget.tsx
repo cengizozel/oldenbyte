@@ -812,7 +812,7 @@ export default function TypingWidget({
           const lengths = optionsFor(d.mode);
           const pickMode = (m: Mode) => { const opts = optionsFor(m); set({ mode: m, length: opts.includes(d.length) ? d.length : (opts[0] ?? d.length) }); };
           return (
-            <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
+            <div className={`absolute inset-px z-30 rounded-[15px] p-5 flex flex-col ${c.bg}`}>
               <SettingsFace c={c} onSave={() => { applyConfig(d); setSettingsOpen(false); }} onCancel={() => setSettingsOpen(false)} onReset={() => setDraftCfg(DEFAULT_CONFIG)}>
                 <SettingsField c={c} label="Mode" inline>
                   {(["words", "time", "drill", "metro"] as Mode[]).map(m => (

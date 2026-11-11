@@ -102,7 +102,7 @@ export default function F1Widget({
       <WidgetHeader c={c} icon={Flag} title="Formula 1" onSettings={() => { setDraftMode(standingsMode); setSettingsOpen(true); }} />
 
       {settingsOpen && (
-        <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
+        <div className={`absolute inset-px z-30 rounded-[15px] p-5 flex flex-col ${c.bg}`}>
           <SettingsFace
             c={c}
             onReset={() => setDraftMode("top5")}

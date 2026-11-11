@@ -20,7 +20,7 @@ export function CharactersPanel({ c, characters, activeCharId, onCreate, onClose
   onDelete: (id: string) => void;
 }) {
   return (
-    <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
+    <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col ${c.bg}`}>
       <div className="px-4 pt-5 shrink-0">
         <WidgetHeader
           c={c}
@@ -77,7 +77,7 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
   const set = (patch: Partial<Character>) => setCharDraft(d => ({ ...d, ...patch }));
 
   return (
-    <div className={`absolute inset-0 z-50 rounded-2xl flex flex-col ${c.bg}`}>
+    <div className={`absolute inset-px z-50 rounded-[15px] flex flex-col ${c.bg}`}>
       <div className="px-4 pt-5 shrink-0">
         <WidgetHeader
           c={c}

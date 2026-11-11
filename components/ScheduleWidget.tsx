@@ -585,7 +585,7 @@ export default function ScheduleWidget({
 
         {/* Entry editor */}
         {editor && (
-          <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 overflow-y-auto ${c.bg}`}>
+          <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col gap-3 p-5 overflow-y-auto ${c.bg}`}>
             <p className={`text-sm opacity-70 ${c.label}`}>
               {editor.id ? "Edit entry" : "New entry"}
             </p>
@@ -695,7 +695,7 @@ export default function ScheduleWidget({
 
         {/* Grid-hours settings */}
         {settingsOpen && (
-          <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col p-5 ${c.bg}`}>
+          <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col p-5 ${c.bg}`}>
             <SettingsFace
               c={c}
               onReset={() => { setDraftStart(DEFAULT_CONFIG.startHour); setDraftEnd(DEFAULT_CONFIG.endHour); }}
@@ -725,7 +725,7 @@ export default function ScheduleWidget({
 
         {/* Export as text */}
         {exportOpen && (
-          <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
+          <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col gap-3 p-5 ${c.bg}`}>
             <div className="flex items-center justify-between">
               <p className={`text-sm opacity-70 ${c.label}`}>Export</p>
               <SmallButton c={c} onClick={copyExport}>
@@ -750,7 +750,7 @@ export default function ScheduleWidget({
           if (!src) return null;
           const groupDays = src.days.map(d => DAYS_SHORT[d]).join(", ");
           return (
-            <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
+            <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col gap-3 p-5 ${c.bg}`}>
               <p className={`text-sm opacity-70 ${c.label}`}>Split from group</p>
               <p className={`text-sm leading-relaxed ${c.text} opacity-80`}>
                 &ldquo;{src.title}&rdquo; repeats on {groupDays}. Moving this block pulls {DAYS[splitAsk.fromDay]} out of that group:

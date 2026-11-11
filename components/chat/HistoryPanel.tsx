@@ -27,7 +27,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, onNew
   const [renameDraft, setRenameDraft] = useState("");
 
   return (
-    <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
+    <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col ${c.bg}`}>
       <div className="px-4 pt-5 shrink-0">
         <WidgetHeader
           c={c}
