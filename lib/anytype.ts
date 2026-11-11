@@ -113,7 +113,7 @@ export async function anytypeSearch(
   return merged.slice(0, limit).map(toHit);
 }
 
-export type AnytypeType = { id: string; key: string; name: string };
+export type AnytypeType = { id: string; key: string; name: string; emoji?: string };
 
 // The object types defined in a space (Page, Note, Task, …), for browsing by type.
 export async function anytypeTypes(
@@ -129,7 +129,7 @@ export async function anytypeTypes(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .filter((t: any) => !t.archived)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((t: any) => ({ id: t.id, key: t.key, name: t.name || t.key }))
+    .map((t: any) => ({ id: t.id, key: t.key, name: t.name || t.key, emoji: t.icon?.format === "emoji" && typeof t.icon.emoji === "string" ? t.icon.emoji : "" }))
     .sort((a: AnytypeType, b: AnytypeType) => a.name.localeCompare(b.name));
 }
 

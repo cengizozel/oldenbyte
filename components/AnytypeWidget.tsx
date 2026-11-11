@@ -12,7 +12,7 @@ import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SmallButton, Chip,
 
 type AnytypeObject = { id: string; name: string; snippet: string; spaceId: string; type: string };
 type Space = { id: string; name: string };
-type AnytypeType = { id: string; key: string; name: string };
+type AnytypeType = { id: string; key: string; name: string; emoji?: string };
 type HomeView = "recent" | "types";
 type ReaderObject = { name: string; markdown: string; type: string; modified: string };
 type AnytypeConfig = { baseUrl: string; apiKey: string; spaceId: string; spaceName: string; limit: number; home: HomeView };
@@ -359,6 +359,8 @@ export default function AnytypeWidget({
                               onClick={() => openType(t)}
                               className={`w-full flex items-center gap-1 py-2 text-left text-sm font-medium ${c.text} hover:opacity-80 transition-opacity`}
                             >
+                              {/* The type's emoji when it has one; a same-width gap otherwise, so names line up. */}
+                              <span className="w-5 shrink-0 text-center" aria-hidden>{t.emoji ?? ""}</span>
                               <span className="flex-1 min-w-0 truncate">{t.name}</span>
                               <ChevronRight size={12} className="shrink-0 opacity-40" />
                             </button>
