@@ -10,22 +10,26 @@ A self-hosted personal dashboard. Drag and resize widgets, keep several dashboar
 - **Accounts**: the first visit creates the admin; others join with an invite code.
 - **Keyboard driven**: press Space, then a widget's number or an action key. See [docs/keyboard.md](docs/keyboard.md).
 - **AI assistant** for any OpenAI-compatible model (Ollama, LM Studio, llama.cpp, ...). It reads your widgets, Kiwix and Anytype on request, with characters that keep their own memory.
-- **Morning digest** at `/digest`: a newspaper-style briefing of your widgets.
+- **Morning digest** at `/digest`: a newspaper-style briefing of your widgets (below).
 - **Your data**: Settings shows everything stored for your account. Backups export and import from edit mode.
 - Works on phones.
 
 ## Widgets
 
-| | |
-|---|---|
-| **Notes** | Notepad (daily, with a calendar), Text, Bookmarks |
-| **Reading** | Feed (RSS, with favorites), Reddit, YouTube (with TubeArchivist), arXiv, HF Daily, Reader (PDF and EPUB), Kiwix, Anytype |
-| **Time** | Calendar (CalDAV), Schedule, Tracker, Rhythm, Upkeep |
-| **Other** | Weather, F1, Deficit, Typing, Chess (Stockfish), TV (IPTV), Assistant |
+- **Notes:** Notepad (daily, with a calendar), Text, Bookmarks
+- **Reading:** Feed (RSS, with favorites), Reddit, YouTube (with TubeArchivist), arXiv, HF Daily, Reader (PDF and EPUB), Kiwix, Anytype
+- **Time:** Calendar (CalDAV), Schedule, Tracker, Rhythm, Upkeep
+- **Other:** Weather, F1, Deficit, Typing, Chess (Stockfish), TV (IPTV), Assistant
 
 New widgets can also be single JSON files in `widget-bank/`, no React needed. See [docs/widget-bank.md](docs/widget-bank.md).
 
 Each widget is documented in [docs/widgets/](docs/widgets/).
+
+## Morning digest
+
+<img src="public/digest.gif" width="400" />
+
+`/digest` turns today's widget data into a newspaper-style briefing with any OpenAI-compatible model, one section per widget, written in parallel.
 
 ## Run it
 
