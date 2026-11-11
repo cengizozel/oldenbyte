@@ -226,7 +226,7 @@ the palette `label` color at 50% opacity.
   indented under it.
 - Narrow settings: the face is a size container. Under 26rem a group of
   three or more options moves under its label and aligns left like text; a
-  toggle, a stepper or a two-way choice stays beside the label. Adding to a
+  toggle or a stepper stays beside the label. Adding to a
   collection is always `SettingsAddRow`; read-only information is
   `SettingsInfo`, an inset block with a heading and bullets.
 
