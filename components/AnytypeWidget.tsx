@@ -350,6 +350,8 @@ export default function AnytypeWidget({
                     <p className="text-red-400 text-xs break-words">{error}</p>
                   ) : !searched && !activeType && config.home === "types" ? (
                     types.length ? (
+                      <>
+                      <p className={`text-sm font-medium opacity-70 mb-1 ${c.label}`}>Types</p>
                       <ul className="flex flex-col">
                         {types.map((t, i) => (
                           <li key={t.id} className={i > 0 ? `border-t ${c.border}` : ""}>
@@ -363,6 +365,7 @@ export default function AnytypeWidget({
                           </li>
                         ))}
                       </ul>
+                      </>
                     ) : (
                       <EmptyState c={c}>no types</EmptyState>
                     )
@@ -373,8 +376,11 @@ export default function AnytypeWidget({
                           <button onClick={goHome} title="Back to types" aria-label="Back to types" className={`opacity-70 hover:opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}>
                             <ChevronLeft size={14} />
                           </button>
-                          <span className={`text-xs font-medium opacity-70 ${c.label}`}>{activeType.name}</span>
+                          <span className={`text-sm font-medium opacity-70 ${c.label}`}>{activeType.name}</span>
                         </div>
+                      )}
+                      {!activeType && objects.length > 0 && (
+                        <p className={`text-sm font-medium opacity-70 mb-1 ${c.label}`}>{searched ? "Results" : "Recent objects"}</p>
                       )}
                       {objects.length ? (
                         <ul className="flex flex-col">

@@ -309,8 +309,8 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
         <p className={`text-sm -mt-1 opacity-70 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
 
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <p className={`text-sm opacity-70 ${c.label}`}>Kiwix library <span className="opacity-70">(all books are searched)</span></p>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <p className={`text-sm opacity-70 min-w-0 ${c.label}`}>Kiwix library <span className="opacity-70">(all books are searched)</span></p>
             <SmallButton c={c} onClick={() => loadKiwixSources(draft.kiwixUrl)} disabled={loadingKiwix || !draft.kiwixUrl.startsWith("http")} title="List the books on the server">
               {loadingKiwix ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Check server

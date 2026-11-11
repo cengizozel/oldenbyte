@@ -8,7 +8,7 @@ import { setLocale, useLocale } from "@/lib/useT";
 import { applyGlow, applyTheme, currentTheme, readGlow, readTheme, setGlowClass, setThemeClasses, DEFAULT_GLOW, GLOW_EVENT, THEME_EVENT, THEMES, type GlowPrefs, type Theme } from "@/lib/theme";
 import { layoutKey, instancesKey, PRELOAD_KEY, PRELOAD_EVENT, type DashboardsState } from "@/lib/dashboards";
 import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
-import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, TZ_AUTO } from "@/lib/timezone";
+import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, setActiveTimezone, TZ_AUTO } from "@/lib/timezone";
 import Toggle from "@/components/ui/Toggle";
 import { KeyboardSettings } from "@/components/KeyboardLayer";
 import { NEW_DASHBOARD_EVENT } from "@/lib/keyboard";
@@ -1115,7 +1115,7 @@ export default function TopBar({
   }, []);
 
   useEffect(() => {
-    storage.getItem("timezone").then(v => setTz(v ?? ""));
+    storage.getItem("timezone").then(v => { setActiveTimezone(v ?? ""); setTz(v ?? ""); });
   }, []);
 
   // Resolve the initial theme (DB wins, else whatever the FOUC script set) and

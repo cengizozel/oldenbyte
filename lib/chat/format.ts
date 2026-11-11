@@ -1,3 +1,4 @@
+import { zoned } from "@/lib/timezone";
 // Display helpers for the Chat widget: times, countdowns, reasoning blocks and
 // image attachments.
 
@@ -25,14 +26,14 @@ export function timeAgo(ms: number): string {
 
 // Messenger-style stamps: "14:32" on each message, day pills between groups.
 export function msgTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return zoned(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 export function msgDayLabel(ms: number): string {
-  const d = new Date(ms);
-  const now = new Date();
+  const d = zoned(ms);
+  const now = zoned();
   const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
   if (sameDay(d, now)) return "Today";
-  if (sameDay(d, new Date(Date.now() - 86400000))) return "Yesterday";
+  if (sameDay(d, zoned(Date.now() - 86400000))) return "Yesterday";
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" as const } : {}) });
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { activeTimezone } from "@/lib/timezone";
 import { useT } from "@/lib/useT";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarDays, Loader, Plug } from "lucide-react";
@@ -102,7 +103,7 @@ export default function CalendarWidget({
           start: localDateStr(start), end: localDateStr(end),
           // Convert event times into this device's zone (UTC- and TZID-stamped
           // times would otherwise show the server's wall clock).
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone: activeTimezone(),
         }),
         signal: ctrl.signal,
       });

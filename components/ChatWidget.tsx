@@ -867,7 +867,7 @@ export default function ChatWidget({
                   <button
                     onClick={e => { e.stopPropagation(); setPowerOpen(o => !o); }}
                     title={isLoaded ? `Model loaded on ${backend}: click to control how long it stays` : "Model not loaded: click for options"}
-                    className={`flex items-center gap-1 min-w-0 text-xs opacity-70 hover:opacity-100 transition-opacity ${FOCUS_RING}`}
+                    className={`flex items-center gap-1 min-w-0 text-sm opacity-70 hover:opacity-100 transition-opacity ${FOCUS_RING}`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isLoaded ? "bg-emerald-500" : "bg-current opacity-40"}`} />
                     <span className="shrink-0">
@@ -876,7 +876,7 @@ export default function ChatWidget({
                     {config.model && <span className="truncate">&nbsp;· {config.model}</span>}
                   </button>
                 ) : (
-                  <span className="text-xs opacity-70 truncate">{config.model}</span>
+                  <span className="text-sm opacity-70 truncate">{config.model}</span>
                 )}
                 {powerOpen && powerCapable && (
                   <>

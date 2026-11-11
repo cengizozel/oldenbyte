@@ -1,5 +1,6 @@
 "use client";
 
+import { zoned } from "@/lib/timezone";
 import { useT } from "@/lib/useT";
 import { useEffect, useState } from "react";
 import { Activity, Plus, Minus, Play, Square, History, Trash2, X, Flame, ChevronLeft } from "lucide-react";
@@ -51,7 +52,8 @@ const DAY_MS = 86400000;
 
 function minutesOfDay(ms: number): number {
   const d = new Date(ms);
-  return d.getHours() * 60 + d.getMinutes();
+  const z = zoned(d);
+  return z.getHours() * 60 + z.getMinutes();
 }
 
 // Circular mean of times-of-day (minutes), so a cluster straddling midnight

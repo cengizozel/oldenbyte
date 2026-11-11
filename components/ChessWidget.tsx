@@ -11,6 +11,7 @@ import { WidgetHeader, SmallButton, SettingsFace, SettingsField } from "@/compon
 
 const ENGINE_PATH = "/stockfish/stockfish-18-lite-single.js";
 const MIN_ELO = 1300;
+const GUTTER = 18; // room for the coordinates beside and under the board
 const MAX_ELO = 2800;
 const MOVE_TIME_MS = 700;
 
@@ -255,7 +256,16 @@ export default function ChessWidget({
 
       <div ref={contentRef} className="flex-1 min-h-0 flex items-center justify-center">
         {boardSize > 0 && (
-          <div style={{ width: boardSize, height: boardSize }}>
+          /* Coordinates sit outside the board, in the card's own text color:
+             ranks down the left, files along the bottom, flipped with the
+             board when you play Black. */
+          <div className={`grid text-sm tabular-nums opacity-70 ${c.label}`} style={{ gridTemplateColumns: `${GUTTER}px ${boardSize - GUTTER}px`, gridTemplateRows: `${boardSize - GUTTER}px ${GUTTER}px` }}>
+            <div className="flex flex-col">
+              {(playerColor === "w" ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8]).map(n => (
+                <span key={n} className="flex-1 flex items-center justify-center">{n}</span>
+              ))}
+            </div>
+          <div style={{ width: boardSize - GUTTER, height: boardSize - GUTTER }}>
             <Chessboard
               options={{
                 id: `chess-${widget.id}`,
@@ -267,15 +277,17 @@ export default function ChessWidget({
                 allowDragging: ready && !thinking && !gameOver,
                 darkSquareStyle: { backgroundColor: "#6b7280" },
                 lightSquareStyle: { backgroundColor: "#d1d5db" },
-                // Coordinates: 12px semibold, dark on the light squares and
-                // near-white on the dark ones, so both clear 4.5:1.
-                lightSquareNotationStyle: { color: "#1f2937" },
-                darkSquareNotationStyle: { color: "#f9fafb" },
-                alphaNotationStyle: { fontSize: 12, fontWeight: 600 },
-                numericNotationStyle: { fontSize: 12, fontWeight: 600 },
+                showNotation: false,
                 animationDurationInMs: 200,
               }}
             />
+          </div>
+            <span />
+            <div className="flex">
+              {(playerColor === "w" ? "abcdefgh" : "hgfedcba").split("").map(f => (
+                <span key={f} className="flex-1 flex items-center justify-center">{f}</span>
+              ))}
+            </div>
           </div>
         )}
       </div>

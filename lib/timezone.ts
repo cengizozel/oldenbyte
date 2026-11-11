@@ -16,6 +16,34 @@ export function deviceTimezone(): string {
   }
 }
 
+// The saved preference, held in memory so plain formatting helpers (lib/format,
+// lib/chat/format) can honour it without each caller threading it through.
+// Browsers with privacy protections often report UTC as the device zone, so
+// anything that prints a clock time or decides "today" must use this, not the
+// device. The top bar and useTimezone set it when the setting loads or
+// changes; it is mirrored to localStorage so the first paint is right too. On
+// the server it stays empty and everything falls back to the server's zone.
+let active = "";
+let primed = false;
+export function setActiveTimezone(tz: string) {
+  active = tz || "";
+  primed = true;
+  try { if (typeof localStorage !== "undefined") localStorage.setItem("timezone", active); } catch { /* private mode */ }
+}
+export function activeTimezone(): string {
+  if (!primed && typeof localStorage !== "undefined") {
+    primed = true;
+    try { active = localStorage.getItem("timezone") ?? ""; } catch { /* private mode */ }
+  }
+  return effectiveTimezone(active);
+}
+// "Now", or any instant, as a Date whose local fields are the wall clock of
+// the chosen zone: feed it to getHours(), toLocaleTimeString() and friends.
+export function zoned(input: Date | number | string = new Date()): Date {
+  const d = input instanceof Date ? input : new Date(input);
+  return zonedDate(d, activeTimezone());
+}
+
 // The chosen zone, falling back to the device zone when set to automatic.
 export function effectiveTimezone(saved: string): string {
   return saved || deviceTimezone();
@@ -72,6 +100,7 @@ export function nowLine(tz: string): string {
 }
 
 export async function setTimezone(value: string): Promise<void> {
+  setActiveTimezone(value);
   await storage.setItem("timezone", value);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(TZ_EVENT, { detail: value }));

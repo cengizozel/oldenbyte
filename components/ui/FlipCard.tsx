@@ -48,11 +48,12 @@ export default function FlipCard({
           transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
         }}
       >
-        {/* The faces carry no fill of their own (the card behind them has it):
-            a filled 3D layer can land a fraction of a pixel wide at some card
-            widths and paint over the card's right border. */}
+        {/* Each face is opaque (it must hide the other one mid-flip and when
+            turned away) and sits one pixel inside the card, so its fill can
+            never land on the card's border at fractional widths. The padding
+            is 19px to keep content 20px from the card's edge. */}
         <div
-          className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${inGroup ? "!pt-0" : ""} ${frontClassName}`}
+          className={`absolute inset-px p-[19px] flex flex-col rounded-[15px] overflow-clip ${inGroup ? "!pt-0" : ""} ${c.bg} ${frontClassName}`}
           style={{
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
@@ -65,7 +66,7 @@ export default function FlipCard({
           <FaceShownContext.Provider value={!flipped}>{front}</FaceShownContext.Provider>
         </div>
         <div
-          className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${backClassName}`}
+          className={`absolute inset-px p-[19px] flex flex-col gap-3 rounded-[15px] overflow-clip ${c.bg} ${backClassName}`}
           style={{
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",

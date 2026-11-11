@@ -1,5 +1,6 @@
 "use client";
 
+import { zoned } from "@/lib/timezone";
 import { useEffect, useRef, useState } from "react";
 import { CalendarRange, Plus, Check, X, Trash2, FileText, Copy } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
@@ -362,7 +363,7 @@ export default function ScheduleWidget({
 
   // ── Editor ──────────────────────────────────────────────────────────────────
   function openEditor(entry: Entry | null, prefill?: { day: number; start: number }) {
-    const todayIdx = (new Date().getDay() + 6) % 7;
+    const todayIdx = (zoned().getDay() + 6) % 7;
     setSettingsOpen(false);
     setEditor(entry ? {
       id: entry.id,
@@ -436,8 +437,8 @@ export default function ScheduleWidget({
     const { startHour, endHour } = config;
     const hours = endHour - startHour;
     const HOUR_PX = big ? 52 : 40;
-    const todayIdx = (new Date().getDay() + 6) % 7;
-    const now = new Date();
+    const todayIdx = (zoned().getDay() + 6) % 7;
+    const now = zoned();
     const nowY = (normMin(now.getHours() * 60 + now.getMinutes(), startHour) - startHour * 60) / 60 * HOUR_PX;
     const labels = big ? DAYS : DAYS_SHORT;
     // One grid, in the tile or full screen, so drag math reads these as is.
