@@ -115,6 +115,9 @@ the palette `label` color at 50% opacity.
   do not draw their own header row: `WidgetHeader` renders into the tab row
   through `lib/tabGroup.ts`, and they lose their top padding, so the first
   content line sits at the same height in a group as in a single widget.
+  In layout edit mode a press on a tab name drags that tab along the row to
+  reorder; a press anywhere else on the tile, the row's empty space included,
+  moves the tile.
 - Chip (`Chip`): the small toggle used for modes and options. 28px tall,
   `text-sm`, `rounded-md`; the active chip has the translucent fill, inactive
   chips sit at 70% opacity.

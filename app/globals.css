@@ -152,6 +152,16 @@
   --clock-center:       #f5f5f5;
 }
 
+/* The tab row's edge glow: a short flash in the palette color when a scroll
+   or fling runs into the end of the row (components/TabStrip.tsx). */
+@keyframes tab-edge-glow {
+  0% { opacity: 0; }
+  25% { opacity: 0.35; }
+  100% { opacity: 0; }
+}
+.tab-edge-glow { animation: tab-edge-glow 500ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { .tab-edge-glow { animation-duration: 150ms; } }
+
 /* ── Base ─────────────────────────────────────────────────────────────────── */
 
 /* The closed settings drawer waits just past the right edge. iOS browsers

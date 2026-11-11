@@ -845,7 +845,10 @@ export default function WidgetGrid({
                     {(item.tabs?.length ?? 0) > 0 && (
                       <div
                         className="shrink-0 relative z-20"
-                        onMouseDown={e => e.stopPropagation()}
+                        // A press on a tab name reorders the tabs (TabStrip);
+                        // anywhere else on the row moves the tile, like the
+                        // rest of it, so the grid's drag must see that press.
+                        onMouseDown={e => { if ((e.target as Element).closest("[data-tab-index]")) e.stopPropagation(); }}
                       >
                         {(() => {
                           const activeId = activeTabs[item.i] ?? item.i;

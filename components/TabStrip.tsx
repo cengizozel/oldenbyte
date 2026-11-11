@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Widget } from "@/lib/widgets";
 import { colorMap } from "@/lib/widgets";
 import { FOCUS_RING } from "@/components/ui/Field";
@@ -19,7 +19,8 @@ import type { TabGroupHosts } from "@/lib/tabGroup";
 // actions) into this row through lib/tabGroup.ts.
 //
 // Clicking a tab shows it, and the row scrolls so the whole tab is in view
-// when the row is wider than the card; dragging the row scrolls it. In layout
+// when the row is wider than the card; dragging the row scrolls it, with
+// momentum on release and a short glow at the edge when it hits the end. In layout
 // edit mode a drag reorders instead, the way browser tabs move: the tab itself travels
 // under the pointer, the others slide out of its way (the same live preview
 // as the dashboard list and the bookmarks), and the move commits on release.
@@ -76,7 +77,28 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   const dragRef = useRef<Drag | null>(null);
   // `scroll` is set when a press scrolls the row (view mode) instead of
   // reordering (edit mode): the row's scrollLeft when the press began.
-  const press = useRef<{ idx: number; x: number; dragging: boolean; scroll?: number } | null>(null);
+  const press = useRef<{ idx: number; x: number; dragging: boolean; scroll?: number; samples?: { t: number; x: number }[] } | null>(null);
+  // Momentum after a row drag, and the edge glow when the row hits an end.
+  const fling = useRef<number | null>(null);
+  const [edge, setEdge] = useState<{ side: "left" | "right"; n: number } | null>(null);
+  const edgeAt = useRef(0);
+  function flash(side: "left" | "right") {
+    const now = performance.now();
+    if (now - edgeAt.current < 400) return;
+    edgeAt.current = now;
+    setEdge(e => ({ side, n: (e?.n ?? 0) + 1 }));
+  }
+  function stopFling() {
+    if (fling.current) { cancelAnimationFrame(fling.current); fling.current = null; }
+  }
+  // Scroll the row by hand, clamped, flashing the edge it ran into.
+  function scrollRow(list: HTMLDivElement, to: number, speed: number) {
+    const max = list.scrollWidth - list.clientWidth;
+    if (to < 0) { list.scrollLeft = 0; if (speed > 0.15) flash("left"); return false; }
+    if (to > max) { list.scrollLeft = max; if (speed > 0.15) flash("right"); return false; }
+    list.scrollLeft = to;
+    return true;
+  }
   const rects = useRef<DOMRect[]>([]);
   const skipClick = useRef(false);
 
@@ -96,16 +118,19 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
 
   // Pointer handling lives on the row, so a press in the gap between tabs
   // still scrolls it; a press on a tab carries its index for reordering.
-  function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+  function onPointerDown(e: PointerEvent) {
     skipClick.current = false;
     if (e.button !== 0) return;
     const i = Number((e.target as Element).closest("[data-tab-index]")?.getAttribute("data-tab-index") ?? -1);
+    // Edit mode: only a press on a tab is ours (it reorders); a press on the
+    // row's empty space is left to the grid, which moves the whole tile.
     if (editing) { if (i >= 0) press.current = { idx: i, x: e.clientX, dragging: false }; return; }
     const list = listRef.current;
-    if (list && list.scrollWidth > list.clientWidth + 1) press.current = { idx: i, x: e.clientX, dragging: false, scroll: list.scrollLeft };
+    stopFling();
+    if (list && list.scrollWidth > list.clientWidth + 1) press.current = { idx: i, x: e.clientX, dragging: false, scroll: list.scrollLeft, samples: [{ t: e.timeStamp, x: e.clientX }] };
   }
 
-  function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+  function onPointerMove(e: PointerEvent) {
     const p = press.current;
     if (!p) return;
     const dx = e.clientX - p.x;
@@ -114,16 +139,22 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
       if (!p.dragging) {
         if (Math.abs(dx) < DRAG_THRESHOLD) return;
         p.dragging = true;
-        e.currentTarget.setPointerCapture(e.pointerId);
+        listRef.current?.setPointerCapture(e.pointerId);
       }
-      if (listRef.current) listRef.current.scrollLeft = p.scroll - dx;
+      const list = listRef.current;
+      if (list) {
+        const before = list.scrollLeft;
+        scrollRow(list, p.scroll - dx, Math.abs(before - (p.scroll - dx)) / 16);
+      }
+      p.samples!.push({ t: e.timeStamp, x: e.clientX });
+      if (p.samples!.length > 6) p.samples!.shift();
       return;
     }
     if (!p.dragging) {
       if (Math.abs(dx) < DRAG_THRESHOLD) return;
       p.dragging = true;
       rects.current = order.map(id => buttons.current.get(id)?.getBoundingClientRect() ?? new DOMRect());
-      e.currentTarget.setPointerCapture(e.pointerId);
+      listRef.current?.setPointerCapture(e.pointerId);
     }
     // The tab stays inside the row: no further left than the first tab's
     // edge, no further right than the last tab's.
@@ -141,7 +172,24 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     press.current = null;
     if (!p?.dragging) return;
     skipClick.current = true;
-    if (p.scroll !== undefined) return;
+    if (p.scroll !== undefined) {
+      // Release: keep going at the pointer's last speed and coast to a stop.
+      const list = listRef.current, s = p.samples ?? [];
+      if (!commit || !list || s.length < 2) return;
+      const a = s[0], b = s[s.length - 1];
+      let v = -(b.x - a.x) / Math.max(1, b.t - a.t); // px per ms, in scroll direction
+      if (Math.abs(v) < 0.05) return;
+      let last = performance.now();
+      const step = (now: number) => {
+        const dt = Math.min(32, now - last); last = now;
+        v *= Math.exp(-dt / 180);
+        const went = scrollRow(list, list.scrollLeft + v * dt, Math.abs(v));
+        if (!went || Math.abs(v) < 0.02) { fling.current = null; return; }
+        fling.current = requestAnimationFrame(step);
+      };
+      fling.current = requestAnimationFrame(step);
+      return;
+    }
     const d = dragRef.current;
     dragRef.current = null;
     setDrag(null);
@@ -185,6 +233,27 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     }
   });
 
+  const handlers = useRef({ onPointerDown, onPointerMove, endDrag });
+  handlers.current = { onPointerDown, onPointerMove, endDrag };
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const down = (e: PointerEvent) => handlers.current.onPointerDown(e);
+    const move = (e: PointerEvent) => handlers.current.onPointerMove(e);
+    const up = () => handlers.current.endDrag(true);
+    const cancel = () => handlers.current.endDrag(false);
+    list.addEventListener("pointerdown", down);
+    list.addEventListener("pointermove", move);
+    list.addEventListener("pointerup", up);
+    list.addEventListener("pointercancel", cancel);
+    return () => {
+      list.removeEventListener("pointerdown", down);
+      list.removeEventListener("pointermove", move);
+      list.removeEventListener("pointerup", up);
+      list.removeEventListener("pointercancel", cancel);
+    };
+  }, []);
+
   // The travelling underline. Edges are measured against the tab list, the
   // first paint is instant, every later change of open tab or order animates.
   const listRef = useRef<HTMLDivElement>(null);
@@ -207,6 +276,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
       ink.style.width = `${Math.max(2, st.r.x - st.l.x)}px`;
     };
     measure();
+    stopFling();
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // A row wider than the card scrolls so the whole open tab shows, with a
     // little room on the side it came in from.
@@ -278,15 +348,11 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   }
 
   return (
-    <div className={`shrink-0 flex items-center gap-3 px-5 pt-[18px] pb-2.5 ${className}`}>
+    <div className={`relative shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 ${editing ? "pr-24 cursor-grab" : "pr-5"} ${className}`}>
       <div
         ref={listRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={() => endDrag(true)}
-        onPointerCancel={() => endDrag(false)}
         style={{ touchAction: editing ? "none" : undefined }}
-        className={`relative flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${editing ? "" : "cursor-default"}`}
+        className={`relative flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${editing ? "cursor-grab" : "cursor-default"}`}
       >
         {order.map((tabId, index) => {
           const isActive = tabId === activeId;
@@ -333,6 +399,15 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
           className={`absolute bottom-0 left-0 h-0.5 w-10 rounded-full bg-current pointer-events-none ${c.label} ${drag ? "opacity-0" : "opacity-100"} transition-opacity`}
         />
       </div>
+      {edge && (
+        <span
+          key={edge.n}
+          aria-hidden
+          onAnimationEnd={() => setEdge(null)}
+          className={`tab-edge-glow pointer-events-none absolute top-0 bottom-0 w-12 ${c.label} ${edge.side === "left" ? "left-0" : "right-0"}`}
+          style={{ background: `radial-gradient(ellipse at ${edge.side} center, currentColor, transparent 70%)` }}
+        />
+      )}
       <div ref={actionsHost} className="ml-auto flex items-center gap-2 shrink-0 empty:hidden" />
     </div>
   );
