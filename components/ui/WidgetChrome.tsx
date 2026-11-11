@@ -457,7 +457,7 @@ export function SettingsAddRow({
 export function SettingsInfo({ c, title, items, more }: { c: ColorClasses; title: ReactNode; items?: ReactNode[]; more?: ReactNode }) {
   return (
     <div className={`rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 flex flex-col gap-1.5 ${c.label}`}>
-      <p className="text-xs font-semibold uppercase tracking-wider opacity-70">{title}</p>
+      <p className="text-sm font-medium">{title}</p>
       {items && items.length > 0 && (
         <ul className="flex flex-col gap-1 list-disc pl-4 text-sm marker:opacity-50">
           {items.map((it, i) => <li key={i} className="min-w-0 break-words">{it}</li>)}

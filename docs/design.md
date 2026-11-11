@@ -5,6 +5,8 @@ a widget should not restyle what they already provide.
 
 ## Type scale
 
+Never all caps: no `uppercase` anywhere, in headings, labels, badges or buttons. Hierarchy comes from weight, size and strength.
+
 Three sizes plus display numbers, nothing in between, all in the one system sans face (the feed
 page is the exception: it sets its headlines and labels in Playfair Display).
 Sizes are fixed pixels so a widget looks the same at every card size. The rule
@@ -200,8 +202,8 @@ the palette `label` color at 50% opacity.
   the collection last, so nothing has to be scrolled past to reach a
   setting. A face replaces the whole card: in a tab group the tab row
   hides while a member's face is open, so grouped and single settings
-  look the same. In the settings drawer, section titles are 12px semibold
-  uppercase overlines, distinct from row labels and their hints. Copy inside a face is `SettingsNote`, errors `SettingsError`.
+  look the same. In the settings drawer, section titles are 14px semibold at full strength, above
+  regular-weight row labels and their lighter hints. Copy inside a face is `SettingsNote`, errors `SettingsError`.
   Every face has reset: it puts the fields back to the widget's defaults
   (the draft only; save applies it), after a "Back to defaults?" step that
   disarms by itself. The save row's three actions are 28px filled buttons

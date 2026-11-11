@@ -94,7 +94,7 @@ export function SettingsSection({ title, children }: { title: string; children: 
   return (
     <section className="flex flex-col">
       {/* An overline, so a section title never reads like a row's hint. */}
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] pt-6 pb-1.5">{title}</h3>
+      <h3 className="text-sm font-semibold text-[var(--text-primary)] pt-6 pb-1.5">{title}</h3>
       <div className="flex flex-col divide-y divide-[var(--surface-border)]">{children}</div>
     </section>
   );
