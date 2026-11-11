@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import * as storage from "@/lib/storage";
 
 // A single optional timezone preference (stored under "timezone"). Empty string
@@ -77,21 +76,6 @@ export async function setTimezone(value: string): Promise<void> {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(TZ_EVENT, { detail: value }));
   }
-}
-
-// The saved preference, kept live: widgets that print a wall-clock time use
-// it so a browser that hides its real zone (privacy settings often report
-// UTC) still shows the hours the user lives in.
-export function useTimezone(): string {
-  const [tz, setTz] = useState("");
-  useEffect(() => {
-    let alive = true;
-    storage.getItem("timezone").then(v => { if (alive) setTz(v ?? ""); });
-    const onTz = (e: Event) => setTz(String((e as CustomEvent).detail ?? ""));
-    window.addEventListener(TZ_EVENT, onTz);
-    return () => { alive = false; window.removeEventListener(TZ_EVENT, onTz); };
-  }, []);
-  return tz;
 }
 
 // "12:37 AM" in the chosen zone (device zone when automatic).

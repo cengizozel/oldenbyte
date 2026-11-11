@@ -7,7 +7,8 @@ import * as storage from "@/lib/storage";
 import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { formatDate, localDateStr } from "@/lib/format";
-import { effectiveTimezone, timeIn, useTimezone } from "@/lib/timezone";
+import { effectiveTimezone, timeIn } from "@/lib/timezone";
+import { useTimezone } from "@/lib/useTimezone";
 import {
   type UpkeepItem as Item, type UpkeepLog as Log, type UpkeepOrder as Order,
   HOUR, DAY, MAX_HOURS, DEFAULT_HOURS, UNDO_WINDOW,
