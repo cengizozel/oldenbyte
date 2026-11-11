@@ -862,6 +862,14 @@ function DashboardSwitcher({
 }) {
   const [open, setOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  // Deleting a dashboard asks first, in its row, like a settings reset, and
+  // disarms by itself.
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!confirmId) return;
+    const t = setTimeout(() => setConfirmId(null), 5000);
+    return () => clearTimeout(t);
+  }, [confirmId]);
   const [draft, setDraft] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -991,7 +999,15 @@ function DashboardSwitcher({
               >
                 <GripVertical size={12} />
               </span>
-              {renamingId === d.id ? (
+              {confirmId === d.id ? (
+                <div className="flex-1 min-w-0 flex items-center gap-1.5 pl-2 pr-1.5 py-1">
+                  <span className="flex-1 min-w-0 truncate text-sm text-[var(--text-primary)]">Delete {d.name}?</span>
+                  <button type="button" autoFocus onClick={() => { setConfirmId(null); removeDashboard(d.id); }}
+                    className={`shrink-0 h-7 px-2.5 rounded-lg text-sm font-medium bg-black/10 dark:bg-white/15 text-red-600 dark:text-red-400 hover:bg-black/15 dark:hover:bg-white/20 ${FOCUS_RING}`}>Delete</button>
+                  <button type="button" onClick={() => setConfirmId(null)}
+                    className={`shrink-0 h-7 px-2.5 rounded-lg text-sm text-[var(--text-primary)] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${FOCUS_RING}`}>Keep</button>
+                </div>
+              ) : renamingId === d.id ? (
                 <input
                   value={draft}
                   autoFocus
@@ -1015,17 +1031,17 @@ function DashboardSwitcher({
                   {d.name}
                 </button>
               )}
-              <button
+              {confirmId !== d.id && <button
                 onClick={() => { setRenamingId(d.id); setDraft(d.name); }}
                 className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0`}
                 title="Rename"
                 aria-label={`Rename ${d.name}`}
               >
                 <Pencil size={12} />
-              </button>
-              {dashboards.list.length > 1 && (
+              </button>}
+              {dashboards.list.length > 1 && confirmId !== d.id && (
                 <button
-                  onClick={() => removeDashboard(d.id)}
+                  onClick={() => setConfirmId(d.id)}
                   className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0 mr-1.5`}
                   title="Delete dashboard"
                   aria-label={`Delete ${d.name}`}
