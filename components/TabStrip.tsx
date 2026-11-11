@@ -18,8 +18,9 @@ import type { TabGroupHosts } from "@/lib/tabGroup";
 // motion gets a plain short slide. Every member's header renders its icon (and the shown one its
 // actions) into this row through lib/tabGroup.ts.
 //
-// Clicking a tab shows it. In layout edit mode a tab can be dragged along the
-// row to reorder the group the way browser tabs move: the tab itself travels
+// Clicking a tab shows it, and the row scrolls so the whole tab is in view
+// when the row is wider than the card; dragging the row scrolls it. In layout
+// edit mode a drag reorders instead, the way browser tabs move: the tab itself travels
 // under the pointer, the others slide out of its way (the same live preview
 // as the dashboard list and the bookmarks), and the move commits on release.
 // Shift with the left or right arrow key does the same from the keyboard.
@@ -73,7 +74,9 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   type Drag = { idx: number; over: number; dx: number };
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
-  const press = useRef<{ idx: number; x: number; dragging: boolean } | null>(null);
+  // `scroll` is set when a press scrolls the row (view mode) instead of
+  // reordering (edit mode): the row's scrollLeft when the press began.
+  const press = useRef<{ idx: number; x: number; dragging: boolean; scroll?: number } | null>(null);
   const rects = useRef<DOMRect[]>([]);
   const skipClick = useRef(false);
 
@@ -91,16 +94,31 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     return slot;
   }
 
-  function onPointerDown(e: ReactPointerEvent<HTMLDivElement>, i: number) {
+  // Pointer handling lives on the row, so a press in the gap between tabs
+  // still scrolls it; a press on a tab carries its index for reordering.
+  function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     skipClick.current = false;
-    if (!editing || e.button !== 0) return;
-    press.current = { idx: i, x: e.clientX, dragging: false };
+    if (e.button !== 0) return;
+    const i = Number((e.target as Element).closest("[data-tab-index]")?.getAttribute("data-tab-index") ?? -1);
+    if (editing) { if (i >= 0) press.current = { idx: i, x: e.clientX, dragging: false }; return; }
+    const list = listRef.current;
+    if (list && list.scrollWidth > list.clientWidth + 1) press.current = { idx: i, x: e.clientX, dragging: false, scroll: list.scrollLeft };
   }
 
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     const p = press.current;
     if (!p) return;
     const dx = e.clientX - p.x;
+    if (p.scroll !== undefined) {
+      // View mode: the press drags the row sideways.
+      if (!p.dragging) {
+        if (Math.abs(dx) < DRAG_THRESHOLD) return;
+        p.dragging = true;
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      if (listRef.current) listRef.current.scrollLeft = p.scroll - dx;
+      return;
+    }
     if (!p.dragging) {
       if (Math.abs(dx) < DRAG_THRESHOLD) return;
       p.dragging = true;
@@ -123,6 +141,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     press.current = null;
     if (!p?.dragging) return;
     skipClick.current = true;
+    if (p.scroll !== undefined) return;
     const d = dragRef.current;
     dragRef.current = null;
     setDrag(null);
@@ -189,6 +208,14 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     };
     measure();
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // A row wider than the card scrolls so the whole open tab shows, with a
+    // little room on the side it came in from.
+    const pad = 12;
+    const from = st.l.target - 4, to = st.r.target + 4;
+    let scroll = list.scrollLeft;
+    if (from - pad < scroll) scroll = Math.max(0, from - pad);
+    else if (to + pad > scroll + list.clientWidth) scroll = to + pad - list.clientWidth;
+    if (Math.round(scroll) !== Math.round(list.scrollLeft)) list.scrollTo({ left: scroll, behavior: !st.painted || reduced ? "auto" : "smooth" });
     if (!st.painted || reduced) {
       // First paint, or reduced motion: no spring. Reduced motion still gets a
       // short CSS slide between positions.
@@ -252,7 +279,15 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
 
   return (
     <div className={`shrink-0 flex items-center gap-3 px-5 pt-[18px] pb-2.5 ${className}`}>
-      <div ref={listRef} className="relative flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={listRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={() => endDrag(true)}
+        onPointerCancel={() => endDrag(false)}
+        style={{ touchAction: editing ? "none" : undefined }}
+        className={`relative flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${editing ? "" : "cursor-default"}`}
+      >
         {order.map((tabId, index) => {
           const isActive = tabId === activeId;
           const isDragged = drag?.idx === index;
@@ -260,11 +295,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
           return (
             <div
               key={tabId}
-              onPointerDown={e => onPointerDown(e, index)}
-              onPointerMove={onPointerMove}
-              onPointerUp={() => endDrag(true)}
-              onPointerCancel={() => endDrag(false)}
-              style={{ transform: shift ? `translateX(${shift}px)` : undefined, touchAction: editing ? "none" : undefined }}
+              style={{ transform: shift ? `translateX(${shift}px)` : undefined }}
               className={`shrink-0 ${isDragged ? "relative z-10 cursor-grabbing" : `transition-transform duration-150 ${editing ? "cursor-grab" : ""}`}`}
             >
               <button
