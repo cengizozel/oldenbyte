@@ -400,9 +400,10 @@ export function SettingsField({ c, label, hint, children, inline = false }: { c:
   return (
     <div className="flex flex-col gap-1.5">
       {inline ? (
-        <div className="flex items-center justify-between gap-3 min-h-7">
-          <span className={`${SETTINGS_LABEL} ${c.text}`}>{label}</span>
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">{children}</div>
+        <div className="flex items-center justify-between gap-x-3 gap-y-1.5 min-h-7 flex-wrap">
+          <span className={`${SETTINGS_LABEL} shrink-0 ${c.text}`}>{label}</span>
+          {/* Wraps under the label, and within itself, when the card is narrow. */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-wrap justify-end ml-auto">{children}</div>
         </div>
       ) : (
         <span className={`${SETTINGS_LABEL} ${c.text}`}>{label}</span>
@@ -455,8 +456,8 @@ export function SettingsListRow({
 export function SettingsListControl({ c, label, children }: { c: ColorClasses; label: ReactNode; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 min-h-9 py-1">
-      <span className={`text-sm min-w-0 truncate ${c.text}`}>{label}</span>
-      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">{children}</div>
+      <span className={`text-sm shrink-0 ${c.text}`}>{label}</span>
+      <div className="flex items-center gap-1.5 min-w-0 flex-wrap justify-end">{children}</div>
     </div>
   );
 }
