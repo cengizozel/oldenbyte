@@ -607,11 +607,12 @@ export default function UpkeepWidget({
                   <div className="shrink-0">
                     <div className="flex items-center justify-between mb-1">
                       {scrub ? (
-                        <span className={`text-xs tabular-nums ${c.text}`}>{whenLabel(scrub.t)} · <span className="font-medium">{scrub.pct}</span><span className="opacity-70"> / 100</span></span>
+                        <span className={`text-xs tabular-nums whitespace-nowrap ${c.text}`}>{whenLabel(scrub.t)} · <span className="font-medium">{scrub.pct}</span><span className="opacity-70"> / 100</span></span>
                       ) : (
                         <span className={`text-xs ${c.label} opacity-70`}>score over time</span>
                       )}
-                      <div className="flex gap-1">
+                      {/* The range chips step aside while the reading is shown, so it never wraps. */}
+                      {!scrub && <div className="flex gap-1">
                         {RANGES.map(r => (
                           <button
                             key={r.key}
@@ -621,7 +622,7 @@ export default function UpkeepWidget({
                             {r.label}
                           </button>
                         ))}
-                      </div>
+                      </div>}
                     </div>
                     <svg viewBox="0 0 240 72" className="w-full touch-none cursor-crosshair" preserveAspectRatio="none" onPointerMove={onScrub} onPointerDown={onScrub} onPointerLeave={() => setScrub(null)}>
                       <line x1={2} y1={8} x2={238} y2={8} className="stroke-black/[0.06] dark:stroke-white/[0.07]" strokeWidth={1} strokeDasharray="2 3" />
