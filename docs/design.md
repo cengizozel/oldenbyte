@@ -111,7 +111,9 @@ the palette `label` color at 50% opacity.
   screen button every widget gets from the grid), the mark turning into a
   close cross, and the same spot brings the identity back. Hover-only
   buttons show in full once the options are asked for. In layout edit mode
-  the toggle is gone and the tile's own controls take that corner.
+  the same toggle swaps in the tile's controls instead (move to another
+  dashboard, group as tabs, remove), so every operation on a tile is in the
+  one place and the title or tabs keep the whole row.
 - Full screen: the grid (`lib/widgetFrame.ts`) lifts the tile over a dimmed,
   blurred backdrop at the viewport's size minus a margin, keeping the widget
   mounted so its state survives; a tab group goes up with its tab row.
@@ -130,7 +132,7 @@ the palette `label` color at 50% opacity.
   toggle slides the tabs out and the options in (the widget's header content
   left-aligned, its `right` group and the tile's full screen button at the
   end), and the same spot brings the tabs back (so does switching tab). In
-  layout edit mode the row carries no options at all. Members do not draw their own
+  layout edit mode the toggle swaps in the tile's controls instead. Members do not draw their own
   header row: `WidgetHeader` renders into the tab row through
   `lib/tabGroup.ts`, and they lose their top padding, so the first content
   line sits at the same height in a group as in a single widget. The header

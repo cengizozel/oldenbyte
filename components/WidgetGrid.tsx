@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ComponentType } from "react";
 import { createPortal } from "react-dom";
 import * as storage from "@/lib/storage";
-import { Layers, ArrowRightLeft } from "lucide-react";
+import { Layers, ArrowRightLeft, Trash2 } from "lucide-react";
 import GridLayout from "react-grid-layout";
 import type { Layout as LayoutItem } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -240,7 +240,75 @@ export default function WidgetGrid({
     editing,
     expanded: expandedCell === cellId,
     setExpanded: v => setExpandedCell(v ? cellId : null),
+    controls: editing ? editControls(cellId) : undefined,
   });
+  // The tile's controls in edit mode, shown by its header behind the header
+  // toggle in place of the widget's options: move to another dashboard (when
+  // there is one), group as tabs, remove.
+  function editControls(i: string) {
+    const widget = instances[i];
+    if (!widget) return null;
+    const isGroupingSource = groupingSource === i;
+    const btn = (on: boolean) => `w-6 h-6 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
+      on
+        ? "bg-blue-100 border-blue-300 text-blue-600 dark:bg-blue-500/20 dark:border-blue-400/50 dark:text-blue-300"
+        : "bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+    }`;
+    return (
+      <>
+        {otherDashboards.length > 0 && (
+          <div className="relative">
+            <button
+              onMouseDown={e => e.stopPropagation()}
+              onClick={() => setMoveMenuFor(m => (m === i ? null : i))}
+              aria-label={`Move ${widget.title} to another dashboard`}
+              aria-expanded={moveMenuFor === i}
+              title="Move to another dashboard"
+              className={btn(moveMenuFor === i)}
+            >
+              <ArrowRightLeft size={14} />
+            </button>
+            {moveMenuFor === i && (
+              <div
+                onMouseDown={e => e.stopPropagation()}
+                className="absolute top-full right-0 mt-1.5 z-30 min-w-32 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-md py-1 text-sm text-[var(--text-primary)]"
+              >
+                <div className="px-3 py-1 text-sm text-[var(--text-muted)]">Move to</div>
+                {otherDashboards.map(d => (
+                  <button
+                    key={d.id}
+                    onClick={() => moveWidget(i, d.id)}
+                    className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 truncate"
+                  >
+                    {d.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <button
+          onMouseDown={e => e.stopPropagation()}
+          onClick={() => handleGroupStart(i)}
+          aria-label={isGroupingSource ? "Cancel grouping" : "Group with another widget as tabs"}
+          aria-pressed={isGroupingSource}
+          title={isGroupingSource ? "Cancel grouping" : "Group as tabs"}
+          className={btn(isGroupingSource)}
+        >
+          <Layers size={14} />
+        </button>
+        <button
+          onMouseDown={e => e.stopPropagation()}
+          onClick={() => removeWidget(i)}
+          aria-label={`Remove ${widget.title}`}
+          title="Remove widget"
+          className={btn(false)}
+        >
+          <Trash2 size={14} />
+        </button>
+      </>
+    );
+  }
   useEffect(() => { if (editing) setExpandedCell(null); }, [editing]);
   useEffect(() => {
     if (!expandedCell) return;
@@ -691,7 +759,8 @@ export default function WidgetGrid({
 
   function renderWithTabs(item: TabLayoutItem, isEditMode: boolean) {
     const inner = renderCell(item, isEditMode);
-    if (isEditMode || !inner) return inner;
+    if (!inner) return inner;
+    if (isEditMode) return <WidgetFrameContext.Provider value={frameFor(item.i)}>{inner}</WidgetFrameContext.Provider>;
     const expanded = expandedCell === item.i;
     return (
       <WidgetFrameContext.Provider value={frameFor(item.i)}>
@@ -882,7 +951,7 @@ export default function WidgetGrid({
                 // above it stays visible along the top edge.
                 const groupC = (item.tabs?.length ?? 0) > 0 ? colorMap[instances[activeTabs[item.i] ?? item.i]?.color ?? "neutral"] : null;
                 return (
-                  <div key={i} className={`relative rounded-2xl overflow-hidden flex flex-col h-full ${groupC?.bg ?? ""}`}>
+                  <div key={i} className={`relative rounded-2xl overflow-hidden flex flex-col h-full cursor-grab ${groupC?.bg ?? ""}`}>
                     {(item.tabs?.length ?? 0) > 0 && (
                       <div
                         className="shrink-0 relative z-20"
@@ -894,16 +963,18 @@ export default function WidgetGrid({
                         {(() => {
                           const activeId = activeTabs[item.i] ?? item.i;
                           return (
-                            <TabStrip
-                              order={[item.i, ...(item.tabs ?? [])]}
-                              activeId={activeId}
-                              instances={instances}
-                              editing
-                              onSelect={tabId => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
-                              onUngroup={tabId => handleUngroupTab(item.i, tabId)}
-                              onReorder={order => handleReorderTabs(item.i, order)}
-                              onHosts={hosts => setTabHostsFor(item.i, hosts)}
-                            />
+                            <WidgetFrameContext.Provider value={frameFor(item.i)}>
+                              <TabStrip
+                                order={[item.i, ...(item.tabs ?? [])]}
+                                activeId={activeId}
+                                instances={instances}
+                                editing
+                                onSelect={tabId => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
+                                onUngroup={tabId => handleUngroupTab(item.i, tabId)}
+                                onReorder={order => handleReorderTabs(item.i, order)}
+                                onHosts={hosts => setTabHostsFor(item.i, hosts)}
+                              />
+                            </WidgetFrameContext.Provider>
                           );
                         })()}
                       </div>
@@ -924,8 +995,13 @@ export default function WidgetGrid({
                         });
                       })()}
                     </div>
-                    {/* Border overlay, highlighted when this is the grouping source */}
-                    <div className={`absolute inset-0 z-10 rounded-2xl border-2 cursor-grab transition-colors ${
+                    {/* Border overlay, highlighted when this is the grouping source.
+                        Pointer-transparent: presses fall through the tile's
+                        non-interactive content to the grid item (the drag
+                        surface), and only the header toggle and its controls
+                        take the pointer, whatever stacking context a widget's
+                        root forms. */}
+                    <div className={`absolute inset-0 z-10 rounded-2xl border-2 pointer-events-none transition-colors ${
                       isGroupingSource
                         ? "border-blue-400 bg-blue-400/10"
                         : "border-dashed border-neutral-300"
@@ -943,67 +1019,6 @@ export default function WidgetGrid({
                         </div>
                       </div>
                     )}
-                    {/* Move to another dashboard */}
-                    {otherDashboards.length > 0 && (
-                      <>
-                        <button
-                          onMouseDown={e => e.stopPropagation()}
-                          onClick={() => setMoveMenuFor(m => (m === i ? null : i))}
-                          aria-label={`Move ${widget.title} to another dashboard`}
-                          aria-expanded={moveMenuFor === i}
-                          title="Move to another dashboard"
-                          className={`absolute top-[18px] right-[76px] z-20 w-6 h-6 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
-                            moveMenuFor === i
-                              ? "bg-blue-100 border-blue-300 text-blue-600 dark:bg-blue-500/20 dark:border-blue-400/50 dark:text-blue-300"
-                              : "bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                          }`}
-                        >
-                          <ArrowRightLeft size={14} />
-                        </button>
-                        {moveMenuFor === i && (
-                          <div
-                            onMouseDown={e => e.stopPropagation()}
-                            className="absolute top-[46px] right-5 z-30 min-w-32 max-w-[80%] rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-md py-1 text-sm text-[var(--text-primary)]"
-                          >
-                            <div className="px-3 py-1 text-sm text-[var(--text-muted)]">Move to</div>
-                            {otherDashboards.map(d => (
-                              <button
-                                key={d.id}
-                                onClick={() => moveWidget(i, d.id)}
-                                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 truncate"
-                              >
-                                {d.name}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                    {/* Layers (group) button */}
-                    <button
-                      onMouseDown={e => e.stopPropagation()}
-                      onClick={() => handleGroupStart(i)}
-                      aria-label={isGroupingSource ? "Cancel grouping" : "Group with another widget as tabs"}
-                      aria-pressed={isGroupingSource}
-                      title={isGroupingSource ? "Cancel grouping" : "Group as tabs"}
-                      className={`absolute top-[18px] right-12 z-20 w-6 h-6 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
-                        isGroupingSource
-                          ? "bg-blue-100 border-blue-300 text-blue-600 dark:bg-blue-500/20 dark:border-blue-400/50 dark:text-blue-300"
-                          : "bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                      }`}
-                    >
-                      <Layers size={14} />
-                    </button>
-                    {/* Remove button */}
-                    <button
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={() => removeWidget(i)}
-                      aria-label={`Remove ${widget.title}`}
-                      title="Remove widget"
-                      className="absolute top-[18px] right-5 z-20 w-6 h-6 flex items-center justify-center rounded-full border bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm leading-none shadow-sm"
-                    >
-                      ×
-                    </button>
                   </div>
                 );
               })}

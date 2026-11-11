@@ -7,6 +7,7 @@ import { FOCUS_RING } from "@/components/ui/Field";
 import type { TabGroupHosts } from "@/lib/tabGroup";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { HEADER_SWAP, HeaderToggle, ExpandButton } from "@/components/ui/WidgetChrome";
+import { useWidgetFrame } from "@/lib/widgetFrame";
 
 // The header row of a tab group. It sits exactly where a single widget's
 // header sits (same title baseline, same gap to the content, header actions on
@@ -73,6 +74,7 @@ function movedTo(order: string[], id: string, index: number): string[] {
 export default function TabStrip({ order, activeId, instances, editing, className = "", onSelect, onUngroup, onReorder, onHosts }: Props) {
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const c = colorMap[instances[activeId]?.color ?? "neutral"];
+  const frame = useWidgetFrame();
 
   // Drag state: the index being dragged, how far the pointer has moved, and
   // the slot (index among the other tabs) it would land in. The slot comes
@@ -505,7 +507,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   }
 
   return (
-    <div className={`shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 ${editing ? "pr-[108px] cursor-grab" : "pr-5"} ${className}`}>
+    <div className={`shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 pr-5 ${editing ? "cursor-grab" : ""} ${className}`}>
       <div className="relative flex-1 min-w-0 flex items-center">
       <div
         ref={listRef}
@@ -592,18 +594,21 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
           </button>
         );
       })}
-      {/* The open widget's options, in the tabs' place while the toggle is on:
-          its header content, then full screen for the tile. None in edit
-          mode, which is for arranging; the tile's own controls sit in this
-          corner then. */}
-      {!editing && (
+      {/* In the tabs' place while the toggle is on: the open widget's options
+          (its header content, then full screen for the tile), or in edit mode
+          the tile's controls (move, group, remove) from the grid. */}
+      {editing ? (
+        <div inert={!showActions} className={`${HEADER_SWAP.pane} ${showActions ? "" : HEADER_SWAP.paneHidden}`}>
+          <div className="ml-auto flex items-center gap-2 shrink-0">{frame?.controls}</div>
+        </div>
+      ) : (
         <div inert={!showActions} className={`${HEADER_SWAP.pane} ${showActions ? "" : HEADER_SWAP.paneHidden}`}>
           <div ref={actionsHost} className="flex-1 min-w-0 flex items-center gap-2 empty:hidden" />
           <div className="ml-auto flex items-center gap-2 shrink-0"><ExpandButton c={c} /></div>
         </div>
       )}
       </div>
-      {!editing && <HeaderToggle c={c} open={showActions} onToggle={() => setShowActions(v => !v)} />}
+      <HeaderToggle c={c} open={showActions} onToggle={() => setShowActions(v => !v)} />
     </div>
   );
 }

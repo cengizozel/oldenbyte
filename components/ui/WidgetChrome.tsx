@@ -140,7 +140,9 @@ export function SaveCancelRow({
 // then a full-screen button every widget gets from the grid), and back. So
 // nothing else sits in a header by default: no always-on buttons, nothing
 // hover-only, no status text. Once the options are asked for, hover-only
-// buttons (the `opacity-0 group-hover:` chrome) show in full.
+// buttons (the `opacity-0 group-hover:` chrome) show in full. In layout edit
+// mode the same toggle swaps in the tile's controls (move, group, remove)
+// instead, so every operation on a tile is in the one place.
 
 // The two faces of a header row and how they trade places.
 export const HEADER_SWAP = {
@@ -223,7 +225,7 @@ export function WidgetHeader({
   const frame = useWidgetFrame();
   const editing = frame?.editing ?? false;
   const [open, setOpen] = useState(false);
-  useEffect(() => { if (editing) setOpen(false); }, [editing]);
+  useEffect(() => { setOpen(false); }, [editing]); // back to the identity on any mode change
 
   if (panel) {
     return (
@@ -256,22 +258,32 @@ export function WidgetHeader({
     );
   }
   const expand = !editing ? <ExpandButton c={c} /> : null;
-  const hasOptions = !!(after || right || expand);
+  const controls = editing ? frame?.controls : null;
+  const hasOptions = editing ? !!controls : !!(after || right || expand);
   return (
-    <div className={`flex items-center gap-3 mb-3 shrink-0 min-h-5 ${editing ? "pr-[88px]" : ""} ${className}`}>
+    <div className={`flex items-center gap-3 mb-3 shrink-0 min-h-5 ${className}`}>
       <div className="relative flex-1 min-w-0 flex items-center">
         <div inert={open} className={`flex items-center gap-1.5 min-w-0 ${c.label} ${HEADER_SWAP.main} ${open ? HEADER_SWAP.mainHidden : ""}`}>
           <Icon size={14} className="opacity-50 shrink-0" />
           <span className="text-sm font-medium truncate">{title}</span>
         </div>
+        {/* In edit mode the tile's content sits, non-interactive, under the
+            grid's drag overlay (z-10); the toggle and this pane rise above it
+            and take the pointer, like the corner buttons they replace. */}
         {hasOptions && (
-          <div inert={!open} className={`${HEADER_SWAP.pane} ${open ? "" : HEADER_SWAP.paneHidden}`}>
-            {after}
-            {(right || expand) && <div className="ml-auto flex items-center gap-2 shrink-0">{right}{expand}</div>}
+          <div inert={!open} className={`${HEADER_SWAP.pane} ${editing ? "z-20" : ""} ${open ? (editing ? "pointer-events-auto" : "") : HEADER_SWAP.paneHidden}`}>
+            {editing ? (
+              <div className="ml-auto flex items-center gap-2 shrink-0">{controls}</div>
+            ) : (
+              <>
+                {after}
+                {(right || expand) && <div className="ml-auto flex items-center gap-2 shrink-0">{right}{expand}</div>}
+              </>
+            )}
           </div>
         )}
       </div>
-      {hasOptions && !editing && <HeaderToggle c={c} open={open} onToggle={() => setOpen(v => !v)} />}
+      {hasOptions && <HeaderToggle c={c} open={open} onToggle={() => setOpen(v => !v)} className={editing ? "relative z-20 pointer-events-auto" : ""} />}
     </div>
   );
 }
