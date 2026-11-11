@@ -406,21 +406,24 @@ export default function YoutubeWidget({
                       })}
                     </div>
                   ) : (
-                  <ul className="flex flex-col">
+                  <ul className="flex flex-col @container">
                     {shown.map((v, i) => {
                       const sc = tagColor(v.channelName);
                       const thumb = config.view === "thumbs" ? thumbUrl(v.link) : "";
+                      // With a thumbnail the row is a two-column grid: thumbnail
+                      // left, channel line and title right. In a narrow card
+                      // (under 18rem of content) the channel line moves above
+                      // the thumbnail so it never squeezes next to it.
                       return (
                         <li key={i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
-                          <div className="flex gap-2">
+                          <div className={thumb ? "grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 items-center" : "flex flex-col gap-1"}>
                             {thumb && (
-                              <button onClick={() => openVideo(v)} aria-label="Open video" className={`shrink-0 self-center hover:opacity-80 transition-opacity rounded-lg ${FOCUS_RING}`}>
+                              <button onClick={() => openVideo(v)} aria-label="Open video" className={`row-span-2 @max-[18rem]:row-span-1 @max-[18rem]:row-start-2 self-center hover:opacity-80 transition-opacity rounded-lg ${FOCUS_RING}`}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={thumb} alt="" loading="lazy" onLoad={unpulse} className="w-24 aspect-video object-cover rounded-lg bg-black/10 dark:bg-white/10 animate-pulse" />
                               </button>
                             )}
-                            <div className="flex-1 min-w-0">
-                          <span className="flex items-center gap-1.5 mb-1 min-w-0">
+                          <span className={`flex items-center gap-1.5 min-w-0 ${thumb ? "col-start-2 @max-[18rem]:col-span-2 @max-[18rem]:col-start-1" : ""}`}>
                             <button
                               type="button"
                               onClick={() => toggleFilter(v.channelId)}
@@ -439,7 +442,7 @@ export default function YoutubeWidget({
                               <span className={`shrink-0 text-xs font-medium tracking-widest px-1 py-0.5 rounded-md bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
                             )}
                           </span>
-                          <div className="flex items-start gap-1 group/title">
+                          <div className={`flex items-start gap-1 group/title min-w-0 ${thumb ? "col-start-2 self-center" : ""}`}>
                             <button
                               onClick={() => openVideo(v)}
                               className={`flex-1 min-w-0 break-words text-left block text-sm font-medium leading-snug ${c.text} hover:opacity-70 transition-opacity ${FOCUS_RING}`}
@@ -457,7 +460,6 @@ export default function YoutubeWidget({
                               <ExternalLink size={12} />
                             </a>
                           </div>
-                            </div>
                           </div>
                         </li>
                       );
