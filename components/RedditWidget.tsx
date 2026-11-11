@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Plus, X, ExternalLink, Flame } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
@@ -83,6 +84,7 @@ export default function RedditWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
   const storageKey = `reddit-widget-${widget.id}`;
   const today = localDateStr();
 
@@ -425,7 +427,7 @@ export default function RedditWidget({
               ) : posts.length ? (
                 <EmptyState c={c}>nothing from r/{filter} right now</EmptyState>
               ) : (
-                <EmptyState c={c} action="add subreddits" />
+                <EmptyState c={c} action={t("empty.reddit")} />
               )}
             </div>
             <ScrollFades c={c} top={list.topFade} bottom={list.bottomFade} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useEffect, useRef, useState } from "react";
 import { Bookmark, Plus, Minus, X, GripVertical, LayoutGrid, Grid2x2, LayoutList, AlignJustify, ExternalLink, Eye, EyeOff } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
@@ -164,6 +165,7 @@ export default function BookmarksWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
   const configKey = `bookmarks-config-${widget.id}`;
 
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -304,7 +306,7 @@ export default function BookmarksWidget({
       />
 
       {!loaded ? null : bookmarks.length === 0 ? (
-        <EmptyState c={c} action="add bookmarks" />
+        <EmptyState c={c} action={t("empty.bookmarks")} />
       ) : shown.length === 0 ? (
         <EmptyState c={c}>all bookmarks hidden</EmptyState>
       ) : (

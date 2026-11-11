@@ -1,6 +1,7 @@
 "use client";
 
 import { Minus, Plus } from "lucide-react";
+import { useT } from "@/lib/useT";
 
 import type { ReactNode,
   InputHTMLAttributes,
@@ -56,6 +57,7 @@ export function Stepper({
   disabled?: boolean;
   className?: string;
 }) {
+  const t = useT();
   const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v / step) * step));
   const btn = `w-6 h-6 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/15 text-current hover:bg-black/15 dark:hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-black/10 dark:disabled:hover:bg-white/15 transition-colors ${FOCUS_RING}`;
   const shown = Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -76,11 +78,11 @@ export function Stepper({
       }}
       className={`flex items-center gap-1.5 shrink-0 rounded-md ${disabled ? "opacity-40" : ""} ${FOCUS_RING} ${className}`}
     >
-      <button type="button" tabIndex={-1} aria-label={`Less ${label}`} disabled={disabled || value <= min} onClick={() => onChange(clamp(value - step))} className={btn}>
+      <button type="button" tabIndex={-1} aria-label={t("common.less", { label })} disabled={disabled || value <= min} onClick={() => onChange(clamp(value - step))} className={btn}>
         <Minus size={12} />
       </button>
       <span className="min-w-8 text-center text-sm tabular-nums">{shown}{unit && <span className="opacity-70 ml-0.5">{unit}</span>}</span>
-      <button type="button" tabIndex={-1} aria-label={`More ${label}`} disabled={disabled || value >= max} onClick={() => onChange(clamp(value + step))} className={btn}>
+      <button type="button" tabIndex={-1} aria-label={t("common.more", { label })} disabled={disabled || value >= max} onClick={() => onChange(clamp(value + step))} className={btn}>
         <Plus size={12} />
       </button>
     </div>

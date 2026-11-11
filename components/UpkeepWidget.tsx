@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, Plus, History, X, Flame, ChevronLeft, RotateCcw, Undo2 } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
@@ -98,6 +99,7 @@ export default function UpkeepWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
 
   const configKey = `upkeep-config-${widget.id}`;
   const logKey = `upkeep-log-${widget.id}`;
@@ -301,7 +303,7 @@ export default function UpkeepWidget({
       />
 
       {!loaded ? null : items.length === 0 ? (
-        <EmptyState c={c} action="add essentials" />
+        <EmptyState c={c} action={t("empty.upkeep")} />
       ) : (
         <div className="flex-1 min-h-0 flex flex-col gap-3">
           <div className="shrink-0 flex justify-center">

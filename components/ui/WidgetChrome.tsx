@@ -4,6 +4,7 @@ import { useContext, useEffect, useRef, useState, type CSSProperties, type React
 import { FaceShownContext } from "./FlipCard";
 import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
+import { useT } from "@/lib/useT";
 import { useWidgetFrame } from "@/lib/widgetFrame";
 import { Plus, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Maximize2, Minimize2, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
@@ -19,12 +20,13 @@ import { FOCUS_RING, HIT_AREA, SettingsInput } from "./Field";
 // settings face (its `onSettings`), at the far right after full screen: same icon, same
 // spot, found by the keyboard layer through data-widget-settings.
 export function SettingsButton({ c, onClick }: { c: ColorClasses; onClick: () => void }) {
+  const t = useT();
   return (
     <button
       type="button"
       onClick={onClick}
-      title="Settings"
-      aria-label="Settings"
+      title={t("common.settings")}
+      aria-label={t("common.settings")}
       data-widget-settings
       className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
     >
@@ -36,12 +38,13 @@ export function SettingsButton({ c, onClick }: { c: ColorClasses; onClick: () =>
 // Force-refresh for feed widgets: the server caches feeds (admin-set TTL) and
 // serves pages from that cache; this button asks for a real upstream fetch now.
 export function RefreshButton({ c, onClick, busy }: { c: ColorClasses; onClick: () => void; busy?: boolean }) {
+  const t = useT();
   return (
     <button
       onClick={onClick}
       disabled={busy}
-      title="Refresh now"
-      aria-label="Refresh now"
+      title={t("common.refreshNow")}
+      aria-label={t("common.refreshNow")}
       data-widget-refresh
       className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 disabled:opacity-40 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
     >
@@ -120,6 +123,7 @@ export function SaveCancelRow({
 }) {
   // Reset is destructive, so it asks first: the icon turns into a short
   // question with a confirming button, and disarms by itself.
+  const t = useT();
   const [confirmReset, setConfirmReset] = useState(false);
   useEffect(() => {
     if (!confirmReset) return;
@@ -131,21 +135,21 @@ export function SaveCancelRow({
       {onReset ? (
         confirmReset ? (
           <span className={`flex items-center gap-2 text-sm min-w-0 ${c.label}`}>
-            <span className="opacity-70 truncate">Reset?</span>
-            <button type="button" onClick={() => { setConfirmReset(false); onReset(); }} className={`shrink-0 h-7 px-2.5 rounded-lg text-sm font-medium bg-black/10 dark:bg-white/15 text-red-600 dark:text-red-400 hover:bg-black/15 dark:hover:bg-white/20 ${FOCUS_RING}`}>Reset</button>
-            <button type="button" onClick={() => setConfirmReset(false)} className={`shrink-0 h-7 px-2.5 rounded-lg text-sm bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${FOCUS_RING}`}>Keep</button>
+            <span className="opacity-70 truncate">{t("common.resetQuestion")}</span>
+            <button type="button" onClick={() => { setConfirmReset(false); onReset(); }} className={`shrink-0 h-7 px-2.5 rounded-lg text-sm font-medium bg-black/10 dark:bg-white/15 text-red-600 dark:text-red-400 hover:bg-black/15 dark:hover:bg-white/20 ${FOCUS_RING}`}>{t("common.reset")}</button>
+            <button type="button" onClick={() => setConfirmReset(false)} className={`shrink-0 h-7 px-2.5 rounded-lg text-sm bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${FOCUS_RING}`}>{t("common.keep")}</button>
           </span>
         ) : (
-          <button type="button" onClick={() => setConfirmReset(true)} className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`} title="Back to defaults" aria-label="Back to defaults">
+          <button type="button" onClick={() => setConfirmReset(true)} className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`} title={t("common.backToDefaults")} aria-label={t("common.backToDefaults")}>
             <RotateCcw size={16} />
           </button>
         )
       ) : <span />}
       <div className="flex items-center gap-2">
-        <button type="button" onClick={onCancel} title="Cancel" aria-label="Cancel" className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`}>
+        <button type="button" onClick={onCancel} title={t("common.cancel")} aria-label={t("common.cancel")} data-face-cancel className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`}>
           <X size={16} />
         </button>
-        <button type="button" onClick={onSave} disabled={saving || saveDisabled} title="Save" aria-label="Save" className={`${FACE_BUTTON} bg-black/10 dark:bg-white/15 hover:bg-black/15 dark:hover:bg-white/20 ${c.text} disabled:opacity-40`}>
+        <button type="button" onClick={onSave} disabled={saving || saveDisabled} title={t("common.save")} aria-label={t("common.save")} data-face-save className={`${FACE_BUTTON} bg-black/10 dark:bg-white/15 hover:bg-black/15 dark:hover:bg-white/20 ${c.text} disabled:opacity-40`}>
           {saving ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
         </button>
       </div>
@@ -194,12 +198,14 @@ export function LogoGlyph({ size = 16, className = "" }: { size?: number; classN
 // fade. 24px tall in a 20px header line, so it takes no extra height.
 export function HeaderToggle({ c, open, onToggle, className = "" }: { c: ColorClasses; open: boolean; onToggle: () => void; className?: string }) {
   const face = "absolute inset-0 transition-[opacity,rotate,scale] duration-200 ease-out motion-reduce:transition-none";
+  const t = useT();
   return (
     <button
       type="button"
       aria-expanded={open}
-      aria-label={open ? "Close options" : "Options"}
-      title={open ? "Close options" : "Options"}
+      data-header-toggle
+      aria-label={open ? t("common.closeOptions") : t("common.options")}
+      title={open ? t("common.closeOptions") : t("common.options")}
       onMouseDown={e => e.stopPropagation()}
       onClick={onToggle}
       className={`shrink-0 w-6 h-6 -my-0.5 flex items-center justify-center rounded-md transition-opacity ${c.label} ${FOCUS_RING} ${open ? "opacity-100" : "opacity-70 hover:opacity-100"} ${className}`}
@@ -222,14 +228,16 @@ export function HeaderDivider({ c }: { c: ColorClasses }) {
 // outside a grid tile (the digest page, previews).
 export function ExpandButton({ c }: { c: ColorClasses }) {
   const frame = useWidgetFrame();
+  const t = useT();
   if (!frame) return null;
-  const label = frame.expanded ? "Exit full screen (Esc)" : "Full screen";
+  const label = frame.expanded ? t("common.exitFullScreen") : t("common.fullScreen");
   return (
     <button
       type="button"
       onClick={() => frame.setExpanded(!frame.expanded)}
       title={label}
       aria-label={label}
+      data-widget-fullscreen
       className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
     >
       {frame.expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
@@ -339,7 +347,7 @@ export function WidgetHeader({
 // field for numbers you know, and one neutral row style for collections.
 
 export function SettingsFace({
-  c, title = "Settings", children, onSave, onCancel, onReset, saving = false, saveDisabled = false, bodyRef, scroll = true,
+  c, title, children, onSave, onCancel, onReset, saving = false, saveDisabled = false, bodyRef, scroll = true,
 }: {
   c: ColorClasses;
   title?: string;
@@ -352,6 +360,7 @@ export function SettingsFace({
   bodyRef?: Ref<HTMLDivElement>;
   scroll?: boolean;
 }) {
+  const t = useT();
   const faceRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef(onCancel);
   cancelRef.current = onCancel;
@@ -382,7 +391,7 @@ export function SettingsFace({
   }, []);
   return (
     <div ref={faceRef} className="flex flex-col gap-3 flex-1 min-h-0">
-      <WidgetHeader panel c={c} icon={SlidersHorizontal} title={title} />
+      <WidgetHeader panel c={c} icon={SlidersHorizontal} title={title ?? t("common.settings")} />
       <div ref={bodyRef} className={`@container flex flex-col gap-3 flex-1 min-h-0 ${scroll ? "overflow-y-auto pr-3" : ""}`}>{children}</div>
       <SaveCancelRow c={c} onSave={onSave} onCancel={onCancel} onReset={onReset} saving={saving} saveDisabled={saveDisabled} />
     </div>
@@ -459,6 +468,7 @@ export function SettingsAddRow({
   busy?: boolean;
   inputRef?: Ref<HTMLInputElement>;
 }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-1.5">
       <SettingsInput
@@ -470,9 +480,9 @@ export function SettingsAddRow({
         placeholder={placeholder}
         className="flex-1 min-w-0"
       />
-      <SmallButton c={c} onClick={onAdd} disabled={busy} title="Add">
+      <SmallButton c={c} onClick={onAdd} disabled={busy} title={t("common.add")}>
         {busy ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-        Add
+        {t("common.add")}
       </SmallButton>
     </div>
   );

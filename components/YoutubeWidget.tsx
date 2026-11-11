@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useState, useEffect, useRef } from "react";
 import { Loader, Plus, X, PlaySquare, ExternalLink } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
@@ -73,6 +74,7 @@ export default function YoutubeWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
   const storageKey = `youtube-widget-${widget.id}`;
   const today = localDateStr();
 
@@ -458,7 +460,7 @@ export default function YoutubeWidget({
                 ) : videos.length ? (
                   <EmptyState c={c}>nothing from {filterName || "this channel"} right now</EmptyState>
                 ) : (
-                  <EmptyState c={c} action="add YouTube channels" />
+                  <EmptyState c={c} action={t("empty.youtube")} />
                 )}
               </div>
               <ScrollFades c={c} top={topFade} bottom={bottomFade} />

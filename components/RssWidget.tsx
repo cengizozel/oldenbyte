@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useState, useEffect, useRef } from "react";
 import { Rss } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
@@ -31,6 +32,7 @@ export default function RssWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
   const storageKey = `rss-widget-${widget.id}`;
   const today = localDateStr();
 
@@ -134,7 +136,7 @@ export default function RssWidget({
                   ))}
                 </ul>
               ) : (
-                <EmptyState c={c} action="add an RSS feed URL" />
+                <EmptyState c={c} action={t("empty.rss")} />
               )}
             </div>
             <ScrollFades c={c} top={topFade} bottom={bottomFade} />

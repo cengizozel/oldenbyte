@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useEffect, useState } from "react";
 import { Activity, Plus, Minus, Play, Square, History, Trash2, X, Flame, ChevronLeft } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
@@ -188,6 +189,7 @@ export default function RhythmWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
 
   const configKey = `rhythm-config-${widget.id}`;
   const logKey = `rhythm-log-${widget.id}`;
@@ -430,7 +432,7 @@ export default function RhythmWidget({
       />
 
       {!loaded ? null : items.length === 0 ? (
-        <EmptyState c={c} action="add things to log" />
+        <EmptyState c={c} action={t("empty.rhythm")} />
       ) : (
         <div className="flex-1 min-h-0 flex flex-col gap-3">
           {/* Today strip: midnight to midnight, a tick per logged moment */}

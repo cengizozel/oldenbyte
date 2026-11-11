@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useState, useEffect, useRef } from "react";
 import { Tv, Play, Loader, List, Square } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
@@ -28,6 +29,7 @@ export default function TvWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
   const storageKey = `tv-widget-${widget.id}`;
 
   const [config, setConfig] = useState<TvConfig>(DEFAULT);
@@ -254,7 +256,7 @@ export default function TvWidget({
               )}
             </div>
           ) : (
-            <EmptyState c={c} action="add a channel" />
+            <EmptyState c={c} action={t("empty.tv")} />
           )}
         </div>
       }

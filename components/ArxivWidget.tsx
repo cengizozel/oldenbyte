@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useState, useEffect, useRef } from "react";
 import { BookOpen, ExternalLink } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
@@ -168,6 +169,7 @@ export default function ArxivWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
   const today = localDateStr();
   const configKey = `arxiv-widget-${widget.id}`;
   const cacheKey  = `arxiv-widget-${widget.id}-${today}`;
@@ -291,7 +293,7 @@ export default function ArxivWidget({
                     ))}
                   </ul>
                 ) : (
-                  <EmptyState c={c} action="choose a category" />
+                  <EmptyState c={c} action={t("empty.arxiv")} />
                 )}
               </div>
               <ScrollFades c={c} top={listFade.topFade} bottom={listFade.bottomFade} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarDays, Loader, Plug } from "lucide-react";
 import Toggle from "@/components/ui/Toggle";
@@ -56,6 +57,7 @@ export default function CalendarWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
   const storageKey = `calendar-widget-${widget.id}`;
 
   const [config, setConfig] = useState<CalendarConfig>(DEFAULT);
@@ -199,7 +201,7 @@ export default function CalendarWidget({
       />
 
       {!loaded ? null : !configured(config) ? (
-        <EmptyState c={c} action="connect a CalDAV calendar" />
+        <EmptyState c={c} action={t("empty.calendar")} />
       ) : loading && !events.length ? (
         <LoadingState c={c} />
       ) : error && !events.length ? (

@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, type RefObject } from "react";
 import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, ChevronRight, Plus, Pencil, Search, LogOut, GripVertical } from "lucide-react";
 import * as storage from "@/lib/storage";
+import { LOCALES } from "@/lib/i18n";
+import { setLocale, useLocale } from "@/lib/useT";
 import { applyGlow, applyTheme, currentTheme, readGlow, readTheme, setGlowClass, setThemeClasses, DEFAULT_GLOW, GLOW_EVENT, THEME_EVENT, THEMES, type GlowPrefs, type Theme } from "@/lib/theme";
 import { layoutKey, instancesKey, PRELOAD_KEY, PRELOAD_EVENT, type DashboardsState } from "@/lib/dashboards";
 import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
@@ -675,6 +677,7 @@ function SettingsPanel({
   preload: boolean;
   onTogglePreload: () => void;
 }) {
+  const locale = useLocale();
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -721,6 +724,19 @@ function SettingsPanel({
           <AccountSection open={open} />
 
           <SettingsSection title="Appearance">
+            {/* Shown once a second language exists (lib/i18n.ts, LOCALES). */}
+            {Object.keys(LOCALES).length > 1 && (
+              <SettingsRow label="Language">
+                <select
+                  aria-label="Language"
+                  value={locale}
+                  onChange={e => setLocale(e.target.value)}
+                  className="h-7 text-sm border rounded-lg px-2 outline-none bg-[var(--surface)] text-[var(--text-primary)] border-[var(--surface-border)]"
+                >
+                  {Object.entries(LOCALES).map(([code, l]) => <option key={code} value={code}>{l.label}</option>)}
+                </select>
+              </SettingsRow>
+            )}
             <SettingsRow label="Theme" hint="Shift+D switches">
               <div role="radiogroup" aria-label="Theme" className="flex rounded-lg bg-black/5 dark:bg-white/10 p-0.5">
                 {THEMES.map(t => (

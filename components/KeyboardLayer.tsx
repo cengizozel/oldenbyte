@@ -259,8 +259,8 @@ export default function KeyboardLayer({
       const target = focusedWidget();
       if (!target) { finish(); showHint("Focus a widget first: leader, then its number"); return; }
       const button = action === "options"
-        ? findButton(target.cell, 'button[aria-label="Options"], button[aria-label="Close options"]')
-        : findHeaderAction(target.cell, 'button[aria-label="Full screen"], button[aria-label="Exit full screen (Esc)"]');
+        ? findButton(target.cell, "[data-header-toggle]")
+        : findHeaderAction(target.cell, "[data-widget-fullscreen]");
       if (!button) { finish(); showHint(action === "options" ? "This widget has no options" : "Full screen is not available here"); return; }
       showMark(target.cell);
       finish(false);
@@ -273,7 +273,7 @@ export default function KeyboardLayer({
       if (!target) { finish(); showHint("Focus a widget first: leader, then its number"); return; }
       const button = action === "settings"
         ? findHeaderAction(target.cell, "[data-widget-settings]")
-        : findHeaderAction(target.cell, '[data-widget-refresh], button[aria-label="Refresh now"]');
+        : findHeaderAction(target.cell, "[data-widget-refresh]");
       if (!button) { finish(); showHint(action === "settings" ? "This widget has no settings" : "This widget has no refresh"); return; }
       showMark(target.cell);
       if (action === "refresh") { button.click(); finish(); return; }

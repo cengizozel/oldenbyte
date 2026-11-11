@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Sun, Cloud, CloudSun, CloudRain, CloudDrizzle, CloudSnow, CloudLightning, CloudFog,
@@ -47,6 +48,7 @@ export default function WeatherWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
   const storageKey = `weather-widget-${widget.id}`;
 
   const [config, setConfig] = useState<WeatherConfig>(DEFAULT);
@@ -155,7 +157,7 @@ export default function WeatherWidget({
       />
 
       {!loaded ? null : !configured(config) ? (
-        <EmptyState c={c} action="choose a location" />
+        <EmptyState c={c} action={t("empty.weather")} />
       ) : loading && !forecast ? (
         <LoadingState c={c} />
       ) : error && !forecast ? (

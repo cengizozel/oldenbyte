@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useState, useEffect } from "react";
 import { Timer, Plus, Play, Pause, History, Trash2, X, Check, Flame, ChevronLeft, Pencil } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
@@ -116,6 +117,7 @@ export default function TrackerWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color] ?? colorMap["neutral"];
+  const t = useT();
 
   const configKey = `tracker-config-${widget.id}`;
   const daysKey = `tracker-days-${widget.id}`;
@@ -377,7 +379,7 @@ export default function TrackerWidget({
       />
 
       {!loaded ? null : items.length === 0 ? (
-        <EmptyState c={c} action="add activities" />
+        <EmptyState c={c} action={t("empty.tracker")} />
       ) : (
         <div className="flex-1 min-h-0 flex flex-col gap-3">
           <div className="shrink-0 flex justify-center">

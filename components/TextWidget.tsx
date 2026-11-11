@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/useT";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Type } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
@@ -47,6 +48,7 @@ export default function TextWidget({
   className?: string;
 }) {
   const c = colorMap[widget.color];
+  const t = useT();
   const storageKey = `text-widget-${widget.id}`;
 
   const [config, setConfig] = useState<TextWidgetConfig>(DEFAULT);
@@ -197,7 +199,7 @@ export default function TextWidget({
                 {display}
               </div>
             ) : (
-              <EmptyState c={c} action="add text" />
+              <EmptyState c={c} action={t("empty.text")} />
             )}
           </div>
         </>
