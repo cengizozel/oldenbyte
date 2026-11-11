@@ -242,7 +242,8 @@ type DateFormat =
   | "time-24"
   | "datetime-12"
   | "datetime-24"
-  | "analog";
+  | "analog"
+  | "segments";
 
 function fmt(date: Date, format: DateFormat): string {
   switch (format) {
@@ -305,6 +306,47 @@ function AnalogClock({ time, size }: { time: Date; size: number }) {
   );
 }
 
+// A seven-segment clock, the bedside-radio kind: 24 hour HH:MM in red LED
+// segments on a dark panel, with every unlit segment faintly visible (the
+// "88:88" ghost) and a colon that blinks each second. It is an object, so it
+// looks the same in every theme.
+const SEGMENTS: Record<string, string> = {
+  "0": "abcdef", "1": "bc", "2": "abdeg", "3": "abcdg", "4": "bcfg",
+  "5": "acdfg", "6": "acdefg", "7": "abc", "8": "abcdefg", "9": "abcdfg",
+};
+// Each segment as a slanted hexagon in a 10 x 18 cell.
+const SEGMENT_SHAPES: Record<string, string> = {
+  a: "1.6,1 8.4,1 7.4,2.4 2.6,2.4",
+  b: "8.9,1.5 8.9,8.4 7.9,7.8 7.9,2.9",
+  c: "8.9,9.6 8.9,16.5 7.9,15.1 7.9,10.2",
+  d: "1.6,17 8.4,17 7.4,15.6 2.6,15.6",
+  e: "1.1,9.6 1.1,16.5 2.1,15.1 2.1,10.2",
+  f: "1.1,1.5 1.1,8.4 2.1,7.8 2.1,2.9",
+  g: "2.2,9 2.9,8.3 7.1,8.3 7.8,9 7.1,9.7 2.9,9.7",
+};
+function SegmentClock({ time, height }: { time: Date; height: number }) {
+  const digits = `${String(time.getHours()).padStart(2, "0")}${String(time.getMinutes()).padStart(2, "0")}`;
+  const colonOn = time.getSeconds() % 2 === 0;
+  const lit = "#ff3b30", ghost = "rgba(255, 59, 48, 0.13)";
+  const xs = [3, 14, 29, 40]; // two digits, the colon's gap, two digits
+  return (
+    <svg viewBox="0 0 53 24" height={height} width={(height * 53) / 24} className="shrink-0" role="img" aria-label={`${digits.slice(0, 2)}:${digits.slice(2)}`}>
+      <rect x="0.5" y="0.5" width="52" height="23" rx="4" fill="#0b0b0b" stroke="#2a2a2a" />
+      <g transform="translate(0 3) skewX(-6)" style={{ filter: "drop-shadow(0 0 1.2px rgba(255, 59, 48, 0.75))" }}>
+        {xs.map((x, i) => (
+          <g key={i} transform={`translate(${x + 1} 0)`}>
+            {Object.entries(SEGMENT_SHAPES).map(([seg, points]) => (
+              <polygon key={seg} points={points} fill={SEGMENTS[digits[i]].includes(seg) ? lit : ghost} />
+            ))}
+          </g>
+        ))}
+        <circle cx="27.5" cy="6" r="1" fill={colonOn ? lit : ghost} />
+        <circle cx="27.5" cy="12" r="1" fill={colonOn ? lit : ghost} />
+      </g>
+    </svg>
+  );
+}
+
 const FORMAT_OPTIONS: { value: DateFormat; label: string }[] = [
   { value: "date-long",    label: "Monday, April 14, 2026" },
   { value: "date-medium",  label: "April 14, 2026" },
@@ -314,9 +356,10 @@ const FORMAT_OPTIONS: { value: DateFormat; label: string }[] = [
   { value: "datetime-12",  label: "Apr 14 · 2:30 PM" },
   { value: "datetime-24",  label: "Apr 14 · 14:30" },
   { value: "analog",       label: "Analog clock" },
+  { value: "segments",     label: "Retro digital" },
 ];
 
-const NEEDS_SECONDS: DateFormat[] = ["time-12", "time-24", "datetime-12", "datetime-24", "analog"];
+const NEEDS_SECONDS: DateFormat[] = ["time-12", "time-24", "datetime-12", "datetime-24", "analog", "segments"];
 
 function DateDisplay({ timezone }: { timezone: string }) {
   const [format, setFormat] = useState<DateFormat>("date-long");
@@ -379,6 +422,8 @@ function DateDisplay({ timezone }: { timezone: string }) {
       >
         {active === "analog"
           ? <AnalogClock time={shown} size={48} />
+          : active === "segments"
+          ? <SegmentClock time={shown} height={40} />
           : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center" suppressHydrationWarning>{fmt(shown, active)}</span>
         }
       </button>
@@ -398,6 +443,8 @@ function DateDisplay({ timezone }: { timezone: string }) {
               >
                 {opt.value === "analog"
                   ? <><AnalogClock time={shown} size={18} /><span>Analog clock</span></>
+                  : opt.value === "segments"
+                  ? <><SegmentClock time={shown} height={18} /><span>Retro digital</span></>
                   : fmt(shown, opt.value)
                 }
               </button>
