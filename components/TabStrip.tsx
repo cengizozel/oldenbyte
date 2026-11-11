@@ -130,10 +130,10 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     return true;
   }
   // Auto-scroll while a tab is dragged near either end of the row.
-  const auto = useRef<{ dir: number; raf: number | null; x: number }>({ dir: 0, raf: null, x: 0 });
+  const auto = useRef<{ dir: number; raf: number | null; x: number; speed: number; pos: number }>({ dir: 0, raf: null, x: 0, speed: 0, pos: 0 });
   function stopAuto() {
     if (auto.current.raf) cancelAnimationFrame(auto.current.raf);
-    auto.current = { dir: 0, raf: null, x: 0 };
+    auto.current = { dir: 0, raf: null, x: 0, speed: 0, pos: 0 };
   }
   const rects = useRef<DOMRect[]>([]);
   const skipClick = useRef(false);
@@ -200,18 +200,24 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     // pointer stays there, so a tab can be carried past the edge.
     const list = listRef.current;
     if (list) {
-      const lr = list.getBoundingClientRect(), zone = 28, max = list.scrollWidth - list.clientWidth;
+      const lr = list.getBoundingClientRect(), zone = 32, max = list.scrollWidth - list.clientWidth;
       const dir = e.clientX < lr.left + zone && list.scrollLeft > 0 ? -1 : e.clientX > lr.right - zone && list.scrollLeft < max ? 1 : 0;
+      // Slow enough to aim with: a creep just inside the zone, rising toward
+      // the edge (about 25 to 110 px/s), and the speed follows the pointer.
+      const depth = dir < 0 ? (lr.left + zone - e.clientX) / zone : dir > 0 ? (e.clientX - (lr.right - zone)) / zone : 0;
       auto.current.x = e.clientX;
+      auto.current.speed = 0.4 + Math.min(1, Math.max(0, depth)) * 1.4;
       if (dir !== auto.current.dir) {
         if (auto.current.raf) cancelAnimationFrame(auto.current.raf);
         auto.current.dir = dir; auto.current.raf = null;
         if (dir) {
+          auto.current.pos = list.scrollLeft; // kept as a float: sub-pixel steps add up
           const tick = () => {
             const l = listRef.current, pr = press.current;
             if (!l || !pr?.dragging || !auto.current.dir) { auto.current.raf = null; return; }
             const m = l.scrollWidth - l.clientWidth;
-            l.scrollLeft = Math.max(0, Math.min(m, l.scrollLeft + auto.current.dir * 5));
+            auto.current.pos = Math.max(0, Math.min(m, auto.current.pos + auto.current.dir * auto.current.speed));
+            l.scrollLeft = Math.round(auto.current.pos);
             updateReorder(auto.current.x);
             if ((auto.current.dir < 0 && l.scrollLeft <= 0) || (auto.current.dir > 0 && l.scrollLeft >= m)) { auto.current.dir = 0; auto.current.raf = null; return; }
             auto.current.raf = requestAnimationFrame(tick);

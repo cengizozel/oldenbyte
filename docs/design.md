@@ -116,7 +116,8 @@ the palette `label` color at 50% opacity.
   through `lib/tabGroup.ts`, and they lose their top padding, so the first
   content line sits at the same height in a group as in a single widget.
   In layout edit mode a press on a tab drags it along the row to reorder,
-  and the row auto-scrolls while the tab is held near either end; a press
+  and the row auto-scrolls while the tab is held near either end (slowly,
+  faster the nearer the edge, so the drop can be aimed); a press
   anywhere else on the tile, the row's empty space included, moves the tile.
   Because neither press can scroll the row, edit mode shows a small arrow at
   each end of the list whenever tabs are cut off; a click pages the row that
