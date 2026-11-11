@@ -63,6 +63,15 @@ export default function WidgetShelf({
       if (res.ok) setLeftovers(l => (l ?? []).filter(o => o.id !== id));
     } catch {}
   }
+  // Remove every listed widget's data, after a confirming second press.
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [removingAll, setRemovingAll] = useState(false);
+  async function removeAllLeftovers() {
+    setConfirmAll(false);
+    setRemovingAll(true);
+    for (const o of leftovers ?? []) await removeLeftover(o.id);
+    setRemovingAll(false);
+  }
   const fmtBytes = (b: number) => b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`;
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const dragging = useRef(false);
@@ -281,7 +290,7 @@ export default function WidgetShelf({
       </div>
       {leftoversOpen && (
         <div className="px-3 pb-3">
-          <div className="rounded-xl border border-[var(--surface-border)] p-2 text-xs text-[var(--text-secondary)]">
+          <div className="rounded-xl border border-[var(--surface-border)] p-2 text-sm text-[var(--text-secondary)]">
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="font-medium">Leftover data</span>
               <button onClick={() => setLeftoversOpen(false)} aria-label="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`}>
@@ -311,6 +320,21 @@ export default function WidgetShelf({
                   </li>
                 ))}
               </ul>
+            )}
+            {!!leftovers?.length && (
+              <div className="flex items-center justify-end gap-1.5 mt-2">
+                {confirmAll ? (
+                  <>
+                    <span className="mr-auto text-[var(--text-primary)]">Remove all {leftovers.length}?</span>
+                    <button onClick={removeAllLeftovers} className={`h-7 px-2.5 rounded-lg font-medium bg-black/10 dark:bg-white/15 text-red-600 dark:text-red-400 hover:bg-black/15 dark:hover:bg-white/20 ${FOCUS_RING}`}>Remove</button>
+                    <button onClick={() => setConfirmAll(false)} className={`h-7 px-2.5 rounded-lg bg-black/5 dark:bg-white/10 text-[var(--text-primary)] hover:bg-black/10 dark:hover:bg-white/15 ${FOCUS_RING}`}>Keep</button>
+                  </>
+                ) : (
+                  <button onClick={() => setConfirmAll(true)} disabled={removingAll} className={`h-7 px-2.5 rounded-lg bg-black/5 dark:bg-white/10 text-[var(--text-primary)] hover:bg-black/10 dark:hover:bg-white/15 disabled:opacity-50 ${FOCUS_RING}`}>
+                    {removingAll ? "Removing..." : "Remove all"}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
