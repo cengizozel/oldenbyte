@@ -146,7 +146,7 @@ function ViewToggle({ c, view, onChange }: { c: ColorClasses; view: View; onChan
             title={o.title}
             aria-label={o.title}
             aria-pressed={active}
-            className={`${HIT_AREA} ${FOCUS_RING} transition-colors ${active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.icon} opacity-40 hover:opacity-80`}`}
+            className={`${HIT_AREA} ${FOCUS_RING} transition-colors ${active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.icon} opacity-70 hover:opacity-100`}`}
           >
             <Icon size={14} />
           </button>
@@ -282,18 +282,18 @@ export default function BookmarksWidget({
                   disabled={iconSize <= ICON_MIN}
                   title="Smaller icons"
                   aria-label="Smaller icons"
-                  className={`${HIT_AREA} ${FOCUS_RING} ${c.icon} opacity-40 hover:opacity-80 disabled:opacity-15 transition-opacity`}
+                  className={`${HIT_AREA} ${FOCUS_RING} ${c.icon} opacity-70 hover:opacity-100 disabled:opacity-15 transition-opacity`}
                 >
-                  <Minus size={12} />
+                  <Minus size={14} />
                 </button>
                 <button
                   onClick={() => changeIconSize(ICON_STEP)}
                   disabled={iconSize >= ICON_MAX}
                   title="Larger icons"
                   aria-label="Larger icons"
-                  className={`${HIT_AREA} ${FOCUS_RING} ${c.icon} opacity-40 hover:opacity-80 disabled:opacity-15 transition-opacity`}
+                  className={`${HIT_AREA} ${FOCUS_RING} ${c.icon} opacity-70 hover:opacity-100 disabled:opacity-15 transition-opacity`}
                 >
-                  <Plus size={12} />
+                  <Plus size={14} />
                 </button>
               </div>
             )}

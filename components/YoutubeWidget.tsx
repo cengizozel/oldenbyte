@@ -481,7 +481,7 @@ export default function YoutubeWidget({
                 <>
                   <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
                     <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
-                    <a href={hrefFor(selected)} target="_blank" rel="noopener noreferrer" className={`shrink-0 opacity-40 hover:opacity-80 ${HIT_AREA} ${FOCUS_RING}`} title={onTa(selected) ? "Watch on TubeArchivist" : "Watch on YouTube"} aria-label={onTa(selected) ? "Watch on TubeArchivist" : "Watch on YouTube"}>
+                    <a href={hrefFor(selected)} target="_blank" rel="noopener noreferrer" className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`} title={onTa(selected) ? "Watch on TubeArchivist" : "Watch on YouTube"} aria-label={onTa(selected) ? "Watch on TubeArchivist" : "Watch on YouTube"}>
                       <ExternalLink size={12} />
                     </a>
                   </div>
