@@ -493,9 +493,11 @@ export function SettingsListRow({
 }) {
   return (
     <div ref={rowRef} style={style} className={`flex flex-col px-3 rounded-lg bg-black/5 dark:bg-white/10 divide-y divide-black/10 dark:divide-white/10 ${className}`}>
-      <div className="flex items-center gap-2 min-h-9 py-1">
+      {/* The item's own row is a header band: a darker strip with the name in
+          semibold, so it never reads as one more control. */}
+      <div className="flex items-center gap-2 min-h-9 py-1 -mx-3 px-3 rounded-t-lg bg-black/5 dark:bg-white/10 last:rounded-b-lg">
         {leading}
-        <div className="flex-1 min-w-0 flex items-center text-sm">{title}</div>
+        <div className="flex-1 min-w-0 flex items-center text-sm font-semibold [&_input]:font-semibold">{title}</div>
         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
       </div>
       {children}
