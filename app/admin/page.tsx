@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Toggle from "@/components/ui/Toggle";
+import { FOCUS_RING } from "@/components/ui/Field";
 import {
   Loader, ArrowLeft, KeyRound, Trash2, Copy, Check, ShieldCheck, AlertTriangle,
 } from "lucide-react";
@@ -19,7 +21,14 @@ type Config = { registrationEnabled: boolean; hasInvite: boolean; feedCacheMinut
 const cardClass =
   "bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl p-5 shadow-sm";
 const inputClass =
-  "text-sm border border-[var(--surface-border)] rounded-xl px-3 py-2 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]";
+  "text-sm h-10 border border-[var(--surface-border)] rounded-xl px-3 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]";
+
+// The same hierarchy as a widget's settings face: a section title, labels in
+// the primary color, hints one step quieter, nothing below 14px.
+const SECTION_TITLE = "text-base font-semibold text-[var(--text-primary)]";
+const LABEL = "text-sm font-medium text-[var(--text-primary)]";
+const HINT = "text-sm text-[var(--text-secondary)]";
+const SECONDARY_BUTTON = "bg-black/5 dark:bg-white/10 text-[var(--text-primary)] hover:bg-black/10 dark:hover:bg-white/15 transition-colors";
 
 function fmtDate(iso: string): string {
   try {
@@ -42,9 +51,9 @@ function CopyBox({ value }: { value: string }) {
     <button
       onClick={copy}
       title="Copy"
-      className="inline-flex items-center gap-1.5 font-mono text-xs bg-[var(--w-amber-bg)] border border-[var(--w-amber-border)] text-[var(--w-amber-text)] rounded-lg px-2 py-1 hover:opacity-80 transition-opacity"
+      className="inline-flex items-center gap-1.5 font-mono text-sm bg-[var(--w-amber-bg)] border border-[var(--w-amber-border)] text-[var(--w-amber-text)] rounded-lg px-2 py-1 hover:opacity-80 transition-opacity"
     >
-      {copied ? <Check size={12} /> : <Copy size={12} />}
+      {copied ? <Check size={14} /> : <Copy size={14} />}
       <span>{value}</span>
     </button>
   );
@@ -215,89 +224,83 @@ export default function AdminPage() {
   return (
     <main className="min-h-screen bg-[var(--page-bg)] px-5 py-8">
       <div className="max-w-2xl mx-auto flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-medium text-[var(--text-primary)]">
-            User management
-          </h1>
-          <Link href="/" className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
-            <ArrowLeft size={14} /> Dashboard
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">User management</h1>
+          <Link href="/" className={`flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm ${SECONDARY_BUTTON} ${FOCUS_RING}`}>
+            <ArrowLeft size={16} /> Dashboard
           </Link>
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm bg-[var(--w-rose-bg)] border border-[var(--w-rose-border)] text-[var(--w-rose-text)]">
-            <AlertTriangle size={14} /> {error}
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm bg-[var(--w-rose-bg)] border border-[var(--w-rose-border)] text-[var(--w-rose-text)]">
+            <AlertTriangle size={16} className="shrink-0" /> {error}
           </div>
         )}
 
         {/* Users */}
         <section className={cardClass}>
-          <span className="text-xs text-[var(--text-muted)]">Users</span>
+          <h2 className={SECTION_TITLE}>Users</h2>
           {!users ? (
-            <div className="flex items-center gap-2 mt-3 text-sm text-[var(--text-muted)]">
-              <Loader size={14} className="animate-spin" /> Loading…
+            <div className={`flex items-center gap-2 mt-4 ${HINT}`}>
+              <Loader size={16} className="animate-spin" /> Loading
             </div>
           ) : users.length === 0 ? (
-            <p className="mt-3 text-sm text-[var(--text-muted)]">No users.</p>
+            <p className={`mt-4 ${HINT}`}>No users.</p>
           ) : (
-            <div className="mt-3 flex flex-col divide-y divide-[var(--surface-border)]">
+            <div className="mt-4 flex flex-col divide-y divide-[var(--surface-border)]">
               {users.map(u => (
-                <div key={u.id} className="py-3 flex flex-col gap-2 first:pt-0 last:pb-0">
+                <div key={u.id} className="py-4 flex flex-col gap-3 first:pt-0 last:pb-0">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm text-[var(--text-primary)] truncate">{u.username}</span>
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                      <span className="text-base font-medium text-[var(--text-primary)] truncate">{u.username}</span>
                       <span
-                        className={`shrink-0 inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md ${
+                        className={`shrink-0 inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded-md ${
                           u.role === "admin"
-                            ? "bg-[var(--w-sky-bg)] border border-[var(--w-sky-border)] text-[var(--w-sky-label)]"
-                            : "bg-[var(--w-neutral-bg)] border border-[var(--w-neutral-border)] text-[var(--w-neutral-label)]"
+                            ? "bg-[var(--w-sky-bg)] border border-[var(--w-sky-border)] text-[var(--w-sky-text)]"
+                            : "bg-[var(--w-neutral-bg)] border border-[var(--w-neutral-border)] text-[var(--w-neutral-text)]"
                         }`}
                       >
-                        {u.role === "admin" && <ShieldCheck size={12} />}
-                        {u.role}
+                        {u.role === "admin" && <ShieldCheck size={14} />}
+                        {u.role === "admin" ? "Admin" : "User"}
                       </span>
-                      {u.id === me.id && (
-                        <span className="shrink-0 text-xs text-[var(--text-muted)]">you</span>
-                      )}
+                      {u.id === me.id && <span className={`shrink-0 ${HINT}`}>you</span>}
                     </div>
-                    <span className="shrink-0 text-xs text-[var(--text-muted)]">{fmtDate(u.createdAt)}</span>
+                    <span className={`shrink-0 ${HINT}`} title="Joined">{fmtDate(u.createdAt)}</span>
                   </div>
 
-                  <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => resetPassword(u.id)}
                       disabled={busy === u.id}
-                      className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:opacity-40 transition-colors"
+                      className={`flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm ${SECONDARY_BUTTON} disabled:opacity-40 ${FOCUS_RING}`}
                     >
-                      {busy === u.id ? <Loader size={12} className="animate-spin" /> : <KeyRound size={12} />}
+                      {busy === u.id ? <Loader size={14} className="animate-spin" /> : <KeyRound size={14} />}
                       Reset password
                     </button>
 
                     {confirmDelete === u.id ? (
-                      <span className="flex items-center gap-2 text-xs text-[var(--w-rose-label)]">
-                        Delete?
-                        <button onClick={() => deleteUser(u.id)} disabled={busy === u.id} className="underline hover:opacity-80 disabled:opacity-40">
-                          Yes
+                      <span className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
+                        Delete {u.username} and their data?
+                        <button onClick={() => deleteUser(u.id)} disabled={busy === u.id} className={`h-8 px-3 rounded-lg text-sm font-medium bg-black/10 dark:bg-white/15 text-red-600 dark:text-red-400 hover:bg-black/15 dark:hover:bg-white/20 disabled:opacity-40 ${FOCUS_RING}`}>
+                          Delete
                         </button>
-                        <button onClick={() => setConfirmDelete(null)} className="underline hover:opacity-80">
-                          No
+                        <button onClick={() => setConfirmDelete(null)} className={`h-8 px-3 rounded-lg text-sm ${SECONDARY_BUTTON} ${FOCUS_RING}`}>
+                          Keep
                         </button>
                       </span>
-                    ) : (
+                    ) : u.id !== me.id && (
                       <button
                         onClick={() => { setConfirmDelete(u.id); setError(""); }}
-                        disabled={u.id === me.id}
-                        title={u.id === me.id ? "You cannot delete your own account" : "Delete"}
-                        className="flex items-center gap-1.5 text-xs text-[var(--w-rose-label)] hover:opacity-80 disabled:opacity-30 disabled:hover:opacity-30 transition-opacity"
+                        className={`flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm bg-black/5 dark:bg-white/10 text-red-600 dark:text-red-400 hover:bg-black/10 dark:hover:bg-white/15 ${FOCUS_RING}`}
                       >
-                        <Trash2 size={12} /> Delete
+                        <Trash2 size={14} /> Delete
                       </button>
                     )}
                   </div>
 
                   {temps[u.id] && (
-                    <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                      <span>Temp password:</span>
+                    <div className="flex items-center gap-2 flex-wrap text-sm text-[var(--text-secondary)]">
+                      <span>Temporary password</span>
                       <CopyBox value={temps[u.id]} />
                     </div>
                   )}
@@ -309,27 +312,25 @@ export default function AdminPage() {
 
         {/* Registration */}
         <section className={cardClass}>
-          <span className="text-xs text-[var(--text-muted)]">Registration</span>
+          <h2 className={SECTION_TITLE}>Registration</h2>
           {!config ? (
-            <div className="flex items-center gap-2 mt-3 text-sm text-[var(--text-muted)]">
-              <Loader size={14} className="animate-spin" /> Loading…
+            <div className={`flex items-center gap-2 mt-4 ${HINT}`}>
+              <Loader size={16} className="animate-spin" /> Loading
             </div>
           ) : (
-            <div className="mt-3 flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[var(--text-secondary)]">Allow new sign-ups</span>
-                <button
-                  onClick={toggleRegistration}
-                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${config.registrationEnabled ? "bg-[var(--text-muted)]" : "bg-[var(--surface-border-focus)]"}`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${config.registrationEnabled ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
+            <div className="mt-4 flex flex-col gap-5">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className={LABEL}>Allow new sign-ups</span>
+                  <span className={HINT}>Anyone with the invite code can create an account.</span>
+                </div>
+                <Toggle checked={config.registrationEnabled} onChange={toggleRegistration} label="Allow new sign-ups" />
               </div>
 
               <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-[var(--text-secondary)]">Invite code</span>
-                  <span className="text-xs text-[var(--text-muted)]">{config.hasInvite ? "Set" : "Not set"}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className={LABEL}>Invite code</span>
+                  <span className={HINT}>{config.hasInvite ? "Set" : "Not set"}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -340,45 +341,53 @@ export default function AdminPage() {
                     value={invite}
                     onChange={e => setInvite(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && saveInvite()}
-                    placeholder={config.hasInvite ? "rotate invite code" : "set invite code"}
-                    className={`${inputClass} flex-1`}
+                    placeholder={config.hasInvite ? "New invite code" : "Invite code"}
+                    aria-label="Invite code"
+                    className={`${inputClass} flex-1 min-w-0`}
                   />
                   <button
                     onClick={saveInvite}
                     disabled={!invite.trim()}
-                    className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl bg-[var(--surface-border)] text-[var(--text-primary)] hover:bg-[var(--surface-border-focus)] disabled:opacity-40 transition-colors"
+                    className={`shrink-0 flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-medium bg-black/10 dark:bg-white/15 text-[var(--text-primary)] hover:bg-black/15 dark:hover:bg-white/20 disabled:opacity-40 ${FOCUS_RING}`}
                   >
-                    <Check size={14} /> Save
+                    <Check size={16} /> Save
                   </button>
                 </div>
-                {configMsg && <p className="text-xs text-[var(--text-muted)]">{configMsg}</p>}
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-sm text-[var(--text-secondary)]">Feed cache</span>
-                  <span className="text-xs text-[var(--text-muted)]">How long feeds (RSS, Reddit, YouTube, HF, arXiv) are served from the server cache before refetching. Widgets can force a refresh anytime.</span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <input
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={config.feedCacheMinutes}
-                    onChange={e => {
-                      const v = parseInt(e.target.value);
-                      setConfig(c => (c ? { ...c, feedCacheMinutes: Number.isFinite(v) ? v : c.feedCacheMinutes } : c));
-                    }}
-                    onBlur={e => saveFeedCache(parseInt(e.target.value))}
-                    onKeyDown={e => e.key === "Enter" && saveFeedCache(parseInt((e.target as HTMLInputElement).value))}
-                    className={`${inputClass} w-20 text-center`}
-                  />
-                  <span className="text-xs text-[var(--text-muted)]">min</span>
-                </div>
+                {configMsg && <p className={HINT}>{configMsg}</p>}
               </div>
             </div>
           )}
         </section>
+
+        {/* Server */}
+        {config && (
+          <section className={cardClass}>
+            <h2 className={SECTION_TITLE}>Server</h2>
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-0.5">
+                <span className={LABEL}>Feed cache</span>
+                <span className={HINT}>How long feeds (RSS, Reddit, YouTube, HF, arXiv) are served from the server cache before refetching. Widgets can still force a refresh.</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <input
+                  type="number"
+                  min={1}
+                  max={1440}
+                  value={config.feedCacheMinutes}
+                  aria-label="Feed cache in minutes"
+                  onChange={e => {
+                    const v = parseInt(e.target.value);
+                    setConfig(c => (c ? { ...c, feedCacheMinutes: Number.isFinite(v) ? v : c.feedCacheMinutes } : c));
+                  }}
+                  onBlur={e => saveFeedCache(parseInt(e.target.value))}
+                  onKeyDown={e => e.key === "Enter" && saveFeedCache(parseInt((e.target as HTMLInputElement).value))}
+                  className={`${inputClass} w-20 text-center tabular-nums`}
+                />
+                <span className="text-sm text-[var(--text-secondary)]">min</span>
+              </div>
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );
