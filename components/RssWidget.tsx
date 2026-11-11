@@ -2,13 +2,15 @@
 
 import { useT } from "@/lib/useT";
 import { useState, useEffect, useRef } from "react";
-import { Rss } from "lucide-react";
+import { Rss, Heart } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { localDateStr } from "@/lib/format";
 import { parseJson } from "@/lib/text";
 import FlipCard from "@/components/ui/FlipCard";
-import { SettingsInput } from "@/components/ui/Field";
+import { SettingsInput, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
+import { timeAgo } from "@/lib/chat/format";
+import { favoriteId, loadFavorites, refreshFavorites, subscribeFavorites, toggleFavorite, type Favorite } from "@/lib/favorites";
 import { useScrollFade } from "@/lib/useScrollFade";
 import { WidgetHeader, Chip, RefreshButton, ScrollFades, LoadingState, EmptyState, SettingsFace, SettingsField, SettingsError } from "@/components/ui/WidgetChrome";
 
@@ -47,6 +49,33 @@ export default function RssWidget({
   // over (or be cached under) a newer config.
   const fetchAbort = useRef<AbortController | null>(null);
 
+  // Favorites (lib/favorites): the hearts, and the list the header heart opens.
+  // Unhearting in that list keeps the item there until it is closed, so a
+  // slip of the finger can be undone with another tap.
+  const [favs, setFavs] = useState<Favorite[]>([]);
+  const [favView, setFavView] = useState<Favorite[] | null>(null);
+  useEffect(() => {
+    loadFavorites().then(setFavs);
+    return subscribeFavorites(setFavs);
+  }, []);
+  const favIds = new Set(favs.map(f => f.id));
+  const feedName = config.name || widget.title;
+  const favList = favView
+    ? [...favs, ...favView.filter(f => !favIds.has(f.id))].sort((a, b) => b.savedAt - a.savedAt)
+    : [];
+  const heart = (on: boolean, item: { title: string; link: string; pubDate?: string }, source: string) => (
+    <button
+      type="button"
+      onClick={() => toggleFavorite(item, source)}
+      aria-pressed={on}
+      title={on ? "Remove from favorites" : "Add to favorites"}
+      aria-label={on ? "Remove from favorites" : "Add to favorites"}
+      className={`shrink-0 mt-0.5 ${HIT_AREA} ${FOCUS_RING} transition-opacity ${on ? "text-rose-500 opacity-100" : `${c.label} opacity-0 group-hover/item:opacity-70 hover:!opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-50`}`}
+    >
+      <Heart size={14} fill={on ? "currentColor" : "none"} />
+    </button>
+  );
+
   useEffect(() => {
     storage.getItem(storageKey).then(async saved => {
       if (!saved) return;
@@ -76,6 +105,7 @@ export default function RssWidget({
       const data: RssItem[] = await res.json();
       if (!Array.isArray(data) || !data.length) throw new Error("No items found.");
       setItems(data);
+      refreshFavorites(data);
       await storage.setItem(cacheKey, JSON.stringify(data));
       return true;
     } catch (e) {
@@ -114,24 +144,53 @@ export default function RssWidget({
             onSettings={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
             c={c}
             icon={Rss}
-            title={config.name || widget.title}
+            title={favView ? "Favorites" : feedName}
             right={
               <>
-                <RefreshButton c={c} busy={loading} onClick={() => fetchFeed(config.url, config.limit, `${storageKey}-${today}`, true)} />
+                <button
+                  type="button"
+                  onClick={() => setFavView(v => (v ? null : favs))}
+                  aria-pressed={!!favView}
+                  title={favView ? "Back to the feed" : "Favorites"}
+                  aria-label={favView ? "Back to the feed" : "Favorites"}
+                  className={`${favView ? "opacity-100 text-rose-500" : `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${c.icon}`} ${HIT_AREA} ${FOCUS_RING}`}
+                >
+                  <Heart size={14} fill={favView ? "currentColor" : "none"} />
+                </button>
+                {!favView && <RefreshButton c={c} busy={loading} onClick={() => fetchFeed(config.url, config.limit, `${storageKey}-${today}`, true)} />}
               </>
             }
           />
           <div className="flex-1 min-h-0 relative">
             <div ref={scrollRef} className="absolute inset-0 overflow-y-auto pr-3" onScroll={onScroll}>
-              {loading && !items.length ? (
+              {favView ? (
+                favList.length ? (
+                  <ul className="flex flex-col">
+                    {favList.map((f, i) => (
+                      <li key={f.id} className={`group/item flex items-start gap-2 py-2 first:pt-0 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
+                        <div className="flex-1 min-w-0">
+                          <a href={f.link} target="_blank" rel="noopener noreferrer" className={`text-sm font-medium leading-snug break-words ${c.text} hover:opacity-70 transition-opacity`}>
+                            {f.title}
+                          </a>
+                          <p className={`text-sm mt-0.5 ${c.label}`}>{f.source} · saved {timeAgo(f.savedAt)}</p>
+                        </div>
+                        {heart(favIds.has(f.id), { title: f.title, link: f.link, pubDate: f.publishedAt }, f.source)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <EmptyState c={c}>Heart an item to keep it here. Favorites are yours, not this widget&apos;s.</EmptyState>
+                )
+              ) : loading && !items.length ? (
                 <LoadingState c={c} />
               ) : items.length ? (
                 <ul className="flex flex-col">
                   {items.map((item, i) => (
-                    <li key={i} className={`py-2 first:pt-0 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
-                      <a href={item.link} target="_blank" rel="noopener noreferrer" className={`text-sm font-medium leading-snug break-words ${c.text} hover:opacity-70 transition-opacity`}>
+                    <li key={i} className={`group/item flex items-start gap-2 py-2 first:pt-0 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
+                      <a href={item.link} target="_blank" rel="noopener noreferrer" className={`flex-1 min-w-0 text-sm font-medium leading-snug break-words ${c.text} hover:opacity-70 transition-opacity`}>
                         {item.title}
                       </a>
+                      {heart(favIds.has(favoriteId(item.link, item.title)), item, feedName)}
                     </li>
                   ))}
                 </ul>

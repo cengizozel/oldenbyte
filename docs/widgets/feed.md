@@ -26,3 +26,8 @@ Feed parsing happens server-side in `GET /api/rss?url=…&limit=…` (`parseFeed
 ## Scroll Fades
 
 The feed list uses `position: absolute; overflow-y: auto` inside a relative container. A `ResizeObserver` and scroll event listener track scroll position and toggle top/bottom gradient fade overlays that blend into the widget background color.
+
+## Favorites
+
+The heart beside an item saves it; the heart in the header lists every favorite, newest first, with the feed it came from. Favorites belong to the user, not the widget (`lib/favorites.ts`, key `favorites`): delete the Feed widget, add another, and they are still there, and every Feed widget on the page shows the same hearts. An item is identified by its link with the host lowercased, `www.` and a trailing slash dropped, and tracking parameters (`utm_*`, `fbclid`, `gclid` and similar) removed, so a story that leaves the feed and comes back, or comes back with a different tracking tag, is still the same favorite. A feed that edits a saved item's headline updates the saved title when the item is next shown. Unhearting in the favorites list keeps the item there until the list is closed, so a mistaken tap can be undone.
+
