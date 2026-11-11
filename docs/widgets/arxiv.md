@@ -6,7 +6,7 @@ Displays the latest papers from a chosen research field fetched from arXiv RSS f
 
 | Key | Value |
 |---|---|
-| `arxiv-widget-{id}` | JSON: `{ category: string }` (default `cs.AI`) |
+| `arxiv-widget-{id}` | JSON: `{ category: string; limit?: number }` (defaults `cs.AI`, 25 papers; 5, 10, 25 or 50) |
 | `arxiv-widget-{id}-{YYYY-MM-DD}` | Daily cache: `{ papers: Paper[] }` |
 
 On load the widget paints today's cache entry, if there is one, and then always refetches and overwrites it. A failed fetch leaves the cached list in place. Changing the category clears the day's cache and fetches the new one. The refresh button adds `refresh=1` to bypass the server feed cache.

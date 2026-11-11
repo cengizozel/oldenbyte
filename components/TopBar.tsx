@@ -347,16 +347,27 @@ function SegmentClock({ time, height }: { time: Date; height: number }) {
   );
 }
 
-const FORMAT_OPTIONS: { value: DateFormat; label: string }[] = [
-  { value: "date-long",    label: "Monday, April 14, 2026" },
-  { value: "date-medium",  label: "April 14, 2026" },
-  { value: "date-short",   label: "Apr 14" },
-  { value: "time-12",      label: "2:30 PM" },
-  { value: "time-24",      label: "14:30" },
-  { value: "datetime-12",  label: "Apr 14 · 2:30 PM" },
-  { value: "datetime-24",  label: "Apr 14 · 14:30" },
-  { value: "analog",       label: "Analog clock" },
-  { value: "segments",     label: "Retro digital" },
+// The format picker is a small gallery: each tile previews the live clock in
+// that format, grouped from the most to the least date and then the clocks.
+// `wide` tiles take the full row (the long date needs it).
+const FORMAT_GROUPS: { title: string; options: { value: DateFormat; label: string; wide?: boolean }[] }[] = [
+  { title: "Date", options: [
+    { value: "date-long", label: "Full date", wide: true },
+    { value: "date-medium", label: "Date" },
+    { value: "date-short", label: "Short date" },
+  ] },
+  { title: "Date and time", options: [
+    { value: "datetime-12", label: "12-hour" },
+    { value: "datetime-24", label: "24-hour" },
+  ] },
+  { title: "Time", options: [
+    { value: "time-12", label: "12-hour" },
+    { value: "time-24", label: "24-hour" },
+  ] },
+  { title: "Clocks", options: [
+    { value: "analog", label: "Analog" },
+    { value: "segments", label: "Retro digital" },
+  ] },
 ];
 
 const NEEDS_SECONDS: DateFormat[] = ["time-12", "time-24", "datetime-12", "datetime-24", "analog", "segments"];
@@ -429,25 +440,37 @@ function DateDisplay({ timezone }: { timezone: string }) {
       </button>
 
       {open && (
-        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-lg p-3 w-52">
-          <div className="flex flex-col gap-0.5">
-            {FORMAT_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => setDraft(opt.value)}
-                className={`flex items-center gap-2 text-left px-3 py-1.5 rounded-xl text-sm transition-colors ${
-                  draft === opt.value
-                    ? "bg-[var(--surface-border)] text-[var(--text-primary)] font-medium"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-border)]"
-                }`}
-              >
-                {opt.value === "analog"
-                  ? <><AnalogClock time={shown} size={18} /><span>Analog clock</span></>
-                  : opt.value === "segments"
-                  ? <><SegmentClock time={shown} height={18} /><span>Retro digital</span></>
-                  : fmt(shown, opt.value)
-                }
-              </button>
+        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-lg p-3 w-[20rem] max-w-[calc(100vw-2rem)]">
+          <div className="flex flex-col gap-3">
+            {FORMAT_GROUPS.map(group => (
+              <div key={group.title} className="flex flex-col gap-1.5">
+                <p className="text-sm text-[var(--text-secondary)]">{group.title}</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {group.options.map(opt => {
+                    const on = draft === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setDraft(opt.value)}
+                        aria-pressed={on}
+                        className={`${opt.wide ? "col-span-2" : ""} flex flex-col items-center justify-center gap-1 min-h-11 px-2 py-2 rounded-xl border text-center transition-colors ${FOCUS_RING} ${
+                          on
+                            ? "border-[var(--text-muted)] bg-[var(--surface-border)] text-[var(--text-primary)]"
+                            : "border-[var(--surface-border)] text-[var(--text-secondary)] hover:bg-[var(--surface-border)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        <span className="flex items-center justify-center min-h-7 text-sm tabular-nums" suppressHydrationWarning>
+                          {opt.value === "analog" ? <AnalogClock time={shown} size={32} />
+                            : opt.value === "segments" ? <SegmentClock time={shown} height={24} />
+                            : fmt(shown, opt.value)}
+                        </span>
+                        {group.title === "Clocks" ? <span className="text-sm text-[var(--text-muted)]">{opt.label}</span> : <span className="sr-only">{opt.label}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
           </div>
 
@@ -1000,8 +1023,8 @@ function DashboardSwitcher({
                 <GripVertical size={12} />
               </span>
               {confirmId === d.id ? (
-                <div className="flex-1 min-w-0 flex items-center gap-1.5 pl-2 pr-1.5 py-1">
-                  <span className="flex-1 min-w-0 truncate text-sm text-[var(--text-primary)]">Delete {d.name}?</span>
+                <div className="flex-1 min-w-0 flex flex-wrap items-center justify-end gap-1.5 pl-2 pr-1.5 py-1.5">
+                  <span className="w-full min-w-0 break-words text-sm text-[var(--text-primary)]">Delete {d.name} and its widgets?</span>
                   <button type="button" autoFocus onClick={() => { setConfirmId(null); removeDashboard(d.id); }}
                     className={`shrink-0 h-7 px-2.5 rounded-lg text-sm font-medium bg-black/10 dark:bg-white/15 text-red-600 dark:text-red-400 hover:bg-black/15 dark:hover:bg-white/20 ${FOCUS_RING}`}>Delete</button>
                   <button type="button" onClick={() => setConfirmId(null)}

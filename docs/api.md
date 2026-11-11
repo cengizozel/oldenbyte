@@ -362,7 +362,7 @@ Deletes the event object at `href`. Returns `{ "ok": true }`.
 ## RSS
 
 ### `GET /api/rss?url=<feed-url>&limit=<n>`
-Fetches and parses an RSS or Atom feed. Returns up to `limit` items (1 to 20, default 5). Used by the Feed and arXiv widgets.
+Fetches and parses an RSS or Atom feed. Returns up to `limit` items (1 to 50, default 5). Used by the Feed and arXiv widgets.
 
 ```json
 [

@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   if (user instanceof NextResponse) return user;
 
   const url = request.nextUrl.searchParams.get("url");
-  const limit = Math.min(Math.max(1, parseInt(request.nextUrl.searchParams.get("limit") ?? "5") || 5), 20);
+  const limit = Math.min(Math.max(1, parseInt(request.nextUrl.searchParams.get("limit") ?? "5") || 5), 50);
   const force = request.nextUrl.searchParams.get("refresh") === "1";
 
   if (!url || !url.startsWith("http")) {

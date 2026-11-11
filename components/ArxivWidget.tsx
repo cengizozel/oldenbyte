@@ -10,7 +10,7 @@ import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { RefreshButton, ScrollFades, LoadingState, EmptyState, WidgetHeader, BackButton, SettingsFace, SettingsField } from "@/components/ui/WidgetChrome";
+import { RefreshButton, ScrollFades, LoadingState, EmptyState, WidgetHeader, BackButton, SettingsFace, SettingsField, Chip } from "@/components/ui/WidgetChrome";
 
 const CATEGORY_GROUPS = [
   {
@@ -141,11 +141,11 @@ function findGroup(categoryValue: string): string {
 }
 
 
-type ArxivConfig = { category: string };
+type ArxivConfig = { category: string; limit?: number };
 type Paper = { title: string; link: string; pubDate: string; content: string };
 type Cache = { papers: Paper[] };
 
-const DEFAULT: ArxivConfig = { category: "cs.AI" };
+const DEFAULT: ArxivConfig = { category: "cs.AI", limit: 25 };
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -208,7 +208,7 @@ export default function ArxivWidget({
     setLoading(true);
     try {
       const load = async (url: string): Promise<Paper[]> => {
-        const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=25${force ? "&refresh=1" : ""}`, { signal: ctrl.signal });
+        const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${cfg.limit ?? 25}${force ? "&refresh=1" : ""}`, { signal: ctrl.signal });
         if (!res.ok) throw new Error();
         return res.json();
       };
@@ -216,7 +216,7 @@ export default function ArxivWidget({
       // weekends and holidays; the search API always has the newest submissions.
       let papers = await load(`https://rss.arxiv.org/rss/${cfg.category}`);
       if (!papers.length) {
-        papers = await load(`https://export.arxiv.org/api/query?search_query=cat:${cfg.category}&sortBy=submittedDate&sortOrder=descending&max_results=25`);
+        papers = await load(`https://export.arxiv.org/api/query?search_query=cat:${cfg.category}&sortBy=submittedDate&sortOrder=descending&max_results=${cfg.limit ?? 25}`);
       }
       if (!papers.length) throw new Error();
       const newCache: Cache = { papers };
@@ -350,7 +350,7 @@ export default function ArxivWidget({
               value={draftGroup.label}
               onChange={e => {
                 const group = CATEGORY_GROUPS.find(g => g.label === e.target.value) ?? CATEGORY_GROUPS[0];
-                setDraft({ category: group.subs[0].value });
+                setDraft(d => ({ ...d, category: group.subs[0].value }));
               }}
             >
               {CATEGORY_GROUPS.map(g => (
@@ -359,11 +359,18 @@ export default function ArxivWidget({
             </SettingsSelect>
           </SettingsField>
           <SettingsField c={c} label="Topic">
-            <SettingsSelect value={draft.category} onChange={e => setDraft({ category: e.target.value })}>
+            <SettingsSelect value={draft.category} onChange={e => setDraft(d => ({ ...d, category: e.target.value }))}>
               {draftGroup.subs.map(sub => (
                 <option key={sub.value} value={sub.value}>{sub.label}</option>
               ))}
             </SettingsSelect>
+          </SettingsField>
+          <SettingsField c={c} label="Papers to show" inline>
+            {[5, 10, 25, 50].map(n => (
+              <Chip key={n} c={c} active={(draft.limit ?? 25) === n} onClick={() => setDraft(d => ({ ...d, limit: n }))}>
+                {n}
+              </Chip>
+            ))}
           </SettingsField>
         </SettingsFace>
       }
