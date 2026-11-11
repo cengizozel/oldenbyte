@@ -191,6 +191,12 @@ export function HeaderToggle({ c, open, onToggle, className = "" }: { c: ColorCl
   );
 }
 
+// Between a widget's own actions and the pair every widget has (settings,
+// full screen): a hairline with a little air, so the eye splits the two.
+export function HeaderDivider({ c }: { c: ColorClasses }) {
+  return <span aria-hidden className={`w-px h-4 mx-1 shrink-0 bg-current opacity-25 ${c.label}`} />;
+}
+
 // Full screen for the tile this widget sits in (lib/widgetFrame.ts). Nothing
 // outside a grid tile (the digest page, previews).
 export function ExpandButton({ c }: { c: ColorClasses }) {
@@ -254,13 +260,14 @@ export function WidgetHeader({
       <>
         {group.iconHost && createPortal(<Icon size={14} className="opacity-50 shrink-0" />, group.iconHost)}
         {group.titleHost && createPortal(<>{title}</>, group.titleHost)}
-        {group.active && group.actionsHost && (after || right || onSettings) && createPortal(
+        {group.active && group.actionsHost && (after || right) && createPortal(
           <div className={`flex-1 flex items-center gap-2 min-w-0 ${className}`}>
             {after}
-            {(right || onSettings) && <div className="ml-auto flex items-center gap-2 shrink-0">{right}{onSettings && <SettingsButton c={c} onClick={onSettings} />}</div>}
+            {right && <div className="ml-auto flex items-center gap-2 shrink-0">{right}</div>}
           </div>,
           group.actionsHost
         )}
+        {group.active && group.settingsHost && onSettings && createPortal(<SettingsButton c={c} onClick={onSettings} />, group.settingsHost)}
       </>
     );
   }
@@ -285,7 +292,14 @@ export function WidgetHeader({
             ) : (
               <>
                 {after}
-                {(right || settings || expand) && <div className="ml-auto flex items-center gap-2 shrink-0">{right}{settings}{expand}</div>}
+                {(right || settings || expand) && (
+                  <div className="ml-auto flex items-center gap-2 shrink-0">
+                    {right}
+                    {(after || right) && (settings || expand) && <HeaderDivider c={c} />}
+                    {settings}
+                    {expand}
+                  </div>
+                )}
               </>
             )}
           </div>

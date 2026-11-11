@@ -4,10 +4,10 @@ import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { Chessboard } from "react-chessboard";
 import type { PieceDropHandlerArgs } from "react-chessboard";
 import { Chess, type Square } from "chess.js";
-import { Swords, RotateCcw, Loader } from "lucide-react";
+import { Swords, Loader, SlidersHorizontal } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { WidgetHeader, SmallButton } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, SmallButton, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 const ENGINE_PATH = "/stockfish/stockfish-18-lite-single.js";
 const MIN_ELO = 1300;
@@ -39,6 +39,9 @@ export default function ChessWidget({
   const [ready, setReady] = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  // Settings face: the engine's strength.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [draftElo, setDraftElo] = useState(1500);
   const [targets, setTargets] = useState<string[]>([]);
 
   // Refs mirror state so the (once-bound) worker callback always reads current values
@@ -228,18 +231,30 @@ export default function ChessWidget({
   else status = (game.turn() === playerColor ? "your move" : "engine's move") + (game.inCheck() ? " · check" : "");
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col h-full ${c.bg} ${c.border} ${c.glow} ${className}`}>
-      <WidgetHeader
-        c={c}
-        icon={Swords}
-        title="Chess"
-        right={
-          <span className={`flex items-center gap-1 text-xs opacity-70 min-w-0 ${c.label}`}>
-            {thinking && <Loader size={12} className="animate-spin shrink-0" />}
-            <span className="truncate">{status}</span>
-          </span>
-        }
-      />
+    <div className={`rounded-2xl border p-5 flex flex-col h-full relative ${c.bg} ${c.border} ${c.glow} ${className}`}>
+      <WidgetHeader c={c} icon={Swords} title="Chess" onSettings={() => { setDraftElo(elo); setSettingsOpen(true); }} />
+
+      {settingsOpen && (
+        <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col gap-3 ${c.bg}`}>
+          <WidgetHeader panel c={c} icon={SlidersHorizontal} title="Settings" />
+          <label className={`flex items-center gap-2 text-sm ${c.label}`}>
+            <span className="opacity-70 tabular-nums w-20 shrink-0">Elo {draftElo}</span>
+            <input
+              type="range"
+              min={MIN_ELO}
+              max={MAX_ELO}
+              step={100}
+              value={draftElo}
+              onChange={e => setDraftElo(parseInt(e.target.value))}
+              className="flex-1 accent-current"
+            />
+          </label>
+          <p className={`text-sm opacity-70 ${c.label}`}>The engine plays at this strength from its next move.</p>
+          <div className="mt-auto">
+            <SaveCancelRow c={c} onSave={() => { changeElo(draftElo); setSettingsOpen(false); }} onCancel={() => setSettingsOpen(false)} />
+          </div>
+        </div>
+      )}
 
       <div ref={contentRef} className="flex-1 min-h-0 flex items-center justify-center">
         {boardSize > 0 && (
@@ -262,25 +277,14 @@ export default function ChessWidget({
         )}
       </div>
 
-      <div className="shrink-0 mt-3 flex flex-col gap-2">
-        <label className={`flex items-center gap-2 text-xs ${c.label}`}>
-          <span className="opacity-70 tabular-nums w-14 shrink-0">Elo {elo}</span>
-          <input
-            type="range"
-            min={MIN_ELO}
-            max={MAX_ELO}
-            step={100}
-            value={elo}
-            onChange={e => changeElo(parseInt(e.target.value))}
-            className="flex-1 accent-current"
-          />
-        </label>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs opacity-70 ${c.label}`}>New game:</span>
-          <SmallButton c={c} onClick={() => newGame("w")}>as White</SmallButton>
-          <SmallButton c={c} onClick={() => newGame("b")}>as Black</SmallButton>
-          <RotateCcw size={14} className={`opacity-30 ${c.label} ml-auto`} />
-        </div>
+      <div className="shrink-0 mt-3 flex items-center gap-2">
+        <span className={`text-sm opacity-70 ${c.label}`}>New game:</span>
+        <SmallButton c={c} onClick={() => newGame("w")}>as White</SmallButton>
+        <SmallButton c={c} onClick={() => newGame("b")}>as Black</SmallButton>
+        <span className={`ml-auto flex items-center gap-1 text-sm opacity-70 min-w-0 ${c.label}`}>
+          {thinking && <Loader size={12} className="animate-spin shrink-0" />}
+          <span className="truncate">{status} · Elo {elo}</span>
+        </span>
       </div>
     </div>
   );

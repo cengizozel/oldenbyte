@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { NotebookPen, Pencil, Check, X, Bold, Italic, Underline, List, History, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { NotebookPen, X, Bold, Italic, Underline, List, History, Trash2, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { formatDate, localDateStr } from "@/lib/format";
 import { decodeEntities, parseJson } from "@/lib/text";
-import { FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
-import { WidgetHeader, Chip, EmptyState } from "@/components/ui/WidgetChrome";
+import { FOCUS_RING, HIT_AREA, SettingsInput } from "@/components/ui/Field";
+import Toggle from "@/components/ui/Toggle";
+import { WidgetHeader, Chip, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 const REGISTRY_KEY = "notepad-registry";
 
@@ -250,7 +251,10 @@ export default function NotebookWidget({
   const [viewDate, setViewDate] = useState(today);
   const [calMonth, setCalMonth] = useState(new Date());
   const [customName, setCustomName] = useState("");
-  const [renaming, setRenaming] = useState(false);
+  // Settings face: the name and whether the month calendar shows.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(true);
+  const [draftCalendar, setDraftCalendar] = useState(true);
   const [draftName, setDraftName] = useState("");
 
   // Past-date tabs: one entry per registered notepad that has data (or is this widget)
@@ -278,6 +282,7 @@ export default function NotebookWidget({
       setOwnNotes({ [day]: todayHtml });
       setLoadState("ready");
     })();
+    storage.getItem(`notebook-${widget.id}-calendar`).then(v => { if (v === "0") setShowCalendar(false); });
     storage.getItem(`notebook-${widget.id}-name`).then(saved => {
       if (saved) setCustomName(saved);
     });
@@ -379,11 +384,13 @@ export default function NotebookWidget({
   const firstDay = getFirstDayOfMonth(year, month);
   const monthLabel = calMonth.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 
-  function saveName() {
+  function saveSettings() {
     const name = draftName.trim();
     setCustomName(name);
     storage.setItem(`notebook-${widget.id}-name`, name);
-    setRenaming(false);
+    setShowCalendar(draftCalendar);
+    storage.setItem(`notebook-${widget.id}-calendar`, draftCalendar ? "1" : "0");
+    setSettingsOpen(false);
   }
 
   function prevMonth() {
@@ -459,46 +466,38 @@ export default function NotebookWidget({
 
       {/* The header spans the tile, so the toggle sits in the corner like
           everywhere else; the note and the calendar share the space below. */}
-      {renaming ? (
-        <div className="flex items-center gap-1.5 mb-3 shrink-0">
-          <span className={`opacity-50 shrink-0 ${c.label}`}><NotebookPen size={14} /></span>
-          <input
-            autoFocus
-            value={draftName}
-            onChange={e => setDraftName(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setRenaming(false); }}
-            placeholder="Name this notepad…"
-            className="flex-1 min-w-0 text-xs border border-[var(--surface-border)] rounded-lg px-2 py-1 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
-          />
-          <button onClick={() => setRenaming(false)} aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0 ${HIT_AREA} ${FOCUS_RING}`}><X size={14} /></button>
-          <button onClick={saveName} aria-label="Save name" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0 ${HIT_AREA} ${FOCUS_RING}`}><Check size={14} /></button>
+      <WidgetHeader
+        c={c}
+        icon={NotebookPen}
+        title={customName || widget.title}
+        onSettings={() => { setDraftName(customName); setDraftCalendar(showCalendar); setSettingsOpen(true); }}
+        right={
+          <button
+            onClick={openHistory}
+            title="All notes"
+            aria-label="All notes"
+            className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+          >
+            <History size={14} />
+          </button>
+        }
+      />
+
+      {settingsOpen && (
+        <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col gap-3 ${c.bg}`}>
+          <WidgetHeader panel c={c} icon={SlidersHorizontal} title="Settings" />
+          <div>
+            <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Name</p>
+            <SettingsInput value={draftName} onChange={e => setDraftName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveSettings()} placeholder={widget.title} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className={`text-sm ${c.label}`}>Calendar</span>
+            <Toggle checked={draftCalendar} onChange={() => setDraftCalendar(v => !v)} label="Show the month calendar" />
+          </div>
+          <div className="mt-auto">
+            <SaveCancelRow c={c} onSave={saveSettings} onCancel={() => setSettingsOpen(false)} />
+          </div>
         </div>
-      ) : (
-        <WidgetHeader
-          c={c}
-          icon={NotebookPen}
-          title={customName || widget.title}
-          right={
-            <>
-              <button
-                onClick={openHistory}
-                title="All notes"
-                aria-label="All notes"
-                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
-              >
-                <History size={14} />
-              </button>
-              <button
-                onClick={() => { setDraftName(customName); setRenaming(true); }}
-                title="Rename"
-                aria-label="Rename"
-                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
-              >
-                <Pencil size={14} />
-              </button>
-            </>
-          }
-        />
       )}
 
       <div className="flex gap-3 flex-1 min-h-0">
@@ -542,6 +541,7 @@ export default function NotebookWidget({
         </div>
 
         {/* Calendar */}
+        {showCalendar && (
         <div className="w-28 min-w-0 flex flex-col gap-2">
 
           <div className="flex items-center justify-between">
@@ -587,6 +587,7 @@ export default function NotebookWidget({
           </div>
 
         </div>
+        )}
       </div>
 
       {/* History overlay: all dated notes across every notepad */}

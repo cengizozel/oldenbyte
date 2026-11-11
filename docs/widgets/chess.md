@@ -1,6 +1,6 @@
 # Chess Widget
 
-Play an ongoing game of chess against the [Stockfish](https://stockfishchess.org/) engine. You play one side; the engine replies automatically. Difficulty is an adjustable Elo, and the game persists between visits.
+Play an ongoing game of chess against the [Stockfish](https://stockfishchess.org/) engine. You play one side; the engine replies automatically. Difficulty is an Elo set in the widget's settings (it applies from the engine's next move), and the game persists between visits. The row under the board starts a new game as either color and shows whose move it is.
 
 ## Storage Keys
 

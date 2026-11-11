@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { SlidersHorizontal } from "lucide-react";
 import { Flag, RotateCcw } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { formatDate, localDateStr } from "@/lib/format";
 import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
-import { LoadingState, ScrollFades, WidgetHeader, SmallButton } from "@/components/ui/WidgetChrome";
+import { LoadingState, ScrollFades, WidgetHeader, SmallButton, Chip, SaveCancelRow } from "@/components/ui/WidgetChrome";
 import { f1CacheKey } from "@/lib/cacheKeys";
 
 type Race = {
@@ -49,6 +50,19 @@ export default function F1Widget({
   const cacheKey = f1CacheKey();
 
   const [data, setData] = useState<F1Data | null>(null);
+  // The one setting: how much of the standings to show under the next race.
+  type Standings = "top3" | "top5" | "hidden";
+  const configKey = `f1-${widget.id}-config`;
+  const [standingsMode, setStandingsMode] = useState<Standings>("top5");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [draftMode, setDraftMode] = useState<Standings>("top5");
+  useEffect(() => {
+    storage.getItem(configKey).then(raw => {
+      const v = parseJson<{ standings?: Standings } | null>(raw, null)?.standings;
+      if (v === "top3" || v === "top5" || v === "hidden") setStandingsMode(v);
+    });
+  }, [configKey]);
+  const rows = standingsMode === "top3" ? 3 : standingsMode === "top5" ? 5 : 0;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([data]);
@@ -86,7 +100,28 @@ export default function F1Widget({
   return (
     <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
 
-      <WidgetHeader c={c} icon={Flag} title="Formula 1" />
+      <WidgetHeader c={c} icon={Flag} title="Formula 1" onSettings={() => { setDraftMode(standingsMode); setSettingsOpen(true); }} />
+
+      {settingsOpen && (
+        <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col gap-3 ${c.bg}`}>
+          <WidgetHeader panel c={c} icon={SlidersHorizontal} title="Settings" />
+          <div>
+            <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Standings</p>
+            <div className="flex gap-1.5">
+              {([["top3", "Top 3"], ["top5", "Top 5"], ["hidden", "Hidden"]] as const).map(([v, label]) => (
+                <Chip key={v} c={c} active={draftMode === v} onClick={() => setDraftMode(v)}>{label}</Chip>
+              ))}
+            </div>
+          </div>
+          <div className="mt-auto">
+            <SaveCancelRow
+              c={c}
+              onSave={() => { setStandingsMode(draftMode); storage.setItem(configKey, JSON.stringify({ standings: draftMode })); setSettingsOpen(false); }}
+              onCancel={() => setSettingsOpen(false)}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 relative">
         <div
@@ -123,14 +158,14 @@ export default function F1Widget({
               )}
 
               {/* Standings */}
-              {data.standings.length > 0 && (
+              {rows > 0 && data.standings.length > 0 && (
                 <>
                   <div className="border-t border-black/10 dark:border-white/10" />
                   <div className="flex flex-col">
                     <p className={`text-xs font-medium opacity-70 mb-1 ${c.label}`}>
                       Standings
                     </p>
-                    {data.standings.map((s, i) => (
+                    {data.standings.slice(0, rows).map((s, i) => (
                       <div
                         key={s.position}
                         className={`flex items-center gap-2 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}

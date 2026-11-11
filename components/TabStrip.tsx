@@ -6,7 +6,7 @@ import { colorMap } from "@/lib/widgets";
 import { FOCUS_RING } from "@/components/ui/Field";
 import type { TabGroupHosts } from "@/lib/tabGroup";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { HEADER_SWAP, HeaderToggle, ExpandButton } from "@/components/ui/WidgetChrome";
+import { HEADER_SWAP, HeaderToggle, ExpandButton, HeaderDivider } from "@/components/ui/WidgetChrome";
 import { useWidgetFrame } from "@/lib/widgetFrame";
 
 // The header row of a tab group. It sits exactly where a single widget's
@@ -303,7 +303,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   // Host elements for the members' header parts: an icon slot in every tab
   // and the actions slot at the right end. The ref callbacks are stable (one
   // per tab) so React only calls them when the element itself changes.
-  const hosts = useRef<TabGroupHosts>({ icons: {}, titles: {}, actions: null });
+  const hosts = useRef<TabGroupHosts>({ icons: {}, titles: {}, actions: null, settings: null });
   const onHostsRef = useRef(onHosts);
   useEffect(() => { onHostsRef.current = onHosts; }, [onHosts]);
   const slotRefs = useRef(new Map<string, (el: HTMLElement | null) => void>());
@@ -324,8 +324,23 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   // default, and the toggle slides the tabs out and the options in (and
   // back). Every widget has at least full screen there.
   const [showActions, setShowActions] = useState(false);
+  // Whether the shown widget put anything of its own in the row: then a
+  // divider separates it from the common pair (settings, full screen).
+  const [hasActions, setHasActions] = useState(false);
+  const actionsMO = useRef<MutationObserver | null>(null);
   const actionsHost = useCallback((el: HTMLElement | null) => {
     hosts.current = { ...hosts.current, actions: el };
+    onHostsRef.current(hosts.current);
+    actionsMO.current?.disconnect();
+    actionsMO.current = null;
+    if (!el) { setHasActions(false); return; }
+    const sync = () => setHasActions(el.childElementCount > 0);
+    actionsMO.current = new MutationObserver(sync);
+    actionsMO.current.observe(el, { childList: true });
+    sync();
+  }, []);
+  const settingsHost = useCallback((el: HTMLElement | null) => {
+    hosts.current = { ...hosts.current, settings: el };
     onHostsRef.current(hosts.current);
   }, []);
   // Back to the tabs whenever the open tab or the mode changes.
@@ -604,7 +619,11 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
       ) : (
         <div inert={!showActions} className={`${HEADER_SWAP.pane} ${showActions ? "" : HEADER_SWAP.paneHidden}`}>
           <div ref={actionsHost} className="flex-1 min-w-0 flex items-center gap-2 empty:hidden" />
-          <div className="ml-auto flex items-center gap-2 shrink-0"><ExpandButton c={c} /></div>
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            {hasActions && <HeaderDivider c={c} />}
+            <span ref={settingsHost} className="contents" />
+            <ExpandButton c={c} />
+          </div>
         </div>
       )}
       </div>

@@ -330,7 +330,7 @@ export default function WidgetGrid({
     const prev = tabHosts.current.get(containerId);
     const sameMap = (a: Record<string, HTMLElement | null>, b: Record<string, HTMLElement | null>) =>
       Object.keys({ ...a, ...b }).every(k => (a[k] ?? null) === (b[k] ?? null));
-    const same = prev && prev.actions === hosts.actions && sameMap(prev.icons, hosts.icons) && sameMap(prev.titles, hosts.titles);
+    const same = prev && prev.actions === hosts.actions && prev.settings === hosts.settings && sameMap(prev.icons, hosts.icons) && sameMap(prev.titles, hosts.titles);
     if (same) return;
     tabHosts.current.set(containerId, hosts);
     setTabHostsVersion(v => v + 1);
@@ -1115,6 +1115,7 @@ export default function WidgetGrid({
               iconHost: tabHosts.current.get(group)?.icons[id] ?? null,
               titleHost: tabHosts.current.get(group)?.titles[id] ?? null,
               actionsHost: tabHosts.current.get(group)?.actions ?? null,
+              settingsHost: tabHosts.current.get(group)?.settings ?? null,
             }}
           >
             {renderWidget(instances[id], extraClass, bankDefs)}

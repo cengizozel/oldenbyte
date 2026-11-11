@@ -43,6 +43,6 @@ Notes are saved with a 600ms debounce after each keystroke to avoid excessive AP
 
 ## Renaming
 
-A pencil icon appears on hover in the widget header. Clicking it opens an inline rename input. The name is saved to `notebook-{id}-name` and displayed next to the icon in the header.
+Settings (the header's settings control) hold the notepad's name, saved to `notebook-{id}-name` and shown in the header, and whether the month calendar shows, saved to `notebook-{id}-calendar` (`"0"` hides it; the note then takes the full width).
 
 Notepad is not `digestable`. The chat's `read_widget` tool can still read it.

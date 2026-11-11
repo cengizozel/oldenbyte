@@ -10,6 +10,10 @@ export type TabGroupHosts = {
   icons: Record<string, HTMLElement | null>;
   titles: Record<string, HTMLElement | null>;
   actions: HTMLElement | null;
+  // The row's common group (settings, then full screen): the shown widget's
+  // settings control goes here, so a divider can sit between its own
+  // actions and the pair every widget has.
+  settings: HTMLElement | null;
 };
 
 export type TabGroupMembership = {
@@ -18,6 +22,7 @@ export type TabGroupMembership = {
   iconHost: HTMLElement | null;
   titleHost: HTMLElement | null;
   actionsHost: HTMLElement | null;
+  settingsHost: HTMLElement | null;
 };
 
 export const TabGroupContext = createContext<TabGroupMembership | null>(null);
