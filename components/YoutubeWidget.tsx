@@ -2,7 +2,7 @@
 
 import { useT } from "@/lib/useT";
 import { useState, useEffect, useRef } from "react";
-import { Loader, Plus, X, PlaySquare, ExternalLink } from "lucide-react";
+import { Loader, Plus, X, PlaySquare } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { timeAgo, formatCount, formatClock, localDateStr } from "@/lib/format";
@@ -478,10 +478,7 @@ export default function YoutubeWidget({
               {selected && (
                 <>
                   <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
-                    <span className="flex-1 min-w-0 text-xs font-medium truncate opacity-80">{selected.title}</span>
-                    <a href={hrefFor(selected)} target="_blank" rel="noopener noreferrer" className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`} title={onTa(selected) ? "Watch on TubeArchivist" : "Watch on YouTube"} aria-label={onTa(selected) ? "Watch on TubeArchivist" : "Watch on YouTube"}>
-                      <ExternalLink size={12} />
-                    </a>
+                    <span className="flex-1 min-w-0 text-sm font-medium truncate opacity-80">{selected.title}</span>
                   </div>
                   <div className="flex-1 min-h-0 overflow-y-auto pr-3">
                     <div className="flex gap-2 mb-2">
@@ -492,7 +489,7 @@ export default function YoutubeWidget({
                           <img src={thumbUrl(selected.link, true)} alt="" onLoad={unpulse} className="w-full aspect-video object-cover rounded-xl bg-black/10 dark:bg-white/10 animate-pulse" />
                         </a>
                       ) : (
-                        <p className={`flex-1 min-w-0 self-center text-sm font-medium leading-snug break-words ${c.text}`}>{selected.title}</p>
+                        <a href={hrefFor(selected)} target="_blank" rel="noopener noreferrer" className={`flex-1 min-w-0 self-center text-sm font-medium leading-snug break-words hover:underline underline-offset-2 ${c.text} ${FOCUS_RING}`}>{selected.title}</a>
                       )}
                     </div>
                     {loadingDetails ? (
