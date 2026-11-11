@@ -4,7 +4,7 @@
 // server-side by lib/widgetData.ts.
 
 import * as storage from "@/lib/storage";
-import { getActiveDataKeys } from "@/lib/dashboards";
+import { getActiveDataKeys, instancesKey, type DashboardsState } from "@/lib/dashboards";
 import { parseJson } from "@/lib/text";
 
 type TabLayoutItem = { i: string; tabs?: string[] };
@@ -72,4 +72,33 @@ export async function listDashboardWidgets(): Promise<WidgetRosterItem[]> {
   return ids
     .filter(id => instances[id] && ENTRY_TYPES.has(instances[id].type))
     .map(id => ({ id, title: instances[id].title, type: instances[id].type }));
+}
+
+/**
+ * The Kiwix servers the user's Kiwix widgets already point at, across every
+ * dashboard, so another feature (the Assistant's lookup) can offer them
+ * instead of asking for the address again. Widgets on the same server are
+ * merged into one entry (addresses compared without case or a trailing
+ * slash); different servers give several entries, most used first.
+ */
+export type KnownKiwixServer = { url: string; widgets: number; sources: string[] };
+export async function listKiwixServers(): Promise<KnownKiwixServer[]> {
+  const dashboards = await readJSON<DashboardsState>("dashboards");
+  const ids = dashboards?.list?.length ? dashboards.list.map(d => d.id) : ["default"];
+  const byUrl = new Map<string, KnownKiwixServer>();
+  for (const dashId of ids) {
+    const instances = await readJSON<Record<string, WidgetInstance>>(instancesKey(dashId));
+    for (const w of Object.values(instances ?? {})) {
+      if (w.type !== "kiwix") continue;
+      const cfg = await readJSON<{ baseUrl?: string; sourceTitle?: string }>(`kiwix-widget-${w.id}`);
+      const url = (cfg?.baseUrl ?? "").trim().replace(/\/+$/, "");
+      if (!/^https?:\/\//i.test(url)) continue;
+      const key = url.toLowerCase();
+      const entry = byUrl.get(key) ?? { url, widgets: 0, sources: [] };
+      entry.widgets++;
+      if (cfg?.sourceTitle && !entry.sources.includes(cfg.sourceTitle)) entry.sources.push(cfg.sourceTitle);
+      byUrl.set(key, entry);
+    }
+  }
+  return [...byUrl.values()].sort((a, b) => b.widgets - a.widgets);
 }
