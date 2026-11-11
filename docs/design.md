@@ -115,9 +115,15 @@ the palette `label` color at 50% opacity.
   do not draw their own header row: `WidgetHeader` renders into the tab row
   through `lib/tabGroup.ts`, and they lose their top padding, so the first
   content line sits at the same height in a group as in a single widget.
-  In layout edit mode a press on a tab name drags that tab along the row to
-  reorder; a press anywhere else on the tile, the row's empty space included,
-  moves the tile.
+  In layout edit mode a press on a tab drags it along the row to reorder,
+  and the row auto-scrolls while the tab is held near either end; a press
+  anywhere else on the tile, the row's empty space included, moves the tile.
+  When the row is wider than the card it scrolls by drag (with momentum), by
+  the mouse wheel, and to the chosen tab on selection. Past either end it
+  glows like Android's edge effect: the glow grows with how far you keep
+  pulling and stays while held, fades on release, and a fling into the end
+  gives a burst sized by its speed. The glow sits at the tab list's own edge,
+  inside the header actions.
 - Chip (`Chip`): the small toggle used for modes and options. 28px tall,
   `text-sm`, `rounded-md`; the active chip has the translucent fill, inactive
   chips sit at 70% opacity.

@@ -18,9 +18,13 @@ import type { TabGroupHosts } from "@/lib/tabGroup";
 // motion gets a plain short slide. Every member's header renders its icon (and the shown one its
 // actions) into this row through lib/tabGroup.ts.
 //
-// Clicking a tab shows it, and the row scrolls so the whole tab is in view
-// when the row is wider than the card; dragging the row scrolls it, with
-// momentum on release and a short glow at the edge when it hits the end. In layout
+// Clicking a tab (its icon or its name) shows it, and the row scrolls so the
+// whole tab is in view when the row is wider than the card. The row scrolls by
+// dragging (with momentum on release) and by the mouse wheel. Past either end
+// it glows the way Android's edge effect does: pulling further while held
+// grows the glow and keeps it there, letting go fades it, and a fling into the
+// end gives a burst in proportion to its speed. The glow sits at the edge of
+// the tab list itself, inside the header actions. In layout
 // edit mode a drag reorders instead, the way browser tabs move: the tab itself travels
 // under the pointer, the others slide out of its way (the same live preview
 // as the dashboard list and the bookmarks), and the move commits on release.
@@ -77,27 +81,58 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   const dragRef = useRef<Drag | null>(null);
   // `scroll` is set when a press scrolls the row (view mode) instead of
   // reordering (edit mode): the row's scrollLeft when the press began.
-  const press = useRef<{ idx: number; x: number; dragging: boolean; scroll?: number; samples?: { t: number; x: number }[] } | null>(null);
-  // Momentum after a row drag, and the edge glow when the row hits an end.
+  // `startScroll` is the row's scrollLeft when a reorder press began, so the
+  // geometry taken then can be corrected while the row auto-scrolls.
+  const press = useRef<{ idx: number; x: number; dragging: boolean; scroll?: number; startScroll: number; samples?: { t: number; x: number }[] } | null>(null);
   const fling = useRef<number | null>(null);
-  const [edge, setEdge] = useState<{ side: "left" | "right"; n: number } | null>(null);
-  const edgeAt = useRef(0);
-  function flash(side: "left" | "right") {
-    const now = performance.now();
-    if (now - edgeAt.current < 400) return;
-    edgeAt.current = now;
-    setEdge(e => ({ side, n: (e?.n ?? 0) + 1 }));
-  }
   function stopFling() {
     if (fling.current) { cancelAnimationFrame(fling.current); fling.current = null; }
   }
-  // Scroll the row by hand, clamped, flashing the edge it ran into.
-  function scrollRow(list: HTMLDivElement, to: number, speed: number) {
+
+  // The edge glow, after Android's EdgeEffect: onPull grows it with the
+  // distance pulled past the end and keeps it while the pointer is down,
+  // onRelease fades it, onAbsorb bursts it in proportion to a fling's speed.
+  type Glow = { side: "left" | "right"; alpha: number; size: number; held: boolean };
+  const [glow, setGlow] = useState<Glow | null>(null);
+  const glowHeld = useRef(false);
+  const glowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function clearGlowLater() {
+    if (glowTimer.current) clearTimeout(glowTimer.current);
+    glowTimer.current = setTimeout(() => setGlow(null), 400);
+  }
+  function pullGlow(side: "left" | "right", distance: number) {
+    if (glowTimer.current) { clearTimeout(glowTimer.current); glowTimer.current = null; }
+    const d = Math.min(distance, 160);
+    glowHeld.current = true;
+    setGlow({ side, alpha: 0.12 + (d / 160) * 0.45, size: 24 + d * 0.6, held: true });
+  }
+  function releaseGlow() {
+    if (!glowHeld.current) return;
+    glowHeld.current = false;
+    setGlow(g => (g ? { ...g, alpha: 0, held: false } : g));
+    clearGlowLater();
+  }
+  function absorbGlow(side: "left" | "right", speed: number) {
+    glowHeld.current = false;
+    setGlow({ side, alpha: Math.min(0.55, 0.15 + speed * 0.5), size: 40 + Math.min(speed, 1) * 60, held: false });
+    requestAnimationFrame(() => requestAnimationFrame(() => setGlow(g => (g && !g.held ? { ...g, alpha: 0 } : g))));
+    clearGlowLater();
+  }
+  // Scroll the row by hand, clamped. `held` means a finger or button is down
+  // (a pull), otherwise the motion is a fling or a wheel tick.
+  function scrollRow(list: HTMLDivElement, to: number, speed: number, held: boolean) {
     const max = list.scrollWidth - list.clientWidth;
-    if (to < 0) { list.scrollLeft = 0; if (speed > 0.15) flash("left"); return false; }
-    if (to > max) { list.scrollLeft = max; if (speed > 0.15) flash("right"); return false; }
+    if (to < 0) { list.scrollLeft = 0; if (held) pullGlow("left", -to); else if (speed > 0.15) absorbGlow("left", speed); return false; }
+    if (to > max) { list.scrollLeft = max; if (held) pullGlow("right", to - max); else if (speed > 0.15) absorbGlow("right", speed); return false; }
     list.scrollLeft = to;
+    if (held) releaseGlow(); // pulled back inside the row while still holding
     return true;
+  }
+  // Auto-scroll while a tab is dragged near either end of the row.
+  const auto = useRef<{ dir: number; raf: number | null; x: number }>({ dir: 0, raf: null, x: 0 });
+  function stopAuto() {
+    if (auto.current.raf) cancelAnimationFrame(auto.current.raf);
+    auto.current = { dir: 0, raf: null, x: 0 };
   }
   const rects = useRef<DOMRect[]>([]);
   const skipClick = useRef(false);
@@ -110,9 +145,11 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     return 0;
   }
 
-  function slotFromPointer(x: number, idx: number): number {
+  // Slot for a pointer at x; `scrolled` is how far the row has scrolled since
+  // the rects were taken, which moved every tab left by that much on screen.
+  function slotFromPointer(x: number, idx: number, scrolled = 0): number {
     let slot = 0;
-    rects.current.forEach((r, i) => { if (i !== idx && x > r.left + r.width / 2) slot++; });
+    rects.current.forEach((r, i) => { if (i !== idx && x > r.left - scrolled + r.width / 2) slot++; });
     return slot;
   }
 
@@ -124,10 +161,11 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     const i = Number((e.target as Element).closest("[data-tab-index]")?.getAttribute("data-tab-index") ?? -1);
     // Edit mode: only a press on a tab is ours (it reorders); a press on the
     // row's empty space is left to the grid, which moves the whole tile.
-    if (editing) { if (i >= 0) press.current = { idx: i, x: e.clientX, dragging: false }; return; }
     const list = listRef.current;
+    if (!list) return;
     stopFling();
-    if (list && list.scrollWidth > list.clientWidth + 1) press.current = { idx: i, x: e.clientX, dragging: false, scroll: list.scrollLeft, samples: [{ t: e.timeStamp, x: e.clientX }] };
+    if (editing) { if (i >= 0) press.current = { idx: i, x: e.clientX, dragging: false, startScroll: list.scrollLeft }; return; }
+    if (list.scrollWidth > list.clientWidth + 1) press.current = { idx: i, x: e.clientX, dragging: false, scroll: list.scrollLeft, startScroll: list.scrollLeft, samples: [{ t: e.timeStamp, x: e.clientX }] };
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -144,7 +182,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
       const list = listRef.current;
       if (list) {
         const before = list.scrollLeft;
-        scrollRow(list, p.scroll - dx, Math.abs(before - (p.scroll - dx)) / 16);
+        scrollRow(list, p.scroll - dx, Math.abs(before - (p.scroll - dx)) / 16, true);
       }
       p.samples!.push({ t: e.timeStamp, x: e.clientX });
       if (p.samples!.length > 6) p.samples!.shift();
@@ -156,13 +194,46 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
       rects.current = order.map(id => buttons.current.get(id)?.getBoundingClientRect() ?? new DOMRect());
       listRef.current?.setPointerCapture(e.pointerId);
     }
-    // The tab stays inside the row: no further left than the first tab's
-    // edge, no further right than the last tab's.
+    updateReorder(e.clientX);
+    // Near either end of a row that can scroll, keep scrolling while the
+    // pointer stays there, so a tab can be carried past the edge.
+    const list = listRef.current;
+    if (list) {
+      const lr = list.getBoundingClientRect(), zone = 28, max = list.scrollWidth - list.clientWidth;
+      const dir = e.clientX < lr.left + zone && list.scrollLeft > 0 ? -1 : e.clientX > lr.right - zone && list.scrollLeft < max ? 1 : 0;
+      auto.current.x = e.clientX;
+      if (dir !== auto.current.dir) {
+        if (auto.current.raf) cancelAnimationFrame(auto.current.raf);
+        auto.current.dir = dir; auto.current.raf = null;
+        if (dir) {
+          const tick = () => {
+            const l = listRef.current, pr = press.current;
+            if (!l || !pr?.dragging || !auto.current.dir) { auto.current.raf = null; return; }
+            const m = l.scrollWidth - l.clientWidth;
+            l.scrollLeft = Math.max(0, Math.min(m, l.scrollLeft + auto.current.dir * 5));
+            updateReorder(auto.current.x);
+            if ((auto.current.dir < 0 && l.scrollLeft <= 0) || (auto.current.dir > 0 && l.scrollLeft >= m)) { auto.current.dir = 0; auto.current.raf = null; return; }
+            auto.current.raf = requestAnimationFrame(tick);
+          };
+          auto.current.raf = requestAnimationFrame(tick);
+        }
+      }
+    }
+  }
+
+  // The reorder preview for a pointer at x: the dragged tab follows the
+  // pointer (plus whatever the row scrolled since the press, since that moved
+  // its resting spot), clamped to the span of the row, and the others part.
+  function updateReorder(x: number) {
+    const p = press.current, list = listRef.current;
+    if (!p || !list) return;
+    const scrolled = list.scrollLeft - p.startScroll;
     const r = rects.current;
     const me = r[p.idx];
     const lo = (r[0]?.left ?? me.left) - me.left;
     const hi = (r[r.length - 1]?.right ?? me.right) - me.right;
-    const next = { idx: p.idx, over: slotFromPointer(e.clientX, p.idx), dx: Math.max(lo, Math.min(hi, dx)) };
+    const d = Math.max(lo, Math.min(hi, x - p.x));
+    const next = { idx: p.idx, over: slotFromPointer(x, p.idx, scrolled), dx: d + scrolled };
     dragRef.current = next;
     setDrag(next);
   }
@@ -170,9 +241,11 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   function endDrag(commit: boolean) {
     const p = press.current;
     press.current = null;
+    stopAuto();
     if (!p?.dragging) return;
     skipClick.current = true;
     if (p.scroll !== undefined) {
+      releaseGlow();
       // Release: keep going at the pointer's last speed and coast to a stop.
       const list = listRef.current, s = p.samples ?? [];
       if (!commit || !list || s.length < 2) return;
@@ -183,7 +256,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
       const step = (now: number) => {
         const dt = Math.min(32, now - last); last = now;
         v *= Math.exp(-dt / 180);
-        const went = scrollRow(list, list.scrollLeft + v * dt, Math.abs(v));
+        const went = scrollRow(list, list.scrollLeft + v * dt, Math.abs(v), false);
         if (!went || Math.abs(v) < 0.02) { fling.current = null; return; }
         fling.current = requestAnimationFrame(step);
       };
@@ -233,8 +306,29 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     }
   });
 
-  const handlers = useRef({ onPointerDown, onPointerMove, endDrag });
-  handlers.current = { onPointerDown, onPointerMove, endDrag };
+  // The wheel scrolls the row sideways when it can scroll (vertical wheels
+  // too, as horizontal lists usually do).
+  function onWheel(e: WheelEvent) {
+    const list = listRef.current;
+    if (!list || list.scrollWidth <= list.clientWidth + 1) return;
+    const d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (!d) return;
+    e.preventDefault();
+    stopFling();
+    scrollRow(list, list.scrollLeft + d, 0, false);
+  }
+  // A click anywhere on a tab (icon, name, gap inside it) shows it. Handled
+  // natively, like the pointer events, because the icon and name are portals.
+  function onListClick(e: MouseEvent) {
+    const t = e.target as Element;
+    if (t.closest('[aria-label="Ungroup"]')) return;
+    const b = t.closest("[data-tab-index]");
+    if (!b) return;
+    const id = order[Number(b.getAttribute("data-tab-index"))];
+    if (id) onClick(id);
+  }
+  const handlers = useRef({ onPointerDown, onPointerMove, endDrag, onWheel, onListClick });
+  handlers.current = { onPointerDown, onPointerMove, endDrag, onWheel, onListClick };
   useEffect(() => {
     const list = listRef.current;
     if (!list) return;
@@ -242,15 +336,21 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     const move = (e: PointerEvent) => handlers.current.onPointerMove(e);
     const up = () => handlers.current.endDrag(true);
     const cancel = () => handlers.current.endDrag(false);
+    const wheel = (e: WheelEvent) => handlers.current.onWheel(e);
+    const click = (e: MouseEvent) => handlers.current.onListClick(e);
     list.addEventListener("pointerdown", down);
     list.addEventListener("pointermove", move);
     list.addEventListener("pointerup", up);
     list.addEventListener("pointercancel", cancel);
+    list.addEventListener("wheel", wheel, { passive: false });
+    list.addEventListener("click", click);
     return () => {
       list.removeEventListener("pointerdown", down);
       list.removeEventListener("pointermove", move);
       list.removeEventListener("pointerup", up);
       list.removeEventListener("pointercancel", cancel);
+      list.removeEventListener("wheel", wheel);
+      list.removeEventListener("click", click);
     };
   }, []);
 
@@ -348,7 +448,8 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   }
 
   return (
-    <div className={`relative shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 ${editing ? "pr-24 cursor-grab" : "pr-5"} ${className}`}>
+    <div className={`shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 ${editing ? "pr-24 cursor-grab" : "pr-5"} ${className}`}>
+      <div className="relative min-w-0 flex items-center">
       <div
         ref={listRef}
         style={{ touchAction: editing ? "none" : undefined }}
@@ -369,7 +470,6 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
                 data-tab-index={index}
                 aria-pressed={isActive}
                 onMouseDown={e => e.stopPropagation()}
-                onClick={() => onClick(tabId)}
                 onKeyDown={e => onKeyDown(e, tabId)}
                 title={editing ? "Drag to reorder" : undefined}
                 className={`flex items-center gap-1.5 h-6 px-1 rounded-md text-sm font-medium whitespace-nowrap transition-opacity ${c.label} ${FOCUS_RING} ${
@@ -399,15 +499,19 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
           className={`absolute bottom-0 left-0 h-0.5 w-10 rounded-full bg-current pointer-events-none ${c.label} ${drag ? "opacity-0" : "opacity-100"} transition-opacity`}
         />
       </div>
-      {edge && (
+      {glow && (
         <span
-          key={edge.n}
           aria-hidden
-          onAnimationEnd={() => setEdge(null)}
-          className={`tab-edge-glow pointer-events-none absolute top-0 bottom-0 w-12 ${c.label} ${edge.side === "left" ? "left-0" : "right-0"}`}
-          style={{ background: `radial-gradient(ellipse at ${edge.side} center, currentColor, transparent 70%)` }}
+          className={`pointer-events-none absolute top-0 bottom-0 ${c.label} ${glow.side === "left" ? "left-0" : "right-0"}`}
+          style={{
+            width: glow.size,
+            opacity: glow.alpha,
+            background: `radial-gradient(ellipse at ${glow.side} center, currentColor, transparent 70%)`,
+            transition: glow.held ? "opacity 60ms linear, width 60ms linear" : "opacity 320ms ease-out, width 320ms ease-out",
+          }}
         />
       )}
+      </div>
       <div ref={actionsHost} className="ml-auto flex items-center gap-2 shrink-0 empty:hidden" />
     </div>
   );
