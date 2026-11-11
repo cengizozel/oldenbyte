@@ -185,8 +185,8 @@ Widget code that would otherwise be copy-pasted lives in a small shared layer:
 
 | Mode | Width | Layout |
 |---|---|---|
-| `full` | ≥ 900px | Fixed 4-column CSS grid sized to fill the viewport (no page scroll) |
-| `two` | 600-900px | Scrolling 2-column reflow; widget widths clamp to 2 columns, heights map to fixed auto-rows |
+| `full` | ≥ 1150px | Fixed 4-column CSS grid sized to fill the viewport (no page scroll) |
+| `two` | 600-1150px | Scrolling 2-column reflow; widget widths clamp to 2 columns, heights map to fixed auto-rows |
 | `stack` | < 600px | Single-column stacked list of fixed-height cards, ordered by grid position |
 
 Tracks use `minmax(0, 1fr)` and cells `min-w-0` so a widget with intrinsically wide content cannot stop shrinking and squeeze the others. Edit mode always uses the react-grid-layout drag grid (except on mobile widths, where the page scrolls).

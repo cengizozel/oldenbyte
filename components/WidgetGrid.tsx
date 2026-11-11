@@ -413,9 +413,12 @@ export default function WidgetGrid({
   const isMobile = size.width > 0 && size.width < 600;
 
   // View-mode layout band: full 4-col grid that fits the viewport, a scrolling
-  // 2-col reflow for narrow windows, and a stacked list on phones.
+  // 2-col reflow for narrow windows, and a stacked list on phones. Four
+  // columns need about 1150px before every card is 260px or wider, the
+  // narrowest the widgets are drawn for; below that two proper columns beat
+  // four squeezed ones.
   const viewMode: "stack" | "two" | "full" =
-    size.width === 0 ? "full" : size.width < 600 ? "stack" : size.width < 900 ? "two" : "full";
+    size.width === 0 ? "full" : size.width < 600 ? "stack" : size.width < 1150 ? "two" : "full";
 
   // Whether the grid should fill the viewport height (no page scroll) vs.
   // grow with content and let the page scroll.
