@@ -150,6 +150,55 @@ export async function anytypeReadObject(
   return { name: o.name || "(untitled)", markdown: o.markdown || "", type: o.type?.name || "", ...meta };
 }
 
+// An image in an object's body. The markdown export only names the file
+// (![name](files/name.png)), so the file object is found by name, then fetched
+// from the space's file gateway. The gateway reports a loopback address; it is
+// read on the same host as the API (a desktop app reached over a tunnel has to
+// expose the gateway port too, a headless client on a server usually does).
+const gateways = new Map<string, string>();
+const fileIds = new Map<string, string>();
+const stem = (n: string) => n.replace(/^.*\//, "").replace(/\.[a-z0-9]{2,5}$/i, "").trim().toLowerCase();
+
+export async function anytypeImage(
+  baseUrl: string, apiKey: string, spaceId: string, name: string, signal?: AbortSignal,
+): Promise<Response> {
+  const api = root(baseUrl);
+  const gwKey = `${api}|${spaceId}`;
+  let gateway = gateways.get(gwKey);
+  if (!gateway) {
+    const res = await userFetch(`${api}/v1/spaces/${encodeURIComponent(spaceId)}`, { headers: headers(apiKey), signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const raw: string = (data.space ?? data).gateway_url ?? "";
+    if (!raw) throw new Error("This Anytype space has no file gateway");
+    const gw = new URL(raw);
+    const apiHost = new URL(api).hostname;
+    if (/^(127\.0\.0\.1|localhost|\[::1\])$/.test(gw.hostname)) gw.hostname = apiHost;
+    gateway = gw.origin;
+    gateways.set(gwKey, gateway);
+  }
+  const want = stem(name);
+  const idKey = `${gwKey}|${want}`;
+  let id = fileIds.get(idKey);
+  if (!id) {
+    const res = await userFetch(`${api}/v1/spaces/${encodeURIComponent(spaceId)}/search`, {
+      method: "POST", headers: headers(apiKey), signal,
+      body: JSON.stringify({ query: want.replace(/[-_]+/g, " "), limit: 25 }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows: any[] = (await res.json()).data ?? [];
+    const images = rows.filter(o => o.layout === "image" || o.type?.key === "image");
+    const hit = images.find(o => stem(o.name ?? "") === want) ?? images.find(o => stem(o.name ?? "").includes(want));
+    if (!hit?.id) throw new Error("Image not found");
+    id = hit.id as string;
+    fileIds.set(idKey, id);
+  }
+  const img = await userFetch(`${gateway}/image/${encodeURIComponent(id)}?width=1200`, { signal });
+  if (!img.ok) throw new Error(`gateway HTTP ${img.status}`);
+  return img;
+}
+
 // Deep link that opens an object in the Anytype desktop app.
 export function anytypeDeepLink(spaceId: string, objectId: string): string {
   return `anytype://object?objectId=${encodeURIComponent(objectId)}&spaceId=${encodeURIComponent(spaceId)}`;

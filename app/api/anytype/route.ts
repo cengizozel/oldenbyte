@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, readJsonBody } from "@/lib/http";
-import { anytypeSearch, anytypeTypes, anytypeReadObject, ANYTYPE_VERSION } from "@/lib/anytype";
+import { anytypeSearch, anytypeTypes, anytypeReadObject, anytypeImage, ANYTYPE_VERSION } from "@/lib/anytype";
 import { actAs, userFetch } from "@/lib/requestUser";
 
 // Proxy to the Anytype local API (embedded in the Anytype desktop app, default
@@ -44,6 +44,7 @@ async function errMsg(res: Response): Promise<string> {
 }
 
 // GET reads: ?op=spaces | ?op=search&q=&spaceId=&limit=[&type=] | ?op=types&spaceId= | ?op=object&spaceId=&id=
+//            | ?op=image&spaceId=&name= (an image in an object's body, see lib/anytype)
 export async function GET(request: NextRequest) {
   const user = await requireUser(request);
   if (user instanceof NextResponse) return user;
@@ -87,6 +88,15 @@ export async function GET(request: NextRequest) {
       if (!spaceId || !id) return NextResponse.json({ error: "Missing spaceId or id" }, { status: 400 });
       const object = await anytypeReadObject(baseUrl, apiKey, spaceId, id, request.signal);
       return NextResponse.json({ object });
+    }
+    if (op === "image") {
+      const spaceId = sp.get("spaceId") ?? "";
+      const name = sp.get("name") ?? "";
+      if (!spaceId || !name) return NextResponse.json({ error: "Missing spaceId or name" }, { status: 400 });
+      const img = await anytypeImage(baseUrl, apiKey, spaceId, name, request.signal);
+      return new NextResponse(img.body, {
+        headers: { "Content-Type": img.headers.get("content-type") ?? "image/jpeg", "Cache-Control": "private, max-age=86400" },
+      });
     }
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });
   } catch (err) {

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Layers, Search, Loader, ExternalLink, Home, ChevronLeft, ChevronRight, Music, Bookmark, BookOpen, MessageCircle, Paperclip, Gamepad2, Image, Film, FileText, User, Copy, Bus, Tv, Video, Shapes, Users, CheckSquare, Calendar, Folder, Link, Tag, MapPin, Star, Heart, Mic, type LucideIcon } from "lucide-react";
+import { Layers, Search, Loader, ExternalLink, Home, ChevronLeft, ChevronRight, Music, Bookmark, BookOpen, MessageCircle, Paperclip, Gamepad2, Image, ImageIcon, Film, FileText, User, Copy, Bus, Tv, Video, Shapes, Users, CheckSquare, Calendar, Folder, Link, Tag, MapPin, Star, Heart, Mic, type LucideIcon } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import Markdown from "@/components/Markdown";
+import Markdown, { type ImageRenderer } from "@/components/Markdown";
 import { SettingsInput, SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
 import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SmallButton, Chip, SettingsFace, SettingsField, SettingsError } from "@/components/ui/WidgetChrome";
 
@@ -26,6 +26,36 @@ function deepLink(o: AnytypeObject): string {
 
 // The API key goes in a header so it never appears in a URL or access log.
 const keyHeader = (apiKey: string): HeadersInit => (apiKey ? { "X-Api-Key": apiKey } : {});
+
+// An image in an object's body, fetched through /api/anytype (the key rides
+// in a header, so a plain <img src> can't carry it). Until it loads, or if
+// the file gateway can't be reached, its name stands in.
+function AnytypeImage({ baseUrl, apiKey, spaceId, src, alt }: { baseUrl: string; apiKey: string; spaceId: string; src: string; alt: string }) {
+  const direct = /^https?:\/\//.test(src);
+  const [fetched, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const url = direct ? src : fetched;
+  useEffect(() => {
+    if (direct) return;
+    let objectUrl = "";
+    const ctl = new AbortController();
+    const name = alt || src.replace(/^.*\//, "");
+    fetch(`/api/anytype?op=image&baseUrl=${encodeURIComponent(baseUrl)}&spaceId=${encodeURIComponent(spaceId)}&name=${encodeURIComponent(name)}`, { headers: keyHeader(apiKey), signal: ctl.signal })
+      .then(r => { if (!r.ok) throw new Error(); return r.blob(); })
+      .then(b => { objectUrl = URL.createObjectURL(b); setUrl(objectUrl); })
+      .catch(() => { if (!ctl.signal.aborted) setFailed(true); });
+    return () => { ctl.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [baseUrl, apiKey, spaceId, src, alt, direct]);
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt={alt} loading="lazy" className="block my-1.5 max-w-full max-h-96 rounded-lg" />;
+  }
+  return (
+    <span title={failed ? "Could not load this image from Anytype" : undefined} className={`inline-flex items-center gap-1.5 my-1 px-2 py-1 rounded-lg bg-black/5 dark:bg-white/10 opacity-80 ${failed ? "" : "animate-pulse"}`}>
+      <ImageIcon size={14} className="shrink-0" />{alt || "image"}
+    </span>
+  );
+}
 
 // A reply that is not JSON means the dashboard server itself did not answer
 // (restarting, or a proxy error page); say so instead of a JSON parse error.
@@ -71,6 +101,10 @@ export default function AnytypeWidget({
   const [loadingTypes, setLoadingTypes] = useState(false);
   const [activeType, setActiveType] = useState<AnytypeType | null>(null);
   const [reader, setReader] = useState<AnytypeObject | null>(null);
+  const readerSpace = reader?.spaceId || config.spaceId;
+  const renderImage = useCallback<ImageRenderer>((src, alt, key) => (
+    <AnytypeImage key={key} baseUrl={config.baseUrl} apiKey={config.apiKey} spaceId={readerSpace} src={src} alt={alt} />
+  ), [config.baseUrl, config.apiKey, readerSpace]);
   const [readerObj, setReaderObj] = useState<ReaderObject | null>(null);
   const [readerLoading, setReaderLoading] = useState(false);
 
@@ -350,7 +384,7 @@ export default function AnytypeWidget({
                       ) : error ? (
                         <p className="text-red-400 text-xs break-words">{error}</p>
                       ) : readerObj?.markdown ? (
-                        <Markdown text={readerObj.markdown} className={`text-sm ${c.text}`} />
+                        <Markdown text={readerObj.markdown} className={`text-sm ${c.text}`} image={renderImage} />
                       ) : (
                         <EmptyState c={c}>{reader.snippet || "no content"}</EmptyState>
                       )}

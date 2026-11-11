@@ -13,21 +13,33 @@ import { memo, useMemo, type ReactNode } from "react";
 export type Cite = { url: string; title: string; label?: number };
 export type Cites = Record<number, Cite>;
 
+// Draws an image (![alt](src)). The default shows web images directly and
+// anything else (a path from an export) as its name; a caller with a way to
+// fetch the file (Anytype) passes its own.
+export type ImageRenderer = (src: string, alt: string, key: string) => ReactNode;
+export const defaultImage: ImageRenderer = (src, alt, key) => /^https?:\/\//.test(src)
+  // eslint-disable-next-line @next/next/no-img-element
+  ? <img key={key} src={src} alt={alt} loading="lazy" className="block my-1.5 max-w-full max-h-96 rounded-lg" />
+  : <span key={key} className="opacity-70">{alt}</span>;
+
 // Inline: `code`, **bold**, *italic*, [text](url), and [N] citation chips.
 // Underscore emphasis is intentionally omitted so snake_case and URLs aren't mangled.
-function renderInline(text: string, prefix: string, cites: Cites = {}): ReactNode[] {
+function renderInline(text: string, prefix: string, cites: Cites = {}, image: ImageRenderer = defaultImage): ReactNode[] {
   const nodes: ReactNode[] = [];
-  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*\n]+\*)|(\[[^\]]+\]\([^)]+\))|(\[\d+\])/g;
+  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*\n]+\*)|(!\[[^\]]*\]\([^)]+\))|(\[[^\]]+\]\([^)]+\))|(\[\d+\])/g;
   let last = 0, i = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) nodes.push(text.slice(last, m.index));
     const tok = m[0];
     const key = `${prefix}-${i++}`;
-    if (tok.startsWith("`")) {
+    if (tok.startsWith("![")) {
+      const im = /^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/.exec(tok);
+      nodes.push(im ? image(decodeURI(im[2]), im[1], key) : tok);
+    } else if (tok.startsWith("`")) {
       nodes.push(<code key={key} className="px-1 py-0.5 rounded-md bg-black/10 dark:bg-white/10 font-mono text-[0.85em]">{tok.slice(1, -1)}</code>);
     } else if (tok.startsWith("**")) {
-      nodes.push(<strong key={key} className="font-semibold">{renderInline(tok.slice(2, -2), key, cites)}</strong>);
+      nodes.push(<strong key={key} className="font-semibold">{renderInline(tok.slice(2, -2), key, cites, image)}</strong>);
     } else if (tok.startsWith("*")) {
       nodes.push(<em key={key} className="italic">{tok.slice(1, -1)}</em>);
     } else if (/^\[\d+\]$/.test(tok)) {
@@ -58,7 +70,7 @@ const isQuote = (l: string) => /^>\s?/.test(l);
 const isUl = (l: string) => /^\s*[-*+]\s+/.test(l);
 const isOl = (l: string) => /^\s*\d+\.\s+/.test(l);
 
-function parseBlocks(src: string, cites: Cites = {}): ReactNode[] {
+function parseBlocks(src: string, cites: Cites = {}, image: ImageRenderer = defaultImage): ReactNode[] {
   const lines = src.replace(/\r\n/g, "\n").split("\n");
   const out: ReactNode[] = [];
   let i = 0, k = 0;
@@ -86,7 +98,7 @@ function parseBlocks(src: string, cites: Cites = {}): ReactNode[] {
       const hk = k++;
       const level = h[1].length;
       const cls = level <= 1 ? "text-base font-semibold" : level === 2 ? "text-[15px] font-semibold" : "text-sm font-semibold";
-      out.push(<p key={hk} className={`${cls} mt-2 first:mt-0 mb-0.5`}>{renderInline(h[2], `h${hk}`, cites)}</p>);
+      out.push(<p key={hk} className={`${cls} mt-2 first:mt-0 mb-0.5`}>{renderInline(h[2], `h${hk}`, cites, image)}</p>);
       i++;
       continue;
     }
@@ -94,14 +106,14 @@ function parseBlocks(src: string, cites: Cites = {}): ReactNode[] {
     if (isQuote(line)) {
       const buf: string[] = [];
       while (i < lines.length && isQuote(lines[i])) { buf.push(lines[i].replace(/^>\s?/, "")); i++; }
-      out.push(<blockquote key={k++} className="my-1.5 pl-3 border-l-2 border-black/15 dark:border-white/20 opacity-80">{parseBlocks(buf.join("\n"), cites)}</blockquote>);
+      out.push(<blockquote key={k++} className="my-1.5 pl-3 border-l-2 border-black/15 dark:border-white/20 opacity-80">{parseBlocks(buf.join("\n"), cites, image)}</blockquote>);
       continue;
     }
 
     if (isUl(line)) {
       const items: string[] = [];
       while (i < lines.length && isUl(lines[i])) { items.push(lines[i].replace(/^\s*[-*+]\s+/, "")); i++; }
-      out.push(<ul key={k} className="my-1 ml-4 list-disc space-y-0.5">{items.map((it, j) => <li key={j}>{renderInline(it, `u${k}-${j}`, cites)}</li>)}</ul>);
+      out.push(<ul key={k} className="my-1 ml-4 list-disc space-y-0.5">{items.map((it, j) => <li key={j}>{renderInline(it, `u${k}-${j}`, cites, image)}</li>)}</ul>);
       k++;
       continue;
     }
@@ -109,7 +121,7 @@ function parseBlocks(src: string, cites: Cites = {}): ReactNode[] {
     if (isOl(line)) {
       const items: string[] = [];
       while (i < lines.length && isOl(lines[i])) { items.push(lines[i].replace(/^\s*\d+\.\s+/, "")); i++; }
-      out.push(<ol key={k} className="my-1 ml-4 list-decimal space-y-0.5">{items.map((it, j) => <li key={j}>{renderInline(it, `o${k}-${j}`, cites)}</li>)}</ol>);
+      out.push(<ol key={k} className="my-1 ml-4 list-decimal space-y-0.5">{items.map((it, j) => <li key={j}>{renderInline(it, `o${k}-${j}`, cites, image)}</li>)}</ol>);
       k++;
       continue;
     }
@@ -125,7 +137,7 @@ function parseBlocks(src: string, cites: Cites = {}): ReactNode[] {
     const inner: ReactNode[] = [];
     buf.forEach((ln, j) => {
       if (j > 0) inner.push(<br key={`b${j}`} />);
-      inner.push(...renderInline(ln, `p${pk}-${j}`, cites));
+      inner.push(...renderInline(ln, `p${pk}-${j}`, cites, image));
     });
     out.push(<p key={pk} className="my-1 first:mt-0 last:mb-0 leading-relaxed">{inner}</p>);
   }
@@ -135,8 +147,8 @@ function parseBlocks(src: string, cites: Cites = {}): ReactNode[] {
 
 // Memoized on its props, and the parse is cached per source string, so a
 // finished chat reply never re-parses while another one streams.
-function Markdown({ text, className = "", cites }: { text: string; className?: string; cites?: Cites }) {
-  const blocks = useMemo(() => parseBlocks(text, cites ?? {}), [text, cites]);
+function Markdown({ text, className = "", cites, image }: { text: string; className?: string; cites?: Cites; image?: ImageRenderer }) {
+  const blocks = useMemo(() => parseBlocks(text, cites ?? {}, image ?? defaultImage), [text, cites, image]);
   return <div className={className}>{blocks}</div>;
 }
 
