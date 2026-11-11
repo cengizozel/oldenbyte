@@ -675,6 +675,7 @@ export default function RhythmWidget({
             </div>
           ) : (
             <WidgetHeader
+              panel
               c={c}
               icon={History}
               title="Insights"

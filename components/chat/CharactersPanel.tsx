@@ -24,6 +24,7 @@ export function CharactersPanel({ c, characters, activeCharId, onCreate, onClose
       <div className="px-4 pt-3 shrink-0">
         <WidgetHeader
           c={c}
+          panel
           icon={Users}
           title="Characters"
           right={
@@ -82,6 +83,7 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
           c={c}
           icon={Users}
           title="Edit character"
+          panel
           right={
             <>
               <button onClick={onCancel} title="Cancel" aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${HIT_AREA} ${FOCUS_RING}`}><X size={14} /></button>

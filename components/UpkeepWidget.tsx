@@ -551,6 +551,7 @@ export default function UpkeepWidget({
             </div>
           ) : (
             <WidgetHeader
+              panel
               c={c}
               icon={History}
               title="Insights"

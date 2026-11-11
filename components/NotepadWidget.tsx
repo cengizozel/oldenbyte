@@ -477,6 +477,7 @@ export default function NotebookWidget({
             </div>
           ) : (
             <WidgetHeader
+              panel
               c={c}
               icon={NotebookPen}
               title={customName || widget.title}

@@ -132,17 +132,22 @@ export function SaveCancelRow({
 // instead, see lib/tabGroup.ts. `after` renders inline after the title, for
 // a badge such as the arXiv category.
 export function WidgetHeader({
-  c, icon: Icon, title, after, right, className = "",
+  c, icon: Icon, title, after, right, panel = false, className = "",
 }: {
   c: ColorClasses;
   icon: LucideIcon;
   title: string;
   after?: ReactNode;
   right?: ReactNode;
+  // The header of an overlay panel (a widget's history, insights, or an
+  // editor) rather than the widget's own: it draws in place even inside a
+  // tab group, where the tab keeps the widget's name and the panel's title
+  // and buttons head the panel below it.
+  panel?: boolean;
   className?: string;
 }) {
   const group = useTabGroup();
-  if (group) {
+  if (group && !panel) {
     // Inside a tab group the tab row is the header: every tab carries its
     // widget's icon and title, and the shown tab's actions sit at the row's
     // right end.
@@ -151,7 +156,7 @@ export function WidgetHeader({
         {group.iconHost && createPortal(<Icon size={14} className="opacity-50 shrink-0" />, group.iconHost)}
         {group.titleHost && createPortal(<>{title}</>, group.titleHost)}
         {group.active && group.actionsHost && (after || right) && createPortal(
-          <div className={`flex items-center gap-2 shrink-0 ${className}`}>
+          <div className={`flex items-center gap-2 min-w-0 ${className}`}>
             {after}
             {right}
           </div>,

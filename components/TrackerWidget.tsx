@@ -505,6 +505,7 @@ export default function TrackerWidget({
             </div>
           ) : (
             <WidgetHeader
+              panel
               c={c}
               icon={History}
               title="History"

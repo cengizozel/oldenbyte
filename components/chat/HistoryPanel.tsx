@@ -33,6 +33,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, onNew
           c={c}
           icon={MessageSquare}
           title="Chats"
+          panel
           right={
             <>
               <button onClick={onNew} title="New chat with the Assistant" aria-label="New chat" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}>

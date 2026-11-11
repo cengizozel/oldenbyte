@@ -46,6 +46,20 @@ type Props = {
 
 // The row's gap between tabs (gap-3), part of the distance a tab slides.
 const GAP = 12;
+// Header actions that only show on hover (the dashboard-wide `opacity-0
+// group-hover:` chrome, see docs/design.md) would still take their full width
+// in the tab row while invisible, squeezing the tabs. Inside the row they
+// collapse to nothing at rest and open to their 24px box when the tile is
+// hovered or focused, or always where there is no hover; the negative margin
+// swallows the flex gap before a collapsed one.
+const COLLAPSE_HIDDEN_ACTIONS = [
+  "[&_.opacity-0]:overflow-hidden [&_.opacity-0]:transition-[max-width,padding,margin,opacity] [&_.opacity-0]:duration-150",
+  "[&_.opacity-0]:!max-w-0 [&_.opacity-0]:!px-0 [&_.opacity-0]:!mr-0 [&_.opacity-0]:!-ml-2",
+  "group-hover:[&_.opacity-0]:!max-w-6 group-hover:[&_.opacity-0]:!px-[5px] group-hover:[&_.opacity-0]:!-mx-[5px]",
+  "focus-within:[&_.opacity-0]:!max-w-6 focus-within:[&_.opacity-0]:!px-[5px] focus-within:[&_.opacity-0]:!-mx-[5px]",
+  "[@media(hover:none)]:[&_.opacity-0]:!max-w-6 [@media(hover:none)]:[&_.opacity-0]:!px-[5px] [@media(hover:none)]:[&_.opacity-0]:!-mx-[5px]",
+].join(" ");
+
 // Pointer travel before a press on a tab counts as a drag rather than a click.
 const DRAG_THRESHOLD = 5;
 
@@ -72,6 +86,7 @@ function movedTo(order: string[], id: string, index: number): string[] {
 export default function TabStrip({ order, activeId, instances, editing, className = "", onSelect, onUngroup, onReorder, onHosts }: Props) {
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const c = colorMap[instances[activeId]?.color ?? "neutral"];
+  const bgVar = /var\((--[\w-]+)\)/.exec(c.bg)?.[1] ?? "--surface";
 
   // Drag state: the index being dragged, how far the pointer has moved, and
   // the slot (index among the other tabs) it would land in. The slot comes
@@ -316,7 +331,25 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     }
     return fn;
   }, []);
-  const actionsHost = useCallback((el: HTMLElement | null) => { hosts.current = { ...hosts.current, actions: el }; onHostsRef.current(hosts.current); }, []);
+  // The shown widget's actions float over the row's right end (view mode)
+  // rather than taking row space, so hovering, which opens the hidden
+  // buttons, never shifts or clips a tab by layout. The list is padded by
+  // their width underneath, so a tab they cover can be scrolled out from
+  // under them and the chosen tab always lands clear of them.
+  const [actionsW, setActionsW] = useState(0);
+  const actionsWRef = useRef(0);
+  const actionsRO = useRef<ResizeObserver | null>(null);
+  const actionsHost = useCallback((el: HTMLElement | null) => {
+    hosts.current = { ...hosts.current, actions: el };
+    onHostsRef.current(hosts.current);
+    actionsRO.current?.disconnect();
+    actionsRO.current = null;
+    const set = (w: number) => { w = Math.round(w); if (w !== actionsWRef.current) { actionsWRef.current = w; setActionsW(w); } };
+    if (!el) { set(0); return; }
+    actionsRO.current = new ResizeObserver(() => set(el.getBoundingClientRect().width));
+    actionsRO.current.observe(el);
+    set(el.getBoundingClientRect().width);
+  }, []);
 
   useEffect(() => {
     const id = pendingFocus.id;
@@ -404,7 +437,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     const from = st.l.target - 4, to = st.r.target + 4;
     let scroll = list.scrollLeft;
     if (from - pad < scroll) scroll = Math.max(0, from - pad);
-    else if (to + pad > scroll + list.clientWidth) scroll = to + pad - list.clientWidth;
+    else if (to + pad > scroll + list.clientWidth - actionsWRef.current) scroll = to + pad - (list.clientWidth - actionsWRef.current);
     if (Math.round(scroll) !== Math.round(list.scrollLeft)) list.scrollTo({ left: scroll, behavior: !st.painted || reduced ? "auto" : "smooth" });
     if (!st.painted || reduced) {
       // First paint, or reduced motion: no spring. Reduced motion still gets a
@@ -494,11 +527,11 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   }
 
   return (
-    <div className={`shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 ${editing ? "pr-24 cursor-grab" : "pr-5"} ${className}`}>
-      <div className="relative min-w-0 flex items-center">
+    <div className={`relative shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 ${editing ? "pr-24 cursor-grab" : "pr-5"} ${className}`}>
+      <div className="relative flex-1 min-w-0 flex items-center">
       <div
         ref={listRef}
-        style={{ touchAction: editing ? "none" : undefined }}
+        style={{ touchAction: editing ? "none" : undefined, paddingRight: actionsW || undefined, scrollPaddingRight: actionsW || undefined }}
         className={`relative flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${editing ? "cursor-grab" : "cursor-default"}`}
       >
         {order.map((tabId, index) => {
@@ -548,8 +581,9 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
       {glow && (
         <span
           aria-hidden
-          className={`pointer-events-none absolute top-0 bottom-0 ${c.label} ${glow.side === "left" ? "left-0" : "right-0"}`}
+          className={`pointer-events-none absolute top-0 bottom-0 ${c.label} ${glow.side === "left" ? "left-0" : ""}`}
           style={{
+            right: glow.side === "right" ? actionsW : undefined,
             width: glow.size,
             opacity: glow.alpha,
             background: `radial-gradient(${glow.size}px 400% at ${glow.side} center, currentColor, transparent 100%)`,
@@ -579,7 +613,16 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
         );
       })}
       </div>
-      <div ref={actionsHost} className="ml-auto flex items-center gap-2 shrink-0 empty:hidden" />
+      {/* The shown widget's header actions, in view mode only: edit mode is for
+          arranging, and the tile's own controls sit in this corner then. They
+          get at most half the row so a long label cannot push the tabs out. */}
+      {!editing && (
+        <div
+          ref={actionsHost}
+          className={`absolute right-5 top-[18px] bottom-2.5 pl-8 flex items-center gap-2 max-w-[50%] empty:hidden pointer-events-none [&>*]:pointer-events-auto [&_.truncate]:max-w-16 ${COLLAPSE_HIDDEN_ACTIONS}`}
+          style={{ background: `linear-gradient(to right, transparent, var(${bgVar}) 32px)` }}
+        />
+      )}
     </div>
   );
 }
