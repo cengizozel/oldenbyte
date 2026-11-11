@@ -12,7 +12,11 @@ import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SmallButton, Chip,
 type Result = { title: string; url: string; snippet: string };
 // A "source" is a kiwix ZIM (Wikipedia, WikiHow, …). `id` is its content-route name.
 type Source = { title: string; id: string };
-type KiwixConfig = { baseUrl: string; source: string; sourceTitle: string; limit: number };
+// home: what the widget shows before you search. "search" is the plain prompt,
+// "last" reopens the article you were reading, "random" opens a random one
+// from the source.
+type Home = "search" | "last" | "random";
+type KiwixConfig = { baseUrl: string; source: string; sourceTitle: string; limit: number; home?: Home };
 
 const DEFAULT: KiwixConfig = { baseUrl: "", source: "", sourceTitle: "", limit: 8 };
 const LIMITS = [5, 8, 10, 15];
@@ -60,7 +64,18 @@ export default function KiwixWidget({
   const resultsFade = useScrollFade<HTMLDivElement>([results, searching, error, searched]);
   const articleFade = useScrollFade<HTMLDivElement>([extract, loadingArticle, articleError, selected]);
 
-  async function openArticle(r: Result) {
+  const lastKey = `${storageKey}-last`;
+  async function openRandom(cfg: KiwixConfig) {
+    if (!cfg.baseUrl || !cfg.source) return;
+    try {
+      const res = await fetch(`/api/kiwix?baseUrl=${encodeURIComponent(cfg.baseUrl)}&random=${encodeURIComponent(cfg.source)}`);
+      const data = await res.json();
+      if (res.ok && data.url) openArticle({ title: data.title, url: data.url, snippet: "" }, cfg);
+    } catch { /* stays on the search prompt */ }
+  }
+
+  async function openArticle(r: Result, cfg: KiwixConfig = config) {
+    storage.setItem(lastKey, JSON.stringify({ title: r.title, url: r.url }));
     setSelected(r);
     setExtract("");
     setArticleError("");
@@ -70,7 +85,7 @@ export default function KiwixWidget({
     articleAbort.current = ctrl;
     try {
       const res = await fetch(
-        `/api/kiwix?baseUrl=${encodeURIComponent(config.baseUrl)}&article=${encodeURIComponent(r.url)}`,
+        `/api/kiwix?baseUrl=${encodeURIComponent(cfg.baseUrl)}&article=${encodeURIComponent(r.url)}`,
         { signal: ctrl.signal }
       );
       const data = await res.json();
@@ -91,6 +106,16 @@ export default function KiwixWidget({
         const parsed = migrate(JSON.parse(saved));
         setConfig(parsed);
         setDraft(parsed);
+        // Home behaviour, once per load.
+        if (parsed.home === "random") openRandom(parsed);
+        else if (parsed.home === "last") {
+          storage.getItem(lastKey).then(raw => {
+            try {
+              const last = raw ? JSON.parse(raw) : null;
+              if (last?.url?.startsWith(parsed.baseUrl.replace(/\/+$/, ""))) openArticle({ title: last.title, url: last.url, snippet: "" }, parsed);
+            } catch {}
+          });
+        }
       } catch {}
     });
   }, [storageKey]);
@@ -339,6 +364,13 @@ export default function KiwixWidget({
                 <span className={`text-sm opacity-70 truncate min-w-0 ${c.text}`}>{draft.sourceTitle || "no source selected"}</span>
               )}
             </div>
+          </SettingsField>
+          <SettingsField c={c} label="Opens with" inline hint={(draft.home ?? "search") === "random" ? "A random article from the source each time the dashboard loads." : (draft.home ?? "search") === "last" ? "The article you were reading last." : undefined}>
+            {([["search", "Search"], ["last", "Last article"], ["random", "Random"]] as [Home, string][]).map(([v, label]) => (
+              <Chip key={v} c={c} active={(draft.home ?? "search") === v} onClick={() => setDraft((d) => ({ ...d, home: v }))}>
+                {label}
+              </Chip>
+            ))}
           </SettingsField>
           <SettingsField c={c} label="Results" inline>
             {LIMITS.map((n) => (

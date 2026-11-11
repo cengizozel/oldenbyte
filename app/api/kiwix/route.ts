@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/http";
-import { isValidBase, listSources, search, articleExtract } from "@/lib/kiwix";
+import { isValidBase, listSources, search, articleExtract, randomArticle } from "@/lib/kiwix";
 import { actAs } from "@/lib/requestUser";
 
 // Server-side proxy to a kiwix-serve instance (https://github.com/kiwix/kiwix-tools).
@@ -24,6 +24,16 @@ export async function GET(request: NextRequest) {
   }
   const q = p.get("q");
   const article = p.get("article");
+
+  // ── A random article of one source (?random=<source>) ───────────────────────
+  const random = p.get("random");
+  if (random) {
+    try {
+      return NextResponse.json(await randomArticle(baseUrl, random, request.signal));
+    } catch (err) {
+      return NextResponse.json({ error: `Could not pick a random article: ${String(err)}` }, { status: 503 });
+    }
+  }
 
   // ── Fetch an article and extract a readable text summary ────────────────────
   if (article) {

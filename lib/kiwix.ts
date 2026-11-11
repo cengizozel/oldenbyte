@@ -204,6 +204,19 @@ function cleanBlock(s: string): string {
 // lists, stats, entries with dates) live in wikitables, often well below the
 // intro, so paragraph-only extraction misses them. Capped so one article stays a
 // reasonable chunk of context.
+// A random article of one book: kiwix-serve's /random redirects to one. Works
+// for any ZIM; some books also keep non-article entries (a cover image in
+// Gutenberg), which the caller treats like a failed load.
+export async function randomArticle(baseUrl: string, source: string, signal?: AbortSignal): Promise<{ title: string; url: string }> {
+  const base = normalizeBase(baseUrl);
+  const res = await userFetch(`${base}/random?content=${encodeURIComponent(source)}`, { signal });
+  await res.body?.cancel().catch(() => {});
+  if (!res.ok || !res.url.startsWith(`${base}/content/`)) throw new Error(`No random article (${res.status})`);
+  let last = res.url.split("/").pop() ?? "";
+  try { last = decodeURIComponent(last); } catch { /* keep as is */ }
+  return { title: last.replace(/[_+]/g, " ").trim() || "Random article", url: res.url };
+}
+
 export async function articleExtract(
   baseUrl: string,
   articleUrl: string,

@@ -20,3 +20,7 @@ Search an offline [Kiwix](https://kiwix.org/) library (Wikipedia, Stack Overflow
 - `baseUrl` usually points at a `kiwix-serve` on the LAN or tailnet. The route fetches through `userFetch` ([`lib/requestUser.ts`](../../lib/requestUser.ts)): admin accounts may reach private addresses, every other account is held to the public-only SSRF check, so only an admin can use an internal Kiwix server.
 
 (component: `components/KiwixWidget.tsx`; shared retrieval in `lib/kiwix.ts`)
+
+## Opens with
+
+The `home` setting chooses what the widget shows before a search: `search` (the plain prompt, default), `last` (reopens the article read last, stored under `{config key}-last`), or `random` (a random article of the source on every load, through `GET /api/kiwix?baseUrl=…&random=<source>`, which follows kiwix-serve's `/random?content=<source>` redirect). Random works for any book; a book that also holds non-article entries, such as Gutenberg's cover images, can land on one, and the widget then stays on the search prompt.
