@@ -1,5 +1,7 @@
 "use client";
 
+import { Minus, Plus } from "lucide-react";
+
 import type { ReactNode,
   InputHTMLAttributes,
   Ref,
@@ -35,6 +37,54 @@ export function SettingsSelect({ className = "", ...props }: SelectHTMLAttribute
 
 export function SettingsTextarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={`${FIELD_CLASS} resize-none ${className}`} />;
+}
+
+// A number with minus and plus: the modern face of a number field, used where
+// a value is stepped rather than typed (seconds, counts). Buttons are the
+// usual 24px round targets; the value sits between them with its unit, and
+// the arrow keys step it too.
+export function Stepper({
+  value, min, max, step = 1, unit = "", onChange, label, disabled = false, className = "",
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  unit?: string;
+  onChange: (next: number) => void;
+  label: string;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v / step) * step));
+  const btn = `w-6 h-6 flex items-center justify-center rounded-full border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:hover:text-[var(--text-secondary)] transition-colors ${FOCUS_RING}`;
+  const shown = Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return (
+    <div
+      role="spinbutton"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={label}
+      aria-valuenow={value}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuetext={`${shown}${unit ? " " + unit : ""}`}
+      aria-disabled={disabled || undefined}
+      onKeyDown={e => {
+        if (disabled) return;
+        if (e.key === "ArrowUp" || e.key === "ArrowRight") { e.preventDefault(); onChange(clamp(value + step)); }
+        if (e.key === "ArrowDown" || e.key === "ArrowLeft") { e.preventDefault(); onChange(clamp(value - step)); }
+      }}
+      className={`flex items-center gap-1.5 shrink-0 rounded-md ${disabled ? "opacity-40" : ""} ${FOCUS_RING} ${className}`}
+    >
+      <button type="button" tabIndex={-1} aria-label={`Less ${label}`} disabled={disabled || value <= min} onClick={() => onChange(clamp(value - step))} className={btn}>
+        <Minus size={12} />
+      </button>
+      <span className="min-w-8 text-center text-sm tabular-nums text-[var(--text-primary)]">{shown}{unit && <span className="text-[var(--text-muted)]">{unit}</span>}</span>
+      <button type="button" tabIndex={-1} aria-label={`More ${label}`} disabled={disabled || value >= max} onClick={() => onChange(clamp(value + step))} className={btn}>
+        <Plus size={12} />
+      </button>
+    </div>
+  );
 }
 
 // Settings drawer layout: a titled section of rows, each row a label (with an

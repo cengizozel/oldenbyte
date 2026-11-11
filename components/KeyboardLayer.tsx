@@ -10,7 +10,7 @@ import {
 } from "@/lib/keyboard";
 import Toggle from "@/components/ui/Toggle";
 import { exitDemoMode, isDemoMode } from "@/lib/demo";
-import { FOCUS_RING, SettingsRow, SettingsSection } from "@/components/ui/Field";
+import { FOCUS_RING, SettingsRow, SettingsSection, Stepper } from "@/components/ui/Field";
 
 // Global keyboard layer: leader key, widget number badges, focus ring, cheat
 // sheet. It finds its targets through data attributes WidgetGrid puts on the
@@ -497,19 +497,14 @@ export function KeyboardSettings() {
       </SettingsRow>
       {config.enabled && (
         <SettingsRow label="Time to answer" hint={`Seconds the widget numbers stay up after ${keyLabel(config.leader)}.`}>
-          <input
-            type="number"
-            inputMode="decimal"
-            aria-label="Seconds a command waits after the leader"
+          <Stepper
+            label="seconds a command waits after the leader"
+            value={config.timeout}
             min={TIMEOUT_RANGE.min}
             max={TIMEOUT_RANGE.max}
             step={TIMEOUT_RANGE.step}
-            value={config.timeout}
-            onChange={e => {
-              const v = Number(e.target.value);
-              if (Number.isFinite(v)) update({ ...config, timeout: Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, v)) });
-            }}
-            className={`w-20 shrink-0 h-7 text-center text-sm border rounded-lg px-2 outline-none bg-[var(--surface)] text-[var(--text-primary)] border-[var(--surface-border)] focus:border-[var(--text-muted)] ${FOCUS_RING}`}
+            unit="s"
+            onChange={v => update({ ...config, timeout: v })}
           />
         </SettingsRow>
       )}
@@ -520,20 +515,15 @@ export function KeyboardSettings() {
       )}
       {config.enabled && (
         <SettingsRow label="Mark stays for" hint={config.markAlways ? "Always shown, so this does not apply." : "Seconds, then it fades."}>
-          <input
-            type="number"
-            inputMode="decimal"
-            aria-label="Seconds the target mark stays"
-            disabled={config.markAlways}
+          <Stepper
+            label="seconds the target mark stays"
+            value={config.mark}
             min={TIMEOUT_RANGE.min}
             max={TIMEOUT_RANGE.max}
             step={TIMEOUT_RANGE.step}
-            value={config.mark}
-            onChange={e => {
-              const v = Number(e.target.value);
-              if (Number.isFinite(v)) update({ ...config, mark: Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, v)) });
-            }}
-            className={`w-20 shrink-0 h-7 text-center text-sm border rounded-lg px-2 outline-none bg-[var(--surface)] text-[var(--text-primary)] border-[var(--surface-border)] focus:border-[var(--text-muted)] disabled:opacity-40 ${FOCUS_RING}`}
+            unit="s"
+            disabled={config.markAlways}
+            onChange={v => update({ ...config, mark: v })}
           />
         </SettingsRow>
       )}
