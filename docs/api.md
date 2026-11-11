@@ -58,6 +58,9 @@ Deletes a key.
 
 ## Settings: Export / Import
 
+### `GET /api/settings/summary`
+What is stored for the signed-in user, for Settings > Your data: each dashboard's widgets with their key count, size and last change, data shared by every dashboard (Assistant chats and characters, feed favorites, dashboards and layouts, preferences), leftovers of removed widgets, and caches. Names, counts and sizes only; no values.
+
 ### `GET /api/settings/export`
 Returns all of the user's non-cache settings as a flat JSON object `{ key: value, ... }`, with values as stored strings. Cache keys (see [storage.md](./storage.md#cache-keys)) are excluded.
 

@@ -11,6 +11,7 @@ import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
 import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, setActiveTimezone, TZ_AUTO } from "@/lib/timezone";
 import Toggle from "@/components/ui/Toggle";
 import { KeyboardSettings } from "@/components/KeyboardLayer";
+import { DataSettings } from "@/components/DataSettings";
 import { NEW_DASHBOARD_EVENT } from "@/lib/keyboard";
 import { FOCUS_RING, HIT_AREA, SettingsRow, SettingsSection } from "@/components/ui/Field";
 
@@ -854,6 +855,8 @@ function SettingsPanel({
               <TimezoneSelect value={timezone} onChange={onChangeTimezone} />
             </SettingsRow>
           </SettingsSection>
+
+          <DataSettings />
         </div>
 
         <div className="shrink-0 px-5 py-3 border-t border-[var(--surface-border)]">
