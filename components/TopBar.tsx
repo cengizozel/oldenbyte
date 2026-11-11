@@ -280,23 +280,27 @@ function AnalogClock({ time, size }: { time: Date; size: number }) {
     return [cx + Math.cos(r) * len, cy + Math.sin(r) * len] as [number, number];
   }
 
-  const [hx, hy] = pt(hourAngle, 26);
-  const [mx, my] = pt(minuteAngle, 36);
-  const [sx, sy] = pt(secondAngle, 40);
+  const [hx, hy] = pt(hourAngle, 22);
+  const [mx, my] = pt(minuteAngle, 32);
+  const [sx, sy] = pt(secondAngle, 36);
 
+  // A quiet dial: a thin ring, a dot at each hour (larger at the quarters),
+  // two rounded hands in the text color, and a hairline second hand with a
+  // short counterweight in the one accent color. Small sizes (the menu's
+  // 18px preview) drop the dots and the second hand, which would only blur.
+  const small = size < 28;
+  const [tx, ty] = pt(secondAngle + 180, 9);
   return (
-    <svg viewBox="0 0 100 100" width={size} height={size} className="shrink-0">
-      <circle cx={cx} cy={cy} r={46} fill="none" style={{ stroke: "var(--clock-face)" }} strokeWidth="4" />
-      {Array.from({ length: 12 }).map((_, i) => {
-        const a = (i / 12) * 360 - 90;
-        const [x1, y1] = pt(a, i % 3 === 0 ? 34 : 39);
-        const [x2, y2] = pt(a, 44);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} style={{ stroke: "var(--clock-face)" }} strokeWidth={i % 3 === 0 ? 4 : 2} strokeLinecap="round" />;
+    <svg viewBox="0 0 100 100" width={size} height={size} className="shrink-0" role="img" aria-label="Analog clock">
+      <circle cx={cx} cy={cy} r={46} fill="none" style={{ stroke: "var(--clock-face)" }} strokeWidth={small ? 6 : 2.5} />
+      {!small && Array.from({ length: 12 }).map((_, i) => {
+        const [x, y] = pt((i / 12) * 360 - 90, 38);
+        return <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 2.4 : 1.3} style={{ fill: "var(--clock-face)" }} />;
       })}
-      <line x1={cx} y1={cy} x2={hx} y2={hy} style={{ stroke: "var(--clock-hour)" }} strokeWidth="7" strokeLinecap="round" />
-      <line x1={cx} y1={cy} x2={mx} y2={my} style={{ stroke: "var(--clock-minute)" }} strokeWidth="5" strokeLinecap="round" />
-      <line x1={cx} y1={cy} x2={sx} y2={sy} style={{ stroke: "var(--clock-second)" }} strokeWidth="2" strokeLinecap="round" />
-      <circle cx={cx} cy={cy} r={5} style={{ fill: "var(--clock-center)" }} />
+      <line x1={cx} y1={cy} x2={hx} y2={hy} style={{ stroke: "var(--clock-hour)" }} strokeWidth={small ? 9 : 6} strokeLinecap="round" />
+      <line x1={cx} y1={cy} x2={mx} y2={my} style={{ stroke: "var(--clock-minute)" }} strokeWidth={small ? 7 : 4} strokeLinecap="round" />
+      {!small && <line x1={tx} y1={ty} x2={sx} y2={sy} style={{ stroke: "var(--clock-second)" }} strokeWidth="1.5" strokeLinecap="round" />}
+      <circle cx={cx} cy={cy} r={small ? 5 : 3.2} style={{ fill: small ? "var(--clock-hour)" : "var(--clock-second)" }} />
     </svg>
   );
 }
@@ -321,6 +325,9 @@ function DateDisplay({ timezone }: { timezone: string }) {
   const [draft, setDraft] = useState<DateFormat>("date-long");
   const ref = useRef<HTMLDivElement>(null);
 
+  // While the menu is open the bar previews the option under consideration;
+  // the check keeps it, the cross (or clicking away) puts the saved one back.
+  const active = open ? draft : format;
   // Render the chosen zone's wall clock (empty timezone = device).
   const shown = zonedDate(now, effectiveTimezone(timezone));
 
@@ -331,7 +338,7 @@ function DateDisplay({ timezone }: { timezone: string }) {
   }, []);
 
   useEffect(() => {
-    const ms = NEEDS_SECONDS.includes(format) ? 1000 : 60_000;
+    const ms = NEEDS_SECONDS.includes(active) ? 1000 : 60_000;
     const id = setInterval(() => setNow(new Date()), ms);
     // Browsers pause timers in background tabs and while the device sleeps, so
     // a tab left open overnight kept showing the day it was opened. Re-read the
@@ -346,7 +353,7 @@ function DateDisplay({ timezone }: { timezone: string }) {
       window.removeEventListener("focus", wake);
       window.removeEventListener("pageshow", wake);
     };
-  }, [format]);
+  }, [active]);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -362,12 +369,6 @@ function DateDisplay({ timezone }: { timezone: string }) {
     setOpen(false);
   }
 
-  async function handleReset() {
-    setFormat("date-long");
-    setDraft("date-long");
-    await storage.removeItem("topbar-date-format");
-    setOpen(false);
-  }
 
   return (
     <div ref={ref} className="relative flex items-center justify-center">
@@ -376,9 +377,9 @@ function DateDisplay({ timezone }: { timezone: string }) {
         className="flex items-center cursor-pointer"
         title="Change format"
       >
-        {format === "analog"
+        {active === "analog"
           ? <AnalogClock time={shown} size={48} />
-          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center" suppressHydrationWarning>{fmt(shown, format)}</span>
+          : <span className="text-sm md:text-lg text-[var(--text-secondary)] text-center" suppressHydrationWarning>{fmt(shown, active)}</span>
         }
       </button>
 
@@ -403,18 +404,14 @@ function DateDisplay({ timezone }: { timezone: string }) {
             ))}
           </div>
 
-          <div className="flex items-center justify-between mt-3 pt-2 border-t border-neutral-100">
-            <button onClick={handleReset} className="text-neutral-300 hover:text-neutral-500" title="Reset">
-              <RotateCcw size={14} />
+          {/* The same filled cancel and save as a settings face. */}
+          <div className="flex items-center justify-end gap-2 mt-3">
+            <button type="button" onClick={() => setOpen(false)} title="Cancel" aria-label="Cancel" className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors bg-black/5 dark:bg-white/10 text-[var(--text-secondary)] opacity-70 hover:opacity-100 ${FOCUS_RING}`}>
+              <X size={16} />
             </button>
-            <div className="flex gap-3">
-              <button onClick={() => setOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Cancel">
-                <X size={14} />
-              </button>
-              <button onClick={handleSave} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Save">
-                <Check size={14} />
-              </button>
-            </div>
+            <button type="button" onClick={handleSave} title="Save" aria-label="Save" className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors bg-black/10 dark:bg-white/15 hover:bg-black/15 dark:hover:bg-white/20 text-[var(--text-primary)] ${FOCUS_RING}`}>
+              <Check size={16} />
+            </button>
           </div>
         </div>
       )}

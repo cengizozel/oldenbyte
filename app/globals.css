@@ -63,11 +63,11 @@
   --w-orange-text:      #69260f;
 
   /* Analog clock */
-  --clock-face:         #d4d4d4;
-  --clock-hour:         #404040;
-  --clock-minute:       #525252;
-  --clock-second:       #a3a3a3;
-  --clock-center:       #404040;
+  --clock-face:         #a3a3a3;
+  --clock-hour:         #262626;
+  --clock-minute:       #262626;
+  --clock-second:       #0d9488;
+  --clock-center:       #262626;
 }
 
 .dark {
@@ -113,11 +113,11 @@
   --w-orange-text:      #ffedd5;
 
   /* Analog clock */
-  --clock-face:         #22d3ee;
-  --clock-hour:         #e879f9;
-  --clock-minute:       #4ade80;
-  --clock-second:       #fb923c;
-  --clock-center:       #e879f9;
+  --clock-face:         #737373;
+  --clock-hour:         #f5f5f5;
+  --clock-minute:       #f5f5f5;
+  --clock-second:       #5eead4;
+  --clock-center:       #f5f5f5;
 }
 
 /* Grey: dark mode with every widget palette on the neutral one, for a screen
@@ -145,10 +145,10 @@
   --w-orange-label:     var(--w-neutral-label);
   --w-orange-text:      var(--w-neutral-text);
 
-  --clock-face:         #d4d4d4;
+  --clock-face:         #737373;
   --clock-hour:         #f5f5f5;
-  --clock-minute:       #a3a3a3;
-  --clock-second:       #8a8a8a;
+  --clock-minute:       #f5f5f5;
+  --clock-second:       #d4d4d4;
   --clock-center:       #f5f5f5;
 }
 
