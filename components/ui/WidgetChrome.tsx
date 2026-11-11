@@ -271,7 +271,7 @@ export function WidgetHeader({
 
   if (panel) {
     return (
-      <div className={`flex items-center justify-between gap-2 mb-3 shrink-0 ${className}`}>
+      <div className={`flex items-center justify-between gap-2 mb-4 shrink-0 ${className}`}>
         <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
           <Icon size={14} className="opacity-50 shrink-0" />
           <span className="text-sm font-medium truncate">{title}</span>
@@ -305,7 +305,7 @@ export function WidgetHeader({
   const controls = editing ? frame?.controls : null;
   const hasOptions = editing ? !!controls : !!(after || right || settings || expand);
   return (
-    <div className={`flex items-center gap-3 mb-3 shrink-0 min-h-5 ${className}`}>
+    <div className={`flex items-center gap-3 mb-4 shrink-0 min-h-5 ${className}`}>
       <div className="relative flex-1 min-w-0 flex items-center">
         <div inert={open} className={`flex items-center gap-1.5 min-w-0 ${c.label} ${HEADER_SWAP.main} ${open ? HEADER_SWAP.mainHidden : ""}`}>
           <Icon size={14} className="opacity-50 shrink-0" />

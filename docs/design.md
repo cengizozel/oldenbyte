@@ -93,7 +93,7 @@ to the card background in light mode to work as a divider.) Rows that carry
 their own rounded fill, such as Tracker activities, use `gap-1` instead.
 Grids use `gap-2`.
 
-Content starts 52px below the card's top edge in every widget, single or in a tab group: 20px padding, the 20px header line, 12px gap. The first row of a list has no top padding of its own (`first:pt-0`), and a flip card's front face drops its top padding inside a group. Measured in a browser across all widget types.
+Content starts 56px below the card's top edge in every widget, single or in a tab group: 20px padding, the 20px header line, 16px gap (the tab row: 18px, its 24px line, 14px). The first row of a list has no top padding of its own (`first:pt-0`), and a flip card's front face drops its top padding inside a group. Measured in a browser across all widget types.
 
 ## Radius
 
