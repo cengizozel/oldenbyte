@@ -7,6 +7,7 @@ import * as storage from "@/lib/storage";
 import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { formatDate, localDateStr } from "@/lib/format";
+import { effectiveTimezone, timeIn, useTimezone } from "@/lib/timezone";
 import {
   type UpkeepItem as Item, type UpkeepLog as Log, type UpkeepOrder as Order,
   HOUR, DAY, MAX_HOURS, DEFAULT_HOURS, UNDO_WINDOW,
@@ -32,7 +33,6 @@ function newId() {
 
 const GRID_DAYS = 14;  // heatmap width
 const fmtDay = (date: string) => formatDate(`${date}T12:00:00`, { year: false });
-const fmtTime = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const colorOf = (id: string) => tagColor(id).dot;
 
 // History ranges: a close look sampled hourly, and a long one sampled at
@@ -490,6 +490,10 @@ export default function UpkeepWidget({
   );
 
   // ── History overlay ────────────────────────────────────────────────────────
+  // Check times print in the chosen timezone, not the browser's (privacy
+  // settings often make the browser report UTC).
+  const tz = useTimezone();
+  const fmtTime = (ms: number) => timeIn(ms, tz);
   const rangeDef = RANGES.find(r => r.key === range) ?? RANGES[0];
   // Samples run from a local midnight `days` ago up to now; the 12-hour step
   // therefore lands on midnight and noon.
@@ -507,6 +511,25 @@ export default function UpkeepWidget({
 
   const x = (t: number) => 2 + ((t - rangeStart) / Math.max(1, at - rangeStart)) * 236;
   const y = (p: number) => 68 - (p / 100) * 60;
+
+  // Scrubbing the chart: the nearest sample to the pointer, shown in the
+  // header with its date and time, the way a stock chart reads.
+  const [scrub, setScrub] = useState<{ t: number; pct: number } | null>(null);
+  function onScrub(e: React.PointerEvent<SVGSVGElement>) {
+    if (!plotted.length) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const t = rangeStart + ((e.clientX - r.left) / Math.max(1, r.width)) * (at - rangeStart);
+    let best = plotted[0];
+    for (const smp of plotted) if (Math.abs(smp.t - t) < Math.abs(best.t - t)) best = smp;
+    setScrub({ t: best.t, pct: best.pct });
+  }
+  const whenLabel = (t: number) => {
+    try {
+      return new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: effectiveTimezone(tz) });
+    } catch {
+      return new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    }
+  };
 
   return (
     <div className="relative h-full">
@@ -583,7 +606,11 @@ export default function UpkeepWidget({
                   {/* Score over time */}
                   <div className="shrink-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs ${c.label} opacity-70`}>score over time</span>
+                      {scrub ? (
+                        <span className={`text-xs tabular-nums ${c.text}`}>{whenLabel(scrub.t)} · <span className="font-medium">{scrub.pct}</span><span className="opacity-70"> / 100</span></span>
+                      ) : (
+                        <span className={`text-xs ${c.label} opacity-70`}>score over time</span>
+                      )}
                       <div className="flex gap-1">
                         {RANGES.map(r => (
                           <button
@@ -596,8 +623,11 @@ export default function UpkeepWidget({
                         ))}
                       </div>
                     </div>
-                    <svg viewBox="0 0 240 72" className="w-full" preserveAspectRatio="none">
+                    <svg viewBox="0 0 240 72" className="w-full touch-none cursor-crosshair" preserveAspectRatio="none" onPointerMove={onScrub} onPointerDown={onScrub} onPointerLeave={() => setScrub(null)}>
                       <line x1={2} y1={8} x2={238} y2={8} className="stroke-black/[0.06] dark:stroke-white/[0.07]" strokeWidth={1} strokeDasharray="2 3" />
+                      {scrub && (
+                        <line x1={x(scrub.t)} y1={6} x2={x(scrub.t)} y2={70} stroke="currentColor" className={c.label} strokeWidth={1} opacity={0.5} vectorEffect="non-scaling-stroke" />
+                      )}
                       {plotted.length > 1 && (
                         <polyline
                           fill="none"
@@ -612,6 +642,9 @@ export default function UpkeepWidget({
                       )}
                       {pct != null && (
                         <circle cx={x(at)} cy={y(pct)} r={2.4} className={pct === 100 ? "fill-emerald-500" : `${c.text} fill-current`} />
+                      )}
+                      {scrub && (
+                        <circle cx={x(scrub.t)} cy={y(scrub.pct)} r={3} className={`${c.text} fill-current`} />
                       )}
                     </svg>
                     <div className={`flex justify-between text-xs opacity-70 ${c.label}`}>
