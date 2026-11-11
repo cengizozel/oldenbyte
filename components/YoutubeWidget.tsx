@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader, Plus, PlaySquare, ExternalLink } from "lucide-react";
+import { Loader, Plus, X, PlaySquare, ExternalLink } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { timeAgo, formatCount, formatClock, localDateStr } from "@/lib/format";
@@ -9,8 +9,9 @@ import { decodeEntities, parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip, BackButton } from "@/components/ui/WidgetChrome";
+import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
+import Toggle from "@/components/ui/Toggle";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsNote, SettingsError, ROW_ACTION } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { youtubeCacheKey } from "@/lib/cacheKeys";
@@ -22,7 +23,10 @@ type YtView         = "list" | "thumbs" | "gallery";
 // url: where the browser opens archived videos. serverUrl (optional): where
 // the dashboard server reaches TubeArchivist, when the browser address is
 // not reachable from inside the server's container (a tailscale HTTPS name).
-type TaConfig       = { url: string; token: string; open: "youtube" | "ta"; serverUrl?: string };
+// mark: which side gets a badge once links open on TubeArchivist, the archived
+// videos ("ta", the default) or the ones not archived yet ("yt"). only: list
+// nothing until it is archived, which makes any badge moot.
+type TaConfig       = { url: string; token: string; open: "youtube" | "ta"; serverUrl?: string; mark?: "ta" | "yt"; only?: boolean };
 const taServer = (ta: TaConfig) => (ta.serverUrl?.trim() || ta.url).trim();
 const blankTa: TaConfig = { url: "", token: "", open: "youtube" };
 type YoutubeConfig  = { channels: YoutubeChannel[]; view: YtView; ta?: TaConfig };
@@ -76,7 +80,24 @@ export default function YoutubeWidget({
   const [videos, setVideos]             = useState<Video[]>([]);
   // Clicking a channel name shows only that channel (lib/useFeedFilter).
   const [filter, setFilter, toggleFilter] = useFeedFilter();
-  const shown = filter ? videos.filter(v => v.channelId === filter) : videos;
+  // "Only archived" waits for the archive list, so the feed never flashes
+  // everything first.
+  const onlyArchived = taActive(config.ta) && !!config.ta.only;
+  const shown = (filter ? videos.filter(v => v.channelId === filter) : videos)
+    .filter(v => !onlyArchived || (archivedLoaded && archived.has(videoId(v.link))));
+  // The badge beside the time: TA on archived videos, or YouTube on the ones
+  // not archived yet, by the mark setting; none when only archived videos show.
+  const badgeFor = (v: Video) => {
+    if (!taActive(config.ta) || config.ta.only) return null;
+    const on = archived.has(videoId(v.link));
+    const mark = config.ta.mark ?? "ta";
+    if (mark === "ta" ? !on : on) return null;
+    return (
+      <span className={`shrink-0 text-xs font-medium tracking-widest px-1 py-0.5 rounded-md bg-black/10 dark:bg-white/15 ${c.label}`} title={mark === "ta" ? "Opens on TubeArchivist" : "Not in TubeArchivist yet; opens on YouTube"}>
+        {mark === "ta" ? "TA" : "YouTube"}
+      </span>
+    );
+  };
   const filterName = filter ? videos.find(v => v.channelId === filter)?.channelName ?? "" : "";
   const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([videos, filter]);
   const [loading, setLoading]           = useState(false);
@@ -92,6 +113,7 @@ export default function YoutubeWidget({
   // TubeArchivist: which feed videos exist in the archive, and the settings
   // face's connection test.
   const [archived, setArchived]         = useState<Set<string>>(new Set());
+  const [archivedLoaded, setArchivedLoaded] = useState(false);
   // Set by the refresh button so the next archive check skips the server's
   // short "not archived" memory.
   const forceTaRef                      = useRef(false);
@@ -118,7 +140,7 @@ export default function YoutubeWidget({
 
   useEffect(() => {
     const ta = config.ta;
-    if (!taActive(ta) || !videos.length) { setArchived(new Set()); return; }
+    if (!taActive(ta) || !videos.length) { setArchived(new Set()); setArchivedLoaded(false); return; }
     const ids = [...new Set(videos.map(v => videoId(v.link)).filter(Boolean))];
     const ctrl = new AbortController();
     fetch("/api/tubearchivist", {
@@ -128,7 +150,7 @@ export default function YoutubeWidget({
       signal: ctrl.signal,
     })
       .then(r => r.json())
-      .then(d => { forceTaRef.current = false; setArchived(new Set(d.archived ?? [])); })
+      .then(d => { forceTaRef.current = false; setArchived(new Set(d.archived ?? [])); setArchivedLoaded(true); })
       .catch(() => {});
     return () => ctrl.abort();
   }, [videos, config.ta, taTick]);
@@ -379,9 +401,7 @@ export default function YoutubeWidget({
                               {v.published && (
                                 <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>{timeAgo(v.published)}</span>
                               )}
-                              {onTa(v) && (
-                                <span className={`shrink-0 text-xs font-medium tracking-widest px-1 py-0.5 rounded-md bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
-                              )}
+                              {badgeFor(v)}
                             </span>
                             <div className="flex items-start gap-1 group/title">
                               <button
@@ -390,16 +410,6 @@ export default function YoutubeWidget({
                               >
                                 {v.title}
                               </button>
-                              <a
-                                href={hrefFor(v)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={e => e.stopPropagation()}
-                                aria-label="Open in new tab"
-                                className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
-                              >
-                                <ExternalLink size={12} />
-                              </a>
                             </div>
                           </div>
                         );
@@ -438,9 +448,7 @@ export default function YoutubeWidget({
                             {v.published && (
                               <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>{timeAgo(v.published)}</span>
                             )}
-                            {onTa(v) && (
-                              <span className={`shrink-0 text-xs font-medium tracking-widest px-1 py-0.5 rounded-md bg-black/10 dark:bg-white/15 ${c.label}`} title="Opens on TubeArchivist">TA</span>
-                            )}
+                            {badgeFor(v)}
                           </span>
                           <div className={`flex items-start gap-1 group/title min-w-0 ${thumb ? "col-start-2 self-center" : ""}`}>
                             <button
@@ -449,16 +457,6 @@ export default function YoutubeWidget({
                             >
                               {v.title}
                             </button>
-                            <a
-                              href={hrefFor(v)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              aria-label="Open in new tab"
-                              className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
-                            >
-                              <ExternalLink size={12} />
-                            </a>
                           </div>
                           </div>
                         </li>
@@ -529,140 +527,128 @@ export default function YoutubeWidget({
         </>
       }
       back={
-        <>
-          <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-            {/* TubeArchivist link-out */}
-            <div className="flex flex-col gap-2 pb-3 border-b border-black/10 dark:border-white/10">
-              <span className={`text-xs opacity-70 ${c.label}`}>TubeArchivist (shared by all YouTube widgets)</span>
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset} saving={loading}>
+          <div className="flex gap-1.5">
+            <SettingsInput
+              type="text"
+              value={chInput}
+              onChange={e => setChInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addChannel()}
+              placeholder="@handle or channel URL"
+              className="flex-1 min-w-0"
+            />
+            <SmallButton c={c} onClick={addChannel} disabled={resolving} title="Add channel" className="self-center">
+              {resolving ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
+            </SmallButton>
+          </div>
+          {draft.channels.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {draft.channels.map(ch => (
+                <SettingsListRow
+                  key={ch.channelId}
+                  title={<span className={`truncate font-medium ${c.text}`}>{ch.name}</span>}
+                  actions={
+                    <button
+                      onClick={() => setDraft(d => ({ ...d, channels: d.channels.filter(c => c.channelId !== ch.channelId) }))}
+                      aria-label={`Remove ${ch.name}`}
+                      title="Remove"
+                      className={`${ROW_ACTION} ${c.label}`}
+                    >
+                      <X size={14} />
+                    </button>
+                  }
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`text-sm opacity-70 ${c.label}`}>Videos</span>
+                    <Stepper label={`videos from ${ch.name}`} value={ch.limit} min={1} max={15} onChange={v => setChannelLimit(ch.channelId, v)} />
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`text-sm opacity-70 ${c.label}`}>Include Shorts</span>
+                    <Toggle
+                      checked={!!ch.includeShorts}
+                      onChange={() => setDraft(d => ({ ...d, channels: d.channels.map(c => c.channelId === ch.channelId ? { ...c, includeShorts: !c.includeShorts } : c) }))}
+                      label={`Include Shorts from ${ch.name}`}
+                    />
+                  </div>
+                </SettingsListRow>
+              ))}
+            </div>
+          )}
+          <SettingsField c={c} label="View" inline>
+            {VIEWS.map(v => (
+              <Chip key={v.id} c={c} active={draft.view === v.id} onClick={() => setDraft(d => ({ ...d, view: v.id }))}>
+                {v.label}
+              </Chip>
+            ))}
+          </SettingsField>
+          <SettingsField c={c} label="TubeArchivist" hint="Shared by all YouTube widgets. Archived videos then open there, marked TA.">
+            <SettingsInput
+              type="url"
+              value={draft.ta?.url ?? ""}
+              onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), url: e.target.value } })); }}
+              placeholder="http://server:8000"
+            />
+            <SettingsInput
+              type="url"
+              value={draft.ta?.serverUrl ?? ""}
+              onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), serverUrl: e.target.value } })); }}
+              placeholder="Server address (optional)"
+              title="Only if the address above is not reachable from the dashboard server, for example a tailscale HTTPS name: the LAN address, such as http://192.168.1.10:8000"
+            />
+            <div className="flex gap-1.5">
               <SettingsInput
-                type="url"
-                value={draft.ta?.url ?? ""}
-                onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), url: e.target.value } })); }}
-                placeholder="http://server:8000"
+                type="password"
+                autoComplete="off"
+                value={draft.ta?.token ?? ""}
+                onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), token: e.target.value } })); }}
+                placeholder="API token"
+                className="flex-1 min-w-0"
               />
-              <SettingsInput
-                type="url"
-                value={draft.ta?.serverUrl ?? ""}
-                onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), serverUrl: e.target.value } })); }}
-                placeholder="Server address (optional)"
-                title="Only if the address above is not reachable from the dashboard server, for example a tailscale HTTPS name: the LAN address, such as http://192.168.1.10:8000"
-              />
-              <div className="flex gap-1">
-                <SettingsInput
-                  type="password"
-                  autoComplete="off"
-                  value={draft.ta?.token ?? ""}
-                  onChange={e => { setTaStatus({ state: "idle", msg: "" }); setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), token: e.target.value } })); }}
-                  placeholder="API token"
-                  className="flex-1 min-w-0"
-                />
-                <SmallButton c={c} onClick={testTa} disabled={taStatus.state === "testing"} title="Test connection" className="self-center">
-                  {taStatus.state === "testing" ? <Loader size={14} className="animate-spin" /> : "Test"}
-                </SmallButton>
-              </div>
-              {taStatus.msg && (
-                <p className={`text-xs ${taStatus.state === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-red-400"}`}>{taStatus.msg}</p>
-              )}
-              {(taStatus.state === "ok" || !!config.ta) && (
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs opacity-70 ${c.label}`}>Open on</span>
+              <SmallButton c={c} onClick={testTa} disabled={taStatus.state === "testing"} title="Test connection" className="self-center">
+                {taStatus.state === "testing" ? <Loader size={14} className="animate-spin" /> : "Test"}
+              </SmallButton>
+            </div>
+            {taStatus.msg && (
+              <p className={`text-sm ${taStatus.state === "ok" ? `opacity-70 ${c.label}` : "text-red-400"}`}>{taStatus.msg}</p>
+            )}
+            {(taStatus.state === "ok" || !!config.ta) && (
+              <div className="flex items-center justify-between gap-3 min-h-7">
+                <span className={`text-sm opacity-70 ${c.label}`}>Open on</span>
+                <div className="flex items-center gap-1.5">
                   {([["youtube", "YouTube"], ["ta", "TubeArchivist"]] as const).map(([id, label]) => (
                     <Chip key={id} c={c} active={(draft.ta?.open ?? "youtube") === id} onClick={() => setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), open: id } }))}>
                       {label}
                     </Chip>
                   ))}
                 </div>
-              )}
-              {draft.ta?.open === "ta" && (
-                <p className={`text-xs opacity-70 ${c.text}`}>
-                  {taActive(config.ta) && videos.length
-                    ? `${videos.filter(v => archived.has(videoId(v.link))).length} of ${videos.length} videos here are in your archive and open there (marked TA). The rest open on YouTube.`
-                    : "Archived videos open on TubeArchivist (marked TA). The rest open on YouTube."}
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className={`text-xs opacity-70 ${c.label}`}>View</span>
-              {VIEWS.map(v => (
-                <Chip key={v.id} c={c} active={draft.view === v.id} onClick={() => setDraft(d => ({ ...d, view: v.id }))}>
-                  {v.label}
-                </Chip>
-              ))}
-            </div>
-            <div className="flex gap-1">
-              <SettingsInput
-                type="text"
-                value={chInput}
-                onChange={e => setChInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && addChannel()}
-                placeholder="@handle or channel URL"
-                className="flex-1 min-w-0"
-              />
-              <SmallButton c={c} onClick={addChannel} disabled={resolving} title="Add channel" className="self-center">
-                {resolving ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-              </SmallButton>
-            </div>
-            {draft.channels.length > 0 && (
-              <div className="flex flex-col gap-1.5">
-                {draft.channels.map(ch => {
-                  const sc = tagColor(ch.name);
-                  return (
-                    <div key={ch.channelId} className={`flex flex-col gap-1 px-2 py-1.5 rounded-lg text-xs font-medium ${sc.bg} ${sc.label}`}>
-                      <div className="flex items-center gap-2">
-                        <span className="flex-1 truncate">{ch.name}</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={15}
-                          value={ch.limit}
-                          onChange={e => setChannelLimit(ch.channelId, Math.max(1, Math.min(15, parseInt(e.target.value) || 1)))}
-                          className="w-10 text-center bg-white/60 rounded-md px-1 py-0.5 outline-none border border-current/20 text-xs"
-                        />
-                        <span className="opacity-70 font-normal">videos</span>
-                        <button
-                          onClick={() => setDraft(d => ({ ...d, channels: d.channels.filter(c => c.channelId !== ch.channelId) }))}
-                          aria-label={`Remove ${ch.name}`}
-                          className={`opacity-70 hover:opacity-100 leading-none ml-1 ${HIT_AREA} ${FOCUS_RING}`}
-                        >
-                          ×
-                        </button>
-                      </div>
-                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!!ch.includeShorts}
-                          onChange={e => setDraft(d => ({ ...d, channels: d.channels.map(c => c.channelId === ch.channelId ? { ...c, includeShorts: e.target.checked } : c) }))}
-                          className="w-3 h-3 rounded-md accent-current"
-                        />
-                        <span className="opacity-70 font-normal">include Shorts</span>
-                      </label>
-                      {/* filter members-only toggle, revisit later
-                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!!ch.filterMembers}
-                          onChange={e => setDraft(d => ({ ...d, channels: d.channels.map(c => c.channelId === ch.channelId ? { ...c, filterMembers: e.target.checked } : c) }))}
-                          className="w-3 h-3 rounded-md accent-current"
-                        />
-                        <span className="opacity-70 font-normal">filter members-only</span>
-                      </label>
-                      */}
-                    </div>
-                  );
-                })}
               </div>
             )}
-            {error && <p className="text-red-400 text-xs">{error}</p>}
-          </div>
-          <SaveCancelRow
-            c={c}
-            onSave={handleSave}
-            onCancel={() => { setSettingsOpen(false); setError(""); }}
-            onReset={handleReset}
-            saving={loading}
-          />
-        </>
+            {draft.ta?.open === "ta" && (
+              <>
+                <div className="flex items-center justify-between gap-3 min-h-7">
+                  <span className={`text-sm opacity-70 ${c.label}`}>Only archived videos</span>
+                  <Toggle checked={!!draft.ta?.only} onChange={() => setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), only: !d.ta?.only } }))} label="Show only videos that are in TubeArchivist" />
+                </div>
+                {!draft.ta?.only && (
+                  <div className="flex items-center justify-between gap-3 min-h-7">
+                    <span className={`text-sm opacity-70 ${c.label}`}>Mark</span>
+                    <div className="flex items-center gap-1.5">
+                      {([["ta", "Archived (TA)"], ["yt", "Not archived (YouTube)"]] as const).map(([id, label]) => (
+                        <Chip key={id} c={c} active={(draft.ta?.mark ?? "ta") === id} onClick={() => setDraft(d => ({ ...d, ta: { ...(d.ta ?? blankTa), mark: id } }))}>
+                          {label}
+                        </Chip>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {taActive(config.ta) && videos.length > 0 && (
+                  <SettingsNote c={c}>{videos.filter(v => archived.has(videoId(v.link))).length} of {videos.length} videos here are in your archive.</SettingsNote>
+                )}
+              </>
+            )}
+          </SettingsField>
+          {error && <SettingsError>{error}</SettingsError>}
+        </SettingsFace>
       }
     />
   );

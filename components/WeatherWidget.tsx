@@ -10,7 +10,7 @@ import * as storage from "@/lib/storage";
 import { formatDate } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput } from "./ui/Field";
-import { WidgetHeader, Chip, SmallButton, EmptyState, LoadingState, SaveCancelRow } from "./ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, EmptyState, LoadingState, SettingsFace, SettingsField, SettingsError } from "./ui/WidgetChrome";
 
 type WeatherConfig = { name: string; region: string; lat: number; lon: number; unit: "c" | "f" };
 type GeoResult = { name: string; lat: number; lon: number; region: string };
@@ -219,9 +219,9 @@ export default function WeatherWidget({
   );
 
   const back = (
-    <>
-      <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-        <div className="flex gap-1">
+    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setSearchError(""); }} onReset={handleReset} saving={loading}>
+      <SettingsField c={c} label="Place" hint={configured(draft) ? `Chosen: ${draft.name}${draft.region ? `, ${draft.region}` : ""}` : undefined}>
+        <div className="flex gap-1.5">
           <SettingsInput
             type="text"
             value={query}
@@ -235,7 +235,7 @@ export default function WeatherWidget({
           </SmallButton>
         </div>
         {results.length > 0 && (
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-1">
             {results.map((r, i) => {
               const picked = draft.lat === r.lat && draft.lon === r.lon;
               return (
@@ -252,27 +252,16 @@ export default function WeatherWidget({
             })}
           </div>
         )}
-        {configured(draft) && (
-          <p className={`text-xs opacity-70 ${c.label}`}>chosen: {draft.name}{draft.region ? `, ${draft.region}` : ""}</p>
-        )}
-        <div className="flex items-center gap-2">
-          <span className={`text-xs opacity-70 ${c.label}`}>Unit</span>
-          {(["c", "f"] as const).map(u => (
-            <Chip key={u} c={c} active={draft.unit === u} onClick={() => setDraft(d => ({ ...d, unit: u }))}>
-              °{u.toUpperCase()}
-            </Chip>
-          ))}
-        </div>
-        {searchError && <p className="text-red-400 text-xs">{searchError}</p>}
-      </div>
-      <SaveCancelRow
-        c={c}
-        onSave={handleSave}
-        onCancel={() => { setSettingsOpen(false); setSearchError(""); }}
-        onReset={handleReset}
-        saving={loading}
-      />
-    </>
+      </SettingsField>
+      <SettingsField c={c} label="Unit" inline>
+        {(["c", "f"] as const).map(u => (
+          <Chip key={u} c={c} active={draft.unit === u} onClick={() => setDraft(d => ({ ...d, unit: u }))}>
+            °{u.toUpperCase()}
+          </Chip>
+        ))}
+      </SettingsField>
+      {searchError && <SettingsError>{searchError}</SettingsError>}
+    </SettingsFace>
   );
 
   return <FlipCard c={c} flipped={settingsOpen} className={className} front={front} back={back} />;

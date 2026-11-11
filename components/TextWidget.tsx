@@ -6,7 +6,7 @@ import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
-import { WidgetHeader, Chip, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, EmptyState, SettingsFace, SettingsField, SettingsError } from "@/components/ui/WidgetChrome";
 
 type FontFamily = "sans" | "serif" | "mono";
 type SourceConfig = { type: "text" | "url"; value: string };
@@ -203,25 +203,15 @@ export default function TextWidget({
         </>
       }
       back={
-        <>
-          {/* Header */}
-          <div className={`flex items-center gap-1.5 shrink-0 ${c.label}`}>
-            <Type size={14} className="opacity-50 shrink-0" />
-            <span className="text-xs font-medium truncate">{widget.title}</span>
-          </div>
-
-          <div ref={settingsBodyRef} className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-
-            {/* Source type toggle */}
-            <div className="flex gap-1">
+        <SettingsFace c={c} bodyRef={settingsBodyRef} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} saving={testing}>
+          <SettingsField c={c} label="Source">
+            <div className="flex gap-1.5">
               {(["text", "url"] as const).map(t => (
                 <Chip key={t} c={c} active={draft.source.type === t} onClick={() => setDraft(d => ({ ...d, source: { ...d.source, type: t } }))}>
                   {t === "text" ? "Text" : "API URL"}
                 </Chip>
               ))}
             </div>
-
-            {/* Input */}
             <SettingsInput
               type={draft.source.type === "url" ? "url" : "text"}
               value={draft.source.value}
@@ -229,47 +219,30 @@ export default function TextWidget({
               onKeyDown={e => e.key === "Enter" && handleSave()}
               placeholder={draft.source.type === "url" ? "https://..." : "Enter any text…"}
             />
-
-            {/* Font picker */}
-            <div>
-              <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Font</p>
-              <div className="flex gap-1.5">
-                {(["sans", "serif", "mono"] as FontFamily[]).map(f => (
-                  <div key={f} className="flex flex-col items-center gap-1">
-                    <Chip c={c} active={draft.font === f} onClick={() => setDraft(d => ({ ...d, font: f }))} className={FONT_PREVIEW_CLASS[f]}>
-                      Aa
-                    </Chip>
-                    <span className={`text-xs opacity-70 ${c.label} ${FONT_PREVIEW_CLASS[f]}`}>
-                      {f.charAt(0).toUpperCase() + f.slice(1)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Size picker */}
-            <div>
-              <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Size</p>
-              <div className="flex gap-1">
-                {SIZES.map(s => (
-                  <Chip key={s.id} c={c} active={(draft.size ?? "auto") === s.id} onClick={() => setDraft(d => ({ ...d, size: s.id }))}>
-                    {s.label}
+          </SettingsField>
+          <SettingsField c={c} label="Font">
+            <div className="flex gap-1.5">
+              {(["sans", "serif", "mono"] as FontFamily[]).map(f => (
+                <div key={f} className="flex flex-col items-center gap-1">
+                  <Chip c={c} active={draft.font === f} onClick={() => setDraft(d => ({ ...d, font: f }))} className={FONT_PREVIEW_CLASS[f]}>
+                    Aa
                   </Chip>
-                ))}
-              </div>
+                  <span className={`text-xs opacity-70 ${c.label} ${FONT_PREVIEW_CLASS[f]}`}>
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                  </span>
+                </div>
+              ))}
             </div>
-
-            {error && <p className="text-red-400 text-xs">{error}</p>}
-
-          </div>
-
-          <SaveCancelRow
-            c={c}
-            onSave={handleSave}
-            onCancel={() => { setSettingsOpen(false); setError(""); }}
-            saving={testing}
-          />
-        </>
+          </SettingsField>
+          <SettingsField c={c} label="Size" inline>
+            {SIZES.map(s => (
+              <Chip key={s.id} c={c} active={(draft.size ?? "auto") === s.id} onClick={() => setDraft(d => ({ ...d, size: s.id }))}>
+                {s.label}
+              </Chip>
+            ))}
+          </SettingsField>
+          {error && <SettingsError>{error}</SettingsError>}
+        </SettingsFace>
       }
     />
   );

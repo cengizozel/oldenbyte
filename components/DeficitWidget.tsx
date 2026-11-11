@@ -13,7 +13,7 @@ import {
 } from "@/lib/deficit";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, SettingsSelect, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { EmptyState, SaveCancelRow, WidgetHeader } from "./ui/WidgetChrome";
+import { EmptyState, WidgetHeader, SettingsFace, SettingsField, SettingsNote, Chip } from "./ui/WidgetChrome";
 
 // Deficit: a profile gives a daily burn, each day you enter what you ate (and
 // any exercise, and a weigh-in if you like), and the widget keeps an estimated
@@ -278,11 +278,10 @@ export default function DeficitWidget({
   );
 
   // ── Settings (back) ──────────────────────────────────────────────────────
+  // Two fields to a row: these are numbers you know (age, height, weights),
+  // so they are typed, with the unit as the placeholder.
   const field = (label: string, node: React.ReactNode) => (
-    <label className={`flex items-center gap-2 text-xs ${c.label}`}>
-      <span className="w-20 shrink-0 opacity-70">{label}</span>
-      {node}
-    </label>
+    <SettingsField c={c} label={label}>{node}</SettingsField>
   );
   const num = (key: keyof Draft, placeholder: string, decimal = false) => (
     <SettingsInput
@@ -290,7 +289,7 @@ export default function DeficitWidget({
       value={draft[key]}
       onChange={e => setDraft(d => ({ ...d, [key]: e.target.value.replace(decimal ? /[^\d.]/g : /[^\d]/g, "") }))}
       placeholder={placeholder}
-      className="!py-1.5"
+      aria-label={String(key)}
     />
   );
   const draftValid = isValidConfig({
@@ -303,48 +302,42 @@ export default function DeficitWidget({
   }, Number(draft.startWeightKg)) : null;
 
   const back = (
-    <>
-      <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto pr-3">
-        {field("sex", (
-          <SettingsSelect value={draft.sex} onChange={e => setDraft(d => ({ ...d, sex: e.target.value as "male" | "female" }))} className="!py-1.5">
+    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(config ? toDraft(config) : emptyDraft(today)); setSettingsOpen(false); }}>
+      <div className="grid grid-cols-2 gap-3">
+        {field("Sex", (
+          <SettingsSelect value={draft.sex} onChange={e => setDraft(d => ({ ...d, sex: e.target.value as "male" | "female" }))}>
             <option value="male">male</option>
             <option value="female">female</option>
           </SettingsSelect>
         ))}
-        {field("age", num("age", "years"))}
-        {field("height", num("heightCm", "cm"))}
-        {field("start weight", num("startWeightKg", "kg", true))}
-        {field("goal weight", num("goalWeightKg", "kg", true))}
-        {field("activity", (
-          <SettingsSelect value={draft.activity} onChange={e => setDraft(d => ({ ...d, activity: e.target.value }))} className="!py-1.5">
-            {ACTIVITY_LEVELS.map(a => <option key={a.value} value={String(a.value)}>{a.label}, {a.hint}</option>)}
-          </SettingsSelect>
+        {field("Age", num("age", "years"))}
+        {field("Height", num("heightCm", "cm"))}
+        {field("Start weight", num("startWeightKg", "kg", true))}
+        {field("Goal weight", num("goalWeightKg", "kg", true))}
+        {field("Start date", (
+          <SettingsInput type="date" value={draft.startDate} max={today} onChange={e => setDraft(d => ({ ...d, startDate: e.target.value }))} />
         ))}
-        {field("start date", (
-          <SettingsInput type="date" value={draft.startDate} max={today} onChange={e => setDraft(d => ({ ...d, startDate: e.target.value }))} className="!py-1.5" />
-        ))}
-        {config && field("drawing", (
-          <div className="flex gap-1">
-            {([["line", "over time"], ["belly", "belly"]] as [DeficitChart, string][]).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => changeChart(key)}
-                title={key === "belly" ? "A side profile whose belly shrinks from the start weight toward the goal" : "The estimated weight over time, toward the goal date"}
-                className={`px-2 py-1 rounded-md text-xs ${FOCUS_RING} ${(config.chart ?? "line") === key ? `bg-black/10 dark:bg-white/15 ${c.text}` : `opacity-70 hover:opacity-100 ${c.label}`}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        ))}
-        <p className={`text-xs leading-relaxed opacity-70 ${c.text}`}>
-          {draftBurn !== null
-            ? <>About <span className="tabular-nums font-medium">{fmtKcal(draftBurn)}</span> kcal a day at the start weight, before exercise. The burn is recomputed from the estimated weight as it changes, and the deficit of each day moves the estimate at {KCAL_PER_KG.toLocaleString()} kcal per kilogram.</>
-            : <>Everything is needed for the daily burn: it is the Mifflin-St Jeor rate for your sex, age, height and weight, times the activity level. The start date is the day the start weight was true.</>}
-        </p>
       </div>
-      <SaveCancelRow c={c} onSave={handleSave} onCancel={() => { setDraft(config ? toDraft(config) : emptyDraft(today)); setSettingsOpen(false); }} />
-    </>
+      {field("Activity", (
+        <SettingsSelect value={draft.activity} onChange={e => setDraft(d => ({ ...d, activity: e.target.value }))}>
+          {ACTIVITY_LEVELS.map(a => <option key={a.value} value={String(a.value)}>{a.label}, {a.hint}</option>)}
+        </SettingsSelect>
+      ))}
+      {config && (
+        <SettingsField c={c} label="Drawing" inline>
+          {([["line", "Over time"], ["belly", "Belly"]] as [DeficitChart, string][]).map(([key, label]) => (
+            <Chip key={key} c={c} active={(config.chart ?? "line") === key} onClick={() => changeChart(key)} title={key === "belly" ? "A side profile whose belly shrinks from the start weight toward the goal" : "The estimated weight over time, toward the goal date"}>
+              {label}
+            </Chip>
+          ))}
+        </SettingsField>
+      )}
+      <SettingsNote c={c}>
+        {draftBurn !== null
+          ? <>About <span className="tabular-nums font-medium">{fmtKcal(draftBurn)}</span> kcal a day at the start weight, before exercise. The burn is recomputed from the estimated weight as it changes.</>
+          : <>Everything is needed for the daily burn: it is the Mifflin-St Jeor rate for your sex, age, height and weight, times the activity level. The start date is the day the start weight was true.</>}
+      </SettingsNote>
+    </SettingsFace>
   );
 
   return (

@@ -9,7 +9,7 @@ import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, WidgetHeader, BackButton } from "@/components/ui/WidgetChrome";
+import { RefreshButton, ScrollFades, LoadingState, EmptyState, WidgetHeader, BackButton, SettingsFace, SettingsField } from "@/components/ui/WidgetChrome";
 
 const CATEGORY_GROUPS = [
   {
@@ -286,16 +286,6 @@ export default function ArxivWidget({
                           >
                             {p.title}
                           </button>
-                          <a
-                            href={p.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            aria-label="Open on arXiv"
-                            className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
-                          >
-                            <ExternalLink size={14} />
-                          </a>
                         </div>
                       </li>
                     ))}
@@ -352,11 +342,8 @@ export default function ArxivWidget({
         </>
       }
       back={
-        <>
-          <div className="flex flex-col gap-1.5">
-            <label className={`text-xs font-medium opacity-70 ${c.label}`}>
-              Field
-            </label>
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => setSettingsOpen(false)}>
+          <SettingsField c={c} label="Field">
             <SettingsSelect
               value={draftGroup.label}
               onChange={e => {
@@ -368,22 +355,15 @@ export default function ArxivWidget({
                 <option key={g.label} value={g.label}>{g.label}</option>
               ))}
             </SettingsSelect>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className={`text-xs font-medium opacity-70 ${c.label}`}>
-              Topic
-            </label>
-            <SettingsSelect
-              value={draft.category}
-              onChange={e => setDraft({ category: e.target.value })}
-            >
+          </SettingsField>
+          <SettingsField c={c} label="Topic">
+            <SettingsSelect value={draft.category} onChange={e => setDraft({ category: e.target.value })}>
               {draftGroup.subs.map(sub => (
                 <option key={sub.value} value={sub.value}>{sub.label}</option>
               ))}
             </SettingsSelect>
-          </div>
-          <SaveCancelRow c={c} onSave={handleSave} onCancel={() => setSettingsOpen(false)} />
-        </>
+          </SettingsField>
+        </SettingsFace>
       }
     />
   );

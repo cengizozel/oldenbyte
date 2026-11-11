@@ -9,7 +9,7 @@ import { parseJson } from "@/lib/text";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
 import { useScrollFade } from "@/lib/useScrollFade";
-import { WidgetHeader, Chip, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, RefreshButton, ScrollFades, LoadingState, EmptyState, SettingsFace, SettingsField, SettingsError } from "@/components/ui/WidgetChrome";
 
 type RssItem = { title: string; link: string; pubDate: string };
 type RssConfig = { url: string; limit: number; name?: string };
@@ -152,44 +152,40 @@ export default function RssWidget({
         </>
       }
       back={
-        <>
-          <SettingsInput
-            type="text"
-            value={draft.name ?? ""}
-            onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
-            placeholder="Name (e.g. BBC, Reddit…)"
-          />
-          <SettingsInput
-            type="url"
-            value={draft.url}
-            onChange={e => setDraft(d => ({ ...d, url: e.target.value }))}
-            onKeyDown={e => e.key === "Enter" && handleSave()}
-            placeholder="https://feeds.bbci.co.uk/news/rss.xml"
-          />
-          <div className="flex flex-col gap-0.5">
-            {RSS_EXAMPLES.map(ex => (
-              <Chip key={ex.url} c={c} active={draft.url === ex.url} onClick={() => setDraft(d => ({ ...d, url: ex.url }))} className="self-start">
-                {ex.label}
-              </Chip>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-70 ${c.label}`}>Items</span>
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset} saving={loading}>
+          <SettingsField c={c} label="Name">
+            <SettingsInput
+              type="text"
+              value={draft.name ?? ""}
+              onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
+              placeholder="e.g. BBC, Hacker News"
+            />
+          </SettingsField>
+          <SettingsField c={c} label="Feed address">
+            <SettingsInput
+              type="url"
+              value={draft.url}
+              onChange={e => setDraft(d => ({ ...d, url: e.target.value }))}
+              onKeyDown={e => e.key === "Enter" && handleSave()}
+              placeholder="https://feeds.bbci.co.uk/news/rss.xml"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              {RSS_EXAMPLES.map(ex => (
+                <Chip key={ex.url} c={c} active={draft.url === ex.url} onClick={() => setDraft(d => ({ ...d, url: ex.url }))}>
+                  {ex.label}
+                </Chip>
+              ))}
+            </div>
+          </SettingsField>
+          <SettingsField c={c} label="Items" inline>
             {LIMITS.map(n => (
               <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft(d => ({ ...d, limit: n }))}>
                 {n}
               </Chip>
             ))}
-          </div>
-          {error && <p className="text-red-400 text-xs">{error}</p>}
-          <SaveCancelRow
-            c={c}
-            onSave={handleSave}
-            onCancel={() => { setSettingsOpen(false); setError(""); }}
-            onReset={handleReset}
-            saving={loading}
-          />
-        </>
+          </SettingsField>
+          {error && <SettingsError>{error}</SettingsError>}
+        </SettingsFace>
       }
     />
   );

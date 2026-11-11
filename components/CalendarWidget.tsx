@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarDays, Loader, Plug } from "lucide-react";
+import Toggle from "@/components/ui/Toggle";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
@@ -10,7 +11,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput } from "./ui/Field";
-import { ScrollFades, EmptyState, LoadingState, SaveCancelRow, WidgetHeader, Chip, SmallButton } from "./ui/WidgetChrome";
+import { ScrollFades, EmptyState, LoadingState, WidgetHeader, Chip, SmallButton, SettingsFace, SettingsField, SettingsListRow, SettingsError } from "./ui/WidgetChrome";
 
 type Calendar = { name: string; url: string; readOnly?: boolean };
 type CalEvent = {
@@ -248,15 +249,15 @@ export default function CalendarWidget({
   );
 
   const back = (
-    <>
-      <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
+    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setConnectError(""); }} onReset={handleReset} saving={loading}>
+      <SettingsField c={c} label="CalDAV server" hint="Works with Nextcloud, Radicale and other CalDAV servers. For Nextcloud use an app password (Settings, Security) and the address ending in /remote.php/dav.">
         <SettingsInput
           type="url"
           value={draft.baseUrl}
           onChange={e => setDraft(d => ({ ...d, baseUrl: e.target.value }))}
           placeholder="https://cloud.example.com/remote.php/dav"
         />
-        <div className="flex gap-1">
+        <div className="flex gap-1.5">
           <SettingsInput
             type="text"
             value={draft.username}
@@ -276,53 +277,39 @@ export default function CalendarWidget({
           {connecting ? <Loader size={12} className="animate-spin" /> : <Plug size={12} />}
           {connecting ? "connecting…" : "Connect"}
         </SmallButton>
-        {available.length > 0 && (
-          <div className="flex flex-col gap-1">
-            <p className={`text-xs opacity-70 ${c.label}`}>Calendars to show</p>
+      </SettingsField>
+      {available.length > 0 && (
+        <SettingsField c={c} label="Calendars to show">
+          <div className="flex flex-col gap-1.5">
             {available.map(cal => {
               const on = draft.calendars.some(s => s.url === cal.url);
               return (
-                <label key={cal.url} className={`flex items-center gap-2 text-xs cursor-pointer ${c.text} ${on ? "opacity-80" : "opacity-70"}`}>
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() =>
-                      setDraft(d => ({
-                        ...d,
-                        calendars: on ? d.calendars.filter(s => s.url !== cal.url) : [...d.calendars, cal],
-                      }))
-                    }
-                    className="accent-current"
-                  />
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tagColor(cal.name).dot }} />
-                  <span className="truncate">{cal.name}</span>
-                  {cal.readOnly && <span className={`text-xs opacity-70 ${c.label}`}>read-only</span>}
-                </label>
+                <SettingsListRow
+                  key={cal.url}
+                  leading={<span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(cal.name).dot }} />}
+                  title={<span className={`truncate ${c.text}`}>{cal.name}{cal.readOnly && <span className={`ml-1.5 opacity-70 ${c.label}`}>read-only</span>}</span>}
+                  actions={
+                    <Toggle
+                      checked={on}
+                      onChange={() => setDraft(d => ({ ...d, calendars: on ? d.calendars.filter(s => s.url !== cal.url) : [...d.calendars, cal] }))}
+                      label={`Show ${cal.name}`}
+                    />
+                  }
+                />
               );
             })}
           </div>
-        )}
-        <div className="flex items-center gap-2">
-          <span className={`text-xs opacity-70 ${c.label}`}>Days ahead</span>
-          {[7, 14, 30].map(n => (
-            <Chip key={n} c={c} active={draft.days === n} onClick={() => setDraft(d => ({ ...d, days: n }))}>
-              {n}
-            </Chip>
-          ))}
-        </div>
-        {connectError && <p className="text-red-400 text-xs">{connectError}</p>}
-        <p className="text-xs text-[var(--text-muted)]">
-          Works with Nextcloud, Radicale, and other CalDAV servers. For Nextcloud use an app password (Settings, Security) and the URL ending in /remote.php/dav.
-        </p>
-      </div>
-      <SaveCancelRow
-        c={c}
-        onSave={handleSave}
-        onCancel={() => { setSettingsOpen(false); setConnectError(""); }}
-        onReset={handleReset}
-        saving={loading}
-      />
-    </>
+        </SettingsField>
+      )}
+      <SettingsField c={c} label="Days ahead" inline>
+        {[7, 14, 30].map(n => (
+          <Chip key={n} c={c} active={draft.days === n} onClick={() => setDraft(d => ({ ...d, days: n }))}>
+            {n}
+          </Chip>
+        ))}
+      </SettingsField>
+      {connectError && <SettingsError>{connectError}</SettingsError>}
+    </SettingsFace>
   );
 
   return <FlipCard c={c} flipped={settingsOpen} className={className} front={front} back={back} />;

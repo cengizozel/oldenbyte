@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Plus, ExternalLink, Flame } from "lucide-react";
+import { Plus, X, ExternalLink, Flame } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { timeAgo, formatCount, localDateStr } from "@/lib/format";
@@ -9,8 +9,9 @@ import { decodeEntities, parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip, BackButton } from "@/components/ui/WidgetChrome";
+import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
+import Toggle from "@/components/ui/Toggle";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsError, ROW_ACTION } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { REDDIT_API_KEY, parseRedditApi, type RedditApiConfig } from "@/lib/reddit";
 import { isDemoMode } from "@/lib/demo";
@@ -413,16 +414,6 @@ export default function RedditWidget({
                           >
                             {post.title}
                           </button>
-                          <a
-                            href={post.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            aria-label="Open on Reddit"
-                            className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
-                          >
-                            <ExternalLink size={12} />
-                          </a>
                           {/* Some image posts come without a feed thumbnail; the
                               full image stands in for it then. */}
                           {config.images && (post.thumbnail || post.image) && (
@@ -510,11 +501,8 @@ export default function RedditWidget({
         </>
       }
       back={
-        <>
-        <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-
-          {/* Subreddit input */}
-          <div className="flex gap-1">
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset}>
+          <div className="flex gap-1.5">
             <SettingsInput
               ref={subInputRef}
               type="text"
@@ -528,27 +516,49 @@ export default function RedditWidget({
               <Plus size={14} />
             </SmallButton>
           </div>
-
-          {/* Post images (thumbnails in the list, full image in the detail view) */}
-          <label className={`flex items-center gap-2 text-xs cursor-pointer select-none ${c.label}`}>
-            <input
-              type="checkbox"
-              checked={!!draft.images}
-              onChange={e => setDraft(d => ({ ...d, images: e.target.checked }))}
-              className="w-3.5 h-3.5 rounded-md accent-current"
-            />
-            <span className="opacity-80">Show post images</span>
-          </label>
-
-          <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-70 ${c.label}`}>Order</span>
-            <Chip c={c} active={(draft.order ?? "arrival") === "arrival"} onClick={() => setDraft(d => ({ ...d, order: "arrival" }))} title="Posts that newly made a top list go first">newest in feed</Chip>
+          {draft.subreddits.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {draft.subreddits.map(sub => (
+                <SettingsListRow
+                  key={sub.name}
+                  title={<span className={`truncate font-medium ${c.text}`}>r/{sub.name}</span>}
+                  actions={
+                    <button
+                      onClick={() => setDraft(d => ({ ...d, subreddits: d.subreddits.filter(s => s.name !== sub.name) }))}
+                      aria-label={`Remove r/${sub.name}`}
+                      title="Remove"
+                      className={`${ROW_ACTION} ${c.label}`}
+                    >
+                      <X size={14} />
+                    </button>
+                  }
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`text-sm opacity-70 ${c.label}`}>Posts</span>
+                    <Stepper label={`posts from r/${sub.name}`} value={sub.limit} min={1} max={25} onChange={v => setSubLimit(sub.name, v)} />
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`text-sm opacity-70 ${c.label}`}>Top of</span>
+                    <div className="flex items-center gap-1 flex-wrap justify-end">
+                      {PERIODS.map(p => (
+                        <Chip key={p.value} c={c} active={sub.period === p.value} onClick={() => setSubPeriod(sub.name, p.value)}>
+                          {p.label}
+                        </Chip>
+                      ))}
+                    </div>
+                  </div>
+                </SettingsListRow>
+              ))}
+            </div>
+          )}
+          <SettingsField c={c} label="Post images" inline>
+            <Toggle checked={!!draft.images} onChange={() => setDraft(d => ({ ...d, images: !d.images }))} label="Show post images" />
+          </SettingsField>
+          <SettingsField c={c} label="Order" inline>
+            <Chip c={c} active={(draft.order ?? "arrival") === "arrival"} onClick={() => setDraft(d => ({ ...d, order: "arrival" }))} title="Posts that newly made a top list go first">newest</Chip>
             <Chip c={c} active={draft.order === "date"} onClick={() => setDraft(d => ({ ...d, order: "date" }))} title="By when the post was made">post date</Chip>
-          </div>
-
-          {/* Reddit app credentials (optional, shared by every Reddit widget) */}
-          <div className="flex flex-col gap-2 pt-3 border-t border-black/10 dark:border-white/10">
-            <span className={`text-sm opacity-70 ${c.label}`}>Reddit API (optional)</span>
+          </SettingsField>
+          <SettingsField c={c} label="Reddit API (optional)" hint="A script app from reddit.com/prefs/apps lifts the limit to 100 requests a minute and adds vote counts. Without it the public feed is used, which Reddit limits to about one request a minute. Shared by every Reddit widget.">
             <SettingsInput
               type="text"
               value={api.clientId}
@@ -570,62 +580,9 @@ export default function RedditWidget({
                 <span className={`text-sm min-w-0 break-words ${apiStatus.ok ? `opacity-70 ${c.label}` : "text-red-400"}`}>{apiStatus.msg}</span>
               )}
             </div>
-            <p className={`text-sm opacity-70 leading-snug ${c.label}`}>
-              A script app from reddit.com/prefs/apps lifts the limit to 100 requests a minute and adds vote counts. Without it the public feed is used, which Reddit limits to about one request a minute.
-            </p>
-          </div>
-
-          {/* Selected subreddits with per-sub limit and period */}
-          {draft.subreddits.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {draft.subreddits.map(sub => {
-                const sc = tagColor(sub.name);
-                return (
-                  <div key={sub.name} className={`flex flex-col gap-1.5 px-2 py-1.5 rounded-lg ${sc.bg} ${sc.label}`}>
-                    <div className="flex items-center gap-2 text-xs font-medium">
-                      <span className="flex-1 min-w-0 truncate">r/{sub.name}</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={25}
-                        value={sub.limit}
-                        onChange={e => setSubLimit(sub.name, Math.max(1, Math.min(25, parseInt(e.target.value) || 1)))}
-                        className="w-10 text-center bg-white/60 rounded-md px-1 py-0.5 outline-none border border-current/20 text-xs"
-                      />
-                      <span className="opacity-70 font-normal">posts</span>
-                      <button
-                        onClick={() => setDraft(d => ({ ...d, subreddits: d.subreddits.filter(s => s.name !== sub.name) }))}
-                        aria-label={`Remove r/${sub.name}`}
-                        className={`opacity-70 hover:opacity-100 leading-none ml-1 ${HIT_AREA} ${FOCUS_RING}`}
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <div className="flex gap-1 flex-wrap justify-center">
-                      {PERIODS.map(p => (
-                        <Chip key={p.value} c={{ ...c, label: sc.label, text: sc.label }} active={sub.period === p.value} onClick={() => setSubPeriod(sub.name, p.value)}>
-                          {p.label}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {error && <p className="text-red-400 text-xs">{error}</p>}
-
-        </div>
-        {/* Save never blocks on the background fetch: it applies the config
-            and the front paints feeds as they arrive. */}
-        <SaveCancelRow
-          c={c}
-          onSave={handleSave}
-          onCancel={() => { setSettingsOpen(false); setError(""); }}
-          onReset={handleReset}
-        />
-        </>
+          </SettingsField>
+          {error && <SettingsError>{error}</SettingsError>}
+        </SettingsFace>
       }
     />
   );

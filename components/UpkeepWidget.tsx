@@ -16,8 +16,8 @@ import {
   stateAt, scoreAt, perfectSince, nextExpiry, sampleScores, summarize, dayChecks, formatSpan,
 } from "@/lib/upkeep";
 import FlipCard from "./ui/FlipCard";
-import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { EmptyState, SaveCancelRow, WidgetHeader, SmallButton } from "./ui/WidgetChrome";
+import { SettingsInput, HIT_AREA, FOCUS_RING, Stepper } from "./ui/Field";
+import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsField, SettingsListRow, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION, Chip } from "./ui/WidgetChrome";
 
 // Upkeep is Tracker and Rhythm's third sibling. Tracker answers "how long?",
 // Rhythm answers "when, and how often?" — Upkeep answers "am I keeping up with
@@ -376,118 +376,101 @@ export default function UpkeepWidget({
 
   // ── Settings (back) ──────────────────────────────────────────────────────
   const draftTotal = draft.reduce((a, it) => a + (it.weight > 0 ? it.weight : 0), 0);
-  const spanInputCls = `w-7 text-xs text-center tabular-nums border border-[var(--surface-border)] rounded-md px-0.5 py-1 outline-none bg-[var(--surface)] ${c.text}`;
 
   const back = (
-    <>
-      <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-        <div className="flex gap-1">
-          <SettingsInput
-            type="text"
-            value={nameInput}
-            onChange={e => setNameInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addItem()}
-            placeholder="e.g. teeth clean, showered"
-            className="flex-1"
-          />
-          <SmallButton c={c} onClick={addItem} title="Add item" className="self-center">
-            <Plus size={14} />
-          </SmallButton>
-        </div>
-        <div className={`flex items-center gap-2 text-xs ${c.label}`}>
-          <span className="opacity-70">Order</span>
-          {([["custom", "as arranged"], ["need", "by need"]] as [Order, string][]).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => changeOrder(key)}
-              title={key === "need" ? "Off items first, heaviest first, then running items soonest to run out first" : "The order below, drag the dots to arrange"}
-              className={`px-1.5 py-0.5 rounded-md ${FOCUS_RING} ${order === key ? `bg-black/10 dark:bg-white/15 ${c.text}` : "opacity-70 hover:opacity-100"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {draft.length > 1 && order === "custom" && (
-          <p className={`text-xs opacity-70 -mt-1 ${c.text}`}>Drag the dot to reorder.</p>
-        )}
-        {draft.length > 0 && (
-          <>
-            <div
-              ref={listRef}
-              className="flex flex-col gap-1.5"
-              onDragOver={e => {
-                if (dragIdx === null) return;
-                e.preventDefault();
-                const slot = slotFromPointer(e.clientY);
-                if (slot !== null && slot !== overIdx) setOverIdx(slot);
-              }}
-              onDrop={() => {
-                if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
-                setDragIdx(null);
-                setOverIdx(null);
-              }}
-            >
-              {draft.map((it, i) => (
-                <div
-                  key={it.id}
-                  ref={el => { rowRefs.current[i] = el; }}
-                  style={{ transform: shiftFor(i) ? `translateY(${shiftFor(i)}px)` : undefined }}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded-lg bg-black/5 dark:bg-white/10 transition-[transform,opacity] duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
-                >
+    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }}>
+      <div className="flex gap-1.5">
+        <SettingsInput
+          type="text"
+          value={nameInput}
+          onChange={e => setNameInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && addItem()}
+          placeholder="e.g. teeth clean, showered"
+          className="flex-1"
+        />
+        <SmallButton c={c} onClick={addItem} title="Add item" className="self-center">
+          <Plus size={14} />
+        </SmallButton>
+      </div>
+      <SettingsField c={c} label="Order" inline>
+        {([["custom", "As arranged"], ["need", "By need"]] as [Order, string][]).map(([key, label]) => (
+          <Chip key={key} c={c} active={order === key} onClick={() => changeOrder(key)} title={key === "need" ? "Off items first, heaviest first, then running items soonest to run out first" : "The order below, drag the dots to arrange"}>
+            {label}
+          </Chip>
+        ))}
+      </SettingsField>
+      {draft.length > 0 && (
+        <>
+          <div
+            ref={listRef}
+            className="flex flex-col gap-1.5"
+            onDragOver={e => {
+              if (dragIdx === null) return;
+              e.preventDefault();
+              const slot = slotFromPointer(e.clientY);
+              if (slot !== null && slot !== overIdx) setOverIdx(slot);
+            }}
+            onDrop={() => {
+              if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
+              setDragIdx(null);
+              setOverIdx(null);
+            }}
+          >
+            {draft.map((it, i) => (
+              <SettingsListRow
+                key={it.id}
+                rowRef={el => { rowRefs.current[i] = el; }}
+                style={{ transform: shiftFor(i) ? `translateY(${shiftFor(i)}px)` : undefined }}
+                className={`transition-[transform,opacity] duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
+                leading={
                   <span
-                    draggable
+                    draggable={order === "custom"}
                     onDragStart={() => setDragIdx(i)}
                     onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
-                    title="Drag to reorder"
-                    className="w-2.5 h-2.5 rounded-full shrink-0 cursor-grab active:cursor-grabbing"
+                    title={order === "custom" ? "Drag to reorder" : undefined}
+                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${order === "custom" ? "cursor-grab active:cursor-grabbing" : ""}`}
                     style={{ backgroundColor: colorOf(it.id) }}
                   />
+                }
+                title={
                   <input
                     value={it.name}
                     onChange={e => setDraft(d => d.map(x => x.id === it.id ? { ...x, name: e.target.value } : x))}
-                    className={`flex-1 min-w-0 bg-transparent dark:!bg-transparent text-sm outline-none ${c.text}`}
+                    aria-label="Item name"
+                    className={`${LIST_TITLE_INPUT} font-medium ${c.text}`}
                   />
-                  <label className={`flex items-center gap-1 text-xs ${c.label} opacity-80`} title="Points this item is worth">
-                    <input
-                      inputMode="numeric"
-                      value={it.weight}
-                      onChange={e => {
-                        const v = e.target.value.replace(/\D/g, "");
-                        setDraft(d => d.map(x => x.id === it.id ? { ...x, weight: v ? parseInt(v, 10) : 0 } : x));
-                      }}
-                      className={`w-8 text-xs text-center tabular-nums border border-[var(--surface-border)] rounded-md px-1 py-1 outline-none bg-[var(--surface)] ${c.text}`}
-                    />
-                    <span>pts</span>
-                  </label>
-                  <span className={`flex items-center gap-0.5 text-xs ${c.label} opacity-80`} title="How long one check lasts, in days and hours">
-                    <input inputMode="numeric" value={Math.floor(it.hours / 24)} onChange={e => setSpan(it.id, "d", e.target.value)} aria-label="Days" className={spanInputCls} />
-                    <span>d</span>
-                    <input inputMode="numeric" value={it.hours % 24} onChange={e => setSpan(it.id, "h", e.target.value)} aria-label="Hours" className={spanInputCls} />
-                    <span>h</span>
-                  </span>
-                  <button
-                    onClick={() => setDraft(d => d.filter(x => x.id !== it.id))}
-                    aria-label={`Remove ${it.name}`}
-                    className={`opacity-70 hover:opacity-100 leading-none ${iconBtnCls} ${c.label}`}
-                  >
-                    ×
+                }
+                actions={
+                  <button onClick={() => setDraft(d => d.filter(x => x.id !== it.id))} aria-label={`Remove ${it.name}`} title="Remove" className={`${ROW_ACTION} ${c.label}`}>
+                    <X size={14} />
                   </button>
+                }
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className={`text-sm opacity-70 ${c.label}`} title="Points this item is worth">Points</span>
+                  <Stepper label={`points for ${it.name}`} value={it.weight} min={0} max={99} onChange={v => setDraft(d => d.map(x => x.id === it.id ? { ...x, weight: v } : x))} />
                 </div>
-              ))}
-            </div>
-            <p className={`text-xs leading-relaxed opacity-70 ${c.text}`}>
-              Points add up to <span className="tabular-nums font-medium">{draftTotal}</span>. Everything running at once scores 100, so the weights just set how much each one moves the needle. The span is how long a check lasts: 12 hours for teeth, a week for laundry.
-            </p>
-          </>
-        )}
-        {draft.length === 0 && (
-          <p className={`text-xs leading-relaxed opacity-70 ${c.text}`}>
-            Add the essentials you want to stay on top of: teeth, shower, laundry, a workout. Give each one points for how much it matters and a span for how long one check lasts. Checking an item starts its countdown; while it runs, its points count toward the score.
-          </p>
-        )}
-      </div>
-      <SaveCancelRow c={c} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }} />
-    </>
+                <div className="flex items-center justify-between gap-3">
+                  <span className={`text-sm opacity-70 ${c.label}`} title="How long one check lasts">Lasts</span>
+                  <div className="flex items-center gap-2">
+                    <Stepper label={`days one check of ${it.name} lasts`} value={Math.floor(it.hours / 24)} min={0} max={60} unit="d" onChange={v => setSpan(it.id, "d", String(v))} />
+                    <Stepper label={`hours one check of ${it.name} lasts`} value={it.hours % 24} min={0} max={23} unit="h" onChange={v => setSpan(it.id, "h", String(v))} />
+                  </div>
+                </div>
+              </SettingsListRow>
+            ))}
+          </div>
+          <SettingsNote c={c}>
+            Points add up to <span className="tabular-nums font-medium">{draftTotal}</span>. Everything running at once scores 100, so the weights just set how much each one moves the needle.
+          </SettingsNote>
+        </>
+      )}
+      {draft.length === 0 && (
+        <SettingsNote c={c}>
+          Add the essentials you want to stay on top of: teeth, shower, laundry, a workout. Give each one points for how much it matters and a span for how long one check lasts. Checking an item starts its clock.
+        </SettingsNote>
+      )}
+    </SettingsFace>
   );
 
   // ── History overlay ────────────────────────────────────────────────────────

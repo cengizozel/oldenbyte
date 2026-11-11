@@ -4,10 +4,10 @@ import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { Chessboard } from "react-chessboard";
 import type { PieceDropHandlerArgs } from "react-chessboard";
 import { Chess, type Square } from "chess.js";
-import { Swords, Loader, SlidersHorizontal } from "lucide-react";
+import { Swords, Loader } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
-import { WidgetHeader, SmallButton, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, SmallButton, SettingsFace, SettingsField } from "@/components/ui/WidgetChrome";
 
 const ENGINE_PATH = "/stockfish/stockfish-18-lite-single.js";
 const MIN_ELO = 1300;
@@ -235,24 +235,21 @@ export default function ChessWidget({
       <WidgetHeader c={c} icon={Swords} title="Chess" onSettings={() => { setDraftElo(elo); setSettingsOpen(true); }} />
 
       {settingsOpen && (
-        <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col gap-3 ${c.bg}`}>
-          <WidgetHeader panel c={c} icon={SlidersHorizontal} title="Settings" />
-          <label className={`flex items-center gap-2 text-sm ${c.label}`}>
-            <span className="opacity-70 tabular-nums w-20 shrink-0">Elo {draftElo}</span>
-            <input
-              type="range"
-              min={MIN_ELO}
-              max={MAX_ELO}
-              step={100}
-              value={draftElo}
-              onChange={e => setDraftElo(parseInt(e.target.value))}
-              className="flex-1 accent-current"
-            />
-          </label>
-          <p className={`text-sm opacity-70 ${c.label}`}>The engine plays at this strength from its next move.</p>
-          <div className="mt-auto">
-            <SaveCancelRow c={c} onSave={() => { changeElo(draftElo); setSettingsOpen(false); }} onCancel={() => setSettingsOpen(false)} />
-          </div>
+        <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
+          <SettingsFace c={c} onSave={() => { changeElo(draftElo); setSettingsOpen(false); }} onCancel={() => setSettingsOpen(false)}>
+            <SettingsField c={c} label={`Strength: Elo ${draftElo}`} hint="The engine plays at this strength from its next move.">
+              <input
+                type="range"
+                min={MIN_ELO}
+                max={MAX_ELO}
+                step={100}
+                value={draftElo}
+                aria-label="Engine strength in Elo"
+                onChange={e => setDraftElo(parseInt(e.target.value))}
+                className={`w-full accent-current ${c.label}`}
+              />
+            </SettingsField>
+          </SettingsFace>
         </div>
       )}
 

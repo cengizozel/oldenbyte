@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { NotebookPen, X, Bold, Italic, Underline, List, History, Trash2, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { NotebookPen, X, Bold, Italic, Underline, List, History, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { formatDate, localDateStr } from "@/lib/format";
 import { decodeEntities, parseJson } from "@/lib/text";
 import { FOCUS_RING, HIT_AREA, SettingsInput } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, EmptyState, SettingsFace, SettingsField } from "@/components/ui/WidgetChrome";
 
 const REGISTRY_KEY = "notepad-registry";
 
@@ -484,19 +484,15 @@ export default function NotebookWidget({
       />
 
       {settingsOpen && (
-        <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col gap-3 ${c.bg}`}>
-          <WidgetHeader panel c={c} icon={SlidersHorizontal} title="Settings" />
-          <div>
-            <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Name</p>
-            <SettingsInput value={draftName} onChange={e => setDraftName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveSettings()} placeholder={widget.title} />
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className={`text-sm ${c.label}`}>Calendar</span>
-            <Toggle checked={draftCalendar} onChange={() => setDraftCalendar(v => !v)} label="Show the month calendar" />
-          </div>
-          <div className="mt-auto">
-            <SaveCancelRow c={c} onSave={saveSettings} onCancel={() => setSettingsOpen(false)} />
-          </div>
+        <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
+          <SettingsFace c={c} onSave={saveSettings} onCancel={() => setSettingsOpen(false)}>
+            <SettingsField c={c} label="Name">
+              <SettingsInput value={draftName} onChange={e => setDraftName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveSettings()} placeholder={widget.title} />
+            </SettingsField>
+            <SettingsField c={c} label="Calendar" inline>
+              <Toggle checked={draftCalendar} onChange={() => setDraftCalendar(v => !v)} label="Show the month calendar" />
+            </SettingsField>
+          </SettingsFace>
         </div>
       )}
 

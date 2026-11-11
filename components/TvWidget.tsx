@@ -6,7 +6,7 @@ import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { WidgetHeader, EmptyState, SaveCancelRow, SmallButton } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, EmptyState, SmallButton, SettingsFace, SettingsField, SettingsError } from "@/components/ui/WidgetChrome";
 
 type Channel = { name: string; url: string };
 type TvConfig = { playlistUrl: string; channels: Channel[]; channelUrl: string; channelName: string };
@@ -266,9 +266,9 @@ export default function TvWidget({
         </div>
       }
       back={
-        <>
-          <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-            <div className="flex items-center gap-2">
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset}>
+          <SettingsField c={c} label="Playlist or stream">
+            <div className="flex items-center gap-1.5">
               <SettingsInput
                 type="url"
                 value={draft.playlistUrl}
@@ -281,13 +281,15 @@ export default function TvWidget({
                 {loadingChannels ? <Loader size={14} className="animate-spin" /> : "Load"}
               </SmallButton>
             </div>
-            {draft.channels.length > 0 && (
+          </SettingsField>
+          {draft.channels.length > 0 && (
+            <SettingsField c={c} label="Channel">
               <div className="flex flex-col gap-1">
                 {draft.channels.map(ch => (
                   <button
                     key={ch.url}
                     onClick={() => setDraft(d => ({ ...d, channelUrl: ch.url, channelName: ch.name }))}
-                    className={`text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${
+                    className={`text-left text-sm px-2.5 py-1.5 rounded-lg transition-colors ${FOCUS_RING} ${
                       draft.channelUrl === ch.url
                         ? `bg-black/10 dark:bg-white/15 ${c.text}`
                         : `${c.text} opacity-70 hover:opacity-100`
@@ -297,16 +299,10 @@ export default function TvWidget({
                   </button>
                 ))}
               </div>
-            )}
-            {error && <p className="text-red-400 text-xs break-words">{error}</p>}
-          </div>
-          <SaveCancelRow
-            c={c}
-            onSave={handleSave}
-            onCancel={() => { setSettingsOpen(false); setError(""); }}
-            onReset={handleReset}
-          />
-        </>
+            </SettingsField>
+          )}
+          {error && <SettingsError>{error}</SettingsError>}
+        </SettingsFace>
       }
     />
   );

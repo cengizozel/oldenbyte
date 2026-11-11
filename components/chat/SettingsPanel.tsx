@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { X, Check, RefreshCw, Loader, ChevronRight } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { EFFORT_OPTIONS, LENGTH_PRESETS, PRESETS, type ChatConfig, type Length } from "@/lib/chat/types";
-import { SettingsInput, SettingsSelect, SettingsTextarea, HIT_AREA, FOCUS_RING } from "../ui/Field";
-import { Chip, SmallButton } from "../ui/WidgetChrome";
+import { SettingsInput, SettingsSelect, SettingsTextarea, HIT_AREA, FOCUS_RING, Stepper } from "../ui/Field";
+import { Chip, SmallButton, SettingsFace } from "../ui/WidgetChrome";
 
 // Settings panel: Model, Behavior, Data sources. Edits a draft of the config
 // and hands it to onSave; mounting it loads the model list, the Kiwix books
@@ -150,8 +150,8 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
   }, []);
 
   return (
-    <div className="flex flex-col gap-3 flex-1 min-h-0 p-4">
-      <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
+    <div className="flex flex-col flex-1 min-h-0 p-4">
+      <SettingsFace c={c} onSave={() => onSave(draft)} onCancel={onCancel} saveDisabled={!draft.baseUrl.trim() || !draft.model.trim()}>
 
         <p className={`text-sm opacity-70 ${c.label}`}>Model</p>
 
@@ -200,7 +200,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
               placeholder="e.g. llama3.2, or click Load models"
             />
           )}
-          {modelsError && <p className="text-red-400 text-xs mt-1">{modelsError}</p>}
+          {modelsError && <p className="text-red-400 text-sm mt-1">{modelsError}</p>}
         </div>
 
         <p className={`text-sm opacity-70 mt-1 ${c.label}`}>Behavior</p>
@@ -252,7 +252,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
         <div>
           <button
             onClick={() => setAdvancedOpen(o => !o)}
-            className={`flex items-center gap-1 text-xs opacity-70 hover:opacity-100 ${FOCUS_RING} ${c.label}`}
+            className={`flex items-center gap-1 text-sm opacity-70 hover:opacity-100 ${FOCUS_RING} ${c.label}`}
           >
             <ChevronRight size={12} className={`transition-transform ${advancedOpen ? "rotate-90" : ""}`} />
             Advanced
@@ -261,15 +261,10 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
             </span>
           </button>
           {advancedOpen && (<div className="mt-1.5">
-          <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Max response length <span className="opacity-70">(tokens, 0 = no limit; style presets set this)</span></p>
-          <SettingsInput
-            type="number"
-            min={0}
-            step={50}
-            value={draft.maxTokens || ""}
-            onChange={e => setDraft(d => ({ ...d, maxTokens: Number(e.target.value) }))}
-            placeholder="0"
-          />
+          <div className="flex items-center justify-between gap-3 min-h-7">
+            <p className={`text-sm opacity-70 ${c.label}`}>Max response length <span className="opacity-70">(tokens, 0 is no limit)</span></p>
+            <Stepper label="max response length in tokens" value={draft.maxTokens || 0} min={0} max={8192} step={64} onChange={v => setDraft(d => ({ ...d, maxTokens: v }))} />
+          </div>
           <div className="flex flex-wrap gap-1 mt-1.5">
             {[128, 256, 512, 1024].map(n => (
               <Chip key={n} c={c} active={draft.maxTokens === n} onClick={() => setDraft(d => ({ ...d, maxTokens: n }))} className="tabular-nums">
@@ -282,11 +277,11 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
 
         <p className={`text-sm opacity-70 mt-1 ${c.label}`}>Data sources</p>
 
-        <p className={`text-xs -mt-1 opacity-70 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
+        <p className={`text-sm -mt-1 opacity-70 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className={`text-xs opacity-70 ${c.label}`}>Kiwix library <span className="opacity-70">(all books are searched)</span></p>
+            <p className={`text-sm opacity-70 ${c.label}`}>Kiwix library <span className="opacity-70">(all books are searched)</span></p>
             <SmallButton c={c} onClick={() => loadKiwixSources(draft.kiwixUrl)} disabled={loadingKiwix || !draft.kiwixUrl.startsWith("http")} title="List the books on the server">
               {loadingKiwix ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Check server
@@ -299,12 +294,12 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
             placeholder="Kiwix URL, e.g. http://192.168.1.10:8080"
           />
           {kiwixSources.length > 0 && (
-            <p className="text-xs text-[var(--text-muted)] mt-1">
+            <p className="text-sm text-[var(--text-muted)] mt-1">
               {kiwixSources.length} book{kiwixSources.length === 1 ? "" : "s"}: {kiwixSources.map(s => s.title).join(", ")}
             </p>
           )}
-          {kiwixError && <p className="text-red-400 text-xs mt-1">{kiwixError}</p>}
-          <p className="text-xs text-[var(--text-muted)] mt-1">Adding books to the server widens the search automatically. Turn lookup on with the library icon by the send button.</p>
+          {kiwixError && <p className="text-red-400 text-sm mt-1">{kiwixError}</p>}
+          <p className="text-sm text-[var(--text-muted)] mt-1">Adding books to the server widens the search automatically. Turn lookup on with the library icon by the send button.</p>
         </div>
 
         <div>
@@ -328,7 +323,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
                 {anytypeSpaces.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </SettingsSelect>
             ) : (
-              <p className="text-xs text-[var(--text-muted)] mt-1.5 flex items-center gap-1">
+              <p className="text-sm text-[var(--text-muted)] mt-1.5 flex items-center gap-1">
                 {anytypeBusy && <Loader size={12} className="animate-spin" />} paired ✓ {draft.anytypeSpaceName && `· ${draft.anytypeSpaceName}`}
               </p>
             )
@@ -351,13 +346,13 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
               {anytypeBusy ? <><Loader size={12} className="animate-spin" /> contacting…</> : "Pair with Anytype"}
             </SmallButton>
           )}
-          {anytypeError && <p className="text-red-400 text-xs mt-1">{anytypeError}</p>}
-          <p className="text-xs text-[var(--text-muted)] mt-1">Pair, pick a space, then turn lookup on with the box icon by the send button.</p>
+          {anytypeError && <p className="text-red-400 text-sm mt-1">{anytypeError}</p>}
+          <p className="text-sm text-[var(--text-muted)] mt-1">Pair, pick a space, then turn lookup on with the box icon by the send button.</p>
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className={`text-xs opacity-70 ${c.label}`}>Anytype write bridge <span className="opacity-70">(optional, enables creating notes)</span></p>
+            <p className={`text-sm opacity-70 ${c.label}`}>Anytype write bridge <span className="opacity-70">(optional, enables creating notes)</span></p>
             <SmallButton
               c={c}
               onClick={async () => {
@@ -392,9 +387,9 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
             placeholder="Bridge token"
             className="mt-1.5"
           />
-          {bridgeStatus === "ok" && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">bridge reachable ✓</p>}
-          {bridgeStatus === "fail" && <p className="text-red-400 text-xs mt-1">bridge not reachable</p>}
-          <p className="text-xs text-[var(--text-muted)] mt-1">Runs next to the Anytype app (tools/anytype-bridge in the repo). Without it, Anytype stays read-only.</p>
+          {bridgeStatus === "ok" && <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">bridge reachable ✓</p>}
+          {bridgeStatus === "fail" && <p className="text-red-400 text-sm mt-1">bridge not reachable</p>}
+          <p className="text-sm text-[var(--text-muted)] mt-1">Runs next to the Anytype app (tools/anytype-bridge in the repo). Without it, Anytype stays read-only.</p>
         </div>
 
         <div>
@@ -414,31 +409,10 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
               </span>
             </div>
           ))}
-          <p className="text-xs text-[var(--text-muted)] mt-1">ask first = the model proposes and you approve a card. auto = it writes immediately and reports what it did.</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">ask first = the model proposes and you approve a card. auto = it writes immediately and reports what it did.</p>
         </div>
 
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-3 shrink-0">
-        <button
-          onClick={onCancel}
-          className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${HIT_AREA} ${FOCUS_RING}`}
-          title="Cancel"
-          aria-label="Cancel"
-        >
-          <X size={14} />
-        </button>
-        <button
-          onClick={() => onSave(draft)}
-          disabled={!draft.baseUrl.trim() || !draft.model.trim()}
-          className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 ${HIT_AREA} ${FOCUS_RING}`}
-          title="Save"
-          aria-label="Save"
-        >
-          <Check size={14} />
-        </button>
-      </div>
+      </SettingsFace>
     </div>
   );
 }

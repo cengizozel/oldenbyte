@@ -5,7 +5,7 @@ import { CalendarRange, Plus, Check, X, Trash2, FileText, Copy } from "lucide-re
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { SettingsInput, SettingsSelect, SettingsTextarea, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { WidgetHeader, Chip, SmallButton, EmptyState } from "./ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, EmptyState, SettingsFace, SettingsField, SettingsError } from "./ui/WidgetChrome";
 import { useWidgetFrame } from "@/lib/widgetFrame";
 
 // A fixed weekly schedule: the same seven-day time grid every week (classes,
@@ -695,40 +695,30 @@ export default function ScheduleWidget({
 
         {/* Grid-hours settings */}
         {settingsOpen && (
-          <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col gap-3 p-5 ${c.bg}`}>
-            <p className={`text-sm opacity-70 ${c.label}`}>Grid hours</p>
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Day starts</p>
-                <SettingsSelect value={draftStart} onChange={e => setDraftStart(+e.target.value)}>
-                  {Array.from({ length: 13 }, (_, h) => <option key={h} value={h}>{fmt(h * 60)}</option>)}
-                </SettingsSelect>
+          <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col p-5 ${c.bg}`}>
+            <SettingsFace
+              c={c}
+              onSave={() => { if (draftEnd - draftStart >= 6) { apply({ ...config, startHour: draftStart, endHour: draftEnd }); setSettingsOpen(false); } }}
+              onCancel={() => setSettingsOpen(false)}
+              saveDisabled={draftEnd - draftStart < 6}
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <SettingsField c={c} label="Day starts">
+                  <SettingsSelect value={draftStart} onChange={e => setDraftStart(+e.target.value)}>
+                    {Array.from({ length: 13 }, (_, h) => <option key={h} value={h}>{fmt(h * 60)}</option>)}
+                  </SettingsSelect>
+                </SettingsField>
+                <SettingsField c={c} label="Day ends">
+                  <SettingsSelect value={draftEnd} onChange={e => setDraftEnd(+e.target.value)}>
+                    {Array.from({ length: 15 }, (_, i) => {
+                      const h = i + 12;
+                      return <option key={h} value={h}>{fmt(h * 60)}{h >= 24 ? " (+1d)" : ""}</option>;
+                    })}
+                  </SettingsSelect>
+                </SettingsField>
               </div>
-              <div className="flex-1">
-                <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Day ends</p>
-                <SettingsSelect value={draftEnd} onChange={e => setDraftEnd(+e.target.value)}>
-                  {Array.from({ length: 15 }, (_, i) => {
-                    const h = i + 12;
-                    return <option key={h} value={h}>{fmt(h * 60)}{h >= 24 ? " (+1d)" : ""}</option>;
-                  })}
-                </SettingsSelect>
-              </div>
-            </div>
-            {draftEnd - draftStart < 6 && <p className="text-red-400 text-xs">The grid must span at least 6 hours.</p>}
-            <div className="flex items-center justify-end gap-3 mt-auto">
-              <button onClick={() => setSettingsOpen(false)} title="Cancel" aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${iconBtnCls}`}>
-                <X size={14} />
-              </button>
-              <button
-                onClick={() => { if (draftEnd - draftStart >= 6) { apply({ ...config, startHour: draftStart, endHour: draftEnd }); setSettingsOpen(false); } }}
-                disabled={draftEnd - draftStart < 6}
-                title="Save"
-                aria-label="Save"
-                className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 ${iconBtnCls}`}
-              >
-                <Check size={14} />
-              </button>
-            </div>
+              {draftEnd - draftStart < 6 && <SettingsError>The grid must span at least 6 hours.</SettingsError>}
+            </SettingsFace>
           </div>
         )}
 

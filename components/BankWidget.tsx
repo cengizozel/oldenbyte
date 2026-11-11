@@ -12,7 +12,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, SettingsSelect } from "./ui/Field";
-import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton } from "./ui/WidgetChrome";
+import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SmallButton, SettingsFace, SettingsField, SettingsNote, SettingsError } from "./ui/WidgetChrome";
 
 type BankConfig = Record<string, string | number>;
 
@@ -270,52 +270,47 @@ export default function BankWidget({
   );
 
   const back = (
-    <>
-      <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-        {(def.config ?? []).map(f => (
-          <div key={f.key}>
-            <p className={`text-sm mb-1 opacity-70 ${c.label}`}>{f.label}</p>
-            {f.type === "select" ? (
-              <SettingsSelect
-                value={String(draft[f.key] ?? "")}
-                onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
-              >
-                {(f.options ?? []).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </SettingsSelect>
-            ) : (
-              <SettingsInput
-                type={f.type === "number" ? "number" : "text"}
-                value={String(draft[f.key] ?? "")}
-                placeholder={f.placeholder}
-                onChange={e => setDraft(d => ({ ...d, [f.key]: f.type === "number" ? Number(e.target.value) : e.target.value }))}
-              />
-            )}
-          </div>
-        ))}
-        {(def.config ?? []).length === 0 && (
-          <p className={`text-xs opacity-70 ${c.text}`}>This widget has no settings.</p>
-        )}
-        <div className={`text-xs leading-relaxed opacity-70 ${c.label}`}>
-          <p>{def.description}</p>
-          <p className="mt-1 break-all">source: {def.fetch.url.split("?")[0]}</p>
-        </div>
-        <SmallButton c={c} onClick={() => fetchData(config, true)} disabled={loading} className="self-start">
-          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-          Refresh now
-        </SmallButton>
-        {error && <p className="text-red-400 text-xs">{error}</p>}
-      </div>
-      <SaveCancelRow
-        c={c}
-        onSave={async () => {
-          setConfig(draft);
-          await storage.setItem(storageKey, JSON.stringify(draft));
-          setSettingsOpen(false);
-          fetchData(draft, true);
-        }}
-        onCancel={() => { setDraft(config); setSettingsOpen(false); }}
-      />
-    </>
+    <SettingsFace
+      c={c}
+      onSave={async () => {
+        setConfig(draft);
+        await storage.setItem(storageKey, JSON.stringify(draft));
+        setSettingsOpen(false);
+        fetchData(draft, true);
+      }}
+      onCancel={() => { setDraft(config); setSettingsOpen(false); }}
+    >
+      {(def.config ?? []).map(f => (
+        <SettingsField key={f.key} c={c} label={f.label}>
+          {f.type === "select" ? (
+            <SettingsSelect
+              value={String(draft[f.key] ?? "")}
+              onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
+            >
+              {(f.options ?? []).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </SettingsSelect>
+          ) : (
+            <SettingsInput
+              type="text"
+              inputMode={f.type === "number" ? "decimal" : undefined}
+              value={String(draft[f.key] ?? "")}
+              placeholder={f.placeholder}
+              onChange={e => setDraft(d => ({ ...d, [f.key]: f.type === "number" ? Number(e.target.value) : e.target.value }))}
+            />
+          )}
+        </SettingsField>
+      ))}
+      {(def.config ?? []).length === 0 && <SettingsNote c={c}>This widget has no settings of its own.</SettingsNote>}
+      <SettingsNote c={c}>
+        {def.description}
+        <span className="block mt-1 break-all">source: {def.fetch.url.split("?")[0]}</span>
+      </SettingsNote>
+      <SmallButton c={c} onClick={() => fetchData(config, true)} disabled={loading} className="self-start">
+        <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+        Refresh now
+      </SmallButton>
+      {error && <SettingsError>{error}</SettingsError>}
+    </SettingsFace>
   );
 
   return <FlipCard c={c} flipped={settingsOpen} className={className} front={front} back={back} />;

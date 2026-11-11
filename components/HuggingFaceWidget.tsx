@@ -9,7 +9,7 @@ import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { RefreshButton, ScrollFades, LoadingState, SaveCancelRow, WidgetHeader, Chip, BackButton } from "@/components/ui/WidgetChrome";
+import { RefreshButton, ScrollFades, LoadingState, WidgetHeader, Chip, BackButton, SettingsFace, SettingsField } from "@/components/ui/WidgetChrome";
 
 type HFPaper = {
   id: string;
@@ -125,16 +125,6 @@ export default function HuggingFaceWidget({
                           >
                             {p.title}
                           </button>
-                          <a
-                            href={p.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            aria-label="Open on Hugging Face"
-                            className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
-                          >
-                            <ExternalLink size={14} />
-                          </a>
                         </div>
                       </li>
                     ))}
@@ -193,21 +183,15 @@ export default function HuggingFaceWidget({
         </>
       }
       back={
-        <>
-          <div className="flex flex-col gap-1.5">
-            <label className={`text-xs font-medium opacity-70 ${c.label}`}>
-              Papers to show
-            </label>
-            <div className="flex gap-2">
-              {[10, 25, 50].map(n => (
-                <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft({ limit: n })} className="flex-1">
-                  {n}
-                </Chip>
-              ))}
-            </div>
-          </div>
-          <SaveCancelRow c={c} onSave={handleSave} onCancel={() => setSettingsOpen(false)} />
-        </>
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => setSettingsOpen(false)}>
+          <SettingsField c={c} label="Papers to show" inline>
+            {[10, 25, 50].map(n => (
+              <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft({ limit: n })}>
+                {n}
+              </Chip>
+            ))}
+          </SettingsField>
+        </SettingsFace>
       }
     />
   );

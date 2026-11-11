@@ -7,7 +7,7 @@ import * as storage from "@/lib/storage";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton, Chip } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SmallButton, Chip, SettingsFace, SettingsField, SettingsError } from "@/components/ui/WidgetChrome";
 
 type Result = { title: string; url: string; snippet: string };
 // A "source" is a kiwix ZIM (Wikipedia, WikiHow, …). `id` is its content-route name.
@@ -313,58 +313,52 @@ export default function KiwixWidget({
         </>
       }
       back={
-        <>
-          <div>
-            <p className={`text-xs mb-1.5 opacity-70 ${c.label}`}>Kiwix</p>
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset}>
+          <SettingsField c={c} label="Kiwix server">
             <SettingsInput
               type="url"
               value={draft.baseUrl}
               onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value }))}
               placeholder="http://192.168.1.10:8080"
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <SmallButton
-              c={c}
-              onClick={() => loadSources(draft.baseUrl, draft.source)}
-              disabled={loadingSources || !draft.baseUrl.startsWith("http")}
-              className="shrink-0"
-            >
-              {loadingSources ? <Loader size={12} className="animate-spin" /> : "Load sources"}
-            </SmallButton>
-            {sources.length > 0 ? (
-              <SettingsSelect
-                value={draft.source}
-                onChange={(e) => {
-                  const s = sources.find((x) => x.id === e.target.value);
-                  setDraft((d) => ({ ...d, source: e.target.value, sourceTitle: s?.title ?? "" }));
-                }}
-                className="flex-1 min-w-0"
+          </SettingsField>
+          <SettingsField c={c} label="Source">
+            <div className="flex items-center gap-1.5">
+              <SmallButton
+                c={c}
+                onClick={() => loadSources(draft.baseUrl, draft.source)}
+                disabled={loadingSources || !draft.baseUrl.startsWith("http")}
+                className="shrink-0"
               >
-                {sources.map((s) => (
-                  <option key={s.id} value={s.id}>{s.title}</option>
-                ))}
-              </SettingsSelect>
-            ) : (
-              <span className={`text-xs opacity-70 truncate min-w-0 ${c.text}`}>{draft.sourceTitle || "no source selected"}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-70 ${c.label}`}>Results</span>
+                {loadingSources ? <Loader size={12} className="animate-spin" /> : "Load sources"}
+              </SmallButton>
+              {sources.length > 0 ? (
+                <SettingsSelect
+                  value={draft.source}
+                  onChange={(e) => {
+                    const s = sources.find((x) => x.id === e.target.value);
+                    setDraft((d) => ({ ...d, source: e.target.value, sourceTitle: s?.title ?? "" }));
+                  }}
+                  className="flex-1 min-w-0"
+                >
+                  {sources.map((s) => (
+                    <option key={s.id} value={s.id}>{s.title}</option>
+                  ))}
+                </SettingsSelect>
+              ) : (
+                <span className={`text-sm opacity-70 truncate min-w-0 ${c.text}`}>{draft.sourceTitle || "no source selected"}</span>
+              )}
+            </div>
+          </SettingsField>
+          <SettingsField c={c} label="Results" inline>
             {LIMITS.map((n) => (
-              <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft((d) => ({ ...d, limit: n }))} className="w-8 tabular-nums">
+              <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft((d) => ({ ...d, limit: n }))} className="tabular-nums">
                 {n}
               </Chip>
             ))}
-          </div>
-          {error && <p className="text-red-400 text-xs">{error}</p>}
-          <SaveCancelRow
-            c={c}
-            onSave={handleSave}
-            onCancel={() => { setSettingsOpen(false); setError(""); }}
-            onReset={handleReset}
-          />
-        </>
+          </SettingsField>
+          {error && <SettingsError>{error}</SettingsError>}
+        </SettingsFace>
       }
     />
   );

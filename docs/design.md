@@ -180,8 +180,23 @@ the palette `label` color at 50% opacity.
 - Icon buttons: 24px hit area (`HIT_AREA` from `ui/Field.tsx`), visible focus
   ring (`FOCUS_RING`, which sets no radius), `aria-label`. Neighbouring icon
   buttons sit at least `gap-3` apart so their hit areas do not overlap.
-- Settings: `PencilButton` opens the `FlipCard` back face; `SaveCancelRow`
-  closes it. Fields use `ui/Field`.
+- Settings faces: every widget's settings share one shape, built from
+  `SettingsFace` and friends in `ui/WidgetChrome.tsx`. The face is the
+  sliders icon and "Settings" as a panel header, a scrolling body, and the
+  save row pinned at the bottom (reset when there is one, cancel, save);
+  Escape cancels, the same as the cross. Inside: `SettingsField` puts a
+  label above each control (or beside a short one, `inline`) with hint copy
+  under it, all `text-sm`; choices are chips up to five options and a select
+  beyond that; on or off is the `Toggle`, never a checkbox; a number you
+  tune (counts, seconds, points) is the `Stepper`, a number you know (an age,
+  a weight) is a typed field with the unit as its placeholder; collections
+  are `SettingsListRow`s, one neutral row style with a leading handle, icon
+  or color dot, the name (a borderless field when editable), icon actions at
+  70% on the right, and per-item controls on the lines below. Rows never
+  take a palette color of their own; a color dot is allowed when it is data
+  the widget shows. Copy inside a face is `SettingsNote`, errors
+  `SettingsError`. The widget's own layout opens the face (a `FlipCard`
+  back, or an overlay inside the card); the face does not care which.
 - Detail views: `BackButton` sits on the left of the first block (the
   thumbnail, or the title when there is none) and stretches to its height, a
   36px wide `rounded-xl` translucent fill with a 16px chevron, so it is an easy

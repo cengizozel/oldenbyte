@@ -9,7 +9,7 @@ import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { EmptyState, SaveCancelRow, WidgetHeader, SmallButton } from "./ui/WidgetChrome";
+import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsListRow, LIST_TITLE_INPUT, ROW_ACTION } from "./ui/WidgetChrome";
 
 type Item = { id: string; name: string };
 // All days of tracked time: date (YYYY-MM-DD, local) -> activity id -> seconds.
@@ -434,50 +434,44 @@ export default function TrackerWidget({
   );
 
   const back = (
-    <>
-      <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-        <div className="flex gap-1">
-          <SettingsInput
-            type="text"
-            value={nameInput}
-            onChange={e => setNameInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addItem()}
-            placeholder="Activity name"
-            className="flex-1"
-          />
-          <SmallButton c={c} onClick={addItem} title="Add activity" className="self-center">
-            <Plus size={14} />
-          </SmallButton>
-        </div>
-        {draft.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            {draft.map(it => (
-              <div key={it.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-black/5 dark:bg-white/10">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colorOf(it.id) }} />
+    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }} onReset={resetTimes}>
+      <div className="flex gap-1.5">
+        <SettingsInput
+          type="text"
+          value={nameInput}
+          onChange={e => setNameInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && addItem()}
+          placeholder="Activity name"
+          className="flex-1"
+        />
+        <SmallButton c={c} onClick={addItem} title="Add activity" className="self-center">
+          <Plus size={14} />
+        </SmallButton>
+      </div>
+      {draft.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {draft.map(it => (
+            <SettingsListRow
+              key={it.id}
+              leading={<span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colorOf(it.id) }} />}
+              title={
                 <input
                   value={it.name}
                   onChange={e => setDraft(d => d.map(x => x.id === it.id ? { ...x, name: e.target.value } : x))}
-                  className={`flex-1 min-w-0 bg-transparent dark:!bg-transparent text-sm outline-none ${c.text}`}
+                  aria-label="Activity name"
+                  className={`${LIST_TITLE_INPUT} font-medium ${c.text}`}
                 />
-                <button
-                  onClick={() => setDraft(d => d.filter(x => x.id !== it.id))}
-                  aria-label={`Remove ${it.name}`}
-                  className={`opacity-70 hover:opacity-100 leading-none ${iconBtnCls} ${c.label}`}
-                >
-                  ×
+              }
+              actions={
+                <button onClick={() => setDraft(d => d.filter(x => x.id !== it.id))} aria-label={`Remove ${it.name}`} title="Remove" className={`${ROW_ACTION} ${c.label}`}>
+                  <X size={14} />
                 </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <SaveCancelRow
-        c={c}
-        onSave={handleSave}
-        onCancel={() => { setDraft(items); setSettingsOpen(false); }}
-        onReset={resetTimes}
-      />
-    </>
+              }
+            />
+          ))}
+        </div>
+      )}
+    </SettingsFace>
   );
 
   return (

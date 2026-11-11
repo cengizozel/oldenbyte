@@ -8,7 +8,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import Markdown from "@/components/Markdown";
 import { SettingsInput, SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton, Chip } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SmallButton, Chip, SettingsFace, SettingsField, SettingsError } from "@/components/ui/WidgetChrome";
 
 type AnytypeObject = { id: string; name: string; snippet: string; spaceId: string; type: string };
 type Space = { id: string; name: string };
@@ -420,87 +420,76 @@ export default function AnytypeWidget({
         </>
       }
       back={
-        <>
-          <SettingsInput
-            type="url"
-            value={draft.baseUrl}
-            onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value, apiKey: "" }))}
-            placeholder="http://127.0.0.1:31009"
-          />
-
-          {/* Pairing / paired state */}
-          {draft.apiKey ? (
-            <div className="flex items-center gap-2">
-              {loadingSpaces ? (
-                <span className={`flex items-center gap-1.5 text-xs opacity-70 ${c.text}`}><Loader size={12} className="animate-spin" /> loading spaces…</span>
-              ) : spaces.length > 0 ? (
-                <SettingsSelect
-                  value={draft.spaceId}
-                  onChange={(e) => {
-                    const s = spaces.find((x) => x.id === e.target.value);
-                    setDraft((d) => ({ ...d, spaceId: e.target.value, spaceName: s?.name ?? "" }));
-                  }}
-                  className="flex-1 min-w-0"
-                >
-                  {spaces.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </SettingsSelect>
-              ) : (
-                <span className={`text-xs opacity-70 truncate min-w-0 ${c.text}`}>{draft.spaceName || "paired ✓, no spaces loaded"}</span>
-              )}
-              <SmallButton c={c} onClick={() => loadSpaces(draft.baseUrl, draft.apiKey, draft.spaceId)} className="shrink-0">
-                Reload
-              </SmallButton>
-            </div>
-          ) : pairing === "awaiting-code" ? (
-            <div className="flex flex-col gap-1.5">
-              <p className={`text-xs opacity-70 ${c.label}`}>Enter the 4-digit code shown in Anytype:</p>
-              <div className="flex items-center gap-2">
-                <SettingsInput
-                  autoFocus
-                  inputMode="numeric"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && confirmCode()}
-                  placeholder="1234"
-                  className="flex-1 min-w-0 tracking-widest"
-                />
-                <SmallButton c={c} onClick={confirmCode} disabled={pairBusy || !code.trim()} className="shrink-0">
-                  {pairBusy ? <Loader size={12} className="animate-spin" /> : "Confirm"}
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset}>
+          <SettingsField c={c} label="Anytype API">
+            <SettingsInput
+              type="url"
+              value={draft.baseUrl}
+              onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value, apiKey: "" }))}
+              placeholder="http://127.0.0.1:31009"
+            />
+            {draft.apiKey ? (
+              <div className="flex items-center gap-1.5">
+                {loadingSpaces ? (
+                  <span className={`flex items-center gap-1.5 text-sm opacity-70 ${c.text}`}><Loader size={12} className="animate-spin" /> loading spaces…</span>
+                ) : spaces.length > 0 ? (
+                  <SettingsSelect
+                    value={draft.spaceId}
+                    onChange={(e) => {
+                      const s = spaces.find((x) => x.id === e.target.value);
+                      setDraft((d) => ({ ...d, spaceId: e.target.value, spaceName: s?.name ?? "" }));
+                    }}
+                    className="flex-1 min-w-0"
+                  >
+                    {spaces.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </SettingsSelect>
+                ) : (
+                  <span className={`text-sm opacity-70 truncate min-w-0 ${c.text}`}>{draft.spaceName || "paired, no spaces loaded"}</span>
+                )}
+                <SmallButton c={c} onClick={() => loadSpaces(draft.baseUrl, draft.apiKey, draft.spaceId)} className="shrink-0">
+                  Reload
                 </SmallButton>
               </div>
-            </div>
-          ) : (
-            <SmallButton c={c} onClick={startPairing} disabled={pairBusy || !draft.baseUrl.startsWith("http")} className="self-start">
-              {pairBusy ? <><Loader size={12} className="animate-spin" /> contacting Anytype…</> : "Pair with Anytype"}
-            </SmallButton>
-          )}
-
-          <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-70 ${c.label}`}>Home</span>
+            ) : pairing === "awaiting-code" ? (
+              <div className="flex flex-col gap-1.5">
+                <p className={`text-sm opacity-70 ${c.label}`}>Enter the 4-digit code shown in Anytype:</p>
+                <div className="flex items-center gap-1.5">
+                  <SettingsInput
+                    autoFocus
+                    inputMode="numeric"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && confirmCode()}
+                    placeholder="1234"
+                    className="flex-1 min-w-0 tracking-widest"
+                  />
+                  <SmallButton c={c} onClick={confirmCode} disabled={pairBusy || !code.trim()} className="shrink-0">
+                    {pairBusy ? <Loader size={12} className="animate-spin" /> : "Confirm"}
+                  </SmallButton>
+                </div>
+              </div>
+            ) : (
+              <SmallButton c={c} onClick={startPairing} disabled={pairBusy || !draft.baseUrl.startsWith("http")} className="self-start">
+                {pairBusy ? <><Loader size={12} className="animate-spin" /> contacting Anytype…</> : "Pair with Anytype"}
+              </SmallButton>
+            )}
+          </SettingsField>
+          <SettingsField c={c} label="Home" inline>
             {([["recent", "Recent"], ["types", "Types"]] as [HomeView, string][]).map(([v, label]) => (
               <Chip key={v} c={c} active={draft.home === v} onClick={() => setDraft((d) => ({ ...d, home: v }))}>
                 {label}
               </Chip>
             ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className={`text-xs opacity-70 ${c.label}`}>Results</span>
+          </SettingsField>
+          <SettingsField c={c} label="Results" inline>
             {[10, 25, 50, 100].map((n) => (
               <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft((d) => ({ ...d, limit: n }))} className="tabular-nums">
                 {n}
               </Chip>
             ))}
-          </div>
-
-          {error && <p className="text-red-400 text-xs break-words">{error}</p>}
-          <SaveCancelRow
-            c={c}
-            onSave={handleSave}
-            onCancel={() => { setSettingsOpen(false); setError(""); }}
-            onReset={handleReset}
-          />
-        </>
+          </SettingsField>
+          {error && <SettingsError>{error}</SettingsError>}
+        </SettingsFace>
       }
     />
   );

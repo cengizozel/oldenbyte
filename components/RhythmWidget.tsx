@@ -8,8 +8,8 @@ import { parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
-import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { EmptyState, SaveCancelRow, WidgetHeader, Chip, SmallButton } from "./ui/WidgetChrome";
+import { SettingsInput, HIT_AREA, FOCUS_RING, Stepper } from "./ui/Field";
+import { EmptyState, WidgetHeader, Chip, SmallButton, SettingsFace, SettingsListRow, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION } from "./ui/WidgetChrome";
 
 // Rhythm is Tracker's sibling. Tracker answers "how long?" with a live
 // stopwatch; Rhythm answers "when, and how often?" — each tap stamps a moment,
@@ -555,81 +555,77 @@ export default function RhythmWidget({
 
   // ── Settings (back) ────────────────────────────────────────────────────────
   const back = (
-    <>
-      <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-        <div className="flex gap-1">
-          <SettingsInput
-            type="text"
-            value={nameInput}
-            onChange={e => setNameInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addItem()}
-            placeholder="e.g. brushed teeth, slept"
-            className="flex-1"
-          />
-          <SmallButton c={c} onClick={addItem} title="Add item" className="self-center">
-            <Plus size={14} />
-          </SmallButton>
-        </div>
-        {draft.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {draft.map(it => (
-              <div key={it.id} className="flex flex-col gap-2 px-2 py-2 rounded-lg bg-black/5 dark:bg-white/10">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colorOf(it.id) }} />
-                  <input
-                    value={it.name}
-                    onChange={e => setDraft(d => d.map(x => x.id === it.id ? { ...x, name: e.target.value } : x))}
-                    className={`flex-1 min-w-0 bg-transparent dark:!bg-transparent text-sm outline-none ${c.text}`}
-                  />
-                  <button
-                    onClick={() => setDraft(d => d.filter(x => x.id !== it.id))}
-                    aria-label={`Remove ${it.name}`}
-                    className={`opacity-70 hover:opacity-100 leading-none ${iconBtnCls} ${c.label}`}
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Seg
-                    c={c}
-                    value={it.kind}
-                    onChange={v => setDraft(d => d.map(x => x.id === it.id ? { ...x, kind: v } : x))}
-                    options={[{ value: "moment", label: "Moment" }, { value: "session", label: "Session" }]}
-                  />
-                  <Seg
-                    c={c}
-                    value={it.mode}
-                    onChange={v => setDraft(d => d.map(x => x.id === it.id ? { ...x, mode: v } : x))}
-                    options={[{ value: "build", label: "Build" }, { value: "reduce", label: "Reduce" }]}
-                  />
-                  {it.kind === "moment" && (
-                    <label className={`flex items-center gap-1 text-xs ${c.label} opacity-80`} title={it.mode === "reduce" ? "Daily limit (optional)" : "Daily target (optional)"}>
-                      <input
-                        inputMode="numeric"
-                        value={it.target ?? ""}
-                        onChange={e => {
-                          const v = e.target.value.replace(/\D/g, "");
-                          setDraft(d => d.map(x => x.id === it.id ? { ...x, target: v ? parseInt(v) : undefined } : x));
-                        }}
-                        placeholder="–"
-                        className={`w-9 text-xs text-center tabular-nums border border-[var(--surface-border)] rounded-md px-1 py-1 outline-none bg-[var(--surface)] ${c.text}`}
-                      />
-                      <span>{it.mode === "reduce" ? "max/day" : "× /day"}</span>
-                    </label>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {draft.length === 0 && (
-          <p className={`text-xs leading-relaxed opacity-70 ${c.text}`}>
-            Add things you want to track by tapping: <b>moments</b> like brushing teeth or coffee, or <b>sessions</b> like sleep that you start and stop. Mark each <b>build</b> (do it more) or <b>reduce</b> (do it less), and set an optional daily target.
-          </p>
-        )}
+    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }}>
+      <div className="flex gap-1.5">
+        <SettingsInput
+          type="text"
+          value={nameInput}
+          onChange={e => setNameInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && addItem()}
+          placeholder="e.g. brushed teeth, slept"
+          className="flex-1"
+        />
+        <SmallButton c={c} onClick={addItem} title="Add item" className="self-center">
+          <Plus size={14} />
+        </SmallButton>
       </div>
-      <SaveCancelRow c={c} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }} />
-    </>
+      {draft.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {draft.map(it => (
+            <SettingsListRow
+              key={it.id}
+              leading={<span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colorOf(it.id) }} />}
+              title={
+                <input
+                  value={it.name}
+                  onChange={e => setDraft(d => d.map(x => x.id === it.id ? { ...x, name: e.target.value } : x))}
+                  aria-label="Item name"
+                  className={`${LIST_TITLE_INPUT} font-medium ${c.text}`}
+                />
+              }
+              actions={
+                <button onClick={() => setDraft(d => d.filter(x => x.id !== it.id))} aria-label={`Remove ${it.name}`} title="Remove" className={`${ROW_ACTION} ${c.label}`}>
+                  <X size={14} />
+                </button>
+              }
+            >
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Seg
+                  c={c}
+                  value={it.kind}
+                  onChange={v => setDraft(d => d.map(x => x.id === it.id ? { ...x, kind: v } : x))}
+                  options={[{ value: "moment", label: "Moment" }, { value: "session", label: "Session" }]}
+                />
+                <Seg
+                  c={c}
+                  value={it.mode}
+                  onChange={v => setDraft(d => d.map(x => x.id === it.id ? { ...x, mode: v } : x))}
+                  options={[{ value: "build", label: "Build" }, { value: "reduce", label: "Reduce" }]}
+                />
+              </div>
+              {it.kind === "moment" && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className={`text-sm opacity-70 ${c.label}`}>{it.mode === "reduce" ? "Daily limit" : "Daily target"}</span>
+                  <Stepper
+                    label={it.mode === "reduce" ? `daily limit for ${it.name}` : `daily target for ${it.name}`}
+                    value={it.target ?? 0}
+                    min={0}
+                    max={99}
+                    unit={it.target ? "" : ""}
+                    onChange={v => setDraft(d => d.map(x => x.id === it.id ? { ...x, target: v || undefined } : x))}
+                  />
+                </div>
+              )}
+            </SettingsListRow>
+          ))}
+        </div>
+      )}
+      {draft.length === 0 && (
+        <SettingsNote c={c}>
+          Add things you want to track by tapping: <b>moments</b> like brushing teeth or coffee, or <b>sessions</b> like sleep that you start and stop. Mark each <b>build</b> (do it more) or <b>reduce</b> (do it less).
+        </SettingsNote>
+      )}
+    </SettingsFace>
   );
 
   // ── History overlay data ─────────────────────────────────────────────────

@@ -56,7 +56,7 @@ async function fromF1Api(): Promise<F1Data> {
         },
       }
     : null;
-  const standings: Standing[] = (drivers.drivers_championship ?? []).slice(0, 5).map((s: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+  const standings: Standing[] = (drivers.drivers_championship ?? []).slice(0, 30).map((s: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
     position: String(s.position),
     points: String(s.points),
     Driver: { givenName: s.driver?.name ?? "", familyName: s.driver?.surname ?? "", code: s.driver?.shortName ?? "" },
@@ -81,7 +81,7 @@ async function fromJolpi(): Promise<F1Data> {
         Circuit: { circuitId: raw.Circuit.circuitId, circuitName: raw.Circuit.circuitName, Location: raw.Circuit.Location },
       }
     : null;
-  const standings: Standing[] = standingsData.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings?.slice(0, 5) ?? [];
+  const standings: Standing[] = standingsData.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings?.slice(0, 30) ?? [];
   return { race, standings };
 }
 

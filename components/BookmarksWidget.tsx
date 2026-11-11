@@ -8,7 +8,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { WidgetHeader, EmptyState, SaveCancelRow, ScrollFades, SmallButton } from "./ui/WidgetChrome";
+import { WidgetHeader, EmptyState, ScrollFades, SmallButton, SettingsFace, SettingsListRow, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION } from "./ui/WidgetChrome";
 
 // A bookmarks board. Each link shows its site favicon (with a tidy colored
 // letter tile when the favicon is missing, or a custom emoji/image override),
@@ -392,70 +392,72 @@ export default function BookmarksWidget({
 
   // ── Settings (back) ──────────────────────────────────────────────────────
   const back = (
-    <>
-      <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-3">
-        <div className="flex items-center gap-2">
-          <SettingsInput
-            type="text"
-            value={urlInput}
-            onChange={e => setUrlInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addDraft()}
-            placeholder="Paste a link, e.g. github.com"
-            className="flex-1"
-          />
-          <SmallButton c={c} onClick={addDraft} title="Add bookmark">
-            <Plus size={14} />
-            Add
-          </SmallButton>
-        </div>
+    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(bookmarks); setUrlInput(""); setSettingsOpen(false); }}>
+      <div className="flex items-center gap-1.5">
+        <SettingsInput
+          type="text"
+          value={urlInput}
+          onChange={e => setUrlInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && addDraft()}
+          placeholder="Paste a link, e.g. github.com"
+          className="flex-1"
+        />
+        <SmallButton c={c} onClick={addDraft} title="Add bookmark">
+          <Plus size={14} />
+          Add
+        </SmallButton>
+      </div>
 
-        {draft.length > 1 && (
-          <p className={`text-xs opacity-70 -mt-1 ${c.text}`}>Drag the handle to reorder.</p>
-        )}
-
-        {draft.length > 0 && (
-          <div
-            ref={listRef}
-            className="flex flex-col gap-2"
-            onDragOver={e => {
-              if (dragIdx === null) return;
-              e.preventDefault();
-              const slot = slotFromPointer(e.clientY);
-              if (slot !== null && slot !== overIdx) setOverIdx(slot);
-            }}
-            onDrop={() => {
-              if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
-              setDragIdx(null);
-              setOverIdx(null);
-            }}
-          >
-            {draft.map((bm, i) => (
-              <div
-                key={bm.id}
-                ref={el => { rowRefs.current[i] = el; }}
-                style={{ transform: shiftFor(i) ? `translateY(${shiftFor(i)}px)` : undefined }}
-                className={`flex flex-col gap-1.5 px-2 py-2 rounded-lg bg-black/5 dark:bg-white/10 transition-[transform,opacity] duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
-              >
-                <div className="flex items-center gap-2">
+      {draft.length > 0 && (
+        <div
+          ref={listRef}
+          className="flex flex-col gap-1.5"
+          onDragOver={e => {
+            if (dragIdx === null) return;
+            e.preventDefault();
+            const slot = slotFromPointer(e.clientY);
+            if (slot !== null && slot !== overIdx) setOverIdx(slot);
+          }}
+          onDrop={() => {
+            if (dragIdx !== null && overIdx !== null) reorder(dragIdx, overIdx);
+            setDragIdx(null);
+            setOverIdx(null);
+          }}
+        >
+          {draft.map((bm, i) => (
+            <SettingsListRow
+              key={bm.id}
+              rowRef={el => { rowRefs.current[i] = el; }}
+              style={{ transform: shiftFor(i) ? `translateY(${shiftFor(i)}px)` : undefined }}
+              className={`transition-[transform,opacity] duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
+              leading={
+                <>
                   <span
                     draggable
                     onDragStart={() => setDragIdx(i)}
                     onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
                     title="Drag to reorder"
-                    className={`shrink-0 cursor-grab active:cursor-grabbing ${c.label} opacity-30 hover:opacity-70`}
+                    className={`shrink-0 cursor-grab active:cursor-grabbing ${c.label} opacity-40 hover:opacity-70`}
                   >
                     <GripVertical size={14} />
                   </span>
                   <Favicon bm={bm} size={22} />
-                  <input
-                    value={bm.name}
-                    onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, name: e.target.value } : x))}
-                    placeholder={domainOf(bm.url) || "Name"}
-                    className={`flex-1 min-w-0 bg-transparent dark:!bg-transparent text-sm outline-none ${c.text}`}
-                  />
+                </>
+              }
+              title={
+                <input
+                  value={bm.name}
+                  onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, name: e.target.value } : x))}
+                  placeholder={domainOf(bm.url) || "Name"}
+                  aria-label="Name"
+                  className={`${LIST_TITLE_INPUT} font-medium ${c.text}`}
+                />
+              }
+              actions={
+                <>
                   <button
                     onClick={() => setDraft(d => d.map(x => x.id === bm.id ? { ...x, hidden: !x.hidden } : x))}
-                    className={`${bm.hidden ? "opacity-80" : "opacity-40"} hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
+                    className={`${ROW_ACTION} ${c.label}`}
                     title={bm.hidden ? "Hidden: click to show on the widget" : "Shown: click to hide from the widget"}
                     aria-label={bm.hidden ? "Show on the widget" : "Hide from the widget"}
                   >
@@ -463,38 +465,41 @@ export default function BookmarksWidget({
                   </button>
                   <button
                     onClick={() => setDraft(d => d.filter(x => x.id !== bm.id))}
-                    className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
+                    className={`${ROW_ACTION} ${c.label}`}
                     title="Remove"
                     aria-label="Remove"
                   >
                     <X size={14} />
                   </button>
-                </div>
-                <input
-                  value={bm.url}
-                  onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, url: e.target.value } : x))}
-                  placeholder="https://..."
-                  className={`w-full bg-transparent dark:!bg-transparent text-xs opacity-70 outline-none ${c.label}`}
-                />
-                <input
-                  value={bm.icon ?? ""}
-                  onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, icon: e.target.value } : x))}
-                  placeholder="icon: emoji or image URL (optional)"
-                  className={`w-full bg-transparent dark:!bg-transparent text-xs opacity-70 outline-none ${c.label}`}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+                </>
+              }
+            >
+              <input
+                value={bm.url}
+                onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, url: e.target.value } : x))}
+                placeholder="https://..."
+                aria-label="Address"
+                className={`${LIST_TITLE_INPUT} w-full opacity-70 ${c.label}`}
+              />
+              <input
+                value={bm.icon ?? ""}
+                onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, icon: e.target.value } : x))}
+                placeholder="Icon: emoji or image URL (optional)"
+                aria-label="Icon"
+                className={`${LIST_TITLE_INPUT} w-full opacity-70 ${c.label}`}
+              />
+            </SettingsListRow>
+          ))}
+        </div>
+      )}
 
-        {draft.length === 0 && (
-          <p className={`text-xs leading-relaxed opacity-70 ${c.text}`}>
-            Add the sites you visit most. Each shows its favicon, with a tidy colored tile when one is not available. To override it, set an emoji or an image URL in a bookmark&apos;s icon field.
-          </p>
-        )}
-      </div>
-      <SaveCancelRow c={c} onSave={handleSave} onCancel={() => { setDraft(bookmarks); setUrlInput(""); setSettingsOpen(false); }} />
-    </>
+      {draft.length > 1 && <SettingsNote c={c}>Drag the handle to reorder.</SettingsNote>}
+      {draft.length === 0 && (
+        <SettingsNote c={c}>
+          Add the sites you visit most. Each shows its favicon, with a tidy colored tile when one is not available. To override it, set an emoji or an image URL in a bookmark&apos;s icon field.
+        </SettingsNote>
+      )}
+    </SettingsFace>
   );
 
   return <FlipCard c={c} flipped={settingsOpen} className={className} front={front} back={back} />;

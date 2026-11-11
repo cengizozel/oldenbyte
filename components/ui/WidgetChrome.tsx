@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
 import { useWidgetFrame } from "@/lib/widgetFrame";
@@ -92,7 +92,7 @@ export function EmptyState({ c, action, children }: { c: ColorClasses; action?: 
   return (
     <div className="flex-1 h-full min-h-0 flex items-center justify-center text-center px-4">
       <p className={`text-sm opacity-70 ${c.text}`}>
-        {children ?? `hover and click the pencil to ${action}`}
+        {children ?? `${action} in settings`}
       </p>
     </div>
   );
@@ -106,25 +106,43 @@ export function SaveCancelRow({
   onCancel,
   onReset,
   saving = false,
+  saveDisabled = false,
 }: {
   c: ColorClasses;
   onSave: () => void;
   onCancel: () => void;
   onReset?: () => void;
   saving?: boolean;
+  saveDisabled?: boolean;
 }) {
+  // Reset is destructive, so it asks first: the icon turns into a short
+  // question with a confirming button, and disarms by itself.
+  const [confirmReset, setConfirmReset] = useState(false);
+  useEffect(() => {
+    if (!confirmReset) return;
+    const t = setTimeout(() => setConfirmReset(false), 5000);
+    return () => clearTimeout(t);
+  }, [confirmReset]);
   return (
-    <div className="flex items-center justify-between mt-auto">
+    <div className="flex items-center justify-between gap-3 mt-auto min-h-6">
       {onReset ? (
-        <button onClick={onReset} className={`${c.label} opacity-40 hover:opacity-70`} title="Reset">
-          <RotateCcw size={14} />
-        </button>
+        confirmReset ? (
+          <span className={`flex items-center gap-2 text-sm min-w-0 ${c.label}`}>
+            <span className="opacity-70 truncate">Reset all settings?</span>
+            <button type="button" onClick={() => { setConfirmReset(false); onReset(); }} className={`shrink-0 font-medium text-red-500 hover:text-red-400 ${FOCUS_RING}`}>Reset</button>
+            <button type="button" onClick={() => setConfirmReset(false)} className={`shrink-0 opacity-70 hover:opacity-100 ${FOCUS_RING}`}>Keep</button>
+          </span>
+        ) : (
+          <button type="button" onClick={() => setConfirmReset(true)} className={`${c.label} opacity-40 hover:opacity-70 ${HIT_AREA} ${FOCUS_RING}`} title="Reset all settings" aria-label="Reset all settings">
+            <RotateCcw size={14} />
+          </button>
+        )
       ) : <span />}
       <div className="flex gap-3">
-        <button onClick={onCancel} title="Cancel" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+        <button onClick={onCancel} title="Cancel" aria-label="Cancel" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
           <X size={14} />
         </button>
-        <button onClick={onSave} disabled={saving} title="Save" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40">
+        <button onClick={onSave} disabled={saving || saveDisabled} title="Save" aria-label="Save" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40">
           {saving ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
         </button>
       </div>
@@ -309,6 +327,116 @@ export function WidgetHeader({
     </div>
   );
 }
+
+// ── Settings faces ───────────────────────────────────────────────────────────
+// Every widget's settings share one shape (docs/design.md, Settings faces):
+// the frame below (header, scrolling body, save row, Escape cancels), fields
+// with a label above the control, chips for a few choices and a select for
+// many, the Toggle for on/off, the Stepper for numbers you tune and a typed
+// field for numbers you know, and one neutral row style for collections.
+
+export function SettingsFace({
+  c, title = "Settings", children, onSave, onCancel, onReset, saving = false, saveDisabled = false, bodyRef, scroll = true,
+}: {
+  c: ColorClasses;
+  title?: string;
+  children: ReactNode;
+  onSave: () => void;
+  onCancel: () => void;
+  onReset?: () => void;
+  saving?: boolean;
+  saveDisabled?: boolean;
+  bodyRef?: Ref<HTMLDivElement>;
+  scroll?: boolean;
+}) {
+  const faceRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef(onCancel);
+  cancelRef.current = onCancel;
+  // Escape cancels, like the cross: only for a face that is shown (a flip
+  // card's hidden back is mounted but inert) and that holds the focus, or
+  // when nothing in particular does.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const face = faceRef.current;
+      if (!face || face.closest("[inert]")) return;
+      const active = document.activeElement;
+      if (active && active !== document.body && !face.contains(active)) return;
+      e.preventDefault();
+      cancelRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  return (
+    <div ref={faceRef} className="flex flex-col gap-3 flex-1 min-h-0">
+      <WidgetHeader panel c={c} icon={SlidersHorizontal} title={title} />
+      <div ref={bodyRef} className={`flex flex-col gap-3 flex-1 min-h-0 ${scroll ? "overflow-y-auto pr-3" : ""}`}>{children}</div>
+      <SaveCancelRow c={c} onSave={onSave} onCancel={onCancel} onReset={onReset} saving={saving} saveDisabled={saveDisabled} />
+    </div>
+  );
+}
+
+// A labelled control: the label above (or beside, for a short control like
+// chips or a toggle), an optional hint under it.
+export function SettingsField({ c, label, hint, children, inline = false }: { c: ColorClasses; label: ReactNode; hint?: ReactNode; children: ReactNode; inline?: boolean }) {
+  return (
+    <div className="flex flex-col gap-1">
+      {inline ? (
+        <div className="flex items-center justify-between gap-3 min-h-7">
+          <span className={`text-sm opacity-70 ${c.label}`}>{label}</span>
+          <div className="flex items-center gap-1.5 shrink-0">{children}</div>
+        </div>
+      ) : (
+        <>
+          <span className={`text-sm opacity-70 ${c.label}`}>{label}</span>
+          {children}
+        </>
+      )}
+      {hint && <p className={`text-sm opacity-70 leading-snug ${c.label}`}>{hint}</p>}
+    </div>
+  );
+}
+
+// Explanatory copy and errors inside a face.
+export function SettingsNote({ c, children }: { c: ColorClasses; children: ReactNode }) {
+  return <p className={`text-sm leading-relaxed opacity-70 ${c.text}`}>{children}</p>;
+}
+export function SettingsError({ children }: { children: ReactNode }) {
+  return <p className="text-sm text-red-400 break-words">{children}</p>;
+}
+
+// One item of an editable collection: a neutral row (no palette color of its
+// own) with a leading slot (drag handle, icon, color dot), the name, trailing
+// icon actions, and any per-item controls on the lines below.
+export function SettingsListRow({
+  leading, title, actions, children, className = "", style, rowRef,
+}: {
+  leading?: ReactNode;
+  title: ReactNode;
+  actions?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  rowRef?: Ref<HTMLDivElement>;
+}) {
+  return (
+    <div ref={rowRef} style={style} className={`flex flex-col gap-2 px-2.5 py-2 rounded-lg bg-black/5 dark:bg-white/10 ${className}`}>
+      <div className="flex items-center gap-2 min-h-6">
+        {leading}
+        <div className="flex-1 min-w-0 flex items-center text-sm">{title}</div>
+        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// The field that sits in a list row's title slot: borderless, so the row
+// reads as a name, and a text field when you look for one.
+export const LIST_TITLE_INPUT = "flex-1 min-w-0 bg-transparent dark:!bg-transparent text-sm outline-none rounded-sm focus-visible:ring-2 focus-visible:ring-[var(--text-muted)]";
+// A small icon action in a row (remove, hide): 70% at rest, full on hover.
+export const ROW_ACTION = `opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`;
 
 // A small toggle for modes and options: the active one has the translucent
 // fill, the rest sit at 70% and brighten on hover.
