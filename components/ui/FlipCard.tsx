@@ -2,6 +2,7 @@
 
 import { createContext, type ReactNode } from "react";
 import type { ColorClasses } from "@/lib/widgets";
+import { useTabGroup } from "@/lib/tabGroup";
 
 // Whether the face a component sits on is the one showing. The back face is
 // always mounted (for the flip), so a settings face reads this to know when
@@ -29,6 +30,11 @@ export default function FlipCard({
   frontClassName?: string;
   backClassName?: string;
 }) {
+  // In a tab group the tab row is the header and sits above the card, so the
+  // front face drops its own top padding: the first content line then starts
+  // at the same height as in a single widget. (The back face keeps it: the
+  // row hides while a settings face is open.)
+  const inGroup = !!useTabGroup();
   return (
     <div
       className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
@@ -43,7 +49,7 @@ export default function FlipCard({
         }}
       >
         <div
-          className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${c.bg} ${frontClassName}`}
+          className={`absolute inset-0 p-5 flex flex-col rounded-2xl overflow-clip ${inGroup ? "!pt-0" : ""} ${c.bg} ${frontClassName}`}
           style={{
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
