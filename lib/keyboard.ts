@@ -66,10 +66,9 @@ export const DEFAULT_KEYBOARD: KeyboardConfig = {
 
 // Widgets are numbered 1..9 then 0, so only the first ten cells of a dashboard
 // get a number (a two-digit scheme would clash with the tab key that follows).
-// Tabs inside a group take 1..9, or q w e r t for the first five.
+// Tabs inside a group take 1..9.
 export const MAX_CELLS = 10;
 export const MAX_TABS = 9;
-export const TAB_LETTERS = ["q", "w", "e", "r", "t"];
 
 // Digit shown for the cell at a 0-based position: 1..9, then 0 for the 10th.
 export function cellDigit(index: number): string {
@@ -82,9 +81,7 @@ export function cellFromKey(key: string): number | null {
 }
 
 export function tabFromKey(key: string): number | null {
-  if (/^[1-9]$/.test(key)) return Number(key) - 1;
-  const i = TAB_LETTERS.indexOf(key);
-  return i >= 0 ? i : null;
+  return /^[1-9]$/.test(key) ? Number(key) - 1 : null;
 }
 
 // Single printable characters only. Digits are reserved for widget numbers.

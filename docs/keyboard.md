@@ -11,7 +11,7 @@ Defaults, all pressed after the leader (**Space**):
 | Keys | Action |
 |---|---|
 | `1`..`9`, `0` | Focus widget 1 to 10 of the visible dashboard |
-| then `1`..`9` or `q w e r t` | In a tab group: pick that tab (q w e r t are tabs 1 to 5) |
+| then `1`..`9` | In a tab group: pick that tab |
 | `o` | Options of the focused widget (its header toggle) |
 | `f` | Full screen for the focused widget (Escape leaves it) |
 | `e` | Open the settings of the focused widget |

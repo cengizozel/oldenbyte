@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 import { RotateCcw, ChevronDown } from "lucide-react";
 import type { DashboardsState } from "@/lib/dashboards";
 import {
-  DEFAULT_KEYBOARD, KEYBOARD_ACTIONS, KEYBOARD_EVENT, NEW_DASHBOARD_EVENT, MAX_CELLS, MAX_TABS, TAB_LETTERS,
+  DEFAULT_KEYBOARD, KEYBOARD_ACTIONS, KEYBOARD_EVENT, NEW_DASHBOARD_EVENT, MAX_CELLS, MAX_TABS,
   cellDigit, cellFromKey, tabFromKey, actionForKey, isBindableKey, isEditableTarget, keyLabel, rebind,
   loadKeyboardConfig, saveKeyboardConfig, TIMEOUT_RANGE, type KeyboardAction, type KeyboardConfig,
 } from "@/lib/keyboard";
@@ -100,6 +100,10 @@ export default function KeyboardLayer({
   const prevFocusRef = useRef<HTMLElement | null>(null);
   // The cell wearing the focus ring ([data-kb-focus], styled in globals.css).
   const ringRef = useRef<HTMLElement | null>(null);
+  // The last tile the pointer pressed: a click on a card is how most people
+  // "pick" a widget, and it moves no keyboard focus, so commands fall back
+  // to it.
+  const lastPressedRef = useRef<HTMLElement | null>(null);
   // Latest props for the listeners registered once below.
   const latest = useRef({ config, dashboards, onDashboardsChange, onToggleEdit });
   useEffect(() => { latest.current = { config, dashboards, onDashboardsChange, onToggleEdit }; });
@@ -162,7 +166,8 @@ export default function KeyboardLayer({
   // else the one wearing the ring.
   function focusedWidget(): { cell: HTMLElement; widget: HTMLElement } | null {
     const prev = prevFocusRef.current;
-    const cell = (prev?.closest("[data-cell-index]") as HTMLElement | null) ?? ringRef.current;
+    const pressed = lastPressedRef.current?.isConnected ? lastPressedRef.current : null;
+    const cell = (prev?.closest("[data-cell-index]") as HTMLElement | null) ?? ringRef.current ?? pressed;
     if (!cell || !cell.isConnected) return null;
     const widget = (prev?.closest("[data-widget-id]") as HTMLElement | null) ?? widgetIn(cell);
     return widget ? { cell, widget } : null;
@@ -178,7 +183,7 @@ export default function KeyboardLayer({
         const b = btn.getBoundingClientRect();
         out.push({
           key: `c${i}t${t}`,
-          label: t < TAB_LETTERS.length ? `${t + 1} ${TAB_LETTERS[t]}` : String(t + 1),
+          label: String(t + 1),
           top: b.bottom + 2,
           left: b.left,
           tab: true,
@@ -213,7 +218,11 @@ export default function KeyboardLayer({
       if (!target) { finish(); showHint("Focus a widget first: leader, then its number"); return; }
       const button = action === "options"
         ? findButton(target.cell, 'button[aria-label="Options"], button[aria-label="Close options"]')
-        : findButton(target.cell, 'button[aria-label="Full screen"], button[aria-label="Exit full screen (Esc)"]');
+        // Full screen sits on the options face, inert while closed; it is
+        // still laid out, and a programmatic click works, so only hidden
+        // members (display none) are skipped.
+        : Array.from(target.cell.querySelectorAll<HTMLElement>('button[aria-label="Full screen"], button[aria-label="Exit full screen (Esc)"]'))
+            .find(el => el.getClientRects().length > 0 && !(el as HTMLButtonElement).disabled) ?? null;
       if (!button) { finish(); showHint(action === "options" ? "This widget has no options" : "Full screen is not available here"); return; }
       finish(false);
       button.click();
@@ -331,11 +340,17 @@ export default function KeyboardLayer({
         setRing(null);
       }, 0);
     }
+    function onPointerDown(e: PointerEvent) {
+      const cell = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-cell-index]") : null;
+      if (cell) lastPressedRef.current = cell;
+    }
     window.addEventListener("keydown", onKey);
     document.addEventListener("focusout", onFocusOut);
+    document.addEventListener("pointerdown", onPointerDown, true);
     return () => {
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("focusout", onFocusOut);
+      document.removeEventListener("pointerdown", onPointerDown, true);
     };
   // The handlers read everything through refs; register once.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -387,7 +402,7 @@ export default function KeyboardLayer({
             <span className="text-sm text-[var(--text-muted)]">Keyboard shortcuts</span>
             <ul className="flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
               <li className="flex items-center justify-between gap-3"><span>Focus widget 1 to 10</span><Kbd>{`${L} 1..9, 0`}</Kbd></li>
-              <li className="flex items-center justify-between gap-3"><span>Then pick a tab</span><Kbd>1..9 or q w e r t</Kbd></li>
+              <li className="flex items-center justify-between gap-3"><span>Then pick a tab</span><Kbd>1..9</Kbd></li>
               {KEYBOARD_ACTIONS.map(a => (
                 <li key={a.id} className="flex items-center justify-between gap-3">
                   <span>{a.label}</span><Kbd>{`${L} ${keyLabel(bindings[a.id])}`}</Kbd>
