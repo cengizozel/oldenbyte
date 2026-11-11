@@ -267,6 +267,12 @@ export default function ChessWidget({
                 allowDragging: ready && !thinking && !gameOver,
                 darkSquareStyle: { backgroundColor: "#6b7280" },
                 lightSquareStyle: { backgroundColor: "#d1d5db" },
+                // Coordinates: 12px semibold, dark on the light squares and
+                // near-white on the dark ones, so both clear 4.5:1.
+                lightSquareNotationStyle: { color: "#1f2937" },
+                darkSquareNotationStyle: { color: "#f9fafb" },
+                alphaNotationStyle: { fontSize: 12, fontWeight: 600 },
+                numericNotationStyle: { fontSize: 12, fontWeight: 600 },
                 animationDurationInMs: 200,
               }}
             />
