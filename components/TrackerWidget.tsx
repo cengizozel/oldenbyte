@@ -9,7 +9,7 @@ import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsListRow, LIST_TITLE_INPUT, ROW_ACTION } from "./ui/WidgetChrome";
+import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsField, SettingsListRow, LIST_TITLE_INPUT, ROW_ACTION } from "./ui/WidgetChrome";
 
 type Item = { id: string; name: string };
 // All days of tracked time: date (YYYY-MM-DD, local) -> activity id -> seconds.
@@ -434,7 +434,7 @@ export default function TrackerWidget({
   );
 
   const back = (
-    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }} onReset={resetTimes}>
+    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }} onReset={() => setDraft([])}>
       <div className="flex gap-1.5">
         <SettingsInput
           type="text"
@@ -448,6 +448,9 @@ export default function TrackerWidget({
           <Plus size={14} />
         </SmallButton>
       </div>
+      <SettingsField c={c} label="Today" inline hint="Clears the time logged today; the activities stay.">
+        <SmallButton c={c} onClick={resetTimes}>Reset today&apos;s times</SmallButton>
+      </SettingsField>
       {draft.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {draft.map(it => (

@@ -105,6 +105,7 @@ export default function F1Widget({
         <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
           <SettingsFace
             c={c}
+            onReset={() => setDraftMode("top5")}
             onSave={() => { setStandingsMode(draftMode); storage.setItem(configKey, JSON.stringify({ standings: draftMode })); setSettingsOpen(false); }}
             onCancel={() => setSettingsOpen(false)}
           >

@@ -273,21 +273,6 @@ export default function AnytypeWidget({
     setSettingsOpen(false);
   }
 
-  async function handleReset() {
-    await storage.removeItem(storageKey);
-    setConfig(DEFAULT);
-    setDraft(DEFAULT);
-    setSpaces([]);
-    setObjects([]);
-    setTypes([]);
-    setActiveType(null);
-    setReader(null);
-    setReaderObj(null);
-    setQuery("");
-    setSearched(false);
-    setPairing("idle");
-    setSettingsOpen(false);
-  }
 
   return (
     <FlipCard
@@ -420,7 +405,7 @@ export default function AnytypeWidget({
         </>
       }
       back={
-        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset}>
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={() => setDraft(DEFAULT)}>
           <SettingsField c={c} label="Anytype API">
             <SettingsInput
               type="url"

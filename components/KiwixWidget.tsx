@@ -176,16 +176,6 @@ export default function KiwixWidget({
     setSettingsOpen(false);
   }
 
-  async function handleReset() {
-    await storage.removeItem(storageKey);
-    setConfig(DEFAULT);
-    setDraft(DEFAULT);
-    setSources([]);
-    setResults([]);
-    setQuery("");
-    setSearched(false);
-    setSettingsOpen(false);
-  }
 
   function openSettings() {
     setDraft(config);
@@ -313,7 +303,7 @@ export default function KiwixWidget({
         </>
       }
       back={
-        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset}>
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={() => setDraft(DEFAULT)}>
           <SettingsField c={c} label="Kiwix server">
             <SettingsInput
               type="url"

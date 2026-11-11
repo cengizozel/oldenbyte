@@ -236,7 +236,7 @@ export default function ChessWidget({
 
       {settingsOpen && (
         <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
-          <SettingsFace c={c} onSave={() => { changeElo(draftElo); setSettingsOpen(false); }} onCancel={() => setSettingsOpen(false)}>
+          <SettingsFace c={c} onReset={() => setDraftElo(1500)} onSave={() => { changeElo(draftElo); setSettingsOpen(false); }} onCancel={() => setSettingsOpen(false)}>
             <SettingsField c={c} label={`Strength: Elo ${draftElo}`} hint="The engine plays at this strength from its next move.">
               <input
                 type="range"

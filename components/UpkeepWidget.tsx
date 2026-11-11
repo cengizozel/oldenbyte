@@ -17,7 +17,7 @@ import {
 } from "@/lib/upkeep";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING, Stepper } from "./ui/Field";
-import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsField, SettingsListRow, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION, Chip } from "./ui/WidgetChrome";
+import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION, Chip } from "./ui/WidgetChrome";
 
 // Upkeep is Tracker and Rhythm's third sibling. Tracker answers "how long?",
 // Rhythm answers "when, and how often?" — Upkeep answers "am I keeping up with
@@ -378,7 +378,7 @@ export default function UpkeepWidget({
   const draftTotal = draft.reduce((a, it) => a + (it.weight > 0 ? it.weight : 0), 0);
 
   const back = (
-    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }}>
+    <SettingsFace c={c} onReset={() => setDraft([])} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }}>
       <div className="flex gap-1.5">
         <SettingsInput
           type="text"
@@ -446,17 +446,13 @@ export default function UpkeepWidget({
                   </button>
                 }
               >
-                <div className="flex items-center justify-between gap-3">
-                  <span className={`text-sm opacity-70 ${c.label}`} title="Points this item is worth">Points</span>
+                <SettingsListControl c={c} label="Points">
                   <Stepper label={`points for ${it.name}`} value={it.weight} min={0} max={99} onChange={v => setDraft(d => d.map(x => x.id === it.id ? { ...x, weight: v } : x))} />
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className={`text-sm opacity-70 ${c.label}`} title="How long one check lasts">Lasts</span>
-                  <div className="flex items-center gap-2">
-                    <Stepper label={`days one check of ${it.name} lasts`} value={Math.floor(it.hours / 24)} min={0} max={60} unit="d" onChange={v => setSpan(it.id, "d", String(v))} />
-                    <Stepper label={`hours one check of ${it.name} lasts`} value={it.hours % 24} min={0} max={23} unit="h" onChange={v => setSpan(it.id, "h", String(v))} />
-                  </div>
-                </div>
+                </SettingsListControl>
+                <SettingsListControl c={c} label="Lasts">
+                  <Stepper label={`days one check of ${it.name} lasts`} value={Math.floor(it.hours / 24)} min={0} max={60} unit="d" onChange={v => setSpan(it.id, "d", String(v))} />
+                  <Stepper label={`hours one check of ${it.name} lasts`} value={it.hours % 24} min={0} max={23} unit="h" onChange={v => setSpan(it.id, "h", String(v))} />
+                </SettingsListControl>
               </SettingsListRow>
             ))}
           </div>

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Check, RefreshCw, Loader, ChevronRight } from "lucide-react";
+import { RefreshCw, Loader, ChevronRight } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
-import { EFFORT_OPTIONS, LENGTH_PRESETS, PRESETS, type ChatConfig, type Length } from "@/lib/chat/types";
-import { SettingsInput, SettingsSelect, SettingsTextarea, HIT_AREA, FOCUS_RING, Stepper } from "../ui/Field";
+import { DEFAULT_CONFIG, EFFORT_OPTIONS, LENGTH_PRESETS, PRESETS, type ChatConfig, type Length } from "@/lib/chat/types";
+import { SettingsInput, SettingsSelect, SettingsTextarea, FOCUS_RING, Stepper } from "../ui/Field";
 import { Chip, SmallButton, SettingsFace } from "../ui/WidgetChrome";
 
 // Settings panel: Model, Behavior, Data sources. Edits a draft of the config
@@ -151,7 +151,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 p-4">
-      <SettingsFace c={c} onSave={() => onSave(draft)} onCancel={onCancel} saveDisabled={!draft.baseUrl.trim() || !draft.model.trim()}>
+      <SettingsFace c={c} onReset={() => setDraft(DEFAULT_CONFIG)} onSave={() => onSave(draft)} onCancel={onCancel} saveDisabled={!draft.baseUrl.trim() || !draft.model.trim()}>
 
         <p className={`text-sm opacity-70 ${c.label}`}>Model</p>
 

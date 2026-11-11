@@ -392,7 +392,7 @@ export default function BookmarksWidget({
 
   // ── Settings (back) ──────────────────────────────────────────────────────
   const back = (
-    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(bookmarks); setUrlInput(""); setSettingsOpen(false); }}>
+    <SettingsFace c={c} onReset={() => setDraft([])} onSave={handleSave} onCancel={() => { setDraft(bookmarks); setUrlInput(""); setSettingsOpen(false); }}>
       <div className="flex items-center gap-1.5">
         <SettingsInput
           type="text"

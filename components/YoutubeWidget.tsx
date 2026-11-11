@@ -11,7 +11,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsNote, SettingsError, ROW_ACTION } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, SettingsError, ROW_ACTION } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { youtubeCacheKey } from "@/lib/cacheKeys";
@@ -321,7 +321,7 @@ export default function YoutubeWidget({
     setError("");
     if (!draft.channels.length) { setError("Add at least one channel."); return; }
     const ta = draft.ta && draft.ta.url.trim() && draft.ta.token.trim()
-      ? { url: draft.ta.url.trim(), token: draft.ta.token.trim(), open: draft.ta.open, ...(draft.ta.serverUrl?.trim() ? { serverUrl: draft.ta.serverUrl.trim() } : {}) }
+      ? { url: draft.ta.url.trim(), token: draft.ta.token.trim(), open: draft.ta.open, ...(draft.ta.serverUrl?.trim() ? { serverUrl: draft.ta.serverUrl.trim() } : {}), ...(draft.ta.mark ? { mark: draft.ta.mark } : {}), ...(draft.ta.only ? { only: true } : {}) }
       : undefined;
     const next: YoutubeConfig = { ...draft, ta };
     const cacheKey = cacheKeyFor(next);
@@ -339,16 +339,6 @@ export default function YoutubeWidget({
     }
   }
 
-  async function handleReset() {
-    fetchAbort.current?.abort();
-    fetchAbort.current = null;
-    setLoading(false);
-    await storage.removeItem(storageKey);
-    setConfig(DEFAULT);
-    setDraft(DEFAULT);
-    setVideos([]);
-    setSettingsOpen(false);
-  }
 
   return (
     <FlipCard
@@ -442,9 +432,6 @@ export default function YoutubeWidget({
                             >
                               {v.channelName}
                             </button>
-                            {v.published && Date.now() - new Date(v.published).getTime() < 86400000 && (
-                              <span className={`shrink-0 text-xs font-medium px-1 py-0.5 rounded-md ${sc.bg} ${sc.label}`}>new</span>
-                            )}
                             {v.published && (
                               <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>{timeAgo(v.published)}</span>
                             )}
@@ -527,53 +514,7 @@ export default function YoutubeWidget({
         </>
       }
       back={
-        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset} saving={loading}>
-          <div className="flex gap-1.5">
-            <SettingsInput
-              type="text"
-              value={chInput}
-              onChange={e => setChInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addChannel()}
-              placeholder="@handle or channel URL"
-              className="flex-1 min-w-0"
-            />
-            <SmallButton c={c} onClick={addChannel} disabled={resolving} title="Add channel" className="self-center">
-              {resolving ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-            </SmallButton>
-          </div>
-          {draft.channels.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              {draft.channels.map(ch => (
-                <SettingsListRow
-                  key={ch.channelId}
-                  title={<span className={`truncate font-medium ${c.text}`}>{ch.name}</span>}
-                  actions={
-                    <button
-                      onClick={() => setDraft(d => ({ ...d, channels: d.channels.filter(c => c.channelId !== ch.channelId) }))}
-                      aria-label={`Remove ${ch.name}`}
-                      title="Remove"
-                      className={`${ROW_ACTION} ${c.label}`}
-                    >
-                      <X size={14} />
-                    </button>
-                  }
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className={`text-sm opacity-70 ${c.label}`}>Videos</span>
-                    <Stepper label={`videos from ${ch.name}`} value={ch.limit} min={1} max={15} onChange={v => setChannelLimit(ch.channelId, v)} />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className={`text-sm opacity-70 ${c.label}`}>Include Shorts</span>
-                    <Toggle
-                      checked={!!ch.includeShorts}
-                      onChange={() => setDraft(d => ({ ...d, channels: d.channels.map(c => c.channelId === ch.channelId ? { ...c, includeShorts: !c.includeShorts } : c) }))}
-                      label={`Include Shorts from ${ch.name}`}
-                    />
-                  </div>
-                </SettingsListRow>
-              ))}
-            </div>
-          )}
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={() => setDraft(DEFAULT)} saving={loading}>
           <SettingsField c={c} label="View" inline>
             {VIEWS.map(v => (
               <Chip key={v.id} c={c} active={draft.view === v.id} onClick={() => setDraft(d => ({ ...d, view: v.id }))}>
@@ -641,12 +582,72 @@ export default function YoutubeWidget({
                     </div>
                   </div>
                 )}
-                {taActive(config.ta) && videos.length > 0 && (
-                  <SettingsNote c={c}>{videos.filter(v => archived.has(videoId(v.link))).length} of {videos.length} videos here are in your archive.</SettingsNote>
-                )}
+                {taActive(config.ta) && videos.length > 0 && archivedLoaded && (() => {
+                  const missing = videos.filter(v => !archived.has(videoId(v.link)));
+                  if (missing.length === 0) return <SettingsNote c={c}>All {videos.length} videos here are in your archive.</SettingsNote>;
+                  const shown = missing.slice(0, 6);
+                  return (
+                    <div className="flex flex-col gap-1">
+                      <SettingsNote c={c}>{missing.length} of {videos.length} videos here are not archived yet:</SettingsNote>
+                      <ul className="flex flex-col gap-0.5">
+                        {shown.map(v => (
+                          <li key={v.link} className="flex items-baseline gap-1.5 min-w-0 text-sm">
+                            <a href={v.link} target="_blank" rel="noopener noreferrer" className={`min-w-0 truncate underline underline-offset-2 decoration-current/40 hover:decoration-current ${c.text} ${FOCUS_RING}`}>{v.title}</a>
+                            <span className={`shrink-0 opacity-70 ${c.label}`}>{v.channelName}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      {missing.length > shown.length && <SettingsNote c={c}>and {missing.length - shown.length} more</SettingsNote>}
+                    </div>
+                  );
+                })()}
               </>
             )}
           </SettingsField>
+          <div className="flex gap-1.5">
+            <SettingsInput
+              type="text"
+              value={chInput}
+              onChange={e => setChInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addChannel()}
+              placeholder="@handle or channel URL"
+              className="flex-1 min-w-0"
+            />
+            <SmallButton c={c} onClick={addChannel} disabled={resolving} title="Add channel" className="self-center">
+              {resolving ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
+            </SmallButton>
+          </div>
+          {draft.channels.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {draft.channels.map(ch => (
+                <SettingsListRow
+                  key={ch.channelId}
+                  title={<span className={`truncate font-medium ${c.text}`}>{ch.name}</span>}
+                  actions={
+                    <button
+                      onClick={() => setDraft(d => ({ ...d, channels: d.channels.filter(c => c.channelId !== ch.channelId) }))}
+                      aria-label={`Remove ${ch.name}`}
+                      title="Remove"
+                      className={`${ROW_ACTION} ${c.label}`}
+                    >
+                      <X size={14} />
+                    </button>
+                  }
+                >
+                  <SettingsListControl c={c} label="Videos">
+                    <Stepper label={`videos from ${ch.name}`} value={ch.limit} min={1} max={15} onChange={v => setChannelLimit(ch.channelId, v)} />
+                  </SettingsListControl>
+                  <SettingsListControl c={c} label="Include Shorts">
+                    <Toggle
+                      checked={!!ch.includeShorts}
+                      onChange={() => setDraft(d => ({ ...d, channels: d.channels.map(c => c.channelId === ch.channelId ? { ...c, includeShorts: !c.includeShorts } : c) }))}
+                      label={`Include Shorts from ${ch.name}`}
+                    />
+                  </SettingsListControl>
+                </SettingsListRow>
+              ))}
+            </div>
+          )}
           {error && <SettingsError>{error}</SettingsError>}
         </SettingsFace>
       }

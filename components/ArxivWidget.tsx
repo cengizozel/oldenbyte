@@ -342,7 +342,7 @@ export default function ArxivWidget({
         </>
       }
       back={
-        <SettingsFace c={c} onSave={handleSave} onCancel={() => setSettingsOpen(false)}>
+        <SettingsFace c={c} onReset={() => setDraft(DEFAULT)} onSave={handleSave} onCancel={() => setSettingsOpen(false)}>
           <SettingsField c={c} label="Field">
             <SettingsSelect
               value={draftGroup.label}

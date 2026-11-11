@@ -1,14 +1,15 @@
 "use client";
 
-import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback, type ReactNode } from "react";
-import { Keyboard, RotateCcw, Target, Volume2, VolumeX, ChevronDown } from "lucide-react";
+import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { Keyboard, RotateCcw, Target } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import { TYPING_WORDS } from "@/lib/typingWords";
 import { SIMPLE_WORDS } from "@/lib/simpleWords";
 import * as storage from "@/lib/storage";
-import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
+import { HIT_AREA, FOCUS_RING, SettingsInput, Stepper } from "@/components/ui/Field";
+import Toggle from "@/components/ui/Toggle";
 import { useWidgetFrame } from "@/lib/widgetFrame";
-import { WidgetHeader, Chip, SmallButton } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, SettingsFace, SettingsField } from "@/components/ui/WidgetChrome";
 
 // A Monkeytype-style typing trainer. Input is word-based: you type a word and
 // SPACE commits it and jumps to the next one (letters you skip count as missed,
@@ -66,14 +67,6 @@ const METRO_LENGTHS = [15, 25, 40];
 const COUNTDOWNS = [0, 3, 5];
 
 // One row of the options: a fixed-width label and its chips.
-function OptionRow({ c, label, children }: { c: ColorClasses; label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-start gap-2">
-      <span className={`w-20 shrink-0 h-7 flex items-center text-sm opacity-70 ${c.label}`}>{label}</span>
-      <div className="flex items-center gap-1 flex-wrap min-w-0">{children}</div>
-    </div>
-  );
-}
 
 // The one-line summary of the next test, shown instead of the config bar.
 function describeConfig(cfg: Config, drills: { id: DrillId; label: string }[]): string {
@@ -340,7 +333,8 @@ export default function TypingWidget({
   const [finished, setFinished] = useState(false);
   const [focused, setFocused] = useState(false);
   const expanded = useWidgetFrame()?.expanded ?? false; // full screen, from the grid
-  const [showOptions, setShowOptions] = useState(false); // the config bar, folded into one line until asked for
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [draftCfg, setDraftCfg] = useState<Config>(DEFAULT_CONFIG);
   const [counting, setCounting] = useState<number | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [caret, setCaret] = useState<{ x: number; y: number; h: number; show: boolean }>({ x: 0, y: 0, h: 0, show: false });
@@ -412,11 +406,6 @@ export default function TypingWidget({
     setConfig(next); configRef.current = next;
     storage.setItem(configKey, JSON.stringify(next));
     reset(next);
-  }
-  function setMode(m: Mode) {
-    const opts = optionsFor(m);
-    const length = opts.includes(config.length) ? config.length : (opts[0] ?? config.length);
-    applyConfig({ ...config, mode: m, length });
   }
 
   function ensureAudio() {
@@ -742,7 +731,6 @@ export default function TypingWidget({
   const restart = () => { reset(configRef.current); focusField(); };
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  const lengthOptions = optionsFor(config.mode);
   const DRILLS: { id: DrillId; label: string }[] = [
     { id: "custom", label: "custom" }, { id: "home", label: "home row" },
     { id: "rhythm", label: "rhythm" }, { id: "weak", label: "my weak keys" },
@@ -794,7 +782,7 @@ export default function TypingWidget({
       <>
         {/* Header */}
         <WidgetHeader
-          onSettings={() => setShowOptions(true)}
+          onSettings={() => { setDraftCfg(config); setSettingsOpen(true); }}
           c={c}
           icon={Keyboard}
           title={widget.title}
@@ -813,116 +801,92 @@ export default function TypingWidget({
           }
         />
 
-        {/* Config: one line that says what the next test is; opens the full bar */}
-        {!showOptions && (
-          <div className={`flex items-center justify-between gap-3 mb-3 shrink-0 ${fade}`}>
-            <button
-              onClick={() => setShowOptions(true)}
-              aria-expanded={false}
-              title="Change the test"
-              className={`flex items-center gap-1 min-h-6 min-w-0 text-sm opacity-70 hover:opacity-100 ${c.label} ${FOCUS_RING}`}
-            >
-              <span className="truncate">{describeConfig(config, DRILLS)}</span>
-              <ChevronDown size={12} className="shrink-0" />
-            </button>
-            {stats.best > 0 && <span className={`text-sm tabular-nums opacity-70 shrink-0 ${c.text}`}>best {stats.best}</span>}
-          </div>
-        )}
-        {showOptions && (
-          <div className={`flex flex-col gap-2 mb-3 shrink-0 ${fade}`}>
-            <OptionRow c={c} label="Mode">
-              {(["words", "time", "drill", "metro"] as Mode[]).map(m => (
-                <Chip key={m} c={c} active={config.mode === m} onClick={() => setMode(m)}>{m}</Chip>
-              ))}
-            </OptionRow>
-            {lengthOptions.length > 0 && (
-              <OptionRow c={c} label="Length">
-                {lengthOptions.map(n => (
-                  <Chip key={n} c={c} active={config.length === n} onClick={() => applyConfig({ ...config, length: n })}>
-                    {config.mode === "time" ? `${n}s` : n}
-                  </Chip>
-                ))}
-              </OptionRow>
-            )}
-            {config.mode !== "drill" && (
-              <OptionRow c={c} label="Words">
-                {(["simple", "varied"] as WordPool[]).map(p => (
-                  <Chip
-                    key={p}
-                    c={c}
-                    active={config.pool === p}
-                    onClick={() => applyConfig({ ...config, pool: p })}
-                    title={p === "simple" ? "The classic 200 most common words" : "The 1000 most common words"}
-                  >
-                    {p}
-                  </Chip>
-                ))}
-              </OptionRow>
-            )}
-            {config.mode === "drill" && (
-              <OptionRow c={c} label="Drill">
-                {DRILLS.map(d => (
-                  <Chip key={d.id} c={c} active={config.drill === d.id} onClick={() => applyConfig({ ...config, drill: d.id })}>{d.label}</Chip>
-                ))}
-              </OptionRow>
-            )}
-            {config.mode === "drill" && config.drill === "custom" && (
-              <OptionRow c={c} label="Letters">
-                <input
-                  value={config.custom}
-                  onChange={e => applyConfig({ ...config, custom: e.target.value })}
-                  placeholder="e.g. zxc"
-                  spellCheck={false}
-                  aria-label="Letters to drill"
-                  className={`w-24 h-7 px-2 rounded-md text-sm font-mono bg-black/5 dark:bg-white/10 ${FOCUS_RING} ${c.text} placeholder:opacity-40`}
-                />
-                <Chip
-                  c={c}
-                  active={config.customScramble}
-                  onClick={() => { if (config.customWords) applyConfig({ ...config, customScramble: !config.customScramble }); }}
-                  title="Random strings of your letters"
-                >
-                  scramble
-                </Chip>
-                <Chip
-                  c={c}
-                  active={config.customWords}
-                  onClick={() => { if (config.customScramble) applyConfig({ ...config, customWords: !config.customWords }); }}
-                  title="Real words containing your letters"
-                >
-                  words
-                </Chip>
-              </OptionRow>
-            )}
-            {config.mode === "metro" && (
-              <OptionRow c={c} label="Tempo">
-                <Chip c={c} onClick={() => applyConfig({ ...config, bpm: Math.max(BPM_MIN, config.bpm - 5) })} title="Slower">−</Chip>
-                <span className={`text-sm tabular-nums w-20 text-center ${c.text}`}>{config.bpm} bpm{config.dynamic ? " start" : ""}</span>
-                <Chip c={c} onClick={() => applyConfig({ ...config, bpm: Math.min(BPM_MAX, config.bpm + 5) })} title="Faster">+</Chip>
-                <Chip c={c} active={config.dynamic} onClick={() => applyConfig({ ...config, dynamic: !config.dynamic })} title="Tempo speeds up on hits, slows on misses">dynamic</Chip>
-                <Chip c={c} active={config.endless} onClick={() => applyConfig({ ...config, endless: !config.endless })} title="Never ends on its own, press Enter to stop">endless</Chip>
-                <button
-                  onClick={() => applyConfig({ ...config, sound: !config.sound })}
-                  title={config.sound ? "Mute" : "Unmute"}
-                  aria-label={config.sound ? "Mute" : "Unmute"}
-                  className={`${HIT_AREA} ${FOCUS_RING} ${c.icon} opacity-70 hover:opacity-100`}
-                >
-                  {config.sound ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                </button>
-              </OptionRow>
-            )}
-            <OptionRow c={c} label="Countdown">
-              {COUNTDOWNS.map(n => (
-                <Chip key={n} c={c} active={config.countdown === n} onClick={() => applyConfig({ ...config, countdown: n })} title="Count down before the test starts">
-                  {n === 0 ? "off" : `${n}s`}
-                </Chip>
-              ))}
-            </OptionRow>
-            <div className="flex justify-end">
-              <SmallButton c={c} onClick={() => setShowOptions(false)}>done</SmallButton>
+        {/* One line that says what the next test is; the header's settings change it. */}
+        <div className={`flex items-center justify-between gap-3 mb-3 shrink-0 ${fade}`}>
+          <span className={`truncate text-sm opacity-70 ${c.label}`}>{describeConfig(config, DRILLS)}</span>
+          {stats.best > 0 && <span className={`text-sm tabular-nums opacity-70 shrink-0 ${c.text}`}>best {stats.best}</span>}
+        </div>
+        {settingsOpen && (() => {
+          const d = draftCfg;
+          const set = (patch: Partial<Config>) => setDraftCfg(x => ({ ...x, ...patch }));
+          const lengths = optionsFor(d.mode);
+          const pickMode = (m: Mode) => { const opts = optionsFor(m); set({ mode: m, length: opts.includes(d.length) ? d.length : (opts[0] ?? d.length) }); };
+          return (
+            <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
+              <SettingsFace c={c} onSave={() => { applyConfig(d); setSettingsOpen(false); }} onCancel={() => setSettingsOpen(false)} onReset={() => setDraftCfg(DEFAULT_CONFIG)}>
+                <SettingsField c={c} label="Mode" inline>
+                  {(["words", "time", "drill", "metro"] as Mode[]).map(m => (
+                    <Chip key={m} c={c} active={d.mode === m} onClick={() => pickMode(m)}>{m}</Chip>
+                  ))}
+                </SettingsField>
+                {lengths.length > 0 && (
+                  <SettingsField c={c} label="Length" inline>
+                    {lengths.map(n => (
+                      <Chip key={n} c={c} active={d.length === n} onClick={() => set({ length: n })}>
+                        {d.mode === "time" ? `${n}s` : n}
+                      </Chip>
+                    ))}
+                  </SettingsField>
+                )}
+                {d.mode !== "drill" && (
+                  <SettingsField c={c} label="Words" inline>
+                    {(["simple", "varied"] as WordPool[]).map(pool => (
+                      <Chip key={pool} c={c} active={d.pool === pool} onClick={() => set({ pool })} title={pool === "simple" ? "The classic 200 most common words" : "The 1000 most common words"}>
+                        {pool}
+                      </Chip>
+                    ))}
+                  </SettingsField>
+                )}
+                {d.mode === "drill" && (
+                  <SettingsField c={c} label="Drill" inline>
+                    {DRILLS.map(dr => (
+                      <Chip key={dr.id} c={c} active={d.drill === dr.id} onClick={() => set({ drill: dr.id })}>{dr.label}</Chip>
+                    ))}
+                  </SettingsField>
+                )}
+                {d.mode === "drill" && d.drill === "custom" && (
+                  <SettingsField c={c} label="Letters">
+                    <div className="flex items-center gap-1.5">
+                      <SettingsInput
+                        value={d.custom}
+                        onChange={e => set({ custom: e.target.value })}
+                        placeholder="e.g. zxc"
+                        spellCheck={false}
+                        aria-label="Letters to drill"
+                        className="w-28 font-mono"
+                      />
+                      <Chip c={c} active={d.customScramble} onClick={() => { if (d.customWords) set({ customScramble: !d.customScramble }); }} title="Random strings of your letters">scramble</Chip>
+                      <Chip c={c} active={d.customWords} onClick={() => { if (d.customScramble) set({ customWords: !d.customWords }); }} title="Real words containing your letters">words</Chip>
+                    </div>
+                  </SettingsField>
+                )}
+                {d.mode === "metro" && (
+                  <>
+                    <SettingsField c={c} label="Tempo" inline>
+                      <Stepper label="tempo in beats per minute" value={d.bpm} min={BPM_MIN} max={BPM_MAX} step={5} unit="bpm" onChange={bpm => set({ bpm })} />
+                    </SettingsField>
+                    <SettingsField c={c} label="Dynamic tempo" inline hint="Speeds up on hits, slows on misses.">
+                      <Toggle checked={d.dynamic} onChange={() => set({ dynamic: !d.dynamic })} label="Dynamic tempo" />
+                    </SettingsField>
+                    <SettingsField c={c} label="Endless" inline hint="Never ends on its own; Enter stops it.">
+                      <Toggle checked={d.endless} onChange={() => set({ endless: !d.endless })} label="Endless" />
+                    </SettingsField>
+                    <SettingsField c={c} label="Sound" inline>
+                      <Toggle checked={d.sound} onChange={() => set({ sound: !d.sound })} label="Metronome sound" />
+                    </SettingsField>
+                  </>
+                )}
+                <SettingsField c={c} label="Countdown" inline>
+                  {COUNTDOWNS.map(n => (
+                    <Chip key={n} c={c} active={d.countdown === n} onClick={() => set({ countdown: n })} title="Count down before the test starts">
+                      {n === 0 ? "off" : `${n}s`}
+                    </Chip>
+                  ))}
+                </SettingsField>
+              </SettingsFace>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Body */}
         <div

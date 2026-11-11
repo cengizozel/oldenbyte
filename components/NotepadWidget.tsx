@@ -485,7 +485,7 @@ export default function NotebookWidget({
 
       {settingsOpen && (
         <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
-          <SettingsFace c={c} onSave={saveSettings} onCancel={() => setSettingsOpen(false)}>
+          <SettingsFace c={c} onReset={() => { setDraftName(""); setDraftCalendar(true); }} onSave={saveSettings} onCancel={() => setSettingsOpen(false)}>
             <SettingsField c={c} label="Name">
               <SettingsInput value={draftName} onChange={e => setDraftName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveSettings()} placeholder={widget.title} />
             </SettingsField>

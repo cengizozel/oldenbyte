@@ -698,6 +698,7 @@ export default function ScheduleWidget({
           <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col p-5 ${c.bg}`}>
             <SettingsFace
               c={c}
+              onReset={() => { setDraftStart(DEFAULT_CONFIG.startHour); setDraftEnd(DEFAULT_CONFIG.endHour); }}
               onSave={() => { if (draftEnd - draftStart >= 6) { apply({ ...config, startHour: draftStart, endHour: draftEnd }); setSettingsOpen(false); } }}
               onCancel={() => setSettingsOpen(false)}
               saveDisabled={draftEnd - draftStart < 6}

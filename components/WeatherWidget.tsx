@@ -140,18 +140,6 @@ export default function WeatherWidget({
     fetchForecast(draft);
   }
 
-  async function handleReset() {
-    fetchAbort.current?.abort();
-    fetchAbort.current = null;
-    setLoading(false);
-    await storage.removeItem(storageKey);
-    setConfig(DEFAULT);
-    setDraft(DEFAULT);
-    setForecast(null);
-    setResults([]);
-    setQuery("");
-    setSettingsOpen(false);
-  }
 
   const unitSuffix = config.unit === "f" ? "°F" : "°C";
   const current = forecast?.current;
@@ -219,7 +207,7 @@ export default function WeatherWidget({
   );
 
   const back = (
-    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setSearchError(""); }} onReset={handleReset} saving={loading}>
+    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setSearchError(""); }} onReset={() => setDraft(DEFAULT)} saving={loading}>
       <SettingsField c={c} label="Place" hint={configured(draft) ? `Chosen: ${draft.name}${draft.region ? `, ${draft.region}` : ""}` : undefined}>
         <div className="flex gap-1.5">
           <SettingsInput

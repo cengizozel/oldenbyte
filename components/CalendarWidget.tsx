@@ -178,17 +178,6 @@ export default function CalendarWidget({
     fetchEvents(draft);
   }
 
-  async function handleReset() {
-    fetchAbort.current?.abort();
-    fetchAbort.current = null;
-    setLoading(false);
-    await storage.removeItem(storageKey);
-    setConfig(DEFAULT);
-    setDraft(DEFAULT);
-    setEvents([]);
-    setAvailable([]);
-    setSettingsOpen(false);
-  }
 
   const today = localDateStr();
   const tomorrow = localDateStr(new Date(Date.now() + 86400000));
@@ -249,7 +238,7 @@ export default function CalendarWidget({
   );
 
   const back = (
-    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setConnectError(""); }} onReset={handleReset} saving={loading}>
+    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setConnectError(""); }} onReset={() => setDraft(DEFAULT)} saving={loading}>
       <SettingsField c={c} label="CalDAV server" hint="Works with Nextcloud, Radicale and other CalDAV servers. For Nextcloud use an app password (Settings, Security) and the address ending in /remote.php/dav.">
         <SettingsInput
           type="url"

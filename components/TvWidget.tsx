@@ -185,13 +185,6 @@ export default function TvWidget({
     setSettingsOpen(false);
   }
 
-  async function handleReset() {
-    stop();
-    await storage.removeItem(storageKey);
-    setConfig(DEFAULT);
-    setDraft(DEFAULT);
-    setSettingsOpen(false);
-  }
 
   return (
     <FlipCard
@@ -266,7 +259,7 @@ export default function TvWidget({
         </div>
       }
       back={
-        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset}>
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={() => setDraft(DEFAULT)}>
           <SettingsField c={c} label="Playlist or stream">
             <div className="flex items-center gap-1.5">
               <SettingsInput

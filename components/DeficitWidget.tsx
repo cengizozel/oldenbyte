@@ -302,7 +302,7 @@ export default function DeficitWidget({
   }, Number(draft.startWeightKg)) : null;
 
   const back = (
-    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(config ? toDraft(config) : emptyDraft(today)); setSettingsOpen(false); }}>
+    <SettingsFace c={c} onReset={() => setDraft(emptyDraft(today))} onSave={handleSave} onCancel={() => { setDraft(config ? toDraft(config) : emptyDraft(today)); setSettingsOpen(false); }}>
       <div className="grid grid-cols-2 gap-3">
         {field("Sex", (
           <SettingsSelect value={draft.sex} onChange={e => setDraft(d => ({ ...d, sex: e.target.value as "male" | "female" }))}>

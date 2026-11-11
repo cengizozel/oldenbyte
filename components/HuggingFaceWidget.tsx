@@ -183,7 +183,7 @@ export default function HuggingFaceWidget({
         </>
       }
       back={
-        <SettingsFace c={c} onSave={handleSave} onCancel={() => setSettingsOpen(false)}>
+        <SettingsFace c={c} onReset={() => setDraft(DEFAULT)} onSave={handleSave} onCancel={() => setSettingsOpen(false)}>
           <SettingsField c={c} label="Papers to show" inline>
             {[10, 25, 50].map(n => (
               <Chip key={n} c={c} active={draft.limit === n} onClick={() => setDraft({ limit: n })}>

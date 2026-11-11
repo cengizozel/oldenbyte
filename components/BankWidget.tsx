@@ -272,6 +272,7 @@ export default function BankWidget({
   const back = (
     <SettingsFace
       c={c}
+      onReset={() => setDraft({})}
       onSave={async () => {
         setConfig(draft);
         await storage.setItem(storageKey, JSON.stringify(draft));

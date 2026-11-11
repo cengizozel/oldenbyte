@@ -203,7 +203,7 @@ export default function TextWidget({
         </>
       }
       back={
-        <SettingsFace c={c} bodyRef={settingsBodyRef} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} saving={testing}>
+        <SettingsFace c={c} onReset={() => setDraft(DEFAULT)} bodyRef={settingsBodyRef} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} saving={testing}>
           <SettingsField c={c} label="Source">
             <div className="flex gap-1.5">
               {(["text", "url"] as const).map(t => (

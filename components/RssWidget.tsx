@@ -100,16 +100,6 @@ export default function RssWidget({
     }
   }
 
-  async function handleReset() {
-    fetchAbort.current?.abort();
-    fetchAbort.current = null;
-    setLoading(false);
-    await storage.removeItem(storageKey);
-    setConfig(DEFAULT);
-    setDraft(DEFAULT);
-    setItems([]);
-    setSettingsOpen(false);
-  }
 
   return (
     <FlipCard
@@ -152,7 +142,7 @@ export default function RssWidget({
         </>
       }
       back={
-        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={handleReset} saving={loading}>
+        <SettingsFace c={c} onSave={handleSave} onCancel={() => { setSettingsOpen(false); setError(""); }} onReset={() => setDraft(DEFAULT)} saving={loading}>
           <SettingsField c={c} label="Name">
             <SettingsInput
               type="text"

@@ -622,7 +622,8 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
           <div className="ml-auto flex items-center gap-2 shrink-0">
             {hasActions && <HeaderDivider c={c} />}
             <ExpandButton c={c} />
-            <span ref={settingsHost} className="contents" />
+            {/* Opening a member's settings face puts the row back to its tabs. */}
+            <span ref={settingsHost} className="contents" onClick={e => { if ((e.target as Element).closest("[data-widget-settings]")) setShowActions(false); }} />
           </div>
         </div>
       )}

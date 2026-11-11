@@ -9,7 +9,7 @@ import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING, Stepper } from "./ui/Field";
-import { EmptyState, WidgetHeader, Chip, SmallButton, SettingsFace, SettingsListRow, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION } from "./ui/WidgetChrome";
+import { EmptyState, WidgetHeader, Chip, SmallButton, SettingsFace, SettingsListRow, SettingsListControl, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION } from "./ui/WidgetChrome";
 
 // Rhythm is Tracker's sibling. Tracker answers "how long?" with a live
 // stopwatch; Rhythm answers "when, and how often?" — each tap stamps a moment,
@@ -555,7 +555,7 @@ export default function RhythmWidget({
 
   // ── Settings (back) ────────────────────────────────────────────────────────
   const back = (
-    <SettingsFace c={c} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }}>
+    <SettingsFace c={c} onReset={() => setDraft([])} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }}>
       <div className="flex gap-1.5">
         <SettingsInput
           type="text"
@@ -589,32 +589,32 @@ export default function RhythmWidget({
                 </button>
               }
             >
-              <div className="flex flex-wrap items-center gap-1.5">
+              <SettingsListControl c={c} label="Kind">
                 <Seg
                   c={c}
                   value={it.kind}
                   onChange={v => setDraft(d => d.map(x => x.id === it.id ? { ...x, kind: v } : x))}
                   options={[{ value: "moment", label: "Moment" }, { value: "session", label: "Session" }]}
                 />
+              </SettingsListControl>
+              <SettingsListControl c={c} label="Aim">
                 <Seg
                   c={c}
                   value={it.mode}
                   onChange={v => setDraft(d => d.map(x => x.id === it.id ? { ...x, mode: v } : x))}
                   options={[{ value: "build", label: "Build" }, { value: "reduce", label: "Reduce" }]}
                 />
-              </div>
+              </SettingsListControl>
               {it.kind === "moment" && (
-                <div className="flex items-center justify-between gap-3">
-                  <span className={`text-sm opacity-70 ${c.label}`}>{it.mode === "reduce" ? "Daily limit" : "Daily target"}</span>
+                <SettingsListControl c={c} label={it.mode === "reduce" ? "Daily limit" : "Daily target"}>
                   <Stepper
                     label={it.mode === "reduce" ? `daily limit for ${it.name}` : `daily target for ${it.name}`}
                     value={it.target ?? 0}
                     min={0}
                     max={99}
-                    unit={it.target ? "" : ""}
                     onChange={v => setDraft(d => d.map(x => x.id === it.id ? { ...x, target: v || undefined } : x))}
                   />
-                </div>
+                </SettingsListControl>
               )}
             </SettingsListRow>
           ))}

@@ -98,8 +98,10 @@ export function EmptyState({ c, action, children }: { c: ColorClasses; action?: 
   );
 }
 
-// Bottom row of a settings face: optional reset on the left, cancel/save on
-// the right. Matches the icon-pair pattern from the feed widgets.
+// Bottom row of a settings face: reset on the left (back to defaults, asked
+// first), cancel and save on the right. Real 28px buttons on a fill, 16px
+// glyphs, so they read as the face's actions and not as stray marks.
+const FACE_BUTTON = `w-7 h-7 flex items-center justify-center rounded-lg transition-colors bg-black/5 dark:bg-white/10 ${FOCUS_RING}`;
 export function SaveCancelRow({
   c,
   onSave,
@@ -128,22 +130,22 @@ export function SaveCancelRow({
       {onReset ? (
         confirmReset ? (
           <span className={`flex items-center gap-2 text-sm min-w-0 ${c.label}`}>
-            <span className="opacity-70 truncate">Reset all settings?</span>
-            <button type="button" onClick={() => { setConfirmReset(false); onReset(); }} className={`shrink-0 font-medium text-red-500 hover:text-red-400 ${FOCUS_RING}`}>Reset</button>
-            <button type="button" onClick={() => setConfirmReset(false)} className={`shrink-0 opacity-70 hover:opacity-100 ${FOCUS_RING}`}>Keep</button>
+            <span className="opacity-70 truncate">Reset?</span>
+            <button type="button" onClick={() => { setConfirmReset(false); onReset(); }} className={`shrink-0 h-7 px-2.5 rounded-lg text-sm font-medium bg-black/10 dark:bg-white/15 text-red-600 dark:text-red-400 hover:bg-black/15 dark:hover:bg-white/20 ${FOCUS_RING}`}>Reset</button>
+            <button type="button" onClick={() => setConfirmReset(false)} className={`shrink-0 h-7 px-2.5 rounded-lg text-sm bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${FOCUS_RING}`}>Keep</button>
           </span>
         ) : (
-          <button type="button" onClick={() => setConfirmReset(true)} className={`${c.label} opacity-40 hover:opacity-70 ${HIT_AREA} ${FOCUS_RING}`} title="Reset all settings" aria-label="Reset all settings">
-            <RotateCcw size={14} />
+          <button type="button" onClick={() => setConfirmReset(true)} className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`} title="Back to defaults" aria-label="Back to defaults">
+            <RotateCcw size={16} />
           </button>
         )
       ) : <span />}
-      <div className="flex gap-3">
-        <button onClick={onCancel} title="Cancel" aria-label="Cancel" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-          <X size={14} />
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={onCancel} title="Cancel" aria-label="Cancel" className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`}>
+          <X size={16} />
         </button>
-        <button onClick={onSave} disabled={saving || saveDisabled} title="Save" aria-label="Save" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40">
-          {saving ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
+        <button type="button" onClick={onSave} disabled={saving || saveDisabled} title="Save" aria-label="Save" className={`${FACE_BUTTON} bg-black/10 dark:bg-white/15 hover:bg-black/15 dark:hover:bg-white/20 ${c.text} disabled:opacity-40`}>
+          {saving ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
         </button>
       </div>
     </div>
@@ -290,7 +292,7 @@ export function WidgetHeader({
     );
   }
   const expand = !editing ? <ExpandButton c={c} /> : null;
-  const settings = onSettings ? <SettingsButton c={c} onClick={onSettings} /> : null;
+  const settings = onSettings ? <SettingsButton c={c} onClick={() => { setOpen(false); onSettings(); }} /> : null;
   const controls = editing ? frame?.controls : null;
   const hasOptions = editing ? !!controls : !!(after || right || settings || expand);
   return (
@@ -379,36 +381,42 @@ export function SettingsFace({
 
 // A labelled control: the label above (or beside, for a short control like
 // chips or a toggle), an optional hint under it.
+// Hierarchy: the label is medium weight at full strength, the hint under it
+// is light, and the control stands on its own fill, so the three never read
+// as the same thing.
+export const SETTINGS_LABEL = "text-sm font-medium";
+export const SETTINGS_HINT = "text-sm opacity-70 leading-snug";
 export function SettingsField({ c, label, hint, children, inline = false }: { c: ColorClasses; label: ReactNode; hint?: ReactNode; children: ReactNode; inline?: boolean }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       {inline ? (
         <div className="flex items-center justify-between gap-3 min-h-7">
-          <span className={`text-sm opacity-70 ${c.label}`}>{label}</span>
-          <div className="flex items-center gap-1.5 shrink-0">{children}</div>
+          <span className={`${SETTINGS_LABEL} ${c.text}`}>{label}</span>
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">{children}</div>
         </div>
       ) : (
-        <>
-          <span className={`text-sm opacity-70 ${c.label}`}>{label}</span>
-          {children}
-        </>
+        <span className={`${SETTINGS_LABEL} ${c.text}`}>{label}</span>
       )}
-      {hint && <p className={`text-sm opacity-70 leading-snug ${c.label}`}>{hint}</p>}
+      {hint && <p className={`${SETTINGS_HINT} ${c.label} ${inline ? "-mt-1" : ""}`}>{hint}</p>}
+      {!inline && children}
     </div>
   );
 }
 
 // Explanatory copy and errors inside a face.
 export function SettingsNote({ c, children }: { c: ColorClasses; children: ReactNode }) {
-  return <p className={`text-sm leading-relaxed opacity-70 ${c.text}`}>{children}</p>;
+  return <p className={`${SETTINGS_HINT} ${c.label}`}>{children}</p>;
 }
 export function SettingsError({ children }: { children: ReactNode }) {
   return <p className="text-sm text-red-400 break-words">{children}</p>;
 }
 
-// One item of an editable collection: a neutral row (no palette color of its
-// own) with a leading slot (drag handle, icon, color dot), the name, trailing
-// icon actions, and any per-item controls on the lines below.
+// One item of an editable collection, laid out like a grouped list: a neutral
+// card (no palette color of its own) whose first row is the item itself, a
+// leading slot (drag handle, icon, color dot), the name and trailing icon
+// actions, and whose further rows are its controls, each a label on the left
+// and a control on the right (SettingsListControl). Rows are the same
+// height and a hairline apart, so every card reads as one table.
 export function SettingsListRow({
   leading, title, actions, children, className = "", style, rowRef,
 }: {
@@ -421,13 +429,24 @@ export function SettingsListRow({
   rowRef?: Ref<HTMLDivElement>;
 }) {
   return (
-    <div ref={rowRef} style={style} className={`flex flex-col gap-2 px-2.5 py-2 rounded-lg bg-black/5 dark:bg-white/10 ${className}`}>
-      <div className="flex items-center gap-2 min-h-6">
+    <div ref={rowRef} style={style} className={`flex flex-col px-3 rounded-lg bg-black/5 dark:bg-white/10 divide-y divide-black/10 dark:divide-white/10 ${className}`}>
+      <div className="flex items-center gap-2 min-h-9 py-1">
         {leading}
         <div className="flex-1 min-w-0 flex items-center text-sm">{title}</div>
         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
       </div>
       {children}
+    </div>
+  );
+}
+
+// A control row inside a SettingsListRow (or any grouped list): the label on
+// the left at the meta level, the control on the right, 36px tall.
+export function SettingsListControl({ c, label, children }: { c: ColorClasses; label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 min-h-9 py-1">
+      <span className={`text-sm min-w-0 truncate ${c.text}`}>{label}</span>
+      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">{children}</div>
     </div>
   );
 }
@@ -457,7 +476,7 @@ export function Chip({
       title={title}
       aria-pressed={active}
       className={`h-7 px-2.5 rounded-md text-sm leading-none transition-colors ${FOCUS_RING} ${
-        active ? `bg-black/10 dark:bg-white/15 ${c.text}` : `${c.label} opacity-70 hover:opacity-100`
+        active ? `bg-black/15 dark:bg-white/20 font-medium ${c.text}` : `bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${c.text}`
       } ${className}`}
     >
       {children}
