@@ -89,20 +89,25 @@ export default function YoutubeWidget({
     .filter(v => !onlyArchived || (archivedLoaded && archived.has(videoId(v.link))));
   // The badge beside the time: TA on archived videos, or YouTube on the ones
   // not archived, by the mark setting; none when only archived videos show.
-  const badgeFor = (v: Video) => {
+  // On a thumbnail it sits in the bottom right corner on a solid dark chip;
+  // in the plain list (no thumbnail) it stays inline beside the time.
+  const badgeFor = (v: Video, onThumb = false) => {
     if (!taActive(config.ta) || config.ta.only) return null;
     const on = archived.has(videoId(v.link));
     const mark = config.ta.mark ?? "ta";
     if (mark === "ta" ? !on : on) return null;
     // The service's own mark, in the label color, instead of a text badge.
-    return mark === "ta"
-      ? <span role="img" aria-label="In TubeArchivist" title="Opens on TubeArchivist" className={`shrink-0 w-3.5 h-3.5 bg-current opacity-80 ${c.label}`} style={{ maskImage: "url(/tubearchivist.svg)", WebkitMaskImage: "url(/tubearchivist.svg)", maskSize: "contain", WebkitMaskSize: "contain", maskRepeat: "no-repeat", WebkitMaskRepeat: "no-repeat", maskPosition: "center", WebkitMaskPosition: "center" }} />
+    const wrap = (icon: React.ReactNode) => onThumb
+      ? <span className="absolute bottom-1 right-1 flex items-center justify-center w-5 h-5 rounded-md bg-black/85 text-white">{icon}</span>
+      : icon;
+    return wrap(mark === "ta"
+      ? <span role="img" aria-label="In TubeArchivist" title="Opens on TubeArchivist" className={`shrink-0 w-3.5 h-3.5 bg-current ${onThumb ? "" : `opacity-80 ${c.label}`}`} style={{ maskImage: "url(/tubearchivist.svg)", WebkitMaskImage: "url(/tubearchivist.svg)", maskSize: "contain", WebkitMaskSize: "contain", maskRepeat: "no-repeat", WebkitMaskRepeat: "no-repeat", maskPosition: "center", WebkitMaskPosition: "center" }} />
       : (
-        <svg role="img" aria-label="Not in TubeArchivist" viewBox="0 0 24 24" className={`shrink-0 w-3.5 h-3.5 opacity-80 ${c.label}`} fill="currentColor">
+        <svg role="img" aria-label="Not in TubeArchivist" viewBox="0 0 24 24" className={`shrink-0 w-3.5 h-3.5 ${onThumb ? "" : `opacity-80 ${c.label}`}`} fill="currentColor">
           <title>Not in TubeArchivist; opens on YouTube</title>
           <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.930.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.930 24 12 24 12s0-3.930-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
         </svg>
-      );
+      ));
   };
   const filterName = filter ? videos.find(v => v.channelId === filter)?.channelName ?? "" : "";
   const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([videos, filter]);
@@ -384,6 +389,7 @@ export default function YoutubeWidget({
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 <img src={thumb} alt="" loading="lazy" onLoad={unpulse} className="absolute inset-0 w-full h-full object-cover bg-black/10 dark:bg-white/10 animate-pulse" />
                               )}
+                              {badgeFor(v, true)}
                             </button>
                             <span className="flex items-center gap-1.5 min-w-0">
                               <button
@@ -397,7 +403,7 @@ export default function YoutubeWidget({
                               {v.published && (
                                 <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>{timeAgo(v.published)}</span>
                               )}
-                              {badgeFor(v)}
+                              
                             </span>
                             <div className="flex items-start gap-1 group/title">
                               <button
@@ -424,9 +430,10 @@ export default function YoutubeWidget({
                         <li key={i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                           <div className={thumb ? "grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 items-center" : "flex flex-col gap-1"}>
                             {thumb && (
-                              <button onClick={() => openVideo(v)} aria-label="Open video" className={`row-span-2 @max-[18rem]:row-span-1 @max-[18rem]:row-start-2 self-center hover:opacity-80 transition-opacity rounded-lg ${FOCUS_RING}`}>
+                              <button onClick={() => openVideo(v)} aria-label="Open video" className={`relative row-span-2 @max-[18rem]:row-span-1 @max-[18rem]:row-start-2 self-center hover:opacity-80 transition-opacity rounded-lg ${FOCUS_RING}`}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={thumb} alt="" loading="lazy" onLoad={unpulse} className="w-24 aspect-video object-cover rounded-lg bg-black/10 dark:bg-white/10 animate-pulse" />
+                                {badgeFor(v, true)}
                               </button>
                             )}
                           <span className={`flex items-center gap-1.5 min-w-0 ${thumb ? "col-start-2 @max-[18rem]:col-span-2 @max-[18rem]:col-start-1" : ""}`}>
@@ -441,7 +448,7 @@ export default function YoutubeWidget({
                             {v.published && (
                               <span className={`shrink-0 text-xs opacity-70 ${c.text}`}>{timeAgo(v.published)}</span>
                             )}
-                            {badgeFor(v)}
+                            {!thumb && badgeFor(v)}
                           </span>
                           <div className={`flex items-start gap-1 group/title min-w-0 ${thumb ? "col-start-2 self-center" : ""}`}>
                             <button
