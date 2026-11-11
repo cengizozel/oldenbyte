@@ -19,6 +19,7 @@ const en = {
     options: "Options",
     closeOptions: "Close options",
     fullScreen: "Full screen",
+    color: "Color",
     exitFullScreen: "Exit full screen (Esc)",
     refreshNow: "Refresh now",
     back: "Back",

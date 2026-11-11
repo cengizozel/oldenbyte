@@ -1,4 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
+import type { WidgetColor } from "@/lib/widgets";
 
 // What the grid tells every widget about the tile it sits in: whether the
 // dashboard is in layout edit mode, and whether this tile is the one shown
@@ -12,6 +13,12 @@ export type WidgetFrame = {
   expanded: boolean;
   setExpanded: (expanded: boolean) => void;
   controls?: ReactNode;
+  // The widget this frame was made for (a single header reads it; a tab row
+  // passes its shown tab's id instead) and the palette setter behind the
+  // header's color button.
+  widgetId?: string;
+  colorOf?: (widgetId: string) => WidgetColor | undefined;
+  setColor?: (widgetId: string, color: WidgetColor) => void;
 };
 
 export const WidgetFrameContext = createContext<WidgetFrame | null>(null);

@@ -6,7 +6,7 @@ import { colorMap } from "@/lib/widgets";
 import { FOCUS_RING } from "@/components/ui/Field";
 import type { TabGroupHosts } from "@/lib/tabGroup";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { HEADER_SWAP, HeaderToggle, ExpandButton, HeaderDivider } from "@/components/ui/WidgetChrome";
+import { HEADER_SWAP, HeaderToggle, ExpandButton, ColorButton, HeaderDivider } from "@/components/ui/WidgetChrome";
 import { useWidgetFrame } from "@/lib/widgetFrame";
 
 // The header row of a tab group. It sits exactly where a single widget's
@@ -623,6 +623,7 @@ export default function TabStrip({ order, activeId, instances, editing, hidden =
           <div ref={actionsHost} className="flex-1 min-w-0 flex items-center gap-2 empty:hidden" />
           <div className="ml-auto flex items-center gap-2 shrink-0">
             {hasActions && <HeaderDivider c={c} />}
+            <ColorButton c={c} widgetId={activeId} />
             <ExpandButton c={c} />
             {/* Opening a member's settings face puts the row back to its tabs. */}
             <span ref={settingsHost} className="contents" onClick={e => { if ((e.target as Element).closest("[data-widget-settings]")) setShowActions(false); }} />

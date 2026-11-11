@@ -133,6 +133,7 @@ the palette `label` color at 50% opacity.
   control for it (a sliders icon, `data-widget-settings`) last in the row,
   after full screen, so settings sits in the same spot on every widget and the keyboard
   layer's `e` always finds it, options open or closed.
+- Color: the palette button, left of full screen in every header's options, picks one of the six palettes for that widget (in a tab group, for the shown tab). A widget stores only the palette's name; each theme defines that palette's own colors, so the choice carries between light and dark with no conversion. Hidden in the grey theme, which draws every widget in the neutral palette.
 - Full screen: the grid (`lib/widgetFrame.ts`) lifts the tile over a dimmed,
   blurred backdrop at the viewport's size minus a margin, keeping the widget
   mounted so its state survives; a tab group goes up with its tab row.

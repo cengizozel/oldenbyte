@@ -253,6 +253,9 @@ export default function WidgetGrid({
     expanded: expandedCell === cellId,
     setExpanded: v => setExpandedCell(v ? cellId : null),
     controls: editing ? editControls(cellId) : undefined,
+    widgetId: cellId,
+    colorOf: id => instances[id]?.color,
+    setColor: (id, color) => setInstances(prev => (prev[id] ? { ...prev, [id]: { ...prev[id], color } } : prev)),
   });
   // The tile's controls in edit mode, shown by its header behind the header
   // toggle in place of the widget's options: move to another dashboard (when
@@ -1120,7 +1123,7 @@ export default function WidgetGrid({
         slots. Never moves in the tree, so widgets never remount. */}
     <div ref={parkingRef} aria-hidden className="fixed w-0 h-0 overflow-hidden invisible pointer-events-none">
       {mounted.map(({ id, extraClass, group }) => createPortal(
-        <WidgetFrameContext.Provider value={frameFor(group ?? id)}>
+        <WidgetFrameContext.Provider value={{ ...frameFor(group ?? id), widgetId: id }}>
         {group ? (
           <TabGroupContext.Provider
             value={{

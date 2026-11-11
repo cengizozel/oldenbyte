@@ -315,7 +315,7 @@ export default function BookmarksWidget({
               padding alone (scrollbar clearance) reads as off-center. */}
           <div ref={ref} onScroll={onScroll} className={`absolute inset-0 overflow-y-auto ${view === "icon" || view === "grid" ? "px-3" : "pr-3"}`}>
             {view === "icon" && (
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${iconSize + 12}px, 1fr))` }}>
+              <div className="grid gap-2 -mt-1" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${iconSize + 12}px, 1fr))` }}>
                 {shown.map(bm => (
                   <a
                     key={bm.id}
@@ -323,7 +323,7 @@ export default function BookmarksWidget({
                     target="_blank"
                     rel="noopener noreferrer"
                     title={displayName(bm)}
-                    className="flex items-center justify-center px-1 pb-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                    className="flex items-center justify-center p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   >
                     <Favicon bm={bm} size={iconSize} />
                   </a>
@@ -332,7 +332,7 @@ export default function BookmarksWidget({
             )}
 
             {view === "grid" && (
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(iconSize + 16, 64)}px, 1fr))` }}>
+              <div className="grid gap-2 -mt-1.5" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(iconSize + 16, 64)}px, 1fr))` }}>
                 {shown.map(bm => (
                   <a
                     key={bm.id}
@@ -340,7 +340,7 @@ export default function BookmarksWidget({
                     target="_blank"
                     rel="noopener noreferrer"
                     title={`${displayName(bm)} · ${bm.url}`}
-                    className="flex flex-col items-center gap-1 px-1 pb-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                    className="flex flex-col items-center gap-1 px-1 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   >
                     <Favicon bm={bm} size={iconSize} />
                     <span className={`w-full text-center truncate text-xs leading-tight ${c.text} opacity-80`}>{displayName(bm)}</span>

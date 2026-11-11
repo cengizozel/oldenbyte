@@ -6,8 +6,9 @@ import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
 import { useT } from "@/lib/useT";
 import { useWidgetFrame } from "@/lib/widgetFrame";
-import { Plus, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Maximize2, Minimize2, SlidersHorizontal, type LucideIcon } from "lucide-react";
-import type { ColorClasses } from "@/lib/widgets";
+import { Plus, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Maximize2, Minimize2, SlidersHorizontal, type LucideIcon, Palette } from "lucide-react";
+import { colorMap, type ColorClasses, type WidgetColor } from "@/lib/widgets";
+import { currentTheme, THEME_EVENT } from "@/lib/theme";
 import { FOCUS_RING, HIT_AREA, SettingsInput } from "./Field";
 
 // Small shared pieces of widget chrome: the hover pencil, scroll fades, the
@@ -224,6 +225,62 @@ export function HeaderDivider({ c }: { c: ColorClasses }) {
   return <span aria-hidden className={`w-px h-4 mx-1 shrink-0 bg-current opacity-25 ${c.label}`} />;
 }
 
+// The palette picker: a third common action, left of full screen, in the
+// light and dark themes (grey draws every widget in the neutral palette, so
+// there is nothing to pick). A widget stores only its palette's name; each
+// theme defines that palette's colors, so a choice carries across themes.
+const PALETTES: WidgetColor[] = ["neutral", "amber", "orange", "rose", "sky", "teal"];
+export function ColorButton({ c, widgetId }: { c: ColorClasses; widgetId?: string }) {
+  const frame = useWidgetFrame();
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [theme, setTheme] = useState<string>("light");
+  useEffect(() => {
+    setTheme(currentTheme());
+    const on = (e: Event) => setTheme((e as CustomEvent<string>).detail);
+    window.addEventListener(THEME_EVENT, on);
+    return () => window.removeEventListener(THEME_EVENT, on);
+  }, []);
+  const id = widgetId ?? frame?.widgetId;
+  if (!frame?.setColor || !id || theme === "grey") return null;
+  const current = frame.colorOf?.(id);
+  return (
+    <span className="relative flex items-center">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        title={t("common.color")}
+        aria-label={t("common.color")}
+        className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+      >
+        <Palette size={14} />
+      </button>
+      {open && (
+        <>
+          <span className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <span role="radiogroup" aria-label={t("common.color")} className="absolute right-0 top-full mt-2 z-50 flex items-center gap-1.5 p-1.5 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-md">
+            {PALETTES.map(name => (
+              <button
+                key={name}
+                type="button"
+                role="radio"
+                aria-checked={current === name}
+                aria-label={name}
+                title={name}
+                onClick={() => { frame.setColor!(id, name); setOpen(false); }}
+                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${colorMap[name].bg} ${current === name ? "border-[var(--text-primary)]" : colorMap[name].border} ${FOCUS_RING}`}
+              >
+                <span className={`w-2.5 h-2.5 rounded-full bg-current ${colorMap[name].label}`} />
+              </button>
+            ))}
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
 // Full screen for the tile this widget sits in (lib/widgetFrame.ts). Nothing
 // outside a grid tile (the digest page, previews).
 export function ExpandButton({ c }: { c: ColorClasses }) {
@@ -300,7 +357,7 @@ export function WidgetHeader({
       </>
     );
   }
-  const expand = !editing ? <ExpandButton c={c} /> : null;
+  const expand = !editing ? <><ColorButton c={c} /><ExpandButton c={c} /></> : null;
   const settings = onSettings ? <SettingsButton c={c} onClick={() => { setOpen(false); onSettings(); }} /> : null;
   const controls = editing ? frame?.controls : null;
   const hasOptions = editing ? !!controls : !!(after || right || settings || expand);
