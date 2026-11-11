@@ -26,9 +26,7 @@ function size(bytes: number): string {
 
 function when(ms: number): string {
   if (!ms) return "";
-  const d = new Date(ms);
-  const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 const meta = (g: Group) => `${size(g.bytes)}${g.updatedAt ? ` · changed ${when(g.updatedAt)}` : ""}`;
@@ -37,6 +35,7 @@ export function DataSettings() {
   const [data, setData] = useState<Summary | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false); // collapsed to its summary line by default
 
   useEffect(() => {
     fetch("/api/settings/summary")
@@ -57,10 +56,23 @@ export function DataSettings() {
         <SettingsRow label={<span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> Loading</span>} />
       ) : (
         <>
-          <SettingsRow
-            label={`${size(total)} stored for ${data.account?.username ?? "you"}`}
-            hint={data.account ? `Account since ${when(data.account.createdAt)} · signed in on ${data.account.sessions} ${data.account.sessions === 1 ? "device" : "devices"}` : undefined}
-          />
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            aria-expanded={expanded}
+            className="flex items-center justify-between gap-3 min-h-10 py-1.5 text-left"
+          >
+            <span className="min-w-0 flex flex-col">
+              <span className="text-sm text-[var(--text-primary)]">{size(total)} stored for {data.account?.username ?? "you"}</span>
+              {data.account && (
+                <span className="text-sm text-[var(--text-muted)] leading-snug">
+                  Account since {when(data.account.createdAt)} · {data.account.sessions} active {data.account.sessions === 1 ? "session" : "sessions"}
+                </span>
+              )}
+            </span>
+            <ChevronRight size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${expanded ? "rotate-90" : ""}`} />
+          </button>
+          {expanded && <>
 
           <p className="pt-3 pb-1 text-sm font-medium text-[var(--text-secondary)]">Shared by every dashboard</p>
           {data.shared.map(g => (
@@ -106,6 +118,7 @@ export function DataSettings() {
             hint={data.leftovers.keys ? `${data.leftovers.widgets} ${data.leftovers.widgets === 1 ? "widget" : "widgets"} · ${meta(data.leftovers)} · clear it from the edit shelf` : "Nothing"}
           />
           <SettingsRow label="Caches" hint={data.caches.keys ? `${meta(data.caches)} · feeds and lookups, removed on their own` : "Nothing"} />
+          </>}
         </>
       )}
     </SettingsSection>

@@ -7,7 +7,7 @@ import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { effectiveTimezone, todayIn, TZ_EVENT } from "@/lib/timezone";
-import { listAllDashboardWidgets, dashboardOf, getCalendarAccount, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
+import { listAllDashboardWidgets, dashboardOf, kindLabel, getCalendarAccount, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
 import { WidgetHeader, EmptyState, Chip, SmallButton } from "./ui/WidgetChrome";
 import { HIT_AREA, FOCUS_RING } from "./ui/Field";
 import { tagColor } from "@/lib/colors";
@@ -307,6 +307,17 @@ export default function ChatWidget({
   // of its button, and scrolling when the card is short.
   const rootRef = useRef<HTMLDivElement>(null);
   const [menuBox, setMenuBox] = useState<{ width: number; maxHeight: number } | null>(null);
+  // Any press outside the menu closes it, inside the widget too (a backdrop
+  // element can't do that: the card's own layers sit above it).
+  const menuWrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: PointerEvent) => { if (!menuWrapRef.current?.contains(e.target as Node)) setMenuOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("keydown", onKey); };
+  }, [menuOpen]);
   function openMenu(btn: HTMLElement) {
     const root = rootRef.current?.getBoundingClientRect();
     const b = btn.getBoundingClientRect();
@@ -933,7 +944,7 @@ export default function ChatWidget({
           after={
             <>
               <button
-                onClick={() => setCharactersOpen(true)}
+                onClick={() => { setHistoryOpen(false); setMenuOpen(false); setCharactersOpen(true); }}
                 title="Switch character"
                 aria-label="Switch character"
                 className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}
@@ -1009,20 +1020,18 @@ export default function ChatWidget({
               <button onClick={newChat} title="New chat with the Assistant" aria-label="New chat" className={actionCls}>
                 <Plus size={14} />
               </button>
-              <button onClick={() => setHistoryOpen(true)} title="Chats" aria-label="Chats" className={actionCls}>
+              <button onClick={() => { setCharactersOpen(false); setMenuOpen(false); setHistoryOpen(true); }} title="Chats" aria-label="Chats" className={actionCls}>
                 <MessageSquare size={14} />
               </button>
-              <div className="relative">
+              <div ref={menuWrapRef} className="relative">
                 <button onClick={e => { if (menuOpen) setMenuOpen(false); else openMenu(e.currentTarget); }} title="Data access: what the assistant may read" aria-label="Data access" className={menuOpen ? `opacity-90 ${HIT_AREA} ${FOCUS_RING} ${c.icon}` : actionCls}>
                   <Database size={14} />
                 </button>
                 {menuOpen && (
                   <>
-                    {/* click-away backdrop */}
-                    <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                     <div style={menuBox ?? undefined} className={`absolute right-0 top-6 z-50 w-60 overflow-y-auto overscroll-contain rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
-                      <div className="flex items-center justify-between gap-2 px-2.5 pt-1.5 pb-1">
-                        <p className={`text-sm opacity-80 ${c.label}`}>Data access</p>
+                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-2.5 pt-1.5 pb-1">
+                        <p className={`text-sm whitespace-nowrap opacity-80 ${c.label}`}>Data access</p>
                         <Chip c={c} active={allDashboards} onClick={toggleAllDashboards} title="List widgets from every dashboard">All dashboards</Chip>
                       </div>
                       {/* One row per data-bearing widget; no master switch. A
@@ -1047,7 +1056,10 @@ export default function ChatWidget({
                             {isCal ? <CalendarDays size={14} className={`shrink-0 opacity-70 ${c.label}`} /> : <Database size={14} className={`shrink-0 opacity-70 ${c.label}`} />}
                             <span className="flex-1 min-w-0 truncate">
                               {w.title}
-                              <span className={`ml-1.5 text-xs opacity-70 ${c.label}`}>{isCal ? (here ? "agenda + add events" : "agenda") : w.type}</span>
+                              {(() => {
+                                const kind = isCal ? (here ? "agenda and new events" : "agenda") : kindLabel(w.type);
+                                return kind.toLowerCase() === w.title.toLowerCase() ? null : <span className={`ml-1.5 text-sm opacity-70 ${c.label}`}>{kind}</span>;
+                              })()}
                             </span>
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${on && ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
                           </button>
@@ -1271,7 +1283,7 @@ export default function ChatWidget({
                   >
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(w.type).dot }} />
                     <span className="flex-1 min-w-0 truncate">{w.title}</span>
-                    <span className="text-xs opacity-70">{w.type}</span>
+                    <span className="text-sm opacity-70">{kindLabel(w.type)}</span>
                   </button>
                 ))}
               </div>

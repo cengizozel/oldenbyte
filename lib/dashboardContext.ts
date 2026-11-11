@@ -59,6 +59,26 @@ export async function getCalendarAccount(): Promise<CalendarSource | null> {
  * Just the roster of data-bearing widgets on the active dashboard (no content
  * fetching). Drives the chat's data-source checkbox list.
  */
+// What a widget type is, in words, for lists that show a widget's own name
+// beside it ("AP News  Feed").
+const KIND_LABELS: Record<string, string> = {
+  rss: "Feed", reddit: "Reddit", youtube: "YouTube", hf: "Hugging Face papers", arxiv: "arXiv papers",
+  f1: "Formula 1", calendar: "Calendar", schedule: "Schedule", weather: "Weather", notebook: "Notepad",
+  text: "Text", tracker: "Time tracker", rhythm: "Habits", upkeep: "Daily essentials", deficit: "Calorie deficit",
+  bookmarks: "Bookmarks", chess: "Chess",
+};
+export function kindLabel(type: string): string {
+  return KIND_LABELS[type] ?? type;
+}
+
+// The name a widget shows in its own header, when it has one of its own (a
+// feed's or a notepad's), else its instance title.
+async function displayTitle(w: WidgetInstance): Promise<string> {
+  if (w.type === "rss") return (await readJSON<{ name?: string }>(`rss-widget-${w.id}`))?.name?.trim() || w.title;
+  if (w.type === "notebook") return ((await storage.getItem(`notebook-${w.id}-name`)) ?? "").trim() || w.title;
+  return w.title;
+}
+
 export async function listDashboardWidgets(dashboardId?: string): Promise<WidgetRosterItem[]> {
   const keys = dashboardId ? { layout: layoutKey(dashboardId), instances: instancesKey(dashboardId) } : await getActiveDataKeys();
   const [layout, instances] = await Promise.all([
@@ -71,9 +91,8 @@ export async function listDashboardWidgets(dashboardId?: string): Promise<Widget
     ids.push(item.i);
     for (const tab of item.tabs ?? []) ids.push(tab);
   }
-  return ids
-    .filter(id => instances[id] && ENTRY_TYPES.has(instances[id].type))
-    .map(id => ({ id, title: instances[id].title, type: instances[id].type }));
+  const usable = ids.filter(id => instances[id] && ENTRY_TYPES.has(instances[id].type));
+  return Promise.all(usable.map(async id => ({ id, title: await displayTitle(instances[id]), type: instances[id].type })));
 }
 
 async function dashboardList(): Promise<{ id: string; name: string }[]> {
