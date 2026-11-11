@@ -118,7 +118,7 @@ export default function BankWidget({
   if (!def) {
     return (
       <div className={`rounded-2xl border h-full p-5 ${c.bg} ${c.border} ${c.glow} ${className}`}>
-        <p className={`text-xs opacity-70 ${c.text}`}>
+        <p className={`text-sm opacity-70 ${c.text}`}>
           This community widget&apos;s definition is no longer in the bank.
         </p>
       </div>
@@ -156,7 +156,7 @@ export default function BankWidget({
                     <div className="flex-1 min-w-0">{head}</div>
                     {meta && <span className={`shrink-0 text-xs tabular-nums opacity-70 ${c.label}`}>{meta}</span>}
                   </div>
-                  {subtitle && <p className={`mt-0.5 text-xs leading-snug opacity-70 line-clamp-2 ${c.text}`}>{subtitle}</p>}
+                  {subtitle && <p className={`mt-0.5 text-sm leading-snug opacity-70 line-clamp-2 ${c.text}`}>{subtitle}</p>}
                 </li>
               );
             })}
@@ -170,7 +170,7 @@ export default function BankWidget({
           <div key={i} className="flex flex-col gap-1">
             {items.map((s, j) => (
               <div key={j} className="flex items-baseline justify-between gap-2">
-                <span className={`text-xs opacity-70 ${c.label}`}>{s.label}</span>
+                <span className={`text-sm opacity-70 ${c.label}`}>{s.label}</span>
                 <span className={`text-sm tabular-nums ${c.text}`}>{s.value}</span>
               </div>
             ))}
@@ -216,7 +216,7 @@ export default function BankWidget({
           <figure key={i} className="flex-1 min-h-0 flex flex-col items-center gap-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={src} alt={caption || resolveText(p.src, data)} className="w-full flex-1 min-h-0 object-contain rounded-xl" />
-            {caption && <ExpandableCaption text={caption} className={`shrink-0 text-xs text-center opacity-70 ${c.text}`} />}
+            {caption && <ExpandableCaption text={caption} className={`shrink-0 text-sm text-center opacity-70 ${c.text}`} />}
           </figure>
         );
       }
@@ -257,7 +257,7 @@ export default function BankWidget({
           {loading && !hasContent ? (
             <LoadingState c={c} />
           ) : error && !hasContent ? (
-            <p className="text-red-400 text-xs">{error}</p>
+            <p className="text-red-400 text-sm">{error}</p>
           ) : hasContent ? (
             layout.map((p, i) => renderPrimitive(p, i))
           ) : (

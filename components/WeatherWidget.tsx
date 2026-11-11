@@ -161,7 +161,7 @@ export default function WeatherWidget({
       ) : loading && !forecast ? (
         <LoadingState c={c} />
       ) : error && !forecast ? (
-        <p className="text-red-400 text-xs">{error}</p>
+        <p className="text-red-400 text-sm">{error}</p>
       ) : current ? (
         <div className="flex-1 min-h-0 flex flex-col gap-3">
           {/* Current conditions */}
@@ -171,12 +171,12 @@ export default function WeatherWidget({
               <span className={`text-2xl font-semibold tabular-nums leading-none ${c.text}`}>
                 {Math.round(current.temp)}{unitSuffix}
               </span>
-              <span className={`text-xs opacity-70 ${c.label}`}>
+              <span className={`text-sm opacity-70 ${c.label}`}>
                 feels {Math.round(current.feelsLike)}° · {codeInfo(current.code).label}
               </span>
             </div>
           </div>
-          <div className={`shrink-0 flex items-center justify-center gap-4 text-xs opacity-70 ${c.label}`}>
+          <div className={`shrink-0 flex items-center justify-center gap-4 text-sm opacity-70 ${c.label}`}>
             <span className="flex items-center gap-1"><Droplets size={12} />{current.humidity}%</span>
             <span className="flex items-center gap-1"><Wind size={12} />{Math.round(current.windKmh)} km/h</span>
           </div>
@@ -188,12 +188,12 @@ export default function WeatherWidget({
                 const { Icon } = codeInfo(d.code);
                 return (
                   <li key={d.date} className={`flex items-center gap-2 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`} title={formatDate(`${d.date}T12:00:00`)}>
-                    <span className={`w-10 shrink-0 text-xs ${c.text} ${i === 0 ? "font-medium" : "opacity-80"}`}>{dayLabel(d.date, i)}</span>
+                    <span className={`w-12 shrink-0 text-sm ${c.text} ${i === 0 ? "font-medium" : "opacity-80"}`}>{dayLabel(d.date, i)}</span>
                     <Icon size={14} className={`shrink-0 opacity-70 ${c.label}`} />
                     {d.rainPct > 20 ? (
-                      <span className={`text-xs tabular-nums opacity-70 ${c.label}`}>{d.rainPct}%</span>
+                      <span className={`text-sm tabular-nums opacity-70 ${c.label}`}>{d.rainPct}%</span>
                     ) : <span />}
-                    <span className={`flex-1 text-right text-xs tabular-nums ${c.text}`}>
+                    <span className={`flex-1 text-right text-sm tabular-nums ${c.text}`}>
                       <span className="opacity-70">{Math.round(d.min)}°</span>
                       {" "}
                       <span>{Math.round(d.max)}°</span>
