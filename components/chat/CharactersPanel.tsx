@@ -21,7 +21,7 @@ export function CharactersPanel({ c, characters, activeCharId, onCreate, onClose
 }) {
   return (
     <div className={`absolute inset-0 z-40 rounded-2xl flex flex-col ${c.bg}`}>
-      <div className="px-4 pt-3 shrink-0">
+      <div className="px-4 pt-5 shrink-0">
         <WidgetHeader
           c={c}
           panel
@@ -78,7 +78,7 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
 
   return (
     <div className={`absolute inset-0 z-50 rounded-2xl flex flex-col ${c.bg}`}>
-      <div className="px-4 pt-3 shrink-0">
+      <div className="px-4 pt-5 shrink-0">
         <WidgetHeader
           c={c}
           icon={Users}

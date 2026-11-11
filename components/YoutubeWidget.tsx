@@ -427,7 +427,7 @@ export default function YoutubeWidget({
                       // (under 18rem of content) the channel line moves above
                       // the thumbnail so it never squeezes next to it.
                       return (
-                        <li key={i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
+                        <li key={i} className={`py-2 first:pt-0 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                           <div className={thumb ? "grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 items-center" : "flex flex-col gap-1"}>
                             {thumb && (
                               <button onClick={() => openVideo(v)} aria-label="Open video" className={`relative row-span-2 @max-[18rem]:row-span-1 @max-[18rem]:row-start-2 self-center hover:opacity-80 transition-opacity rounded-lg ${FOCUS_RING}`}>

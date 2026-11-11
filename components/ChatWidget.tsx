@@ -844,7 +844,7 @@ export default function ChatWidget({
       {/* Header: single row, no divider (a border here reads like a tab bar).
           The chevron switches character; the model line after it opens the
           residency controls. */}
-      <div className="px-4 pt-3 shrink-0">
+      <div className="px-4 pt-5 shrink-0">
         <WidgetHeader
           onSettings={settingsOpen ? undefined : openSettings}
           c={c}

@@ -218,7 +218,7 @@ export default function CalendarWidget({
                     {dayHeading(day, today, tomorrow)}
                   </span>
                   {list.map((ev, i) => (
-                    <div key={`${ev.uid}-${ev.start}`} className={`flex items-start gap-2 pl-1 py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`} title={`${ev.calendar}${ev.location ? ` · ${ev.location}` : ""}`}>
+                    <div key={`${ev.uid}-${ev.start}`} className={`flex items-start gap-2 pl-1 py-2 first:pt-0 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`} title={`${ev.calendar}${ev.location ? ` · ${ev.location}` : ""}`}>
                       <span className="w-2 h-2 mt-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(ev.calendar).dot }} />
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm leading-snug truncate ${c.text}`}>{ev.title}</p>

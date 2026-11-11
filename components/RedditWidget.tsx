@@ -378,7 +378,7 @@ export default function RedditWidget({
                     const sc = tagColor(post.subreddit.toLowerCase());
                     const isNew = lastVisit > 0 && (firstSeen[post.link] ?? 0) > lastVisit;
                     return (
-                      <li key={post.link || i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
+                      <li key={post.link || i} className={`py-2 first:pt-0 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                         <span className="flex items-center gap-1.5 mb-1 min-w-0">
                           <button
                             type="button"

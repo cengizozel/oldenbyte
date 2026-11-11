@@ -280,7 +280,7 @@ export default function ArxivWidget({
                 ) : cache?.papers.length ? (
                   <ul className="flex flex-col">
                     {cache.papers.map((p, i) => (
-                      <li key={i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
+                      <li key={i} className={`py-2 first:pt-0 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                         <div className="flex items-start gap-1 group/title">
                           <button
                             onClick={() => setSelected(p)}

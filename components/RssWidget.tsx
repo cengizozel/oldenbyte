@@ -128,7 +128,7 @@ export default function RssWidget({
               ) : items.length ? (
                 <ul className="flex flex-col">
                   {items.map((item, i) => (
-                    <li key={i} className={`py-2 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
+                    <li key={i} className={`py-2 first:pt-0 ${i > 0 ? "border-t border-black/10 dark:border-white/10" : ""}`}>
                       <a href={item.link} target="_blank" rel="noopener noreferrer" className={`text-sm font-medium leading-snug break-words ${c.text} hover:opacity-70 transition-opacity`}>
                         {item.title}
                       </a>
