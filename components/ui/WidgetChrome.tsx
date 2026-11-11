@@ -92,7 +92,7 @@ export function EmptyState({ c, action, children }: { c: ColorClasses; action?: 
   return (
     <div className="flex-1 h-full min-h-0 flex items-center justify-center text-center px-4">
       <p className={`text-sm opacity-70 ${c.text}`}>
-        {children ?? `${action} in settings`}
+        {children ?? action}
       </p>
     </div>
   );
