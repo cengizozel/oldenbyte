@@ -18,6 +18,8 @@ import { userFetch } from "@/lib/requestUser";
 import { todayIn } from "@/lib/timezone";
 import { decodeEntities } from "@/lib/text";
 import { DAY, HOUR, formatSpan, normalizeItem, perfectSince, sampleScores, scoreAt, stateAt, summarize, type UpkeepItem, type UpkeepLog } from "@/lib/upkeep";
+import { Chess } from "chess.js";
+import { formatScore, puzzleStreak, resultFor, uciToSan, type Saved } from "@/lib/chess";
 import { isValidConfig, project, type DeficitConfig, type DeficitDays } from "@/lib/deficit";
 
 async function read(userId: string, key: string): Promise<string | null> {
@@ -389,6 +391,42 @@ async function readBookmarks(userId: string, id: string, title: string): Promise
     .map(b => ({ title: (b.name || "").trim() || domainOf(b.url), link: b.url })));
 }
 
+// The game in progress, with the engine's view of the live position (stored by
+// the widget) so the chat talks about the real evaluation instead of guessing.
+async function readChess(userId: string, id: string, title: string, opts?: ReadOpts): Promise<string> {
+  const s = await readJSON<Saved>(userId, `chess-${id}`);
+  const game = new Chess();
+  try { if (s?.pgn) game.loadPgn(s.pgn); } catch { /* a fresh board */ }
+  const player = s?.playerColor === "b" ? "Black" : "White";
+  const hist = game.history({ verbose: true });
+  const lines = [`## ${title} (Chess against Stockfish)`];
+  lines.push(`The user plays ${player} against the engine at Elo ${s?.elo ?? 1500}.`);
+  if (!hist.length) lines.push("No moves played yet.");
+  else lines.push(`Moves: ${game.pgn().replace(/\[[^\]]*\]\s*/g, "").trim()}`);
+  lines.push(`Position (FEN): ${game.fen()}`);
+  const r = resultFor(game, s?.playerColor === "b" ? "b" : "w");
+  if (r) lines.push(`Game over: ${r === "w" ? "the user won" : r === "l" ? "the user lost" : "draw"}.`);
+  else lines.push(`${game.turn() === "w" ? "White" : "Black"} to move${game.inCheck() ? ", in check" : ""}.`);
+  const a = s?.analysis;
+  if (a && a.fen === game.fen()) {
+    lines.push(`Engine evaluation (full strength, White's view): ${formatScore(a)}${a.best ? `, best move ${uciToSan(a.fen, a.best)}` : ""}. Trust this over your own reading of the position.`);
+  }
+  if (s?.review && s.review.pgn === game.pgn() && s.review.marks.length) {
+    lines.push("Review of the user's moves:");
+    for (const m of s.review.marks) {
+      const mv = hist[m.ply];
+      if (mv) lines.push(`- move ${Math.floor(m.ply / 2) + 1} ${mv.san} was a ${m.kind} (lost ${(m.loss / 100).toFixed(1)}), better was ${m.best}`);
+    }
+  }
+  const rec = s?.record;
+  if (rec) {
+    const tally = Object.entries(rec.byElo).map(([e, v]) => `Elo ${e}: ${v.w} won, ${v.d} drawn, ${v.l} lost`).join("; ");
+    if (tally) lines.push(`Record: ${tally}. Win streak ${rec.streak}, best ${rec.best}.`);
+    if (rec.puzzleDays.length) lines.push(`Daily puzzle streak: ${puzzleStreak(rec.puzzleDays, opts?.today ?? todayIn(opts?.timezone ?? "UTC"))} days.`);
+  }
+  return lines.join("\n");
+}
+
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 // The user's local day/zone, relayed by the chat client so date-anchored
@@ -408,6 +446,7 @@ export async function readWidgetData(userId: string, id: string, type: string, t
       case "upkeep":   return await readUpkeep(userId, id, title);
       case "deficit":  return await readDeficit(userId, id, title, opts);
       case "bookmarks": return await readBookmarks(userId, id, title);
+      case "chess":    return await readChess(userId, id, title, opts);
       case "f1":       return await readF1(userId, title, opts);
       case "rss":      return await readRss(userId, id, title);
       case "reddit":   return await readReddit(userId, id, title);

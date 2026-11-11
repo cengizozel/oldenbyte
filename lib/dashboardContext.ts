@@ -11,8 +11,8 @@ type TabLayoutItem = { i: string; tabs?: string[] };
 type WidgetInstance = { id: string; type: string; title: string };
 
 // Widget types whose contents the chat can read (lib/widgetData.ts has a
-// reader for each); reader/chess/chat/empty have no useful text.
-const ENTRY_TYPES = new Set(["notebook", "text", "f1", "weather", "calendar", "schedule", "rss", "reddit", "youtube", "arxiv", "hf", "tracker", "rhythm", "upkeep", "deficit", "bookmarks"]);
+// reader for each); reader/chat/empty have no useful text.
+const ENTRY_TYPES = new Set(["notebook", "text", "f1", "weather", "calendar", "schedule", "rss", "reddit", "youtube", "arxiv", "hf", "tracker", "rhythm", "upkeep", "deficit", "bookmarks", "chess"]);
 
 async function readJSON<T>(key: string): Promise<T | null> {
   return parseJson<T | null>(await storage.getItem(key), null);

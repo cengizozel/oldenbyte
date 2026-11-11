@@ -2,11 +2,24 @@
 
 Play an ongoing game of chess against the [Stockfish](https://stockfishchess.org/) engine. You play one side; the engine replies automatically. Difficulty is an Elo set in the widget's settings (it applies from the engine's next move), and the game persists between visits. The row under the board starts a new game as either color and shows whose move it is.
 
+## Features
+
+- **Last move and material.** The last move's squares are tinted. Above and below the board are the pieces each side has taken, with the material lead in pawns.
+- **Take back.** Undoes your last move and the engine's reply.
+- **Move list.** Every move is listed under the board. Clicking one, or the arrows beside the list, shows that position; "Back to game" returns to the live game.
+- **Evaluation bar** (setting, off by default). Who is ahead, from a full-strength engine, beside the board.
+- **Hint.** Draws the best move as a green arrow.
+- **Blunder alerts** (setting, on by default). After a move that loses three pawns or more, the status line names the better move and offers a take back.
+- **Review.** Checks each of your moves and marks inaccuracies (`?!`, 0.6 pawns or more), mistakes (`?`, 1.5) and blunders (`??`, 3). Clicking a marked move shows the position before it with the played move in red and the better one in green.
+- **Daily puzzle.** Lichess's puzzle of the day (`/api/chess/puzzle`, no key, cached for an hour). Any mate counts as solving it.
+- **Record.** Won, drawn and lost per engine Elo, the last 30 results, the win streak, and the daily puzzle streak.
+- **Assistant.** The chat reads the game: moves, position, whose turn, the engine's evaluation and best move of the live position, the review, and the record.
+
 ## Storage Keys
 
 | Key | Value |
 |---|---|
-| `chess-{id}` | JSON: `{ pgn: string; elo: number; playerColor: "w" \| "b" }` |
+| `chess-{id}` | JSON `Saved` in `lib/chess.ts`: `pgn`, `elo`, `playerColor`, `evalBar`, `coach`, `counted` (the result is in the record), `analysis` (engine view of the live position), `review` (`{ pgn, marks }`), `record` |
 
 The game is stored as **PGN** (full move history, so it survives reloads), alongside the chosen difficulty and which color you play. On load the PGN is replayed into a fresh `chess.js` game.
 
@@ -39,6 +52,8 @@ go movetime 700                            (bestmove <uci>)
 
 `bestmove e2e4` (or `e7e8q` for promotions) is parsed into `{ from, to, promotion }` and applied via `chess.js`.
 
+A second worker (`Analyzer` in `lib/chessEngine.ts`) runs at full strength for the evaluation bar, hints, blunder alerts and review. Jobs run one at a time and are cached by position. Pure helpers (scoring, classification, the record) live in `lib/chess.ts` with tests in `tests/chess.test.ts`.
+
 ## Difficulty
 
 An Elo slider (**1300 to 2800, steps of 100**, default 1500) maps to Stockfish's `UCI_LimitStrength` + `UCI_Elo`. Changing it re-sends the options to the running worker; it doesn't affect the current position, only how the engine plays from then on.
@@ -53,4 +68,4 @@ An Elo slider (**1300 to 2800, steps of 100**, default 1500) maps to Stockfish's
 
 ## Layout
 
-The board is rendered square, sized to `min(width, height)` of the tile via a `ResizeObserver`, and centered. Default tile size is 2x4. `digestable: false`: a chess position isn't useful for the `/digest` briefing.
+The board is rendered square, sized to `min(width, height)` of the tile via a `ResizeObserver`, and centered. Default tile size is 2x4. `digestable: false`: a chess position isn't useful for the `/digest` briefing, though the chat can read it.
