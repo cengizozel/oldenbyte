@@ -50,6 +50,8 @@ export default function RssWidget({
   const fetchAbort = useRef<AbortController | null>(null);
 
   // Favorites (lib/favorites): the hearts, and the list the header heart opens.
+  // Every item shows a faint heart, about as quiet as the dividers, so saving
+  // never depends on hover; a saved one is solid red.
   // Unhearting in that list keeps the item there until it is closed, so a
   // slip of the finger can be undone with another tap.
   const [favs, setFavs] = useState<Favorite[]>([]);
@@ -70,7 +72,7 @@ export default function RssWidget({
       aria-pressed={on}
       title={on ? "Remove from favorites" : "Add to favorites"}
       aria-label={on ? "Remove from favorites" : "Add to favorites"}
-      className={`shrink-0 mt-0.5 ${HIT_AREA} ${FOCUS_RING} transition-opacity ${on ? "text-rose-500 opacity-100" : `${c.label} opacity-0 group-hover/item:opacity-70 hover:!opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-50`}`}
+      className={`shrink-0 mt-0.5 ${HIT_AREA} ${FOCUS_RING} transition-opacity ${on ? "text-rose-500 opacity-100" : `${c.label} opacity-30 hover:opacity-80 focus-visible:opacity-80`}`}
     >
       <Heart size={14} fill={on ? "currentColor" : "none"} />
     </button>
