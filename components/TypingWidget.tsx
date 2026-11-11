@@ -805,7 +805,6 @@ export default function TypingWidget({
           className={fade}
           right={
             <>
-              {stats.best > 0 && <span className={`text-xs tabular-nums opacity-70 ${c.text}`}>best {stats.best}</span>}
               <button
                 onClick={restart}
                 title="Restart (Tab)"
@@ -828,15 +827,18 @@ export default function TypingWidget({
 
         {/* Config: one line that says what the next test is; opens the full bar */}
         {!showOptions && (
-          <button
-            onClick={() => setShowOptions(true)}
-            aria-expanded={false}
-            title="Change the test"
-            className={`self-start flex items-center gap-1 min-h-6 mb-3 shrink-0 text-sm opacity-70 hover:opacity-100 ${c.label} ${FOCUS_RING} ${fade}`}
-          >
-            <span>{describeConfig(config, DRILLS)}</span>
-            <ChevronDown size={12} />
-          </button>
+          <div className={`flex items-center justify-between gap-3 mb-3 shrink-0 ${fade}`}>
+            <button
+              onClick={() => setShowOptions(true)}
+              aria-expanded={false}
+              title="Change the test"
+              className={`flex items-center gap-1 min-h-6 min-w-0 text-sm opacity-70 hover:opacity-100 ${c.label} ${FOCUS_RING}`}
+            >
+              <span className="truncate">{describeConfig(config, DRILLS)}</span>
+              <ChevronDown size={12} className="shrink-0" />
+            </button>
+            {stats.best > 0 && <span className={`text-sm tabular-nums opacity-70 shrink-0 ${c.text}`}>best {stats.best}</span>}
+          </div>
         )}
         {showOptions && (
           <div className={`flex flex-col gap-2 mb-3 shrink-0 ${fade}`}>

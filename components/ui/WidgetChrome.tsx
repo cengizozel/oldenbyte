@@ -156,9 +156,9 @@ export function WidgetHeader({
         {group.iconHost && createPortal(<Icon size={14} className="opacity-50 shrink-0" />, group.iconHost)}
         {group.titleHost && createPortal(<>{title}</>, group.titleHost)}
         {group.active && group.actionsHost && (after || right) && createPortal(
-          <div className={`flex items-center gap-2 min-w-0 ${className}`}>
+          <div className={`flex-1 flex items-center gap-2 min-w-0 ${className}`}>
             {after}
-            {right}
+            {right && <div className="ml-auto flex items-center gap-2 shrink-0">{right}</div>}
           </div>,
           group.actionsHost
         )}

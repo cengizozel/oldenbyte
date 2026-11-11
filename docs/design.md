@@ -111,13 +111,15 @@ the palette `label` color at 50% opacity.
   trailing edge catching up, a little overshoot); reduced motion gets a 150ms slide.
   A tab's icon and name are the ones its widget's header would show (a feed
   tab reads "BBC News", a weather tab its city), not the registry title;
-  and the shown widget's header actions float over the row's right end on a
-  short fade into the card color, taking no row space: hover-only buttons
-  collapse to nothing at rest and open on hover, truncating labels are capped
-  at 64px, and the list is padded by the actions' width underneath, so a tab
-  they cover scrolls out from under them and the chosen tab always lands
-  clear of them. In layout edit mode the row carries no actions at all (the
-  tile's own controls sit in that corner). Members do not draw their own
+  and the shown widget's header actions sit behind one toggle at the row's
+  right end, the same glyph for every widget (an ellipsis that turns into a
+  close cross). The row shows tabs by default; the toggle slides the tabs
+  out and the actions in, left-aligned with the `right` group at the end as
+  in a single header, and the same spot brings the tabs back (so does
+  switching tab). Hover-only buttons show in full there, since they were
+  asked for. The toggle only exists when the open widget has actions, and
+  in layout edit mode the row carries no actions at all (the tile's own
+  controls sit in that corner). Members do not draw their own
   header row: `WidgetHeader` renders into the tab row through
   `lib/tabGroup.ts`, and they lose their top padding, so the first content
   line sits at the same height in a group as in a single widget. The header

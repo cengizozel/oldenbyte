@@ -5,7 +5,7 @@ import type { Widget } from "@/lib/widgets";
 import { colorMap } from "@/lib/widgets";
 import { FOCUS_RING } from "@/components/ui/Field";
 import type { TabGroupHosts } from "@/lib/tabGroup";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Ellipsis, X } from "lucide-react";
 
 // The header row of a tab group. It sits exactly where a single widget's
 // header sits (same title baseline, same gap to the content, header actions on
@@ -46,20 +46,6 @@ type Props = {
 
 // The row's gap between tabs (gap-3), part of the distance a tab slides.
 const GAP = 12;
-// Header actions that only show on hover (the dashboard-wide `opacity-0
-// group-hover:` chrome, see docs/design.md) would still take their full width
-// in the tab row while invisible, squeezing the tabs. Inside the row they
-// collapse to nothing at rest and open to their 24px box when the tile is
-// hovered or focused, or always where there is no hover; the negative margin
-// swallows the flex gap before a collapsed one.
-const COLLAPSE_HIDDEN_ACTIONS = [
-  "[&_.opacity-0]:overflow-hidden [&_.opacity-0]:transition-[max-width,padding,margin,opacity] [&_.opacity-0]:duration-150",
-  "[&_.opacity-0]:!max-w-0 [&_.opacity-0]:!px-0 [&_.opacity-0]:!mr-0 [&_.opacity-0]:!-ml-2",
-  "group-hover:[&_.opacity-0]:!max-w-6 group-hover:[&_.opacity-0]:!px-[5px] group-hover:[&_.opacity-0]:!-mx-[5px]",
-  "focus-within:[&_.opacity-0]:!max-w-6 focus-within:[&_.opacity-0]:!px-[5px] focus-within:[&_.opacity-0]:!-mx-[5px]",
-  "[@media(hover:none)]:[&_.opacity-0]:!max-w-6 [@media(hover:none)]:[&_.opacity-0]:!px-[5px] [@media(hover:none)]:[&_.opacity-0]:!-mx-[5px]",
-].join(" ");
-
 // Pointer travel before a press on a tab counts as a drag rather than a click.
 const DRAG_THRESHOLD = 5;
 
@@ -86,7 +72,6 @@ function movedTo(order: string[], id: string, index: number): string[] {
 export default function TabStrip({ order, activeId, instances, editing, className = "", onSelect, onUngroup, onReorder, onHosts }: Props) {
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const c = colorMap[instances[activeId]?.color ?? "neutral"];
-  const bgVar = /var\((--[\w-]+)\)/.exec(c.bg)?.[1] ?? "--surface";
 
   // Drag state: the index being dragged, how far the pointer has moved, and
   // the slot (index among the other tabs) it would land in. The slot comes
@@ -331,25 +316,28 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     }
     return fn;
   }, []);
-  // The shown widget's actions float over the row's right end (view mode)
-  // rather than taking row space, so hovering, which opens the hidden
-  // buttons, never shifts or clips a tab by layout. The list is padded by
-  // their width underneath, so a tab they cover can be scrolled out from
-  // under them and the chosen tab always lands clear of them.
-  const [actionsW, setActionsW] = useState(0);
-  const actionsWRef = useRef(0);
-  const actionsRO = useRef<ResizeObserver | null>(null);
+  // The shown widget's header actions live behind one toggle at the row's
+  // right end, the same for every widget: the row shows tabs by default, and
+  // the toggle slides the tabs out and the actions in (and back). So nothing
+  // in the row depends on which widget is open or on hovering, and the
+  // actions, once asked for, are fully visible. The toggle only exists when
+  // the open widget has actions.
+  const [hasActions, setHasActions] = useState(false);
+  const [showActions, setShowActions] = useState(false);
+  const actionsMO = useRef<MutationObserver | null>(null);
   const actionsHost = useCallback((el: HTMLElement | null) => {
     hosts.current = { ...hosts.current, actions: el };
     onHostsRef.current(hosts.current);
-    actionsRO.current?.disconnect();
-    actionsRO.current = null;
-    const set = (w: number) => { w = Math.round(w); if (w !== actionsWRef.current) { actionsWRef.current = w; setActionsW(w); } };
-    if (!el) { set(0); return; }
-    actionsRO.current = new ResizeObserver(() => set(el.getBoundingClientRect().width));
-    actionsRO.current.observe(el);
-    set(el.getBoundingClientRect().width);
+    actionsMO.current?.disconnect();
+    actionsMO.current = null;
+    if (!el) { setHasActions(false); return; }
+    const sync = () => setHasActions(el.childElementCount > 0);
+    actionsMO.current = new MutationObserver(sync);
+    actionsMO.current.observe(el, { childList: true });
+    sync();
   }, []);
+  // Back to the tabs whenever the open tab or the mode changes.
+  useEffect(() => { setShowActions(false); }, [activeId, editing]);
 
   useEffect(() => {
     const id = pendingFocus.id;
@@ -437,7 +425,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
     const from = st.l.target - 4, to = st.r.target + 4;
     let scroll = list.scrollLeft;
     if (from - pad < scroll) scroll = Math.max(0, from - pad);
-    else if (to + pad > scroll + list.clientWidth - actionsWRef.current) scroll = to + pad - (list.clientWidth - actionsWRef.current);
+    else if (to + pad > scroll + list.clientWidth) scroll = to + pad - list.clientWidth;
     if (Math.round(scroll) !== Math.round(list.scrollLeft)) list.scrollTo({ left: scroll, behavior: !st.painted || reduced ? "auto" : "smooth" });
     if (!st.painted || reduced) {
       // First paint, or reduced motion: no spring. Reduced motion still gets a
@@ -527,12 +515,15 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   }
 
   return (
-    <div className={`relative shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 ${editing ? "pr-24 cursor-grab" : "pr-5"} ${className}`}>
+    <div className={`shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 ${editing ? "pr-24 cursor-grab" : "pr-5"} ${className}`}>
       <div className="relative flex-1 min-w-0 flex items-center">
       <div
         ref={listRef}
-        style={{ touchAction: editing ? "none" : undefined, paddingRight: actionsW || undefined, scrollPaddingRight: actionsW || undefined }}
-        className={`relative flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${editing ? "cursor-grab" : "cursor-default"}`}
+        style={{ touchAction: editing ? "none" : undefined }}
+        inert={showActions}
+        className={`relative flex items-center gap-3 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none ${editing ? "cursor-grab" : "cursor-default"} ${
+          showActions ? "opacity-0 -translate-x-2 pointer-events-none" : ""
+        }`}
       >
         {order.map((tabId, index) => {
           const isActive = tabId === activeId;
@@ -581,9 +572,8 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
       {glow && (
         <span
           aria-hidden
-          className={`pointer-events-none absolute top-0 bottom-0 ${c.label} ${glow.side === "left" ? "left-0" : ""}`}
+          className={`pointer-events-none absolute top-0 bottom-0 ${c.label} ${glow.side === "left" ? "left-0" : "right-0"}`}
           style={{
-            right: glow.side === "right" ? actionsW : undefined,
             width: glow.size,
             opacity: glow.alpha,
             background: `radial-gradient(${glow.size}px 400% at ${glow.side} center, currentColor, transparent 100%)`,
@@ -612,16 +602,36 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
           </button>
         );
       })}
-      </div>
-      {/* The shown widget's header actions, in view mode only: edit mode is for
-          arranging, and the tile's own controls sit in this corner then. They
-          get at most half the row so a long label cannot push the tabs out. */}
+      {/* The open widget's actions, in the tabs' place while the toggle is on.
+          Hover-only buttons (the `opacity-0 group-hover:` chrome) show in
+          full here: the person asked for them. None in edit mode, which is for
+          arranging; the tile's own controls sit in this corner then. */}
       {!editing && (
         <div
           ref={actionsHost}
-          className={`absolute right-5 top-[18px] bottom-2.5 pl-8 flex items-center gap-2 max-w-[50%] empty:hidden pointer-events-none [&>*]:pointer-events-auto [&_.truncate]:max-w-16 ${COLLAPSE_HIDDEN_ACTIONS}`}
-          style={{ background: `linear-gradient(to right, transparent, var(${bgVar}) 32px)` }}
+          inert={!showActions}
+          className={`absolute inset-0 flex items-center gap-2 min-w-0 transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none [&_.opacity-0:not(:hover)]:!opacity-90 dark:[&_.opacity-0:not(:hover)]:!opacity-70 ${
+            showActions ? "" : "opacity-0 translate-x-2 pointer-events-none"
+          }`}
         />
+      )}
+      </div>
+      {!editing && hasActions && (
+        <button
+          type="button"
+          aria-expanded={showActions}
+          aria-label={showActions ? "Show tabs" : "Widget options"}
+          title={showActions ? "Show tabs" : "Widget options"}
+          onMouseDown={e => e.stopPropagation()}
+          onClick={() => setShowActions(v => !v)}
+          className={`shrink-0 w-6 h-6 flex items-center justify-center rounded-md transition-opacity ${c.label} ${FOCUS_RING} ${showActions ? "opacity-100" : "opacity-70 hover:opacity-100"}`}
+        >
+          {/* One glyph crossfades into the other, with a quarter turn. */}
+          <span className="relative block w-4 h-4" aria-hidden>
+            <Ellipsis size={16} className={`absolute inset-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none ${showActions ? "opacity-0 rotate-90" : "opacity-100 rotate-0"}`} />
+            <X size={16} className={`absolute inset-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none ${showActions ? "opacity-100 rotate-0" : "opacity-0 -rotate-90"}`} />
+          </span>
+        </button>
       )}
     </div>
   );
