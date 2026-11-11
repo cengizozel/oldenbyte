@@ -28,7 +28,7 @@ const MODIFIERS = ["Shift", "Control", "Alt", "Meta", "CapsLock", "AltGraph"];
 const FOCUSABLE_FIELDS =
   "input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset]):not([type=range]):not([type=file]):not([type=color]), textarea, select, [contenteditable='true'], [contenteditable='']";
 
-type Badge = { key: string; label: string; top: number; left: number; tab: boolean };
+type Badge = { key: string; label: string; top: number; left: number; tab: boolean; target: boolean };
 type Phase = { kind: "leader" } | { kind: "tab"; cell: HTMLElement } | { kind: "help" };
 
 // Rendered and not inside an inert subtree (the hidden face of a FlipCard).
@@ -66,6 +66,15 @@ function findButton(widget: HTMLElement, selector: string): HTMLElement | null {
     .find(el => isShown(el) && !(el as HTMLButtonElement).disabled) ?? null;
 }
 
+// A header action (settings, refresh, full screen): it sits on the options
+// face, inert while the face is closed, but laid out, and a programmatic
+// click works there; only hidden members (display none) are skipped. So the
+// keys work with the options closed.
+function findHeaderAction(cell: HTMLElement, selector: string): HTMLElement | null {
+  return Array.from(cell.querySelectorAll<HTMLElement>(selector))
+    .find(el => el.getClientRects().length > 0 && !(el as HTMLButtonElement).disabled) ?? null;
+}
+
 // Lets React commit a state change (tab switch, settings flip) before focusing.
 function afterRender(fn: () => void) {
   requestAnimationFrame(() => requestAnimationFrame(fn));
@@ -98,12 +107,14 @@ export default function KeyboardLayer({
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Focus before the leader, restored when a command does not move it.
   const prevFocusRef = useRef<HTMLElement | null>(null);
-  // The cell wearing the focus ring ([data-kb-focus], styled in globals.css).
+  // The cell wearing the mark ([data-kb-focus], styled in globals.css).
   const ringRef = useRef<HTMLElement | null>(null);
-  // The last tile the pointer pressed: a click on a card is how most people
-  // "pick" a widget, and it moves no keyboard focus, so commands fall back
-  // to it.
-  const lastPressedRef = useRef<HTMLElement | null>(null);
+  // The target: the tile commands act on. A click on a card or a keyboard
+  // pick sets it and shows the mark for a few seconds (or for good, by
+  // setting); the mark also shows while a command is pending, so the leader
+  // always tells you what o, f, e and r would hit.
+  const targetRef = useRef<HTMLElement | null>(null);
+  const markTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Latest props for the listeners registered once below.
   const latest = useRef({ config, dashboards, onDashboardsChange, onToggleEdit });
   useEffect(() => { latest.current = { config, dashboards, onDashboardsChange, onToggleEdit }; });
@@ -114,11 +125,37 @@ export default function KeyboardLayer({
     window.addEventListener(KEYBOARD_EVENT, onChange);
     return () => window.removeEventListener(KEYBOARD_EVENT, onChange);
   }, []);
+  // Settings flip: keep the mark on the target, or let it go.
+  useEffect(() => {
+    const target = targetRef.current;
+    if (config.markAlways) { clearMarkTimer(); if (target?.isConnected) setRing(target); }
+    else if (!markTimerRef.current) setRing(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.markAlways]);
 
   function setRing(cell: HTMLElement | null) {
     ringRef.current?.removeAttribute("data-kb-focus");
     ringRef.current = cell;
     cell?.setAttribute("data-kb-focus", "");
+  }
+
+  function clearMarkTimer() {
+    if (markTimerRef.current) clearTimeout(markTimerRef.current);
+    markTimerRef.current = null;
+  }
+
+  function showMark(cell: HTMLElement) {
+    targetRef.current = cell;
+    setRing(cell);
+    clearMarkTimer();
+    const { mark, markAlways } = latest.current.config;
+    if (!markAlways) markTimerRef.current = setTimeout(() => { markTimerRef.current = null; setRing(null); }, mark * 1000);
+  }
+
+  // The mark is only a moment's feedback unless kept on: when a pending
+  // command ends with no fresh pick, it goes.
+  function settleMark() {
+    if (!markTimerRef.current && !latest.current.config.markAlways) setRing(null);
   }
 
   function showHint(text: string) {
@@ -148,6 +185,7 @@ export default function KeyboardLayer({
     prevFocusRef.current = null;
     if (restore && prev && prev.isConnected && prev !== document.body) prev.focus({ preventScroll: true });
     else catcherRef.current?.blur();
+    settleMark();
   }
 
   function focusCell(cell: HTMLElement) {
@@ -158,16 +196,16 @@ export default function KeyboardLayer({
     const widget = widgetIn(cell);
     if (!widget) { catcherRef.current?.blur(); return; }
     cell.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
-    setRing(cell);
+    showMark(cell);
     bestTarget(widget).focus({ preventScroll: true });
   }
 
   // The widget a command acts on: the one holding focus before the leader,
-  // else the one wearing the ring.
+  // else the target.
   function focusedWidget(): { cell: HTMLElement; widget: HTMLElement } | null {
     const prev = prevFocusRef.current;
-    const pressed = lastPressedRef.current?.isConnected ? lastPressedRef.current : null;
-    const cell = (prev?.closest("[data-cell-index]") as HTMLElement | null) ?? ringRef.current ?? pressed;
+    const target = targetRef.current?.isConnected ? targetRef.current : null;
+    const cell = (prev?.closest("[data-cell-index]") as HTMLElement | null) ?? target;
     if (!cell || !cell.isConnected) return null;
     const widget = (prev?.closest("[data-widget-id]") as HTMLElement | null) ?? widgetIn(cell);
     return widget ? { cell, widget } : null;
@@ -178,7 +216,7 @@ export default function KeyboardLayer({
     cells.forEach((cell, i) => {
       if (only && cell !== only) return;
       const r = cell.getBoundingClientRect();
-      out.push({ key: `c${i}`, label: cellDigit(i), top: Math.max(4, r.top - 6), left: Math.max(4, r.left - 6), tab: false });
+      out.push({ key: `c${i}`, label: cellDigit(i), top: Math.max(4, r.top - 6), left: Math.max(4, r.left - 6), tab: false, target: cell === targetRef.current });
       tabButtons(cell).forEach((btn, t) => {
         const b = btn.getBoundingClientRect();
         out.push({
@@ -187,6 +225,7 @@ export default function KeyboardLayer({
           top: b.bottom + 2,
           left: b.left,
           tab: true,
+          target: false,
         });
       });
     });
@@ -197,6 +236,9 @@ export default function KeyboardLayer({
     const active = document.activeElement;
     prevFocusRef.current = active instanceof HTMLElement ? active : null;
     phaseRef.current = { kind: "leader" };
+    // The current target wears the mark for as long as the command is pending.
+    const target = targetRef.current;
+    if (target?.isConnected) { clearMarkTimer(); setRing(target); }
     setBadges(badgesFor(visibleCells()));
     catcherRef.current?.focus({ preventScroll: true });
     arm(() => finish());
@@ -218,12 +260,9 @@ export default function KeyboardLayer({
       if (!target) { finish(); showHint("Focus a widget first: leader, then its number"); return; }
       const button = action === "options"
         ? findButton(target.cell, 'button[aria-label="Options"], button[aria-label="Close options"]')
-        // Full screen sits on the options face, inert while closed; it is
-        // still laid out, and a programmatic click works, so only hidden
-        // members (display none) are skipped.
-        : Array.from(target.cell.querySelectorAll<HTMLElement>('button[aria-label="Full screen"], button[aria-label="Exit full screen (Esc)"]'))
-            .find(el => el.getClientRects().length > 0 && !(el as HTMLButtonElement).disabled) ?? null;
+        : findHeaderAction(target.cell, 'button[aria-label="Full screen"], button[aria-label="Exit full screen (Esc)"]');
       if (!button) { finish(); showHint(action === "options" ? "This widget has no options" : "Full screen is not available here"); return; }
+      showMark(target.cell);
       finish(false);
       button.click();
       afterRender(() => focusCell(target.cell));
@@ -233,9 +272,10 @@ export default function KeyboardLayer({
       const target = focusedWidget();
       if (!target) { finish(); showHint("Focus a widget first: leader, then its number"); return; }
       const button = action === "settings"
-        ? findButton(target.widget, '[data-widget-settings], button[aria-label="Settings"], button[title="Settings"]')
-        : findButton(target.widget, '[data-widget-refresh], button[aria-label="Refresh now"]');
+        ? findHeaderAction(target.cell, "[data-widget-settings]")
+        : findHeaderAction(target.cell, '[data-widget-refresh], button[aria-label="Refresh now"]');
       if (!button) { finish(); showHint(action === "settings" ? "This widget has no settings" : "This widget has no refresh"); return; }
+      showMark(target.cell);
       if (action === "refresh") { button.click(); finish(); return; }
       finish(false);
       button.click();
@@ -329,27 +369,16 @@ export default function KeyboardLayer({
       e.preventDefault();
       startLeader();
     }
-    // The ring follows real focus: it goes when focus leaves the cell for
-    // anything but the catcher (click elsewhere, Tab away, Vimium's Escape).
-    function onFocusOut() {
-      setTimeout(() => {
-        const ring = ringRef.current;
-        if (!ring || !document.hasFocus()) return;
-        const active = document.activeElement;
-        if (active === catcherRef.current || (active && ring.contains(active))) return;
-        setRing(null);
-      }, 0);
-    }
+    // A click on a card picks it: the mark shows there for a moment.
     function onPointerDown(e: PointerEvent) {
+      if (!latest.current.config.enabled) return;
       const cell = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-cell-index]") : null;
-      if (cell) lastPressedRef.current = cell;
+      if (cell) showMark(cell);
     }
     window.addEventListener("keydown", onKey);
-    document.addEventListener("focusout", onFocusOut);
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("pointerdown", onPointerDown, true);
     };
   // The handlers read everything through refs; register once.
@@ -381,7 +410,7 @@ export default function KeyboardLayer({
           key={b.key}
           aria-hidden
           style={{ top: b.top, left: b.left }}
-          className={`fixed z-[60] pointer-events-none rounded-md shadow-md font-medium tabular-nums bg-[var(--text-primary)] text-[var(--surface)] ${b.tab ? "px-1 text-xs" : "px-1.5 py-0.5 text-sm"}`}
+          className={`fixed z-[60] pointer-events-none rounded-md shadow-md font-medium tabular-nums bg-[var(--text-primary)] text-[var(--surface)] ${b.tab ? "px-1 text-xs" : "px-1.5 py-0.5 text-sm"} ${b.target ? "ring-2 ring-[var(--text-muted)] ring-offset-2 ring-offset-[var(--surface)]" : ""}`}
         >
           {b.label}
         </span>
@@ -481,6 +510,30 @@ export function KeyboardSettings() {
               if (Number.isFinite(v)) update({ ...config, timeout: Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, v)) });
             }}
             className={`w-20 shrink-0 h-7 text-center text-sm border rounded-lg px-2 outline-none bg-[var(--surface)] text-[var(--text-primary)] border-[var(--surface-border)] focus:border-[var(--text-muted)] ${FOCUS_RING}`}
+          />
+        </SettingsRow>
+      )}
+      {config.enabled && (
+        <SettingsRow label="Target mark" hint="The ring on the widget your commands act on, after a click or a pick.">
+          <Toggle checked={config.markAlways} onChange={() => update({ ...config, markAlways: !config.markAlways })} label="Always shown" />
+        </SettingsRow>
+      )}
+      {config.enabled && (
+        <SettingsRow label="Mark stays for" hint={config.markAlways ? "Always shown, so this does not apply." : "Seconds, then it fades."}>
+          <input
+            type="number"
+            inputMode="decimal"
+            aria-label="Seconds the target mark stays"
+            disabled={config.markAlways}
+            min={TIMEOUT_RANGE.min}
+            max={TIMEOUT_RANGE.max}
+            step={TIMEOUT_RANGE.step}
+            value={config.mark}
+            onChange={e => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v)) update({ ...config, mark: Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, v)) });
+            }}
+            className={`w-20 shrink-0 h-7 text-center text-sm border rounded-lg px-2 outline-none bg-[var(--surface)] text-[var(--text-primary)] border-[var(--surface-border)] focus:border-[var(--text-muted)] disabled:opacity-40 ${FOCUS_RING}`}
           />
         </SettingsRow>
       )}

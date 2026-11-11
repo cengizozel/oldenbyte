@@ -10,7 +10,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput } from "./ui/Field";
-import { PencilButton, ScrollFades, EmptyState, LoadingState, SaveCancelRow, WidgetHeader, Chip, SmallButton } from "./ui/WidgetChrome";
+import { ScrollFades, EmptyState, LoadingState, SaveCancelRow, WidgetHeader, Chip, SmallButton } from "./ui/WidgetChrome";
 
 type Calendar = { name: string; url: string; readOnly?: boolean };
 type CalEvent = {
@@ -202,10 +202,10 @@ export default function CalendarWidget({
   const front = (
     <>
       <WidgetHeader
+        onSettings={() => { setDraft(config); setAvailable([]); setConnectError(""); setSettingsOpen(true); }}
         c={c}
         icon={CalendarDays}
         title="Calendar"
-        right={<PencilButton c={c} onClick={() => { setDraft(config); setAvailable([]); setConnectError(""); setSettingsOpen(true); }} />}
       />
 
       {!loaded ? null : !configured(config) ? (

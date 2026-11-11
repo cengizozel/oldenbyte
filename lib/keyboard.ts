@@ -23,6 +23,10 @@ export type KeyboardConfig = {
   leader: string;
   // Seconds a pending command (and the widget numbers) stays up after the leader.
   timeout: number;
+  // The target mark: the ring on the widget that commands act on, shown for
+  // `mark` seconds after a click or a keyboard pick, or kept on with markAlways.
+  mark: number;
+  markAlways: boolean;
   bindings: Record<KeyboardAction, string>;
 };
 export const TIMEOUT_RANGE = { min: 0.5, max: 10, step: 0.5 };
@@ -51,6 +55,8 @@ export const DEFAULT_KEYBOARD: KeyboardConfig = {
   enabled: true,
   leader: " ",
   timeout: 1.5,
+  mark: 3,
+  markAlways: false,
   bindings: {
     options: "o",
     fullScreen: "f",
@@ -120,11 +126,16 @@ export function parseKeyboardConfig(raw: string | null): KeyboardConfig {
     const k = parsed.bindings?.[id];
     if (typeof k === "string" && isBindableKey(k)) bindings[id] = k;
   }
-  const t = Number(parsed.timeout);
+  const seconds = (v: unknown, fallback: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) && v !== null && v !== "" ? Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, n)) : fallback;
+  };
   return {
     enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : true,
     leader: typeof parsed.leader === "string" && isBindableKey(parsed.leader) ? parsed.leader : DEFAULT_KEYBOARD.leader,
-    timeout: Number.isFinite(t) ? Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, t)) : DEFAULT_KEYBOARD.timeout,
+    timeout: seconds(parsed.timeout, DEFAULT_KEYBOARD.timeout),
+    mark: seconds(parsed.mark, DEFAULT_KEYBOARD.mark),
+    markAlways: typeof parsed.markAlways === "boolean" ? parsed.markAlways : false,
     bindings,
   };
 }

@@ -22,7 +22,9 @@ Defaults, all pressed after the leader (**Space**):
 | `?` | Cheat sheet with the current bindings (any key closes it) |
 | `Escape` | Cancel a pending command; on a focused widget, leave it |
 
-While the leader is pending, every widget shows its number and every tab group shows its tab keys. A pending command times out after 1.5 seconds by default; Settings > Keyboard > Time to answer sets it (0.5 to 10 seconds, stored in the same config as `timeout`). In a tab group, if no tab key follows within that time (or another key arrives), the current tab is focused.
+While the leader is pending, every widget shows its number and every tab group shows its tab keys. A pending command times out after 1.5 seconds by default; Settings > Keyboard > Time to answer sets it (0.5 to 10 seconds, stored in the same config as `timeout`).
+
+The widget that `o`, `f`, `e` and `r` act on is the target: the last widget picked with the leader and its number, or the last card clicked. Picking or clicking draws the mark (a ring round the card) for 3 seconds by default, and while the leader is pending the mark is back on the target and its number badge is ringed, so you always see what a command would hit. Settings > Keyboard > Target mark keeps it on permanently (Always shown), and Mark stays for sets the seconds otherwise (`mark` and `markAlways` in the config). In a tab group, if no tab key follows within that time (or another key arrives), the current tab is focused.
 
 Numbering follows reading order: top to bottom, then left to right, by each widget's position in the layout. Only the first ten widgets get a number (1..9, then 0); a two-digit scheme would be ambiguous with the tab key that follows. Tab groups number up to nine tabs. Numbers apply to the visible dashboard only, and not while editing the layout.
 

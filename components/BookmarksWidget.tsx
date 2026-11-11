@@ -8,7 +8,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { WidgetHeader, PencilButton, EmptyState, SaveCancelRow, ScrollFades, SmallButton } from "./ui/WidgetChrome";
+import { WidgetHeader, EmptyState, SaveCancelRow, ScrollFades, SmallButton } from "./ui/WidgetChrome";
 
 // A bookmarks board. Each link shows its site favicon (with a tidy colored
 // letter tile when the favicon is missing, or a custom emoji/image override),
@@ -270,6 +270,7 @@ export default function BookmarksWidget({
   const front = (
     <>
       <WidgetHeader
+        onSettings={() => { setDraft(bookmarks); setSettingsOpen(true); }}
         c={c}
         icon={Bookmark}
         title={widget.title}
@@ -298,7 +299,6 @@ export default function BookmarksWidget({
               </div>
             )}
             {bookmarks.length > 0 && <ViewToggle c={c} view={view} onChange={changeView} />}
-            <PencilButton c={c} onClick={() => { setDraft(bookmarks); setSettingsOpen(true); }} title="Edit bookmarks" />
           </>
         }
       />

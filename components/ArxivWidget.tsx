@@ -9,7 +9,7 @@ import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, WidgetHeader, BackButton } from "@/components/ui/WidgetChrome";
+import { RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, WidgetHeader, BackButton } from "@/components/ui/WidgetChrome";
 
 const CATEGORY_GROUPS = [
   {
@@ -249,6 +249,7 @@ export default function ArxivWidget({
       front={
         <>
           <WidgetHeader
+            onSettings={() => { setDraft(config); setSettingsOpen(true); }}
             c={c}
             icon={BookOpen}
             title="arXiv"
@@ -260,7 +261,6 @@ export default function ArxivWidget({
             right={!selected && (
               <>
                 <RefreshButton c={c} busy={loading} onClick={() => fetchPapers(config, true)} />
-                <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
               </>
             )}
           />

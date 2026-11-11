@@ -10,7 +10,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
-import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip, BackButton } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip, BackButton } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { youtubeCacheKey } from "@/lib/cacheKeys";
@@ -336,6 +336,7 @@ export default function YoutubeWidget({
       front={
         <>
           <WidgetHeader
+            onSettings={() => { setDraft(config); setSettingsOpen(true); setError(""); setTaStatus({ state: "idle", msg: "" }); }}
             c={c}
             icon={PlaySquare}
             title={widget.title}
@@ -343,7 +344,6 @@ export default function YoutubeWidget({
             right={!selected && (
               <>
                 <RefreshButton c={c} busy={loading} onClick={() => fetchVideos(config, cacheKeyFor(config), true)} />
-                <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); setTaStatus({ state: "idle", msg: "" }); }} />
               </>
             )}
           />

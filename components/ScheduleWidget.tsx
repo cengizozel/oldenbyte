@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarRange, Plus, Pencil, Check, X, Trash2, FileText, Copy } from "lucide-react";
+import { CalendarRange, Plus, Check, X, Trash2, FileText, Copy } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { SettingsInput, SettingsSelect, SettingsTextarea, HIT_AREA, FOCUS_RING } from "./ui/Field";
@@ -560,6 +560,7 @@ export default function ScheduleWidget({
     return (
       <>
         <WidgetHeader
+          onSettings={() => { setDraftStart(config.startHour); setDraftEnd(config.endHour); setEditor(null); setExportOpen(false); setSettingsOpen(o => !o); }}
           c={c}
           icon={CalendarRange}
           title={widget.title}
@@ -575,14 +576,6 @@ export default function ScheduleWidget({
                 className={actionCls}
               >
                 <FileText size={14} />
-              </button>
-              <button
-                onClick={() => { setDraftStart(config.startHour); setDraftEnd(config.endHour); setEditor(null); setExportOpen(false); setSettingsOpen(o => !o); }}
-                title="Grid hours"
-                aria-label="Grid hours"
-                className={actionCls}
-              >
-                <Pencil size={14} />
               </button>
             </>
           }

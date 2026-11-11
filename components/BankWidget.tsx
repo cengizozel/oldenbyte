@@ -12,7 +12,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, SettingsSelect } from "./ui/Field";
-import { WidgetHeader, PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton } from "./ui/WidgetChrome";
+import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton } from "./ui/WidgetChrome";
 
 type BankConfig = Record<string, string | number>;
 
@@ -247,10 +247,10 @@ export default function BankWidget({
   const front = (
     <>
       <WidgetHeader
+        onSettings={() => { setDraft(config); setSettingsOpen(true); }}
         c={c}
         icon={Puzzle}
         title={widget.title}
-        right={<PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />}
       />
       <div className="flex-1 min-h-0 relative">
         <div ref={ref} onScroll={onScroll} className="absolute inset-0 overflow-y-auto pr-3 flex flex-col gap-3">

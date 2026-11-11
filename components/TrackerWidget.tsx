@@ -9,7 +9,7 @@ import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { PencilButton, EmptyState, SaveCancelRow, WidgetHeader, SmallButton } from "./ui/WidgetChrome";
+import { EmptyState, SaveCancelRow, WidgetHeader, SmallButton } from "./ui/WidgetChrome";
 
 type Item = { id: string; name: string };
 // All days of tracked time: date (YYYY-MM-DD, local) -> activity id -> seconds.
@@ -363,6 +363,7 @@ export default function TrackerWidget({
   const front = (
     <>
       <WidgetHeader
+        onSettings={() => { setDraft(items); setSettingsOpen(true); }}
         c={c}
         icon={Timer}
         title="Tracker"
@@ -371,7 +372,6 @@ export default function TrackerWidget({
             <button onClick={() => { setDetailDate(null); setHistoryOpen(true); }} title="History and insights" aria-label="History and insights" className={headerIconCls}>
               <History size={14} />
             </button>
-            <PencilButton c={c} onClick={() => { setDraft(items); setSettingsOpen(true); }} title="Edit activities" />
           </>
         }
       />

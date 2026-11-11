@@ -10,7 +10,7 @@ import * as storage from "@/lib/storage";
 import { formatDate } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput } from "./ui/Field";
-import { WidgetHeader, Chip, SmallButton, PencilButton, EmptyState, LoadingState, SaveCancelRow } from "./ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, EmptyState, LoadingState, SaveCancelRow } from "./ui/WidgetChrome";
 
 type WeatherConfig = { name: string; region: string; lat: number; lon: number; unit: "c" | "f" };
 type GeoResult = { name: string; lat: number; lon: number; region: string };
@@ -160,10 +160,10 @@ export default function WeatherWidget({
   const front = (
     <>
       <WidgetHeader
+        onSettings={() => { setDraft(config); setQuery(""); setResults([]); setSearchError(""); setSettingsOpen(true); }}
         c={c}
         icon={CurrentIcon}
         title={config.name || widget.title}
-        right={<PencilButton c={c} onClick={() => { setDraft(config); setQuery(""); setResults([]); setSearchError(""); setSettingsOpen(true); }} />}
       />
 
       {!loaded ? null : !configured(config) ? (

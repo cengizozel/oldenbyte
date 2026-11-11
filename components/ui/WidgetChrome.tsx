@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
 import { useWidgetFrame } from "@/lib/widgetFrame";
-import { Pencil, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Maximize2, Minimize2, type LucideIcon } from "lucide-react";
+import { Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Maximize2, Minimize2, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { FOCUS_RING, HIT_AREA } from "./Field";
 
@@ -14,16 +14,20 @@ import { FOCUS_RING, HIT_AREA } from "./Field";
 // Settings entry point. Hidden until the card is hovered or the button gets
 // keyboard focus (always visible on touch devices), matching the pattern every
 // widget previously inlined.
-export function PencilButton({ c, onClick, title }: { c: ColorClasses; onClick: () => void; title?: string }) {
+// The one settings control, drawn by WidgetHeader for every widget that has a
+// settings face (its `onSettings`), right before full screen: same icon, same
+// spot, found by the keyboard layer through data-widget-settings.
+export function SettingsButton({ c, onClick }: { c: ColorClasses; onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      title={title}
-      aria-label={title ?? "Settings"}
+      title="Settings"
+      aria-label="Settings"
       data-widget-settings
       className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
     >
-      <Pencil size={14} />
+      <SlidersHorizontal size={14} />
     </button>
   );
 }
@@ -207,13 +211,16 @@ export function ExpandButton({ c }: { c: ColorClasses }) {
 }
 
 export function WidgetHeader({
-  c, icon: Icon, title, after, right, panel = false, className = "",
+  c, icon: Icon, title, after, right, onSettings, panel = false, className = "",
 }: {
   c: ColorClasses;
   icon: LucideIcon;
   title: string;
   after?: ReactNode;
   right?: ReactNode;
+  // Opens the widget's settings face: the header draws the settings control
+  // for it, after `right` and before full screen.
+  onSettings?: () => void;
   // The header of an overlay panel (a widget's history, insights, or an
   // editor) rather than the widget's own: it draws in place, with its
   // buttons always visible, even inside a tab group, where the tab keeps the
@@ -247,10 +254,10 @@ export function WidgetHeader({
       <>
         {group.iconHost && createPortal(<Icon size={14} className="opacity-50 shrink-0" />, group.iconHost)}
         {group.titleHost && createPortal(<>{title}</>, group.titleHost)}
-        {group.active && group.actionsHost && (after || right) && createPortal(
+        {group.active && group.actionsHost && (after || right || onSettings) && createPortal(
           <div className={`flex-1 flex items-center gap-2 min-w-0 ${className}`}>
             {after}
-            {right && <div className="ml-auto flex items-center gap-2 shrink-0">{right}</div>}
+            {(right || onSettings) && <div className="ml-auto flex items-center gap-2 shrink-0">{right}{onSettings && <SettingsButton c={c} onClick={onSettings} />}</div>}
           </div>,
           group.actionsHost
         )}
@@ -258,8 +265,9 @@ export function WidgetHeader({
     );
   }
   const expand = !editing ? <ExpandButton c={c} /> : null;
+  const settings = onSettings ? <SettingsButton c={c} onClick={onSettings} /> : null;
   const controls = editing ? frame?.controls : null;
-  const hasOptions = editing ? !!controls : !!(after || right || expand);
+  const hasOptions = editing ? !!controls : !!(after || right || settings || expand);
   return (
     <div className={`flex items-center gap-3 mb-3 shrink-0 min-h-5 ${className}`}>
       <div className="relative flex-1 min-w-0 flex items-center">
@@ -277,7 +285,7 @@ export function WidgetHeader({
             ) : (
               <>
                 {after}
-                {(right || expand) && <div className="ml-auto flex items-center gap-2 shrink-0">{right}{expand}</div>}
+                {(right || settings || expand) && <div className="ml-auto flex items-center gap-2 shrink-0">{right}{settings}{expand}</div>}
               </>
             )}
           </div>

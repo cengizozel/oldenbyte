@@ -8,7 +8,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import Markdown from "@/components/Markdown";
 import { SettingsInput, SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { WidgetHeader, PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton, Chip } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton, Chip } from "@/components/ui/WidgetChrome";
 
 type AnytypeObject = { id: string; name: string; snippet: string; spaceId: string; type: string };
 type Space = { id: string; name: string };
@@ -297,6 +297,7 @@ export default function AnytypeWidget({
       front={
         <>
           <WidgetHeader
+            onSettings={openSettings}
             c={c}
             icon={Layers}
             title={config.spaceName || "Anytype"}
@@ -307,7 +308,6 @@ export default function AnytypeWidget({
                     <Home size={14} />
                   </button>
                 )}
-                <PencilButton c={c} onClick={openSettings} />
               </>
             }
           />

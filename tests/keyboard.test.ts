@@ -15,6 +15,11 @@ describe("widget and tab numbers", () => {
     expect(tabFromKey("0")).toBeNull();
     expect(tabFromKey("w")).toBeNull();
   });
+  it("reads the target mark settings with defaults", () => {
+    expect(parseKeyboardConfig(JSON.stringify({})).mark).toBe(3);
+    expect(parseKeyboardConfig(JSON.stringify({})).markAlways).toBe(false);
+    expect(parseKeyboardConfig(JSON.stringify({ mark: 0.1, markAlways: true }))).toMatchObject({ mark: 0.5, markAlways: true });
+  });
   it("keeps a stored timeout within range", () => {
     expect(parseKeyboardConfig(JSON.stringify({ timeout: 4 })).timeout).toBe(4);
     expect(parseKeyboardConfig(JSON.stringify({ timeout: 99 })).timeout).toBe(10);

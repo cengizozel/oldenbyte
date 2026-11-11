@@ -9,7 +9,7 @@ import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { PencilButton, EmptyState, SaveCancelRow, WidgetHeader, Chip, SmallButton } from "./ui/WidgetChrome";
+import { EmptyState, SaveCancelRow, WidgetHeader, Chip, SmallButton } from "./ui/WidgetChrome";
 
 // Rhythm is Tracker's sibling. Tracker answers "how long?" with a live
 // stopwatch; Rhythm answers "when, and how often?" — each tap stamps a moment,
@@ -416,6 +416,7 @@ export default function RhythmWidget({
   const front = (
     <>
       <WidgetHeader
+        onSettings={() => { setDraft(items); setSettingsOpen(true); }}
         c={c}
         icon={Activity}
         title="Rhythm"
@@ -424,7 +425,6 @@ export default function RhythmWidget({
             <button onClick={() => { setDetailDate(null); setHistoryOpen(true); }} title="History and insights" aria-label="History and insights" className={headerIconCls}>
               <History size={14} />
             </button>
-            <PencilButton c={c} onClick={() => { setDraft(items); setSettingsOpen(true); }} title="Edit items" />
           </>
         }
       />

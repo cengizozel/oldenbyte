@@ -17,7 +17,7 @@ import {
 } from "@/lib/upkeep";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { PencilButton, EmptyState, SaveCancelRow, WidgetHeader, SmallButton } from "./ui/WidgetChrome";
+import { EmptyState, SaveCancelRow, WidgetHeader, SmallButton } from "./ui/WidgetChrome";
 
 // Upkeep is Tracker and Rhythm's third sibling. Tracker answers "how long?",
 // Rhythm answers "when, and how often?" — Upkeep answers "am I keeping up with
@@ -287,6 +287,7 @@ export default function UpkeepWidget({
   const front = (
     <>
       <WidgetHeader
+        onSettings={() => { setDraft(items); setSettingsOpen(true); }}
         c={c}
         icon={ShieldCheck}
         title="Upkeep"
@@ -295,7 +296,6 @@ export default function UpkeepWidget({
             <button onClick={() => { setDetailDate(null); setHistoryOpen(true); }} title="History and insights" aria-label="History and insights" className={headerIconCls}>
               <History size={14} />
             </button>
-            <PencilButton c={c} onClick={() => { setDraft(items); setSettingsOpen(true); }} title="Edit items" />
           </>
         }
       />

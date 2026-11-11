@@ -124,7 +124,11 @@ the palette `label` color at 50% opacity.
   buttons show in full once the options are asked for. In layout edit mode
   the same toggle swaps in the tile's controls instead (move to another
   dashboard, group as tabs, remove), so every operation on a tile is in the
-  one place and the title or tabs keep the whole row.
+  one place and the title or tabs keep the whole row. A widget with a
+  settings face passes `onSettings`, and the header draws the one settings
+  control for it (a sliders icon, `data-widget-settings`) right before full
+  screen, so settings sits in the same spot on every widget and the keyboard
+  layer's `e` always finds it, options open or closed.
 - Full screen: the grid (`lib/widgetFrame.ts`) lifts the tile over a dimmed,
   blurred backdrop at the viewport's size minus a margin, keeping the widget
   mounted so its state survives; a tab group goes up with its tab row.

@@ -6,7 +6,7 @@ import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
-import { WidgetHeader, Chip, PencilButton, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type FontFamily = "sans" | "serif" | "mono";
 type SourceConfig = { type: "text" | "url"; value: string };
@@ -180,10 +180,10 @@ export default function TextWidget({
       front={
         <>
           <WidgetHeader
+            onSettings={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
             c={c}
             icon={Type}
             title={widget.title}
-            right={<PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />}
           />
 
           {/* Auto-fit text display */}

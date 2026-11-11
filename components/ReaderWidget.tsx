@@ -9,7 +9,7 @@ import "react-pdf/dist/Page/TextLayer.css";
 import { colorMap, type Widget } from "@/lib/widgets";
 import FlipCard from "@/components/ui/FlipCard";
 import { FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
-import { WidgetHeader, SmallButton, PencilButton, LoadingState, EmptyState } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, SmallButton, LoadingState, EmptyState } from "@/components/ui/WidgetChrome";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
 
@@ -776,6 +776,7 @@ export default function ReaderWidget({
         front={
           <>
             <WidgetHeader
+              onSettings={() => { setSettingsOpen(true); setError(""); loadDir(dir); }}
               c={c}
               icon={BookOpen}
               title={config?.displayName || widget.title}
@@ -791,7 +792,6 @@ export default function ReaderWidget({
                       <Maximize2 size={14} />
                     </button>
                   )}
-                  <PencilButton c={c} onClick={() => { setSettingsOpen(true); setError(""); loadDir(dir); }} title="Settings" />
                 </>
               }
             />

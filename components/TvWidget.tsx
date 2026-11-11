@@ -6,7 +6,7 @@ import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { WidgetHeader, PencilButton, EmptyState, SaveCancelRow, SmallButton } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, EmptyState, SaveCancelRow, SmallButton } from "@/components/ui/WidgetChrome";
 
 type Channel = { name: string; url: string };
 type TvConfig = { playlistUrl: string; channels: Channel[]; channelUrl: string; channelName: string };
@@ -201,6 +201,7 @@ export default function TvWidget({
       front={
         <div ref={rootRef} className="flex flex-col flex-1 min-h-0">
           <WidgetHeader
+            onSettings={() => { setDraft(config); setError(""); setSettingsOpen(true); }}
             c={c}
             icon={Tv}
             title={config.channelName || "TV"}
@@ -216,7 +217,6 @@ export default function TvWidget({
                     <List size={14} />
                   </button>
                 )}
-                <PencilButton c={c} onClick={() => { setDraft(config); setError(""); setSettingsOpen(true); }} />
               </>
             }
           />

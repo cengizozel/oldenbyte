@@ -9,7 +9,7 @@ import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { PencilButton, RefreshButton, ScrollFades, LoadingState, SaveCancelRow, WidgetHeader, Chip, BackButton } from "@/components/ui/WidgetChrome";
+import { RefreshButton, ScrollFades, LoadingState, SaveCancelRow, WidgetHeader, Chip, BackButton } from "@/components/ui/WidgetChrome";
 
 type HFPaper = {
   id: string;
@@ -93,13 +93,13 @@ export default function HuggingFaceWidget({
       front={
         <>
           <WidgetHeader
+            onSettings={() => { setDraft(config); setSettingsOpen(true); }}
             c={c}
             icon={Sparkles}
             title="HF Daily"
             right={!selected && (
               <>
                 <RefreshButton c={c} busy={loading} onClick={() => fetchPapers(config, true)} />
-                <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); }} />
               </>
             )}
           />

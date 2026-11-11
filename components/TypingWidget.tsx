@@ -794,6 +794,7 @@ export default function TypingWidget({
       <>
         {/* Header */}
         <WidgetHeader
+          onSettings={() => setShowOptions(true)}
           c={c}
           icon={Keyboard}
           title={widget.title}

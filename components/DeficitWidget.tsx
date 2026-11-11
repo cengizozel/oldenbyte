@@ -13,7 +13,7 @@ import {
 } from "@/lib/deficit";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, SettingsSelect, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { PencilButton, EmptyState, SaveCancelRow, WidgetHeader } from "./ui/WidgetChrome";
+import { EmptyState, SaveCancelRow, WidgetHeader } from "./ui/WidgetChrome";
 
 // Deficit: a profile gives a daily burn, each day you enter what you ate (and
 // any exercise, and a weigh-in if you like), and the widget keeps an estimated
@@ -211,10 +211,10 @@ export default function DeficitWidget({
   const front = (
     <>
       <WidgetHeader
+        onSettings={() => { setDraft(config ? toDraft(config) : emptyDraft(today)); setSettingsOpen(true); }}
         c={c}
         icon={Flame}
         title="Deficit"
-        right={<PencilButton c={c} onClick={() => { setDraft(config ? toDraft(config) : emptyDraft(today)); setSettingsOpen(true); }} title="Profile and goal" />}
       />
 
       {!loaded ? null : !config || !p ? (

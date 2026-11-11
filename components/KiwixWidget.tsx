@@ -7,7 +7,7 @@ import * as storage from "@/lib/storage";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { WidgetHeader, PencilButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton, Chip } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SaveCancelRow, SmallButton, Chip } from "@/components/ui/WidgetChrome";
 
 type Result = { title: string; url: string; snippet: string };
 // A "source" is a kiwix ZIM (Wikipedia, WikiHow, …). `id` is its content-route name.
@@ -202,6 +202,7 @@ export default function KiwixWidget({
       front={
         <>
           <WidgetHeader
+            onSettings={!selected ? (openSettings) : undefined}
             c={c}
             icon={Library}
             title={config.sourceTitle || "Kiwix"}
@@ -217,7 +218,6 @@ export default function KiwixWidget({
                     <Home size={14} />
                   </button>
                 )}
-                {!selected && <PencilButton c={c} onClick={openSettings} />}
               </>
             }
           />

@@ -10,7 +10,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
-import { WidgetHeader, Chip, SmallButton, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip, BackButton } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow, FilterChip, BackButton } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { REDDIT_API_KEY, parseRedditApi, type RedditApiConfig } from "@/lib/reddit";
 import { isDemoMode } from "@/lib/demo";
@@ -337,6 +337,7 @@ export default function RedditWidget({
       front={
         <>
         <WidgetHeader
+          onSettings={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
           c={c}
           icon={Flame}
           title={widget.title}
@@ -369,7 +370,6 @@ export default function RedditWidget({
                 </>
               )}
               <RefreshButton c={c} busy={loading} onClick={() => fetchPosts(config, cacheKeyFor(config), true)} />
-              <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
             </span>
           }
         />

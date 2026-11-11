@@ -9,7 +9,7 @@ import { parseJson } from "@/lib/text";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput } from "@/components/ui/Field";
 import { useScrollFade } from "@/lib/useScrollFade";
-import { WidgetHeader, Chip, PencilButton, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, RefreshButton, ScrollFades, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 
 type RssItem = { title: string; link: string; pubDate: string };
 type RssConfig = { url: string; limit: number; name?: string };
@@ -119,13 +119,13 @@ export default function RssWidget({
       front={
         <>
           <WidgetHeader
+            onSettings={() => { setDraft(config); setSettingsOpen(true); setError(""); }}
             c={c}
             icon={Rss}
             title={config.name || widget.title}
             right={
               <>
                 <RefreshButton c={c} busy={loading} onClick={() => fetchFeed(config.url, config.limit, `${storageKey}-${today}`, true)} />
-                <PencilButton c={c} onClick={() => { setDraft(config); setSettingsOpen(true); setError(""); }} />
               </>
             }
           />
