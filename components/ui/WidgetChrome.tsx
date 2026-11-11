@@ -383,7 +383,7 @@ export function SettingsFace({
   return (
     <div ref={faceRef} className="flex flex-col gap-3 flex-1 min-h-0">
       <WidgetHeader panel c={c} icon={SlidersHorizontal} title={title} />
-      <div ref={bodyRef} className={`flex flex-col gap-3 flex-1 min-h-0 ${scroll ? "overflow-y-auto pr-3" : ""}`}>{children}</div>
+      <div ref={bodyRef} className={`@container flex flex-col gap-3 flex-1 min-h-0 ${scroll ? "overflow-y-auto pr-3" : ""}`}>{children}</div>
       <SaveCancelRow c={c} onSave={onSave} onCancel={onCancel} onReset={onReset} saving={saving} saveDisabled={saveDisabled} />
     </div>
   );
@@ -402,8 +402,11 @@ export function SettingsField({ c, label, hint, children, inline = false }: { c:
       {inline ? (
         <div className="flex items-center justify-between gap-x-3 gap-y-1.5 min-h-7 flex-wrap">
           <span className={`${SETTINGS_LABEL} shrink-0 ${c.text}`}>{label}</span>
-          {/* Wraps under the label, and within itself, when the card is narrow. */}
-          <div className="flex items-center gap-1.5 min-w-0 flex-wrap justify-end ml-auto">{children}</div>
+          {/* Narrow cards (the face is a size container): a group of three or
+              more options takes its own line under the label, left-aligned
+              like text; a toggle, a stepper or a two-way choice stays beside
+              the label. */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-wrap justify-end ml-auto @max-[26rem]:[&:has(>*:nth-child(3))]:basis-full @max-[26rem]:[&:has(>*:nth-child(3))]:justify-start @max-[26rem]:[&:has(>*:nth-child(3))]:ml-0">{children}</div>
         </div>
       ) : (
         <span className={`${SETTINGS_LABEL} ${c.text}`}>{label}</span>

@@ -218,6 +218,12 @@ the palette `label` color at 50% opacity.
 - Empty states: `EmptyState`, centered, 14px at 70%. Never inside a styled
   frame (a player area, a dashed box) unless the frame is the control itself.
 
+- Narrow settings: the face is a size container. Under 26rem a group of
+  three or more options moves under its label and aligns left like text; a
+  toggle, a stepper or a two-way choice stays beside the label. Adding to a
+  collection is always `SettingsAddRow`; read-only information is
+  `SettingsInfo`, an inset block with a heading and bullets.
+
 ## Page chrome
 
 Top bar text, in the same face as the widgets: title and the right-hand field
