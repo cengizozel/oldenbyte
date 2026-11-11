@@ -39,7 +39,12 @@ export function parseFeed(xml: string, limit: number): FeedItem[] {
 
   while ((match = blockRegex.exec(xml)) !== null && items.length < limit) {
     const block = match[1];
-    const title = extractTag(block, "title");
+    let title = extractTag(block, "title");
+    // Aggregator feeds (Google News) append the publisher to every headline
+    // and name it in <source>: "Headline - Reuters". The widget already
+    // shows the feed's name, so the suffix goes.
+    const source = extractTag(block, "source");
+    if (source && title.endsWith(` - ${source}`)) title = title.slice(0, -(source.length + 3)).trim();
     // Atom: <link href="..."/>; RSS: <link>...</link> or <guid>...</guid>
     const atomLinkMatch = block.match(/<link[^>]+href="([^"]+)"/i);
     const link = atomLinkMatch
