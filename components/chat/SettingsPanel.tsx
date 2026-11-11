@@ -5,7 +5,7 @@ import { RefreshCw, Loader, ChevronRight } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { DEFAULT_CONFIG, EFFORT_OPTIONS, LENGTH_PRESETS, PRESETS, type ChatConfig, type Length } from "@/lib/chat/types";
 import { SettingsInput, SettingsSelect, SettingsTextarea, FOCUS_RING, Stepper } from "../ui/Field";
-import { listKiwixServers, type KnownKiwixServer } from "@/lib/dashboardContext";
+import { listKiwixServers, listAnytypeConnections, type KnownKiwixServer, type KnownAnytype } from "@/lib/dashboardContext";
 import { Chip, SmallButton, SettingsFace } from "../ui/WidgetChrome";
 
 // Settings panel: Model, Behavior, Data sources. Edits a draft of the config
@@ -26,7 +26,13 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
   const [loadingKiwix, setLoadingKiwix] = useState(false);
   const [kiwixError, setKiwixError] = useState("");
   const [knownKiwix, setKnownKiwix] = useState<KnownKiwixServer[]>([]);
-  useEffect(() => { listKiwixServers().then(setKnownKiwix).catch(() => {}); }, []);
+  const [knownAnytype, setKnownAnytype] = useState<KnownAnytype[]>([]);
+  useEffect(() => {
+    listKiwixServers().then(setKnownKiwix).catch(() => {});
+    listAnytypeConnections().then(setKnownAnytype).catch(() => {});
+  }, []);
+  // An Anytype widget's connection not already in use here.
+  const anytypeOffers = knownAnytype.filter(k => !(k.url.toLowerCase() === draft.anytypeUrl.trim().replace(/\/+$/, "").toLowerCase() && k.spaceId === draft.anytypeSpaceId && !!draft.anytypeApiKey));
 
   // Anytype pairing: its own connection, like the Kiwix one.
   const [anytypeSpaces, setAnytypeSpaces] = useState<{ id: string; name: string }[]>([]);
@@ -407,6 +413,27 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
                 </SmallButton>
               </div>
             </>
+          )}
+          {anytypeOffers.length > 0 && (
+            <div className="flex flex-col gap-1 mt-1.5">
+              <p className={`text-sm opacity-70 ${c.label}`}>{knownAnytype.length > 1 ? "From your Anytype widgets:" : "From your Anytype widget:"}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {anytypeOffers.map(k => (
+                  <Chip
+                    key={`${k.url}|${k.spaceId}`}
+                    c={c}
+                    onClick={() => {
+                      setAnytypeError("");
+                      setDraft(d => ({ ...d, anytypeUrl: k.url, anytypeApiKey: k.apiKey, anytypeSpaceId: k.spaceId, anytypeSpaceName: k.spaceName }));
+                      loadAnytypeSpaces(k.url, k.apiKey, k.spaceId);
+                    }}
+                    title={`Reuse this connection (${k.widgets} widget${k.widgets === 1 ? "" : "s"})`}
+                  >
+                    Use {k.url.replace(/^https?:\/\//, "")}{k.spaceName ? ` · ${k.spaceName}` : ""}
+                  </Chip>
+                ))}
+              </div>
+            </div>
           )}
           {anytypeError && <p className="text-red-400 text-sm mt-1">{anytypeError}</p>}
           <p className="text-sm text-[var(--text-muted)] mt-1">Connect with an API key from a headless client on a server (works from every device), or pair with the desktop app (only while it is open). Then pick a space and turn lookup on with the box icon by the send button.</p>

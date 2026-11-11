@@ -102,3 +102,30 @@ export async function listKiwixServers(): Promise<KnownKiwixServer[]> {
   }
   return [...byUrl.values()].sort((a, b) => b.widgets - a.widgets);
 }
+
+/**
+ * The Anytype connections the user's Anytype widgets already hold (address,
+ * key and space), across every dashboard, so the Assistant can reuse one
+ * instead of pairing again. Same address and space is one entry; a widget
+ * that is not connected yet (no key) is skipped.
+ */
+export type KnownAnytype = { url: string; apiKey: string; spaceId: string; spaceName: string; widgets: number };
+export async function listAnytypeConnections(): Promise<KnownAnytype[]> {
+  const dashboards = await readJSON<DashboardsState>("dashboards");
+  const ids = dashboards?.list?.length ? dashboards.list.map(d => d.id) : ["default"];
+  const byKey = new Map<string, KnownAnytype>();
+  for (const dashId of ids) {
+    const instances = await readJSON<Record<string, WidgetInstance>>(instancesKey(dashId));
+    for (const w of Object.values(instances ?? {})) {
+      if (w.type !== "anytype") continue;
+      const cfg = await readJSON<{ baseUrl?: string; apiKey?: string; spaceId?: string; spaceName?: string }>(`anytype-widget-${w.id}`);
+      const url = (cfg?.baseUrl ?? "").trim().replace(/\/+$/, "");
+      if (!/^https?:\/\//i.test(url) || !cfg?.apiKey) continue;
+      const key = `${url.toLowerCase()}|${cfg.spaceId ?? ""}`;
+      const entry = byKey.get(key) ?? { url, apiKey: cfg.apiKey, spaceId: cfg.spaceId ?? "", spaceName: cfg.spaceName ?? "", widgets: 0 };
+      entry.widgets++;
+      byKey.set(key, entry);
+    }
+  }
+  return [...byKey.values()].sort((a, b) => b.widgets - a.widgets);
+}
