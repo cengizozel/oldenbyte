@@ -12,7 +12,7 @@ import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SmallButton, Chip,
 
 type AnytypeObject = { id: string; name: string; snippet: string; spaceId: string; type: string };
 type Space = { id: string; name: string };
-type AnytypeType = { id: string; key: string; name: string; emoji?: string; icon?: string };
+type AnytypeType = { id: string; key: string; name: string; emoji?: string; icon?: string; count?: number };
 type HomeView = "recent" | "types";
 type ReaderObject = { name: string; markdown: string; type: string; modified: string };
 type AnytypeConfig = { baseUrl: string; apiKey: string; spaceId: string; spaceName: string; limit: number; home: HomeView };
@@ -408,7 +408,10 @@ export default function AnytypeWidget({
                               <span className="w-5 shrink-0 flex items-center justify-center" aria-hidden>
                                 {t.emoji || (() => { const I = TYPE_ICONS[t.icon ?? ""] ?? (t.icon ? Shapes : null); return I ? <I size={14} className="opacity-70" /> : null; })()}
                               </span>
-                              <span className="flex-1 min-w-0 truncate">{t.name}</span>
+                              <span className="flex-1 min-w-0 truncate">
+                                {t.name}
+                                {typeof t.count === "number" && <span className={`font-normal tabular-nums ${c.label}`}> · {t.count}</span>}
+                              </span>
                               <ChevronRight size={12} className="shrink-0 opacity-40" />
                             </button>
                           </li>

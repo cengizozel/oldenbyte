@@ -115,7 +115,7 @@ export async function anytypeSearch(
 
 // emoji: the type's emoji icon; icon: the name of its built-in icon (Anytype
 // uses Ionicons names such as "musical-notes"), when it has no emoji.
-export type AnytypeType = { id: string; key: string; name: string; emoji?: string; icon?: string };
+export type AnytypeType = { id: string; key: string; name: string; emoji?: string; icon?: string; count?: number };
 
 // The object types defined in a space (Page, Note, Task, …), for browsing by type.
 export async function anytypeTypes(
@@ -133,6 +133,32 @@ export async function anytypeTypes(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .map((t: any) => ({ id: t.id, key: t.key, name: t.name || t.key, emoji: t.icon?.format === "emoji" && typeof t.icon.emoji === "string" ? t.icon.emoji : "", icon: t.icon?.format === "icon" && typeof t.icon.name === "string" ? t.icon.name : "" }))
     .sort((a: AnytypeType, b: AnytypeType) => a.name.localeCompare(b.name));
+}
+
+// How many objects each type has: a one-result search per type, reading the
+// total the API reports. A few at a time; a type whose count fails is left
+// without one.
+export async function anytypeTypeCounts(
+  baseUrl: string, apiKey: string, spaceId: string, types: AnytypeType[], signal?: AbortSignal,
+): Promise<AnytypeType[]> {
+  const out = [...types];
+  let next = 0;
+  async function worker() {
+    while (next < out.length) {
+      const i = next++;
+      try {
+        const res = await userFetch(`${root(baseUrl)}/v1/spaces/${encodeURIComponent(spaceId)}/search?limit=1`, {
+          method: "POST", headers: headers(apiKey), signal,
+          body: JSON.stringify({ query: "", types: [out[i].key] }),
+        });
+        if (!res.ok) continue;
+        const total = (await res.json())?.pagination?.total;
+        if (typeof total === "number") out[i] = { ...out[i], count: total };
+      } catch { /* leave this one without a count */ }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(6, out.length) }, worker));
+  return out;
 }
 
 // Read an object's full body as markdown (the ?format=md ObjectWithBody view).

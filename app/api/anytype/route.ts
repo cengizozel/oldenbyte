@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, readJsonBody } from "@/lib/http";
-import { anytypeSearch, anytypeTypes, anytypeReadObject, anytypeImage, ANYTYPE_VERSION } from "@/lib/anytype";
+import { anytypeSearch, anytypeTypes, anytypeTypeCounts, anytypeReadObject, anytypeImage, ANYTYPE_VERSION } from "@/lib/anytype";
 import { actAs, userFetch } from "@/lib/requestUser";
 
 // Proxy to the Anytype local API (embedded in the Anytype desktop app, default
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     if (op === "types") {
       const spaceId = sp.get("spaceId") ?? "";
       if (!spaceId) return NextResponse.json({ error: "Missing spaceId" }, { status: 400 });
-      const types = await anytypeTypes(baseUrl, apiKey, spaceId, request.signal);
+      const types = await anytypeTypeCounts(baseUrl, apiKey, spaceId, await anytypeTypes(baseUrl, apiKey, spaceId, request.signal), request.signal);
       return NextResponse.json({ types });
     }
     if (op === "object") {
