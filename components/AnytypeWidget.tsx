@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Layers, Search, Loader, ExternalLink, Home, ChevronLeft, ChevronRight } from "lucide-react";
+import { Layers, Search, Loader, ExternalLink, Home, ChevronLeft, ChevronRight, Music, Bookmark, BookOpen, MessageCircle, Paperclip, Gamepad2, Image, Film, FileText, User, Copy, Bus, Tv, Video, Shapes, Users, CheckSquare, Calendar, Folder, Link, Tag, MapPin, Star, Heart, Mic, type LucideIcon } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { useScrollFade } from "@/lib/useScrollFade";
@@ -12,7 +12,7 @@ import { WidgetHeader, ScrollFades, LoadingState, EmptyState, SmallButton, Chip,
 
 type AnytypeObject = { id: string; name: string; snippet: string; spaceId: string; type: string };
 type Space = { id: string; name: string };
-type AnytypeType = { id: string; key: string; name: string; emoji?: string };
+type AnytypeType = { id: string; key: string; name: string; emoji?: string; icon?: string };
 type HomeView = "recent" | "types";
 type ReaderObject = { name: string; markdown: string; type: string; modified: string };
 type AnytypeConfig = { baseUrl: string; apiKey: string; spaceId: string; spaceName: string; limit: number; home: HomeView };
@@ -36,6 +36,17 @@ async function readJson(res: Response) {
     throw new Error(`The dashboard server did not answer (HTTP ${res.status}). Try again in a moment.`);
   }
 }
+
+// Anytype's built-in types carry a named icon (Ionicons names) instead of an
+// emoji. The common ones map to the dashboard's own icon set, drawn in the
+// card's color; an unknown name gets a generic shape.
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  "musical-notes": Music, bookmark: Bookmark, book: BookOpen, chatbubble: MessageCircle, layers: Layers,
+  attach: Paperclip, "game-controller": Gamepad2, image: Image, film: Film, document: FileText,
+  accessibility: User, person: User, people: Users, search: Search, copy: Copy, bus: Bus, tv: Tv,
+  videocam: Video, checkbox: CheckSquare, calendar: Calendar, folder: Folder, link: Link,
+  pricetag: Tag, location: MapPin, star: Star, heart: Heart, mic: Mic,
+};
 
 export default function AnytypeWidget({
   widget,
@@ -360,7 +371,9 @@ export default function AnytypeWidget({
                               className={`w-full flex items-center gap-1 py-2 text-left text-sm font-medium ${c.text} hover:opacity-80 transition-opacity`}
                             >
                               {/* The type's emoji when it has one; a same-width gap otherwise, so names line up. */}
-                              <span className="w-5 shrink-0 text-center" aria-hidden>{t.emoji ?? ""}</span>
+                              <span className="w-5 shrink-0 flex items-center justify-center" aria-hidden>
+                                {t.emoji || (() => { const I = TYPE_ICONS[t.icon ?? ""] ?? (t.icon ? Shapes : null); return I ? <I size={14} className="opacity-70" /> : null; })()}
+                              </span>
                               <span className="flex-1 min-w-0 truncate">{t.name}</span>
                               <ChevronRight size={12} className="shrink-0 opacity-40" />
                             </button>

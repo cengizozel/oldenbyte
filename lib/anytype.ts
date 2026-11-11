@@ -113,7 +113,9 @@ export async function anytypeSearch(
   return merged.slice(0, limit).map(toHit);
 }
 
-export type AnytypeType = { id: string; key: string; name: string; emoji?: string };
+// emoji: the type's emoji icon; icon: the name of its built-in icon (Anytype
+// uses Ionicons names such as "musical-notes"), when it has no emoji.
+export type AnytypeType = { id: string; key: string; name: string; emoji?: string; icon?: string };
 
 // The object types defined in a space (Page, Note, Task, …), for browsing by type.
 export async function anytypeTypes(
@@ -129,7 +131,7 @@ export async function anytypeTypes(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .filter((t: any) => !t.archived)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((t: any) => ({ id: t.id, key: t.key, name: t.name || t.key, emoji: t.icon?.format === "emoji" && typeof t.icon.emoji === "string" ? t.icon.emoji : "" }))
+    .map((t: any) => ({ id: t.id, key: t.key, name: t.name || t.key, emoji: t.icon?.format === "emoji" && typeof t.icon.emoji === "string" ? t.icon.emoji : "", icon: t.icon?.format === "icon" && typeof t.icon.name === "string" ? t.icon.name : "" }))
     .sort((a: AnytypeType, b: AnytypeType) => a.name.localeCompare(b.name));
 }
 
