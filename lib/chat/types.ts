@@ -93,6 +93,7 @@ export type ChatConfig = {
   sourcesVersion?: number; // 2 = per-widget model (no master toggle)
   maxTokens: number; // cap on response length; 0 = no limit (server default)
   length: Length;    // response-style preset: brevity instruction + suggested cap
+  textSize?: "sm" | "md" | "lg"; // message text: 14, 16 or 18px (default 14)
   effort: Effort;    // reasoning-model thinking budget
   useKiwix: boolean;       // let the model search the Kiwix library via tools
   kiwixUrl: string;        // kiwix-serve base URL; lookups search ALL books on it

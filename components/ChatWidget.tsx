@@ -1123,6 +1123,7 @@ export default function ChatWidget({
                     m={m}
                     index={i}
                     c={c}
+                    textClass={config.textSize === "lg" ? "text-lg" : config.textSize === "md" ? "text-base" : "text-sm"}
                     daySep={daySeps[i]}
                     canEdit={!streaming && !!m.content}
                     isLast={isLast}

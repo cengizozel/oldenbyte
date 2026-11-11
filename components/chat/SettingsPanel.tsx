@@ -228,6 +228,17 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
         </div>
 
         <div>
+          <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Text size</p>
+          <div className="flex flex-wrap gap-1">
+            {([["sm", "Small"], ["md", "Medium"], ["lg", "Large"]] as const).map(([key, label]) => (
+              <Chip key={key} c={c} active={(draft.textSize ?? "sm") === key} onClick={() => setDraft(d => ({ ...d, textSize: key }))}>
+                {label}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        <div>
           <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Response style</p>
           <div className="flex flex-wrap gap-1">
             {(Object.keys(LENGTH_PRESETS) as Length[]).map(key => (

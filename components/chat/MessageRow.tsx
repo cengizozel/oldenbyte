@@ -182,6 +182,7 @@ type Props = {
   m: ChatMessage;
   index: number;
   c: ColorClasses;
+  textClass?: string; // message text size, from the chat's settings
   daySep: string | null;
   canEdit: boolean;
   isLast: boolean;
@@ -197,7 +198,7 @@ type Props = {
 // One message with its attachments, cards and footer. Memoized: every prop is
 // either data that changes only with this message or a stable handler, so a
 // finished message does not re-render while another one streams.
-function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onRetry, onContinue, onResolve, onOpenImage, onOpenMemory }: Props) {
+function MessageRow({ m, index: i, c, textClass = "text-sm", daySep, canEdit, isLast, live, onEdit, onRetry, onContinue, onResolve, onOpenImage, onOpenMemory }: Props) {
   const inProgress = !!live;
   return (
     <Fragment>
@@ -225,7 +226,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
         )}
         {!(m.role === "assistant" && !m.content) && !(m.role === "user" && !m.content) && (
           <div
-            className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${
+            className={`max-w-[85%] rounded-2xl px-3 py-2 ${textClass} break-words ${
               m.role === "user"
                 ? "whitespace-pre-wrap bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--text-primary)] shadow-sm"
                 : c.text
@@ -265,16 +266,20 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
           </button>
         )}
         {live && <LiveStatus content={m.content} c={c} live={live} />}
-        <div className="flex items-center gap-2 px-1">
-          {!inProgress && m.at != null && (
-            <span className={`text-xs tabular-nums ${c.text} opacity-70`}>{msgTime(m.at)}</span>
-          )}
+        {/* One quiet line under the message: when, how fast, then the actions.
+            The speed is the one figure worth a glance; the rest (tokens, total
+            time, time to first token) is in its tooltip. Nothing wraps. */}
+        <div className={`flex items-center gap-2 px-1 whitespace-nowrap text-xs tabular-nums ${c.text}`}>
+          {!inProgress && m.at != null && <span className="opacity-70">{msgTime(m.at)}</span>}
           {!inProgress && m.role === "assistant" && m.stats && m.stats.tokens > 0 && (
-            <span className={`text-xs ${c.text} opacity-70 transition-opacity`}>
-              {m.stats.tps.toFixed(1)} tok/s · {m.stats.tokens} tokens · {m.stats.total.toFixed(1)}s
-              {m.stats.ttft >= 0.05 ? ` · ${m.stats.ttft.toFixed(1)}s to first` : ""}
+            <span
+              title={`${m.stats.tokens} tokens in ${m.stats.total.toFixed(1)}s${m.stats.ttft >= 0.05 ? `, first token after ${m.stats.ttft.toFixed(1)}s` : ""}`}
+              className="opacity-70 before:content-['·'] before:mr-2"
+            >
+              {m.stats.tps.toFixed(0)} tok/s
             </span>
           )}
+          <span className="w-1" />
           {canEdit && (
             <button
               onClick={() => onEdit(i)}
