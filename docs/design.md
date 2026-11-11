@@ -147,4 +147,6 @@ color, an optional one-line hint under it in the muted color, and its control
 on the right. Long lists (the key bindings) sit behind a disclosure row, so
 the drawer reads as a short list of decisions. Themes: light, dark and grey
 (dark with every widget palette on the neutral one), chosen with a segmented
-control and cycled with Shift+D.
+control and cycled with Shift+D. The card glow is a per-theme switch next to
+it (off in light by default, on in dark and grey), applied as the `glow` class
+on the root.

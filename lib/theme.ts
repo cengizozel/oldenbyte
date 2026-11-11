@@ -17,6 +17,45 @@ export const THEMES: { id: Theme; label: string }[] = [
 ];
 
 export const THEME_EVENT = "themechange";
+export const GLOW_EVENT = "glowchange";
+
+// The neon glow around cards, chosen per theme: off in light by default, on in
+// dark and grey. Applied as the `glow` class on <html> for the current theme
+// (app/globals.css keys every card glow on it), mirrored to localStorage for
+// the pre-paint script and to the database.
+export type GlowPrefs = Record<Theme, boolean>;
+export const DEFAULT_GLOW: GlowPrefs = { light: false, dark: true, grey: true };
+let glowPrefs: GlowPrefs = DEFAULT_GLOW;
+
+export function readGlow(raw: unknown): GlowPrefs {
+  try {
+    const v = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const picked = v && typeof v === "object"
+      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([k, b]) => k in DEFAULT_GLOW && typeof b === "boolean"))
+      : {};
+    return { ...DEFAULT_GLOW, ...picked };
+  } catch {
+    return DEFAULT_GLOW;
+  }
+}
+
+export function currentGlow(): GlowPrefs {
+  return glowPrefs;
+}
+
+export function setGlowClass(prefs: GlowPrefs = glowPrefs) {
+  glowPrefs = prefs;
+  document.documentElement.classList.toggle("glow", prefs[currentTheme()]);
+}
+
+export function applyGlow(prefs: GlowPrefs) {
+  setGlowClass(prefs);
+  if (!isDemoMode()) {
+    try { localStorage.setItem("glow", JSON.stringify(prefs)); } catch { /* private mode */ }
+  }
+  storage.setItem("glow", JSON.stringify(prefs));
+  window.dispatchEvent(new CustomEvent(GLOW_EVENT, { detail: prefs }));
+}
 
 export function readTheme(value: unknown): Theme {
   return value === "dark" || value === "grey" ? value : "light";
@@ -36,6 +75,7 @@ export function setThemeClasses(theme: Theme) {
   const cl = document.documentElement.classList;
   cl.toggle("dark", theme !== "light");
   cl.toggle("grey", theme === "grey");
+  cl.toggle("glow", glowPrefs[theme]);
 }
 
 export function applyTheme(next: Theme) {

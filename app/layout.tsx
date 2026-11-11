@@ -26,7 +26,7 @@ export default function RootLayout({
       <body>
         {/* Apply the saved theme before paint to avoid a flash of the wrong mode. */}
         <Script id="theme-init" strategy="beforeInteractive">
-          {`(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||t==='grey'){document.documentElement.classList.add('dark');if(t==='grey')document.documentElement.classList.add('grey')}}catch(e){}})()`}
+          {`(function(){try{var c=document.documentElement.classList;var t=localStorage.getItem('theme');var th=(t==='dark'||t==='grey')?t:'light';if(th!=='light'){c.add('dark');if(th==='grey')c.add('grey')}var g={};try{g=JSON.parse(localStorage.getItem('glow')||'{}')||{}}catch(e){}var on=typeof g[th]==='boolean'?g[th]:th!=='light';if(on)c.add('glow')}catch(e){}})()`}
         </Script>
         <ThemeHotkey />
         {children}

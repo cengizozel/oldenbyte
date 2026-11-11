@@ -182,17 +182,26 @@ body {
   color: var(--text-placeholder);
 }
 
-/* ── Widget neon glow (dark mode only) ────────────────────────────────────── */
+/* ── Widget neon glow ──────────────────────────────────────────────────────── */
+/* On when <html> carries the `glow` class, a per-theme choice in Settings >
+   Appearance (lib/theme.ts): off in light by default, on in dark and grey. */
 
-.dark .w-amber-glow  { box-shadow: 0 0 6px rgba(252,211,77,0.9),  0 0 20px rgba(252,211,77,0.55),  0 0 55px rgba(252,211,77,0.22);  }
-.dark .w-sky-glow    { box-shadow: 0 0 6px rgba(125,211,252,0.9), 0 0 20px rgba(125,211,252,0.55), 0 0 55px rgba(125,211,252,0.22); }
-.dark .w-neutral-glow{ box-shadow: 0 0 6px rgba(212,212,212,0.7), 0 0 20px rgba(212,212,212,0.35), 0 0 55px rgba(212,212,212,0.14); }
-.dark .w-rose-glow   { box-shadow: 0 0 6px rgba(253,164,175,0.9), 0 0 20px rgba(253,164,175,0.55), 0 0 55px rgba(253,164,175,0.22); }
-.dark .w-teal-glow   { box-shadow: 0 0 6px rgba(94,234,212,0.9),  0 0 20px rgba(94,234,212,0.55),  0 0 55px rgba(94,234,212,0.22);  }
-.dark .w-orange-glow { box-shadow: 0 0 6px rgba(253,186,116,0.9), 0 0 20px rgba(253,186,116,0.55), 0 0 55px rgba(253,186,116,0.22); }
+.glow.dark .w-amber-glow  { box-shadow: 0 0 6px rgba(252,211,77,0.9),  0 0 20px rgba(252,211,77,0.55),  0 0 55px rgba(252,211,77,0.22);  }
+.glow.dark .w-sky-glow    { box-shadow: 0 0 6px rgba(125,211,252,0.9), 0 0 20px rgba(125,211,252,0.55), 0 0 55px rgba(125,211,252,0.22); }
+.glow.dark .w-neutral-glow{ box-shadow: 0 0 6px rgba(212,212,212,0.7), 0 0 20px rgba(212,212,212,0.35), 0 0 55px rgba(212,212,212,0.14); }
+.glow.dark .w-rose-glow   { box-shadow: 0 0 6px rgba(253,164,175,0.9), 0 0 20px rgba(253,164,175,0.55), 0 0 55px rgba(253,164,175,0.22); }
+.glow.dark .w-teal-glow   { box-shadow: 0 0 6px rgba(94,234,212,0.9),  0 0 20px rgba(94,234,212,0.55),  0 0 55px rgba(94,234,212,0.22);  }
+.glow.dark .w-orange-glow { box-shadow: 0 0 6px rgba(253,186,116,0.9), 0 0 20px rgba(253,186,116,0.55), 0 0 55px rgba(253,186,116,0.22); }
+/* Light: the same halo in each palette's label color, kept faint on the pale page. */
+.glow:not(.dark) .w-amber-glow  { box-shadow: 0 0 6px rgba(146,64,14,0.28),  0 0 20px rgba(146,64,14,0.14),  0 0 55px rgba(146,64,14,0.06);  }
+.glow:not(.dark) .w-sky-glow    { box-shadow: 0 0 6px rgba(7,89,133,0.28),   0 0 20px rgba(7,89,133,0.14),   0 0 55px rgba(7,89,133,0.06);   }
+.glow:not(.dark) .w-neutral-glow{ box-shadow: 0 0 6px rgba(82,82,82,0.22),   0 0 20px rgba(82,82,82,0.1),    0 0 55px rgba(82,82,82,0.04);   }
+.glow:not(.dark) .w-rose-glow   { box-shadow: 0 0 6px rgba(190,18,60,0.26),  0 0 20px rgba(190,18,60,0.12),  0 0 55px rgba(190,18,60,0.05);  }
+.glow:not(.dark) .w-teal-glow   { box-shadow: 0 0 6px rgba(17,94,89,0.28),   0 0 20px rgba(17,94,89,0.14),   0 0 55px rgba(17,94,89,0.06);   }
+.glow:not(.dark) .w-orange-glow { box-shadow: 0 0 6px rgba(154,52,18,0.28),  0 0 20px rgba(154,52,18,0.14),  0 0 55px rgba(154,52,18,0.06);  }
 /* Grey keeps a soft, uniform glow. */
-.dark.grey .w-amber-glow, .dark.grey .w-sky-glow, .dark.grey .w-neutral-glow,
-.dark.grey .w-rose-glow, .dark.grey .w-teal-glow, .dark.grey .w-orange-glow {
+.glow.dark.grey .w-amber-glow, .glow.dark.grey .w-sky-glow, .glow.dark.grey .w-neutral-glow,
+.glow.dark.grey .w-rose-glow, .glow.dark.grey .w-teal-glow, .glow.dark.grey .w-orange-glow {
   box-shadow: 0 0 6px rgba(212,212,212,0.45), 0 0 20px rgba(212,212,212,0.2), 0 0 55px rgba(212,212,212,0.08);
 }
 

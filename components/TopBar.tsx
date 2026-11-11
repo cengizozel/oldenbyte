@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, type RefObject } from "react";
 import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, ChevronRight, Plus, Pencil, Search, LogOut, GripVertical } from "lucide-react";
 import * as storage from "@/lib/storage";
-import { applyTheme, currentTheme, readTheme, setThemeClasses, THEME_EVENT, THEMES, type Theme } from "@/lib/theme";
+import { applyGlow, applyTheme, currentTheme, readGlow, readTheme, setGlowClass, setThemeClasses, DEFAULT_GLOW, GLOW_EVENT, THEME_EVENT, THEMES, type GlowPrefs, type Theme } from "@/lib/theme";
 import { layoutKey, instancesKey, PRELOAD_KEY, PRELOAD_EVENT, type DashboardsState } from "@/lib/dashboards";
 import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
 import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, TZ_AUTO } from "@/lib/timezone";
@@ -650,6 +650,8 @@ function SettingsPanel({
   onClose,
   theme,
   onTheme,
+  glow,
+  onGlow,
   demo,
   onToggleDemo,
   timezone,
@@ -664,6 +666,8 @@ function SettingsPanel({
   returnFocusRef?: RefObject<HTMLElement | null>;
   theme: Theme;
   onTheme: (t: Theme) => void;
+  glow: GlowPrefs;
+  onGlow: (g: GlowPrefs) => void;
   demo: boolean;
   onToggleDemo: () => void;
   timezone: string;
@@ -735,6 +739,14 @@ function SettingsPanel({
                   </button>
                 ))}
               </div>
+            </SettingsRow>
+            <SettingsRow label="Glow" hint={`Halo around the cards in the ${THEMES.find(t => t.id === theme)?.label.toLowerCase() ?? theme} theme`}>
+              <Toggle
+                checked={glow[theme]}
+                onChange={() => onGlow({ ...glow, [theme]: !glow[theme] })}
+                label="Glow"
+                title={glow[theme] ? "Turn the glow off for this theme" : "Turn the glow on for this theme"}
+              />
             </SettingsRow>
           </SettingsSection>
 
@@ -1019,6 +1031,7 @@ export default function TopBar({
   onDashboardsChange?: (next: DashboardsState) => void;
 }) {
   const [theme, setTheme] = useState<Theme>("light");
+  const [glow, setGlow] = useState<GlowPrefs>(DEFAULT_GLOW);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [demo, setDemo] = useState(false);
   const [timezone, setTz] = useState("");
@@ -1048,12 +1061,15 @@ export default function TopBar({
   // Resolve the initial theme (DB wins, else whatever the FOUC script set) and
   // keep DB ↔ localStorage ↔ DOM consistent.
   useEffect(() => {
-    storage.getItem("theme").then(saved => {
+    Promise.all([storage.getItem("theme"), storage.getItem("glow")]).then(([saved, glowRaw]) => {
       const start = saved ? readTheme(saved) : currentTheme();
+      const prefs = readGlow(glowRaw);
       setTheme(start);
+      setGlow(prefs);
+      setGlowClass(prefs);
       setThemeClasses(start);
       if (!isDemoMode()) {
-        try { localStorage.setItem("theme", start); } catch {}
+        try { localStorage.setItem("theme", start); localStorage.setItem("glow", JSON.stringify(prefs)); } catch {}
       }
     });
   }, []);
@@ -1062,8 +1078,10 @@ export default function TopBar({
   // UI from the shared `themechange` event.
   useEffect(() => {
     const onChange = (e: Event) => setTheme(readTheme((e as CustomEvent).detail));
+    const onGlow = (e: Event) => setGlow(readGlow((e as CustomEvent).detail));
     window.addEventListener(THEME_EVENT, onChange);
-    return () => window.removeEventListener(THEME_EVENT, onChange);
+    window.addEventListener(GLOW_EVENT, onGlow);
+    return () => { window.removeEventListener(THEME_EVENT, onChange); window.removeEventListener(GLOW_EVENT, onGlow); };
   }, []);
 
   return (
@@ -1137,6 +1155,8 @@ export default function TopBar({
       onClose={() => setSettingsOpen(false)}
       theme={theme}
       onTheme={applyTheme}
+      glow={glow}
+      onGlow={applyGlow}
       demo={demo}
       onToggleDemo={() => (demo ? exitDemoMode() : enterDemoMode())}
       timezone={timezone}
