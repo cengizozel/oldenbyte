@@ -489,7 +489,7 @@ export function SettingsListRow({
   rowRef?: Ref<HTMLDivElement>;
 }) {
   return (
-    <div ref={rowRef} style={style} className={`flex flex-col px-3 rounded-lg bg-black/5 dark:bg-white/10 divide-y divide-black/10 dark:divide-white/10 [&>*]:min-h-9 [&>*:not(:first-child)]:py-2 ${className}`}>
+    <div ref={rowRef} style={style} className={`flex flex-col px-3 rounded-lg bg-black/5 dark:bg-white/10 divide-y divide-black/10 dark:divide-white/10 ${className}`}>
       <div className="flex items-center gap-2 min-h-9 py-1">
         {leading}
         <div className="flex-1 min-w-0 flex items-center text-sm">{title}</div>
@@ -509,6 +509,12 @@ export function SettingsListControl({ c, label, children }: { c: ColorClasses; l
       <div className="flex items-center gap-1.5 min-w-0 flex-wrap justify-end">{children}</div>
     </div>
   );
+}
+
+// A bare field as a row of a list card (an address, an icon): the same 36px
+// row as a control, the field filling it.
+export function SettingsListField({ children }: { children: ReactNode }) {
+  return <div className="flex items-center min-h-9 py-1">{children}</div>;
 }
 
 // The field that sits in a list row's title slot: borderless, so the row

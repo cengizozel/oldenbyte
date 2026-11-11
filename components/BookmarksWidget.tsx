@@ -8,7 +8,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { WidgetHeader, EmptyState, ScrollFades, SmallButton, SettingsFace, SettingsListRow, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION, SettingsAddRow } from "./ui/WidgetChrome";
+import { WidgetHeader, EmptyState, ScrollFades, SmallButton, SettingsFace, SettingsListRow, SettingsListField, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION, SettingsAddRow } from "./ui/WidgetChrome";
 
 // A bookmarks board. Each link shows its site favicon (with a tidy colored
 // letter tile when the favicon is missing, or a custom emoji/image override),
@@ -461,6 +461,7 @@ export default function BookmarksWidget({
                 </>
               }
             >
+              <SettingsListField>
               <input
                 value={bm.url}
                 onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, url: e.target.value } : x))}
@@ -468,6 +469,8 @@ export default function BookmarksWidget({
                 aria-label="Address"
                 className={`${LIST_TITLE_INPUT} w-full opacity-70 ${c.label}`}
               />
+              </SettingsListField>
+              <SettingsListField>
               <input
                 value={bm.icon ?? ""}
                 onChange={e => setDraft(d => d.map(x => x.id === bm.id ? { ...x, icon: e.target.value } : x))}
@@ -475,6 +478,7 @@ export default function BookmarksWidget({
                 aria-label="Icon"
                 className={`${LIST_TITLE_INPUT} w-full opacity-70 ${c.label}`}
               />
+              </SettingsListField>
             </SettingsListRow>
           ))}
         </div>
