@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Library, Search, Loader, ExternalLink, ChevronLeft, Home } from "lucide-react";
+import { Library, Search, Loader, ExternalLink, ChevronLeft, Home, Shuffle } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { useScrollFade } from "@/lib/useScrollFade";
@@ -64,6 +64,7 @@ export default function KiwixWidget({
   const resultsFade = useScrollFade<HTMLDivElement>([results, searching, error, searched]);
   const articleFade = useScrollFade<HTMLDivElement>([extract, loadingArticle, articleError, selected]);
 
+  const [randomBusy, setRandomBusy] = useState(false);
   const lastKey = `${storageKey}-last`;
   async function openRandom(cfg: KiwixConfig) {
     if (!cfg.baseUrl || !cfg.source) return;
@@ -289,7 +290,17 @@ export default function KiwixWidget({
                         ))}
                       </ul>
                     ) : (
-                      <EmptyState c={c}>{searched ? "no results" : "type a query and press Enter"}</EmptyState>
+                      /* The search page, whatever "Opens with" says: the prompt, and one
+                         button for a random article from the source. */
+                      <div className="flex-1 h-full min-h-0 flex flex-col items-center justify-center gap-3 text-center px-4">
+                        <p className={`text-sm opacity-70 ${c.text}`}>{searched ? "no results" : "type a query and press Enter"}</p>
+                        {config.baseUrl && config.source && (
+                          <SmallButton c={c} onClick={() => { setRandomBusy(true); openRandom(config).finally(() => setRandomBusy(false)); }} disabled={randomBusy}>
+                            {randomBusy ? <Loader size={14} className="animate-spin" /> : <Shuffle size={14} />}
+                            Random article
+                          </SmallButton>
+                        )}
+                      </div>
                     )}
                   </div>
                   <ScrollFades c={c} top={resultsFade.topFade} bottom={resultsFade.bottomFade} />
