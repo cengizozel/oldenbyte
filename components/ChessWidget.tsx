@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, type CSSProperties, type ReactNod
 import { Chessboard } from "react-chessboard";
 import type { Arrow, PieceDropHandlerArgs } from "react-chessboard";
 import { Chess, type Move, type Square } from "chess.js";
-import { Swords, Loader, Undo2, Lightbulb, ListChecks, Puzzle, Trophy, ChevronLeft, ChevronRight, RotateCcw, X } from "lucide-react";
+import { Swords, Loader, Undo2, Lightbulb, ListChecks, Puzzle, Trophy, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { localDateStr } from "@/lib/format";
@@ -544,10 +544,8 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
 
       {recordOpen && (
         <div className={`absolute inset-px z-30 rounded-[15px] p-5 flex flex-col gap-3 ${c.bg}`}>
-          <WidgetHeader panel c={c} icon={Trophy} title="Record" right={
-            <button type="button" onClick={() => setRecordOpen(false)} title="Close" aria-label="Close" className={`opacity-80 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><X size={14} /></button>
-          } />
-          <div className={`flex flex-col gap-4 overflow-y-auto pr-3 text-sm ${c.text}`}>
+          <WidgetHeader panel c={c} icon={Trophy} title="Record" />
+          <div className={`flex-1 min-h-0 flex flex-col gap-4 overflow-y-auto pr-3 text-sm ${c.text}`}>
             <div className="grid grid-cols-3 gap-2">
               {[["Win streak", record.streak], ["Best streak", record.best], ["Puzzle streak", puzzleStreak(record.puzzleDays, today)]].map(([k, v]) => (
                 <div key={k} className="rounded-lg bg-black/5 dark:bg-white/10 px-3 py-2">
@@ -577,10 +575,15 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
               </tbody>
             </table>
           </div>
+          <div className="shrink-0 flex justify-end">
+            <SmallButton c={c} onClick={() => setRecordOpen(false)}>Back to game</SmallButton>
+          </div>
         </div>
       )}
 
-      {mode === "game" && capRow(caps[opp], -yours)}
+      {/* The rows around the board keep their height in every mode, so the
+          board is the same size in a game, a puzzle and before the first move. */}
+      {mode === "game" ? capRow(caps[opp], -yours) : capRow("", 0)}
 
       <div ref={contentRef} className="flex-1 min-h-0 flex items-center justify-center">
         {side > GUTTER && (
@@ -626,12 +629,13 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
         )}
       </div>
 
-      {mode === "game" && capRow(caps[playerColor], yours)}
+      {mode === "game" ? capRow(caps[playerColor], yours) : capRow("", 0)}
 
       {/* Moves: click one to see its position; a reviewed mistake shows the
           position before it with the better move. */}
+      {!(mode === "game" && n > 0) && <div className="shrink-0 mt-2 h-6" aria-hidden />}
       {mode === "game" && n > 0 && (
-        <div className="shrink-0 mt-2 flex items-center gap-1.5">
+        <div className="shrink-0 mt-2 h-6 flex items-center gap-1.5">
           <button type="button" aria-label="Previous move" title="Previous move" disabled={(view ?? n - 1) < 0}
             onClick={() => setView(v => Math.max(-1, (v ?? n - 1) - 1))} className={`shrink-0 opacity-80 hover:opacity-100 disabled:opacity-30 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><ChevronLeft size={16} /></button>
           <div ref={stripRef} className={`flex-1 min-w-0 flex items-center overflow-x-auto whitespace-nowrap text-sm tabular-nums [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${c.text}`}>
