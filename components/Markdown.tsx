@@ -8,7 +8,9 @@ import { memo, useMemo, type ReactNode } from "react";
 
 // Source citations: a map of [N] marker → article so `[1]` in the text renders
 // as a clickable chip linking to the source.
-export type Cite = { url: string; title: string };
+// `label` is the number shown on the chip when it differs from the marker
+// (sources are renumbered 1..k for display, see MessageRow).
+export type Cite = { url: string; title: string; label?: number };
 export type Cites = Record<number, Cite>;
 
 // Inline: `code`, **bold**, *italic*, [text](url), and [N] citation chips.
@@ -35,7 +37,7 @@ function renderInline(text: string, prefix: string, cites: Cites = {}): ReactNod
         nodes.push(
           <a key={key} href={cite.url} target="_blank" rel="noopener noreferrer" title={cite.title}
             className="inline-flex items-center justify-center align-super text-[0.65em] font-semibold min-w-[1.1em] px-1 mx-px rounded-md bg-black/10 dark:bg-white/15 hover:bg-black/20 dark:hover:bg-white/25 no-underline">
-            {n}
+            {cite.label ?? n}
           </a>
         );
       } else {

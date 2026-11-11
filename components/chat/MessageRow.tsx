@@ -38,11 +38,20 @@ function ThinkBlock({ content, active, labelClass }: { content: string; active: 
   );
 }
 
+// The server numbers every article the model retrieved, in order, and keeps
+// only the ones it read or cited, so the surviving numbers have gaps: a reply
+// could cite "[3]" above a footer saying "1 source". For display the kept
+// sources are renumbered 1..k in their own order; the stored numbers, which
+// the reply's text refers to, are left alone.
+function displayNumbers(sources: Source[] | undefined): Map<number, number> {
+  return new Map((sources ?? []).map((s, i) => [s.n, i + 1]));
+}
+
 function AssistantBody({ content, inProgress, labelClass, sources }: { content: string; inProgress: boolean; labelClass: string; sources?: Source[] }) {
   // Map [n] to its article so the Markdown renderer makes citation chips
   // clickable. Memoized so the Markdown memo holds across renders.
   const cites = useMemo(
-    () => Object.fromEntries((sources ?? []).map(s => [s.n, { url: s.url, title: s.title }])),
+    () => { const shown = displayNumbers(sources); return Object.fromEntries((sources ?? []).map(s => [s.n, { url: s.url, title: s.title, label: shown.get(s.n) }])); },
     [sources]
   );
   return (
@@ -59,6 +68,7 @@ function AssistantBody({ content, inProgress, labelClass, sources }: { content: 
 // "Sources" disclosure under a reply: the articles the model actually cited.
 function SourcesList({ sources, labelClass, textClass }: { sources: Source[]; labelClass: string; textClass: string }) {
   const [open, setOpen] = useState(false);
+  const shown = displayNumbers(sources);
   return (
     <div className="mt-1">
       <button
@@ -73,7 +83,7 @@ function SourcesList({ sources, labelClass, textClass }: { sources: Source[]; la
           {sources.map(s => (
             <li key={s.n} className={`text-xs ${textClass} opacity-80`}>
               <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:opacity-80">
-                <span className="opacity-70">[{s.n}]</span> <span className="underline underline-offset-2">{s.title}</span>
+                <span className="opacity-70">[{shown.get(s.n) ?? s.n}]</span> <span className="underline underline-offset-2">{s.title}</span>
               </a>
             </li>
           ))}
