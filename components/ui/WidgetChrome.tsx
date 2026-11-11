@@ -467,7 +467,9 @@ export const LIST_TITLE_INPUT = "flex-1 min-w-0 bg-transparent dark:!bg-transpar
 // A small icon action in a row (remove, hide): 70% at rest, full on hover.
 export const ROW_ACTION = `opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`;
 
-// A small toggle for modes and options: the active one has the translucent
+// A small toggle for modes and options: the chosen one is inverted (a solid
+// dark chip in light themes, a solid light one in dark), far past 3:1 against
+// its neighbours; the rest sit on a faint fill. Was: the active one has the translucent
 // fill, the rest sit at 70% and brighten on hover.
 export function Chip({
   c, active = false, onClick, title, children, className = "",
@@ -486,7 +488,7 @@ export function Chip({
       title={title}
       aria-pressed={active}
       className={`h-7 px-2.5 rounded-md text-sm leading-none transition-colors ${FOCUS_RING} ${
-        active ? `bg-black/15 dark:bg-white/20 font-medium ${c.text}` : `bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${c.text}`
+        active ? "bg-black/75 text-white dark:bg-white/85 dark:text-black font-medium" : `bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${c.text}`
       } ${className}`}
     >
       {children}

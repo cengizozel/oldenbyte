@@ -173,8 +173,8 @@ the palette `label` color at 50% opacity.
   across the row's height, and sits at the tab list's own edge, inside the
   header actions.
 - Chip (`Chip`): the small toggle used for modes and options. 28px tall,
-  `text-sm`, `rounded-md`; the active chip has the translucent fill, inactive
-  chips sit at 70% opacity.
+  `text-sm`, `rounded-md`; the chosen chip is inverted (solid dark in light
+  themes, solid light in dark), the others sit on a faint fill.
 - Button (`SmallButton`): the standard small action. 28px tall, `text-sm`,
   `rounded-lg`, palette label color on a translucent fill.
 - Icon buttons: 24px hit area (`HIT_AREA` from `ui/Field.tsx`), visible focus
