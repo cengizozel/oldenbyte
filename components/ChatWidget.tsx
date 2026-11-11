@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Bot, Send, Square, Check, X, Loader, Database, MessageSquare, Plus, ChevronDown, Library, Power, Layers, CalendarDays, EllipsisVertical, Paperclip, type LucideIcon } from "lucide-react";
+import { Bot, Send, Square, Check, X, Loader, Database, MessageSquare, Plus, ChevronDown, Library, Power, Layers, CalendarDays, Paperclip, type LucideIcon } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
@@ -933,8 +933,8 @@ export default function ChatWidget({
                 <MessageSquare size={14} />
               </button>
               <div className="relative">
-                <button onClick={() => { if (!menuOpen) listDashboardWidgets().then(setRoster).catch(() => {}); setMenuOpen(o => !o); }} title="More" aria-label="More" className={menuOpen ? `opacity-90 ${HIT_AREA} ${FOCUS_RING} ${c.icon}` : actionCls}>
-                  <EllipsisVertical size={14} />
+                <button onClick={() => { if (!menuOpen) listDashboardWidgets().then(setRoster).catch(() => {}); setMenuOpen(o => !o); }} title="Data access: what the assistant may read" aria-label="Data access" className={menuOpen ? `opacity-90 ${HIT_AREA} ${FOCUS_RING} ${c.icon}` : actionCls}>
+                  <Database size={14} />
                 </button>
                 {menuOpen && (
                   <>
