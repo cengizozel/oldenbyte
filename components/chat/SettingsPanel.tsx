@@ -6,7 +6,8 @@ import type { ColorClasses } from "@/lib/widgets";
 import { DEFAULT_CONFIG, EFFORT_OPTIONS, LENGTH_PRESETS, PRESETS, type ChatConfig, type Length } from "@/lib/chat/types";
 import { SettingsInput, SettingsSelect, SettingsTextarea, FOCUS_RING, Stepper } from "../ui/Field";
 import { listKiwixServers, listAnytypeConnections, type KnownKiwixServer, type KnownAnytype } from "@/lib/dashboardContext";
-import { Chip, SmallButton, SettingsFace } from "../ui/WidgetChrome";
+import { Chip, SmallButton, SettingsFace, SettingsListControl } from "../ui/WidgetChrome";
+import Toggle from "../ui/Toggle";
 
 // Settings panel: Model, Behavior, Data sources. Edits a draft of the config
 // and hands it to onSave; mounting it loads the model list, the Kiwix books
@@ -310,7 +311,7 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
 
         <div>
           <div className="flex items-center justify-between gap-2 mb-1">
-            <p className={`text-sm opacity-70 min-w-0 ${c.label}`}>Kiwix library <span className="opacity-70">(all books are searched)</span></p>
+            <p className={`text-sm opacity-70 min-w-0 ${c.label}`}>Kiwix library</p>
             <SmallButton c={c} onClick={() => loadKiwixSources(draft.kiwixUrl)} disabled={loadingKiwix || !draft.kiwixUrl.startsWith("http")} title="List the books on the server">
               {loadingKiwix ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Check server
@@ -341,13 +342,25 @@ export default function SettingsPanel({ c, config, onCancel, onSave }: {
               </div>
             </div>
           )}
+          {/* The server's books, each with a switch: unchecked ones are left
+              out of lookups. A book added later starts checked. */}
           {kiwixSources.length > 0 && (
-            <p className="text-sm text-[var(--text-muted)] mt-1">
-              {kiwixSources.length} book{kiwixSources.length === 1 ? "" : "s"}: {kiwixSources.map(s => s.title).join(", ")}
-            </p>
+            <div className="mt-1.5 rounded-lg bg-black/5 dark:bg-white/10 px-3 divide-y divide-black/10 dark:divide-white/10">
+              {kiwixSources.map(b => {
+                const on = !(draft.kiwixSkip ?? []).includes(b.id);
+                return (
+                  <SettingsListControl key={b.id} c={c} label={b.title}>
+                    <Toggle
+                      checked={on}
+                      onChange={() => setDraft(d => ({ ...d, kiwixSkip: on ? [...(d.kiwixSkip ?? []), b.id] : (d.kiwixSkip ?? []).filter(x => x !== b.id) }))}
+                      label={`Search ${b.title}`}
+                    />
+                  </SettingsListControl>
+                );
+              })}
+            </div>
           )}
           {kiwixError && <p className="text-red-400 text-sm mt-1">{kiwixError}</p>}
-          <p className="text-sm text-[var(--text-muted)] mt-1">Adding books to the server widens the search automatically. Turn lookup on with the library icon by the send button.</p>
         </div>
 
         <div>

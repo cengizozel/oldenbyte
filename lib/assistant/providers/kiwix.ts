@@ -4,7 +4,7 @@ import type { Provider, ProviderCtx, ToolSpec, ToolResult } from "@/lib/assistan
 // Kiwix provider: full-text search + article reads over the user's offline
 // reference library (Wikipedia, WikiHow, whatever ZIMs the server holds).
 
-export type KiwixConfig = { baseUrl: string; source?: string; sourceTitle?: string };
+export type KiwixConfig = { baseUrl: string; source?: string; sourceTitle?: string; skip?: string[] };
 
 // Derive a readable title from a content url, e.g. /A/Lionel_Messi → "Lionel Messi".
 function titleFromUrl(url: string): string {
@@ -67,7 +67,7 @@ export function kiwixProvider(cfg: KiwixConfig): Provider {
         if (!q) return { kind: "message", text: "No query provided." };
         const results = cfg.source
           ? await kiwixSearch(cfg.baseUrl, cfg.source, q, 6, ctx.signal)
-          : await searchAllBooks(cfg.baseUrl, q, 6, ctx.signal);
+          : await searchAllBooks(cfg.baseUrl, q, 6, ctx.signal, Array.isArray(cfg.skip) ? cfg.skip.filter(x => typeof x === "string").slice(0, 200) : []);
         return {
           kind: "search", source: "kiwix", query: q,
           results: results.map(r => ({ title: r.title, ref: r.url, link: r.url, snippet: r.snippet })),

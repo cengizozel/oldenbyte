@@ -601,8 +601,8 @@ export function SettingsListRow({
 export function SettingsListControl({ c, label, children }: { c: ColorClasses; label: ReactNode; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 min-h-9 py-1">
-      <span className={`text-sm shrink-0 ${c.text}`}>{label}</span>
-      <div className="flex items-center gap-1.5 min-w-0 flex-wrap justify-end">{children}</div>
+      <span className={`text-sm min-w-0 truncate ${c.text}`} title={typeof label === "string" ? label : undefined}>{label}</span>
+      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end max-w-[70%]">{children}</div>
     </div>
   );
 }

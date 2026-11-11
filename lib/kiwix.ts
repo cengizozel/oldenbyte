@@ -143,14 +143,17 @@ async function cachedSources(base: string, signal?: AbortSignal): Promise<KiwixS
 // Full-text search across EVERY book on the server: one request per language
 // group, round-robin merged so a single huge book doesn't drown the others.
 // Adding a ZIM to the server widens the searchable area with no config change.
+// `skip` holds book ids to leave out (the user's unchecked books); a book
+// added to the server later is not in it, so it is searched by default.
 export async function searchAllBooks(
   baseUrl: string,
   query: string,
   limit = 8,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  skip: string[] = []
 ): Promise<KiwixResult[]> {
   const base = normalizeBase(baseUrl);
-  const sources = await cachedSources(base, signal);
+  const sources = (await cachedSources(base, signal)).filter(s => !skip.includes(s.id));
   if (!sources.length) return [];
 
   const groups = new Map<string, KiwixSource[]>();

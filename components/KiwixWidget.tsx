@@ -222,7 +222,7 @@ export default function KiwixWidget({
       front={
         <>
           <WidgetHeader
-            onSettings={!selected ? (openSettings) : undefined}
+            onSettings={openSettings}
             c={c}
             icon={Library}
             title={config.sourceTitle || "Kiwix"}

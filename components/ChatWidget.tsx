@@ -711,7 +711,7 @@ export default function ChatWidget({
         reasoningEffort: config.effort === "default" ? "" : config.effort,
         stream: true,
         kiwix: !cont && config.useKiwix && config.kiwixUrl
-          ? { baseUrl: config.kiwixUrl } // no source: search every book on the server
+          ? { baseUrl: config.kiwixUrl, skip: config.kiwixSkip ?? [] } // no source: every book but the unchecked ones
           : null,
         anytype: !cont && config.useAnytype && config.anytypeUrl && config.anytypeApiKey && config.anytypeSpaceId
           ? {
@@ -969,7 +969,7 @@ export default function ChatWidget({
                       })}
                       <p className={`px-2.5 pt-2 pb-1 text-sm opacity-70 border-t ${c.border} mt-1 ${c.label}`}>Connections</p>
                       {([
-                        { icon: Library, label: "Kiwix library", caption: "all books", on: config.useKiwix, ready: !!config.kiwixUrl, toggle: toggleKiwix, hint: "set up in settings" },
+                        { icon: Library, label: "Kiwix library", caption: (config.kiwixSkip?.length ? "selected books" : "all books"), on: config.useKiwix, ready: !!config.kiwixUrl, toggle: toggleKiwix, hint: "set up in settings" },
                         { icon: Layers, label: "Anytype", caption: config.anytypeSpaceName || "", on: config.useAnytype, ready: !!(config.anytypeApiKey && config.anytypeSpaceId), toggle: toggleAnytype, hint: "pair in settings" },
                       ] as const).map(row => (
                         <button

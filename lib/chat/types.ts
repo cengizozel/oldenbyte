@@ -96,7 +96,8 @@ export type ChatConfig = {
   textSize?: "sm" | "md" | "lg"; // message text: 14, 16 or 18px (default 14)
   effort: Effort;    // reasoning-model thinking budget
   useKiwix: boolean;       // let the model search the Kiwix library via tools
-  kiwixUrl: string;        // kiwix-serve base URL; lookups search ALL books on it
+  kiwixUrl: string;        // kiwix-serve base URL; lookups search its books
+  kiwixSkip?: string[];    // book ids left out of lookups (unchecked in settings)
   kiwixSource: string;     // legacy single-book pin (no longer set by the UI)
   kiwixSourceTitle: string;
   useCalendar: boolean;    // legacy (v1); a calendar widget's dashboardWidgets entry now grants its tools
