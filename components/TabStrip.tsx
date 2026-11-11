@@ -621,8 +621,8 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
           <div ref={actionsHost} className="flex-1 min-w-0 flex items-center gap-2 empty:hidden" />
           <div className="ml-auto flex items-center gap-2 shrink-0">
             {hasActions && <HeaderDivider c={c} />}
-            <span ref={settingsHost} className="contents" />
             <ExpandButton c={c} />
+            <span ref={settingsHost} className="contents" />
           </div>
         </div>
       )}

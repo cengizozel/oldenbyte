@@ -15,7 +15,7 @@ import { FOCUS_RING, HIT_AREA } from "./Field";
 // keyboard focus (always visible on touch devices), matching the pattern every
 // widget previously inlined.
 // The one settings control, drawn by WidgetHeader for every widget that has a
-// settings face (its `onSettings`), right before full screen: same icon, same
+// settings face (its `onSettings`), at the far right after full screen: same icon, same
 // spot, found by the keyboard layer through data-widget-settings.
 export function SettingsButton({ c, onClick }: { c: ColorClasses; onClick: () => void }) {
   return (
@@ -243,7 +243,7 @@ export function WidgetHeader({
   after?: ReactNode;
   right?: ReactNode;
   // Opens the widget's settings face: the header draws the settings control
-  // for it, after `right` and before full screen.
+  // for it, last in the row, after full screen.
   onSettings?: () => void;
   // The header of an overlay panel (a widget's history, insights, or an
   // editor) rather than the widget's own: it draws in place, with its
@@ -314,8 +314,8 @@ export function WidgetHeader({
                   <div className="ml-auto flex items-center gap-2 shrink-0">
                     {right}
                     {(after || right) && (settings || expand) && <HeaderDivider c={c} />}
-                    {settings}
                     {expand}
+                    {settings}
                   </div>
                 )}
               </>

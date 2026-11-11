@@ -126,8 +126,8 @@ the palette `label` color at 50% opacity.
   dashboard, group as tabs, remove), so every operation on a tile is in the
   one place and the title or tabs keep the whole row. A widget with a
   settings face passes `onSettings`, and the header draws the one settings
-  control for it (a sliders icon, `data-widget-settings`) right before full
-  screen, so settings sits in the same spot on every widget and the keyboard
+  control for it (a sliders icon, `data-widget-settings`) last in the row,
+  after full screen, so settings sits in the same spot on every widget and the keyboard
   layer's `e` always finds it, options open or closed.
 - Full screen: the grid (`lib/widgetFrame.ts`) lifts the tile over a dimmed,
   blurred backdrop at the viewport's size minus a margin, keeping the widget
@@ -145,7 +145,7 @@ the palette `label` color at 50% opacity.
   and the shown widget's options sit behind the header toggle at the row's
   right end, as in a single header: the row shows tabs by default, the
   toggle slides the tabs out and the options in (the widget's header content
-  left-aligned, its `right` group and the tile's full screen button at the
+  left-aligned, its `right` group, then full screen and settings at the
   end), and the same spot brings the tabs back (so does switching tab). In
   layout edit mode the toggle swaps in the tile's controls instead. Members do not draw their own
   header row: `WidgetHeader` renders into the tab row through
