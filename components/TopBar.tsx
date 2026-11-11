@@ -927,7 +927,7 @@ function DashboardSwitcher({
                 onDragStart={() => setDragIdx(i)}
                 onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
                 title="Drag to reorder"
-                className="shrink-0 pl-1 cursor-grab active:cursor-grabbing text-[var(--text-secondary)] opacity-0 group-hover/dash:opacity-40 hover:!opacity-80"
+                className="shrink-0 pl-1 cursor-grab active:cursor-grabbing text-[var(--text-secondary)] opacity-40 hover:!opacity-80"
               >
                 <GripVertical size={12} />
               </span>
@@ -957,7 +957,7 @@ function DashboardSwitcher({
               )}
               <button
                 onClick={() => { setRenamingId(d.id); setDraft(d.name); }}
-                className={`opacity-0 group-hover/dash:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0`}
+                className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0`}
                 title="Rename"
                 aria-label={`Rename ${d.name}`}
               >
@@ -966,7 +966,7 @@ function DashboardSwitcher({
               {dashboards.list.length > 1 && (
                 <button
                   onClick={() => removeDashboard(d.id)}
-                  className={`opacity-0 group-hover/dash:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0 mr-1.5`}
+                  className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0 mr-1.5`}
                   title="Delete dashboard"
                   aria-label={`Delete ${d.name}`}
                 >

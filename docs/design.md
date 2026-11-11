@@ -36,8 +36,11 @@ Emphasis is done with opacity on the palette color, in three steps only:
 
 Nothing readable sits below 70%, with one exception: the upcoming words in
 Typing sit at 60% so the typed text stands out, which still clears 3:1 in both
-themes. Lower values are for decoration: dividers, disabled controls and
-hover-only chrome.
+themes. Nothing is hover-only: a widget's header options sit behind the header
+toggle, and row actions (open a link, edit, delete, rename, the chat message
+buttons) rest at 70% and go to 100% on hover. Lower values are for
+decoration: dividers, disabled controls, the dashboard drag handle and the
+link hint on bookmark rows at 40%.
 
 ## Accessibility
 
@@ -66,6 +69,14 @@ an opacity step should be re-measured, not assumed.
 - Focus visible (2.4.7) and names: every icon button has an `aria-label`, the
   keyboard layer marks the focused widget, and the hidden inputs that catch
   keys are labelled.
+
+Light palette: the `label` and `text` colors of every palette in light mode
+are set so that text at the 70% meta step still clears 4.5:1 over that
+palette's tinted card (measured by compositing: for amber, `#632c0a` at 70%
+over `#fffbeb` is 4.6:1). They are darker than the Tailwind 800/900 values
+they started from, and label and text end up close in tone; the hue stays.
+The only run under 4.5:1 in light mode is Typing's upcoming words while the
+card is unfocused (60% inside the 40% fade), which is decoration by design.
 
 ## Spacing
 

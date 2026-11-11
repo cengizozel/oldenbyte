@@ -29,38 +29,38 @@
   /* Amber widget */
   --w-amber-bg:         #fffbeb;
   --w-amber-border:     #fef3c7;
-  --w-amber-label:      #92400e;
-  --w-amber-text:       #78350f;
+  --w-amber-label:      #632c0a;
+  --w-amber-text:       #622b0c;
 
   /* Sky widget */
   --w-sky-bg:           #f0f9ff;
   --w-sky-border:       #e0f2fe;
-  --w-sky-label:        #075985;
-  --w-sky-text:         #0c4a6e;
+  --w-sky-label:        #053d5c;
+  --w-sky-text:         #0a3d5a;
 
   /* Neutral widget */
   --w-neutral-bg:       #fafafa;
   --w-neutral-border:   #e5e5e5;
-  --w-neutral-label:    #525252;
-  --w-neutral-text:     #404040;
+  --w-neutral-label:    #383838;
+  --w-neutral-text:     #383838;
 
   /* Rose widget */
   --w-rose-bg:          #fff1f2;
   --w-rose-border:      #ffe4e6;
-  --w-rose-label:       #be123c;
-  --w-rose-text:        #881337;
+  --w-rose-label:       #890d2b;
+  --w-rose-text:        #801234;
 
   /* Teal widget */
   --w-teal-bg:          #f0fdfa;
   --w-teal-border:      #ccfbf1;
-  --w-teal-label:       #115e59;
-  --w-teal-text:        #134e4a;
+  --w-teal-label:       #0c413d;
+  --w-teal-text:        #10413d;
 
   /* Orange widget */
   --w-orange-bg:        #fff7ed;
   --w-orange-border:    #ffedd5;
-  --w-orange-label:     #9a3412;
-  --w-orange-text:      #7c2d12;
+  --w-orange-label:     #6d250d;
+  --w-orange-text:      #69260f;
 
   /* Analog clock */
   --clock-face:         #d4d4d4;

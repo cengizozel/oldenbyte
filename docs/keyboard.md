@@ -12,6 +12,8 @@ Defaults, all pressed after the leader (**Space**):
 |---|---|
 | `1`..`9`, `0` | Focus widget 1 to 10 of the visible dashboard |
 | then `1`..`9` or `q w e r t` | In a tab group: pick that tab (q w e r t are tabs 1 to 5) |
+| `o` | Options of the focused widget (its header toggle) |
+| `f` | Full screen for the focused widget (Escape leaves it) |
 | `e` | Open the settings of the focused widget |
 | `r` | Refresh the focused widget |
 | `[` / `]` | Previous / next dashboard |
@@ -20,7 +22,7 @@ Defaults, all pressed after the leader (**Space**):
 | `?` | Cheat sheet with the current bindings (any key closes it) |
 | `Escape` | Cancel a pending command; on a focused widget, leave it |
 
-While the leader is pending, every widget shows its number and every tab group shows its tab keys. A pending command times out after 1.5 seconds. In a tab group, if no tab key follows within that time (or another key arrives), the current tab is focused.
+While the leader is pending, every widget shows its number and every tab group shows its tab keys. A pending command times out after 1.5 seconds by default; Settings > Keyboard > Time to answer sets it (0.5 to 10 seconds, stored in the same config as `timeout`). In a tab group, if no tab key follows within that time (or another key arrives), the current tab is focused.
 
 Numbering follows reading order: top to bottom, then left to right, by each widget's position in the layout. Only the first ten widgets get a number (1..9, then 0); a two-digit scheme would be ambiguous with the tab key that follows. Tab groups number up to nine tabs. Numbers apply to the visible dashboard only, and not while editing the layout.
 

@@ -270,7 +270,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
             <span className={`text-xs tabular-nums ${c.text} opacity-70`}>{msgTime(m.at)}</span>
           )}
           {!inProgress && m.role === "assistant" && m.stats && m.stats.tokens > 0 && (
-            <span className={`text-xs ${c.text} opacity-0 group-hover/msg:opacity-70 [@media(hover:none)]:opacity-70 transition-opacity`}>
+            <span className={`text-xs ${c.text} opacity-70 transition-opacity`}>
               {m.stats.tps.toFixed(1)} tok/s · {m.stats.tokens} tokens · {m.stats.total.toFixed(1)}s
               {m.stats.ttft >= 0.05 ? ` · ${m.stats.ttft.toFixed(1)}s to first` : ""}
             </span>
@@ -280,7 +280,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
               onClick={() => onEdit(i)}
               title={m.role === "user" ? "Edit message (reruns from here)" : "Edit reply"}
               aria-label={m.role === "user" ? "Edit message" : "Edit reply"}
-              className={`opacity-0 group-hover/msg:opacity-70 [@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+              className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
             >
               <Pencil size={14} />
             </button>
@@ -290,7 +290,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
               onClick={() => onRetry(i)}
               title="Regenerate the reply from here"
               aria-label="Regenerate the reply"
-              className={`opacity-0 group-hover/msg:opacity-70 [@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+              className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
             >
               <RefreshCw size={14} />
             </button>
@@ -300,7 +300,7 @@ function MessageRow({ m, index: i, c, daySep, canEdit, isLast, live, onEdit, onR
               onClick={() => onContinue(i)}
               title="Continue this reply where it left off"
               aria-label="Continue this reply"
-              className={`opacity-0 group-hover/msg:opacity-70 [@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+              className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
             >
               <ChevronsRight size={14} />
             </button>

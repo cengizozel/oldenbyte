@@ -6,7 +6,7 @@ import type { DashboardsState } from "@/lib/dashboards";
 import {
   DEFAULT_KEYBOARD, KEYBOARD_ACTIONS, KEYBOARD_EVENT, NEW_DASHBOARD_EVENT, MAX_CELLS, MAX_TABS, TAB_LETTERS,
   cellDigit, cellFromKey, tabFromKey, actionForKey, isBindableKey, isEditableTarget, keyLabel, rebind,
-  loadKeyboardConfig, saveKeyboardConfig, type KeyboardAction, type KeyboardConfig,
+  loadKeyboardConfig, saveKeyboardConfig, TIMEOUT_RANGE, type KeyboardAction, type KeyboardConfig,
 } from "@/lib/keyboard";
 import Toggle from "@/components/ui/Toggle";
 import { exitDemoMode, isDemoMode } from "@/lib/demo";
@@ -24,7 +24,6 @@ import { FOCUS_RING, SettingsRow, SettingsSection } from "@/components/ui/Field"
 // focuses a hidden input (the command catcher) and reads the following keys
 // from it. Finishing a command blurs it again, which hands keys back to Vimium.
 
-const TIMEOUT = 1500;
 const MODIFIERS = ["Shift", "Control", "Alt", "Meta", "CapsLock", "AltGraph"];
 const FOCUSABLE_FIELDS =
   "input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset]):not([type=range]):not([type=file]):not([type=color]), textarea, select, [contenteditable='true'], [contenteditable='']";
@@ -131,7 +130,7 @@ export default function KeyboardLayer({
 
   function arm(onTimeout: () => void) {
     clearTimer();
-    timerRef.current = setTimeout(onTimeout, TIMEOUT);
+    timerRef.current = setTimeout(onTimeout, latest.current.config.timeout * 1000);
   }
 
   // End the pending command. With restore, focus goes back where it was before
@@ -205,6 +204,20 @@ export default function KeyboardLayer({
       phaseRef.current = { kind: "help" };
       setBadges([]);
       setHelpOpen(true);
+      return;
+    }
+    if (action === "options" || action === "fullScreen") {
+      // Both live in the header: the toggle, and the full screen button on
+      // the options face (clicked where it stands, open face or not).
+      const target = focusedWidget();
+      if (!target) { finish(); showHint("Focus a widget first: leader, then its number"); return; }
+      const button = action === "options"
+        ? findButton(target.cell, 'button[aria-label="Options"], button[aria-label="Close options"]')
+        : findButton(target.cell, 'button[aria-label="Full screen"], button[aria-label="Exit full screen (Esc)"]');
+      if (!button) { finish(); showHint(action === "options" ? "This widget has no options" : "Full screen is not available here"); return; }
+      finish(false);
+      button.click();
+      afterRender(() => focusCell(target.cell));
       return;
     }
     if (action === "settings" || action === "refresh") {
@@ -438,6 +451,24 @@ export function KeyboardSettings() {
       <SettingsRow label="Shortcuts" hint={`${keyLabel(config.leader)}, then a widget number or a key. ? lists them.`}>
         <Toggle checked={config.enabled} onChange={() => update({ ...config, enabled: !config.enabled })} label="Keyboard shortcuts" />
       </SettingsRow>
+      {config.enabled && (
+        <SettingsRow label="Time to answer" hint={`Seconds the widget numbers stay up after ${keyLabel(config.leader)}.`}>
+          <input
+            type="number"
+            inputMode="decimal"
+            aria-label="Seconds a command waits after the leader"
+            min={TIMEOUT_RANGE.min}
+            max={TIMEOUT_RANGE.max}
+            step={TIMEOUT_RANGE.step}
+            value={config.timeout}
+            onChange={e => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v)) update({ ...config, timeout: Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, v)) });
+            }}
+            className={`w-20 shrink-0 h-7 text-center text-sm border rounded-lg px-2 outline-none bg-[var(--surface)] text-[var(--text-primary)] border-[var(--surface-border)] focus:border-[var(--text-muted)] ${FOCUS_RING}`}
+          />
+        </SettingsRow>
+      )}
       {config.enabled && (
         <div className="flex flex-col py-1.5">
           <button

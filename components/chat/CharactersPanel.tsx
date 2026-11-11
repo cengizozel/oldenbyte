@@ -52,10 +52,10 @@ export function CharactersPanel({ c, characters, activeCharId, onCreate, onClose
                   {ch.memories.length ? ` · ${ch.memories.length} ${ch.memories.length === 1 ? "memory" : "memories"}` : ""}
                 </p>
               </div>
-              <button onClick={e => { e.stopPropagation(); onEdit(ch); }} title="Edit" aria-label="Edit character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Pencil size={14} /></button>
-              <button onClick={e => { e.stopPropagation(); onDuplicate(ch); }} title="Duplicate: same persona, fresh memory" aria-label="Duplicate character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Copy size={14} /></button>
+              <button onClick={e => { e.stopPropagation(); onEdit(ch); }} title="Edit" aria-label="Edit character" className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Pencil size={14} /></button>
+              <button onClick={e => { e.stopPropagation(); onDuplicate(ch); }} title="Duplicate: same persona, fresh memory" aria-label="Duplicate character" className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Copy size={14} /></button>
               {ch.id !== DEFAULT_CHARACTER_ID && (
-                <button onClick={e => { e.stopPropagation(); onDelete(ch.id); }} title="Delete character" aria-label="Delete character" className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><X size={14} /></button>
+                <button onClick={e => { e.stopPropagation(); onDelete(ch.id); }} title="Delete character" aria-label="Delete character" className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><X size={14} /></button>
               )}
             </div>
           );

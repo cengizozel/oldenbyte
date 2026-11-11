@@ -767,10 +767,10 @@ export default function WidgetGrid({
         {/* The cell keeps its place; the frame inside it lifts to the viewport. */}
         <div className="h-full">
           <div
-            className={expanded ? "fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm p-4 sm:p-8 flex" : "h-full"}
+            className={expanded ? "fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm p-3 sm:p-6 xl:p-10 flex" : "h-full"}
             onMouseDown={expanded ? e => { if (e.target === e.currentTarget) setExpandedCell(null); } : undefined}
           >
-            <div className={expanded ? "tw-overlay-in w-full h-full min-h-0 max-w-[1400px] mx-auto" : "h-full"}>{inner}</div>
+            <div className={expanded ? "tw-overlay-in w-full h-full min-h-0" : "h-full"}>{inner}</div>
           </div>
         </div>
       </WidgetFrameContext.Provider>

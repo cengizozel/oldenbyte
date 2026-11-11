@@ -581,7 +581,7 @@ export default function TrackerWidget({
                             }}
                             title="Edit time"
                             aria-label="Edit time"
-                            className={`opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${iconBtnCls} ${c.icon}`}
+                            className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${iconBtnCls} ${c.icon}`}
                           >
                             <Pencil size={14} />
                           </button>

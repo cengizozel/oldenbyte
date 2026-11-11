@@ -86,7 +86,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, onNew
                 onClick={e => { e.stopPropagation(); setRenameDraft(cv.renamed ? cv.title : ""); setRenamingId(cv.id); }}
                 title="Rename chat"
                 aria-label="Rename chat"
-                className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
+                className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
               >
                 <Pencil size={14} />
               </button>
@@ -94,7 +94,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, onNew
                 onClick={e => { e.stopPropagation(); onDelete(cv.id); }}
                 title="Delete chat"
                 aria-label="Delete chat"
-                className={`shrink-0 mt-0.5 opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
+                className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}
               >
                 <X size={14} />
               </button>

@@ -419,7 +419,7 @@ export default function RedditWidget({
                             rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
                             aria-label="Open on Reddit"
-                            className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+                            className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 focus-visible:!opacity-100 transition-opacity ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
                           >
                             <ExternalLink size={12} />
                           </a>

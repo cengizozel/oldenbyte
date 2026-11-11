@@ -394,7 +394,7 @@ export default function AnytypeWidget({
                                 </button>
                                 <a
                                   href={deepLink(o)}
-                                  className={`shrink-0 mt-0.5 opacity-0 group-hover/title:opacity-90 dark:group-hover/title:opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
+                                  className={`shrink-0 mt-0.5 opacity-70 hover:!opacity-100 transition-opacity ${c.icon}`}
                                   title="Open in Anytype"
                                 >
                                   <ExternalLink size={12} />

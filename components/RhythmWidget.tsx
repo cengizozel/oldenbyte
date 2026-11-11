@@ -703,7 +703,7 @@ export default function RhythmWidget({
                       onClick={() => deleteEvent(r.id, r.kind, r.idx)}
                       title="Delete entry"
                       aria-label="Delete entry"
-                      className={`opacity-0 group-hover/row:opacity-70 hover:!opacity-100 focus-visible:!opacity-100 hover:text-red-500 ${iconBtnCls} ${c.icon}`}
+                      className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 hover:text-red-500 ${iconBtnCls} ${c.icon}`}
                     >
                       <Trash2 size={14} />
                     </button>

@@ -360,7 +360,7 @@ export default function BookmarksWidget({
                   >
                     <Favicon bm={bm} size={22} />
                     <span className={`flex-1 min-w-0 truncate text-sm font-medium ${c.text}`}>{displayName(bm)}</span>
-                    <ExternalLink size={12} className={`shrink-0 opacity-0 group-hover/bm:opacity-40 ${c.label}`} />
+                    <ExternalLink size={12} className={`shrink-0 opacity-40 ${c.label}`} />
                   </a>
                 ))}
               </div>

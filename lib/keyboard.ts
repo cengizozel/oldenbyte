@@ -8,6 +8,8 @@ import * as storage from "@/lib/storage";
 // See docs/keyboard.md.
 
 export type KeyboardAction =
+  | "options"
+  | "fullScreen"
   | "settings"
   | "refresh"
   | "prevDashboard"
@@ -19,8 +21,11 @@ export type KeyboardAction =
 export type KeyboardConfig = {
   enabled: boolean;
   leader: string;
+  // Seconds a pending command (and the widget numbers) stays up after the leader.
+  timeout: number;
   bindings: Record<KeyboardAction, string>;
 };
+export const TIMEOUT_RANGE = { min: 0.5, max: 10, step: 0.5 };
 
 // One setting key for the whole config. Settings > Keyboard writes it and fires
 // KEYBOARD_EVENT (detail: KeyboardConfig) so the layer applies it at once.
@@ -31,6 +36,8 @@ export const NEW_DASHBOARD_EVENT = "keyboardnewdashboard";
 
 // Order here is the order in Settings > Keyboard and the cheat sheet.
 export const KEYBOARD_ACTIONS: { id: KeyboardAction; label: string }[] = [
+  { id: "options",       label: "Options of the focused widget (the header toggle)" },
+  { id: "fullScreen",    label: "Full screen for the focused widget" },
   { id: "settings",      label: "Settings of the focused widget" },
   { id: "refresh",       label: "Refresh the focused widget" },
   { id: "prevDashboard", label: "Previous dashboard" },
@@ -43,7 +50,10 @@ export const KEYBOARD_ACTIONS: { id: KeyboardAction; label: string }[] = [
 export const DEFAULT_KEYBOARD: KeyboardConfig = {
   enabled: true,
   leader: " ",
+  timeout: 1.5,
   bindings: {
+    options: "o",
+    fullScreen: "f",
     settings: "e",
     refresh: "r",
     prevDashboard: "[",
@@ -113,9 +123,11 @@ export function parseKeyboardConfig(raw: string | null): KeyboardConfig {
     const k = parsed.bindings?.[id];
     if (typeof k === "string" && isBindableKey(k)) bindings[id] = k;
   }
+  const t = Number(parsed.timeout);
   return {
     enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : true,
     leader: typeof parsed.leader === "string" && isBindableKey(parsed.leader) ? parsed.leader : DEFAULT_KEYBOARD.leader,
+    timeout: Number.isFinite(t) ? Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, t)) : DEFAULT_KEYBOARD.timeout,
     bindings,
   };
 }
