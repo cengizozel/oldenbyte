@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Bot, Send, Square, Check, X, Loader, Database, MessageSquare, Plus, ChevronDown, Library, Power, Layers, CalendarDays, Paperclip, type LucideIcon } from "lucide-react";
+import { Bot, Send, Square, Check, X, Loader, Database, MessageSquare, Plus, ChevronDown, Library, Power, Layers, CalendarDays, Paperclip, ArrowDown, type LucideIcon } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
@@ -276,6 +276,17 @@ export default function ChatWidget({
   const [powerBusy, setPowerBusy] = useState(false);
   // Header overflow menu (clear conversation, context viewer).
   const [menuOpen, setMenuOpen] = useState(false);
+  // The data access menu fits inside the card: as wide as there is room left
+  // of its button, and scrolling when the card is short.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [menuBox, setMenuBox] = useState<{ width: number; maxHeight: number } | null>(null);
+  function openMenu(btn: HTMLElement) {
+    const root = rootRef.current?.getBoundingClientRect();
+    const b = btn.getBoundingClientRect();
+    if (root) setMenuBox({ width: Math.min(240, b.right - root.left - 8), maxHeight: Math.max(120, root.bottom - b.bottom - 16) });
+    listDashboardWidgets().then(setRoster).catch(() => {});
+    setMenuOpen(true);
+  }
   // Inline rename via the room-title pill above the messages.
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
@@ -291,9 +302,25 @@ export default function ChatWidget({
   // Follow the stream only while the user is near the bottom; if they scroll up
   // (e.g. to read while it's still thinking), stop auto-scrolling.
   const atBottomRef = useRef(true);
-  function onMessagesScroll() {
+  // Scrolled well up: a button jumps back to the latest message. A reply that
+  // finishes while you read further up marks it "New reply" until you look.
+  const [away, setAway] = useState(false);
+  const [unseen, setUnseen] = useState(false);
+  function measureScroll() {
     const el = scrollRef.current;
-    if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    if (!el) return;
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    atBottomRef.current = dist < 48;
+    setAway(dist > Math.max(160, el.clientHeight / 2));
+    if (atBottomRef.current) setUnseen(false);
+  }
+  function onMessagesScroll() { measureScroll(); }
+  function jumpToLatest() {
+    const el = scrollRef.current;
+    if (!el) return;
+    atBottomRef.current = true;
+    setUnseen(false);
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }
   const abortRef = useRef<AbortController | null>(null);
   // When the current response started (performance.now()), for the live
@@ -304,7 +331,14 @@ export default function ChatWidget({
   // scrolled up to read earlier content.
   useEffect(() => {
     if (atBottomRef.current) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    else measureScroll(); // the reply grows below you
   }, [messages, streaming]);
+
+  const wasStreaming = useRef(false);
+  useEffect(() => {
+    if (wasStreaming.current && !streaming && !atBottomRef.current) setUnseen(true);
+    wasStreaming.current = streaming;
+  }, [streaming]);
 
   // Leaving the settings panel remounts the message list at the top: snap back
   // to the latest message.
@@ -324,8 +358,8 @@ export default function ChatWidget({
     const el = composerRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
-  }, [input]);
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, 28), 160)}px`;
+  }, [input, settingsOpen]);
 
   const configured = Boolean(config.baseUrl && config.model);
 
@@ -856,7 +890,7 @@ export default function ChatWidget({
   }) as unknown as LucideIcon);
 
   return (
-    <div className={`rounded-2xl border flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
+    <div ref={rootRef} className={`rounded-2xl border flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
 
       {/* Header: single row, no divider (a border here reads like a tab bar).
           The chevron switches character; the model line after it opens the
@@ -950,14 +984,14 @@ export default function ChatWidget({
                 <MessageSquare size={14} />
               </button>
               <div className="relative">
-                <button onClick={() => { if (!menuOpen) listDashboardWidgets().then(setRoster).catch(() => {}); setMenuOpen(o => !o); }} title="Data access: what the assistant may read" aria-label="Data access" className={menuOpen ? `opacity-90 ${HIT_AREA} ${FOCUS_RING} ${c.icon}` : actionCls}>
+                <button onClick={e => { if (menuOpen) setMenuOpen(false); else openMenu(e.currentTarget); }} title="Data access: what the assistant may read" aria-label="Data access" className={menuOpen ? `opacity-90 ${HIT_AREA} ${FOCUS_RING} ${c.icon}` : actionCls}>
                   <Database size={14} />
                 </button>
                 {menuOpen && (
                   <>
                     {/* click-away backdrop */}
                     <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                    <div className={`absolute right-0 top-6 z-50 w-60 rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
+                    <div style={menuBox ?? undefined} className={`absolute right-0 top-6 z-50 w-60 overflow-y-auto overscroll-contain rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
                       <p className={`px-2.5 pt-1.5 pb-1 text-sm opacity-70 ${c.label}`}>Data access</p>
                       {/* One row per data-bearing widget on the dashboard; no master
                           switch. A calendar widget's row also grants its tools. */}
@@ -1207,7 +1241,19 @@ export default function ChatWidget({
           )}
 
           {/* Composer */}
-          <div className={`shrink-0 p-2.5 pt-1`}>
+          <div className={`shrink-0 p-2.5 pt-1 relative`}>
+            {(away || unseen) && (
+              <button
+                type="button"
+                onClick={jumpToLatest}
+                title="Jump to the latest message"
+                aria-label={unseen ? "New reply, jump to it" : "Jump to the latest message"}
+                className={`absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-10 h-8 rounded-full border shadow-md flex items-center gap-1.5 text-sm transition-colors ${unseen || streaming ? "px-3" : "w-8 justify-center"} bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-primary)] hover:border-[var(--surface-border-focus)] ${FOCUS_RING}`}
+              >
+                {streaming && !unseen ? <Loader size={14} className="animate-spin" /> : <ArrowDown size={14} />}
+                {unseen ? <>New reply<span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /></> : streaming ? "Replying" : null}
+              </button>
+            )}
             <div className="flex items-end gap-2 bg-[var(--surface)] rounded-2xl border border-[var(--surface-border)] px-3 py-1.5">
               <textarea
                 ref={composerRef}
@@ -1243,7 +1289,7 @@ export default function ChatWidget({
                 disabled={!configured || !loaded}
                 rows={1}
                 placeholder={configured ? "Message…" : "Configure a model first"}
-                className="flex-1 resize-none overflow-y-auto text-sm outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-transparent py-1 disabled:opacity-50"
+                className="flex-1 min-h-7 resize-none overflow-y-auto text-sm leading-5 outline-none text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-transparent py-1 disabled:opacity-50"
               />
               {visionOk !== false && (
                 <>
