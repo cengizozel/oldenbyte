@@ -1189,7 +1189,7 @@ export default function ChatWidget({
           )}
 
           {/* Composer */}
-          <div className={`shrink-0 p-2.5 border-t ${c.border}`}>
+          <div className={`shrink-0 p-2.5 pt-1`}>
             <div className="flex items-end gap-2 bg-[var(--surface)] rounded-2xl border border-[var(--surface-border)] px-3 py-1.5">
               <textarea
                 ref={composerRef}
