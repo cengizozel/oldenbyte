@@ -824,30 +824,18 @@ export default function ChatWidget({
   // Hover-revealed header action icon (matches the other widgets).
   const actionCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`;
 
-  // The header's icon slot is the character avatar (emoji, or the default
-  // bot), doubling as the button that opens the character's settings and
-  // memories. WidgetHeader takes a Lucide icon, so this wraps the avatar as
-  // one, created once (a fresh component each render would remount and drop
-  // focus); it reads its live values through a ref mirror.
-  const avatar = {
-    emoji: activeCharacter && activeCharacter.id !== DEFAULT_CHARACTER_ID ? activeCharacter.emoji : "",
-    title: activeCharacter ? `${activeCharacter.name}: settings and memories` : "Character settings",
-    open: () => { if (activeCharacter) setEditingChar(activeCharacter); },
-  };
-  const avatarRef = useRef(avatar);
-  avatarRef.current = avatar;
-  const [AvatarIcon] = useState<LucideIcon>(() => (function AvatarIcon() {
-    const a = avatarRef.current;
-    return (
-      <button
-        onClick={a.open}
-        title={a.title}
-        aria-label={a.title}
-        className={`shrink-0 w-7 h-7 bg-black/5 dark:bg-white/10 flex items-center justify-center text-base leading-none hover:bg-black/10 dark:hover:bg-white/15 transition-colors ${FOCUS_RING} !rounded-lg`}
-      >
-        {a.emoji || <Bot size={16} className="opacity-70" />}
-      </button>
-    );
+  // The header's icon is the character avatar: its emoji, or the default
+  // bot, drawn like any other header icon (no box, no button; the character
+  // is edited from the Characters panel). WidgetHeader takes a Lucide icon,
+  // so this wraps the avatar as one, created once (a fresh component each
+  // render would remount); it reads the live emoji through a ref mirror.
+  const avatarEmoji = activeCharacter && activeCharacter.id !== DEFAULT_CHARACTER_ID ? activeCharacter.emoji : "";
+  const avatarRef = useRef(avatarEmoji);
+  avatarRef.current = avatarEmoji;
+  const [AvatarIcon] = useState<LucideIcon>(() => (function AvatarIcon({ size = 14, className = "" }: { size?: number | string; className?: string }) {
+    const emoji = avatarRef.current;
+    if (!emoji) return <Bot size={size} className={className} />;
+    return <span style={{ fontSize: size, lineHeight: 1 }} className={`${className} !opacity-100`} aria-hidden>{emoji}</span>;
   }) as unknown as LucideIcon);
 
   return (

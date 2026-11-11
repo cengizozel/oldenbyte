@@ -457,52 +457,54 @@ export default function NotebookWidget({
   return (
     <div className={`rounded-2xl border p-5 flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
 
+      {/* The header spans the tile, so the toggle sits in the corner like
+          everywhere else; the note and the calendar share the space below. */}
+      {renaming ? (
+        <div className="flex items-center gap-1.5 mb-3 shrink-0">
+          <span className={`opacity-50 shrink-0 ${c.label}`}><NotebookPen size={14} /></span>
+          <input
+            autoFocus
+            value={draftName}
+            onChange={e => setDraftName(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setRenaming(false); }}
+            placeholder="Name this notepad…"
+            className="flex-1 min-w-0 text-xs border border-[var(--surface-border)] rounded-lg px-2 py-1 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
+          />
+          <button onClick={() => setRenaming(false)} aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0 ${HIT_AREA} ${FOCUS_RING}`}><X size={14} /></button>
+          <button onClick={saveName} aria-label="Save name" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0 ${HIT_AREA} ${FOCUS_RING}`}><Check size={14} /></button>
+        </div>
+      ) : (
+        <WidgetHeader
+          c={c}
+          icon={NotebookPen}
+          title={customName || widget.title}
+          right={
+            <>
+              <button
+                onClick={openHistory}
+                title="All notes"
+                aria-label="All notes"
+                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+              >
+                <History size={14} />
+              </button>
+              <button
+                onClick={() => { setDraftName(customName); setRenaming(true); }}
+                title="Rename"
+                aria-label="Rename"
+                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+              >
+                <Pencil size={14} />
+              </button>
+            </>
+          }
+        />
+      )}
+
       <div className="flex gap-3 flex-1 min-h-0">
 
-        {/* Left: icon + note */}
+        {/* Left: note */}
         <div className="flex flex-col flex-1 min-h-0 min-w-0">
-          {renaming ? (
-            <div className="flex items-center gap-1.5 mb-3 shrink-0">
-              <span className={`opacity-50 shrink-0 ${c.label}`}><NotebookPen size={14} /></span>
-              <input
-                autoFocus
-                value={draftName}
-                onChange={e => setDraftName(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setRenaming(false); }}
-                placeholder="Name this notepad…"
-                className="flex-1 min-w-0 text-xs border border-[var(--surface-border)] rounded-lg px-2 py-1 outline-none focus:border-[var(--surface-border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] bg-[var(--surface)]"
-              />
-              <button onClick={() => setRenaming(false)} aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0 ${HIT_AREA} ${FOCUS_RING}`}><X size={14} /></button>
-              <button onClick={saveName} aria-label="Save name" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0 ${HIT_AREA} ${FOCUS_RING}`}><Check size={14} /></button>
-            </div>
-          ) : (
-            <WidgetHeader
-              c={c}
-              icon={NotebookPen}
-              title={customName || widget.title}
-              right={
-                <>
-                  <button
-                    onClick={openHistory}
-                    title="All notes"
-                    aria-label="All notes"
-                    className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
-                  >
-                    <History size={14} />
-                  </button>
-                  <button
-                    onClick={() => { setDraftName(customName); setRenaming(true); }}
-                    title="Rename"
-                    aria-label="Rename"
-                    className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
-                  >
-                    <Pencil size={14} />
-                  </button>
-                </>
-              }
-            />
-          )}
-
           {!isToday && (
             <div className="mb-2 shrink-0">
               <p className={`text-xs opacity-70 ${c.label}`}>

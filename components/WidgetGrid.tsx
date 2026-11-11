@@ -952,7 +952,7 @@ export default function WidgetGrid({
                           aria-label={`Move ${widget.title} to another dashboard`}
                           aria-expanded={moveMenuFor === i}
                           title="Move to another dashboard"
-                          className={`absolute top-2 right-16 z-20 w-6 h-6 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
+                          className={`absolute top-[18px] right-[76px] z-20 w-6 h-6 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
                             moveMenuFor === i
                               ? "bg-blue-100 border-blue-300 text-blue-600 dark:bg-blue-500/20 dark:border-blue-400/50 dark:text-blue-300"
                               : "bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -963,7 +963,7 @@ export default function WidgetGrid({
                         {moveMenuFor === i && (
                           <div
                             onMouseDown={e => e.stopPropagation()}
-                            className="absolute top-9 right-2 z-30 min-w-32 max-w-[80%] rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-md py-1 text-sm text-[var(--text-primary)]"
+                            className="absolute top-[46px] right-5 z-30 min-w-32 max-w-[80%] rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-md py-1 text-sm text-[var(--text-primary)]"
                           >
                             <div className="px-3 py-1 text-sm text-[var(--text-muted)]">Move to</div>
                             {otherDashboards.map(d => (
@@ -986,7 +986,7 @@ export default function WidgetGrid({
                       aria-label={isGroupingSource ? "Cancel grouping" : "Group with another widget as tabs"}
                       aria-pressed={isGroupingSource}
                       title={isGroupingSource ? "Cancel grouping" : "Group as tabs"}
-                      className={`absolute top-2 right-9 z-20 w-6 h-6 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
+                      className={`absolute top-[18px] right-12 z-20 w-6 h-6 flex items-center justify-center rounded-full border shadow-sm transition-colors ${
                         isGroupingSource
                           ? "bg-blue-100 border-blue-300 text-blue-600 dark:bg-blue-500/20 dark:border-blue-400/50 dark:text-blue-300"
                           : "bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -1000,7 +1000,7 @@ export default function WidgetGrid({
                       onClick={() => removeWidget(i)}
                       aria-label={`Remove ${widget.title}`}
                       title="Remove widget"
-                      className="absolute top-2 right-2 z-20 w-6 h-6 flex items-center justify-center rounded-full border bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm leading-none shadow-sm"
+                      className="absolute top-[18px] right-5 z-20 w-6 h-6 flex items-center justify-center rounded-full border bg-[var(--surface)] border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm leading-none shadow-sm"
                     >
                       ×
                     </button>

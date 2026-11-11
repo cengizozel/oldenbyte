@@ -103,12 +103,12 @@ the palette `label` color at 50% opacity.
 - Header: `WidgetHeader` from `components/ui/WidgetChrome.tsx`. Every header,
   single or in a tab group, reads the same way: the widget's identity on the
   left (icon and title, `text-sm font-medium`, palette label color; or the
-  tabs) and one toggle at the right end, the same ellipsis glyph on every
-  widget. Nothing else sits in a header by default: no always-on buttons,
+  tabs) and one toggle at the right end, the oldenbyte mark (the logo's
+  dashed square and solid square, one color, 16px) on every widget. Nothing else sits in a header by default: no always-on buttons,
   nothing hover-only, no status text (a status like Typing's best wpm goes
   on a line in the body). The toggle swaps the identity for the widget's
   options in the same row (its `after` and `right` content, then a full
-  screen button every widget gets from the grid), the glyph turning into a
+  screen button every widget gets from the grid), the mark turning into a
   close cross, and the same spot brings the identity back. Hover-only
   buttons show in full once the options are asked for. In layout edit mode
   the toggle is gone and the tile's own controls take that corner.

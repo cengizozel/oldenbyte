@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
 import { useWidgetFrame } from "@/lib/widgetFrame";
-import { Pencil, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Ellipsis, Maximize2, Minimize2, type LucideIcon } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Maximize2, Minimize2, type LucideIcon } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { FOCUS_RING, HIT_AREA } from "./Field";
 
@@ -150,10 +150,23 @@ export const HEADER_SWAP = {
   paneHidden: "opacity-0 translate-x-2 pointer-events-none",
 };
 
-// The toggle: an ellipsis that turns into a close cross with a quarter turn.
-// 24px tall in a 20px header line, so it takes no extra height.
+// The oldenbyte mark (public/logo.svg) reduced to one color and 16px: the
+// dashed rounded square with the solid square inside, in the header's label
+// color. The toggle wears it on every widget, so the brand is the one piece
+// of chrome every header shares.
+export function LogoGlyph({ size = 16, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden className={className}>
+      <rect x="1.5" y="1.5" width="13" height="13" rx="3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 2.2" />
+      <rect x="5.25" y="5.25" width="5.5" height="5.5" rx="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+// The toggle: the mark, which turns into a close cross with a turn and a
+// fade. 24px tall in a 20px header line, so it takes no extra height.
 export function HeaderToggle({ c, open, onToggle, className = "" }: { c: ColorClasses; open: boolean; onToggle: () => void; className?: string }) {
-  const face = "absolute inset-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none";
+  const face = "absolute inset-0 transition-[opacity,rotate,scale] duration-200 ease-out motion-reduce:transition-none";
   return (
     <button
       type="button"
@@ -165,8 +178,8 @@ export function HeaderToggle({ c, open, onToggle, className = "" }: { c: ColorCl
       className={`shrink-0 w-6 h-6 -my-0.5 flex items-center justify-center rounded-md transition-opacity ${c.label} ${FOCUS_RING} ${open ? "opacity-100" : "opacity-70 hover:opacity-100"} ${className}`}
     >
       <span className="relative block w-4 h-4" aria-hidden>
-        <Ellipsis size={16} className={`${face} ${open ? "opacity-0 rotate-90" : "opacity-100 rotate-0"}`} />
-        <X size={16} className={`${face} ${open ? "opacity-100 rotate-0" : "opacity-0 -rotate-90"}`} />
+        <LogoGlyph className={`${face} ${open ? "opacity-0 rotate-45 scale-75" : "opacity-100 rotate-0 scale-100"}`} />
+        <X size={16} className={`${face} ${open ? "opacity-100 rotate-0 scale-100" : "opacity-0 -rotate-45 scale-75"}`} />
       </span>
     </button>
   );
@@ -245,7 +258,7 @@ export function WidgetHeader({
   const expand = !editing ? <ExpandButton c={c} /> : null;
   const hasOptions = !!(after || right || expand);
   return (
-    <div className={`flex items-center gap-3 mb-3 shrink-0 min-h-5 ${className}`}>
+    <div className={`flex items-center gap-3 mb-3 shrink-0 min-h-5 ${editing ? "pr-[88px]" : ""} ${className}`}>
       <div className="relative flex-1 min-w-0 flex items-center">
         <div inert={open} className={`flex items-center gap-1.5 min-w-0 ${c.label} ${HEADER_SWAP.main} ${open ? HEADER_SWAP.mainHidden : ""}`}>
           <Icon size={14} className="opacity-50 shrink-0" />

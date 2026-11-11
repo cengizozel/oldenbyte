@@ -505,7 +505,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   }
 
   return (
-    <div className={`shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 ${editing ? "pr-24 cursor-grab" : "pr-5"} ${className}`}>
+    <div className={`shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 ${editing ? "pr-[108px] cursor-grab" : "pr-5"} ${className}`}>
       <div className="relative flex-1 min-w-0 flex items-center">
       <div
         ref={listRef}
