@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { MessageSquare, Plus, X, Pencil } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { timeAgo } from "@/lib/chat/format";
@@ -11,8 +11,9 @@ import { WidgetHeader } from "../ui/WidgetChrome";
 // Chats list: switches the whole widget to a list of saved conversations.
 // The active chat's title, count and rename placeholder come from the live
 // working copy (`active`), the rest from the index.
-export default function HistoryPanel({ c, conversations, activeId, active, onNew, onClose, onSelect, onRename, onDelete }: {
+export default function HistoryPanel({ c, conversations, activeId, active, filter, onNew, onClose, onSelect, onRename, onDelete }: {
   c: ColorClasses;
+  filter?: ReactNode; // the "All dashboards" chip
   conversations: ConvMeta[];
   activeId: string;
   active: { title: string; count: number; autoTitle: string };
@@ -36,6 +37,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, onNew
           panel
           right={
             <>
+              {filter}
               <button onClick={onNew} title="New chat with the Assistant" aria-label="New chat" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}>
                 <Plus size={14} />
               </button>
@@ -47,7 +49,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, onNew
         />
       </div>
       <div className="flex-1 min-h-0 overflow-auto px-2 pb-2 flex flex-col gap-1">
-        {[...conversations].sort((a, b) => b.updatedAt - a.updatedAt).map(cv => {
+        {[...conversations].filter(cv => cv.id === activeId || cv.count > 0).sort((a, b) => b.updatedAt - a.updatedAt).map(cv => {
           const isActive = cv.id === activeId;
           const title = isActive ? active.title : cv.title;
           const count = isActive ? active.count : cv.count;

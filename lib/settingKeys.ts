@@ -41,7 +41,7 @@ const WIDGET_KEYS: RegExp[] = [
   /^(?:text|rss|reddit|youtube|arxiv|hf|weather|calendar|schedule|tv|kiwix|anytype|bank)-widget-(.+?)(?:-cache)?$/,
   /^reddit-(.+?)-(?:seen|visit)$/,
   /^chat-widget-(.+)$/,
-  /^chat-(.+?)-(?:index|conv-.+)$/,
+  /^chat-(?!library-)(.+?)-(?:index|conv-.+)$/, // chat-library-* is the shared chat library, global
   /^notebook-(.+?)-(?:days|dates|name|day-\d{4}-\d{2}-\d{2})$/,
   /^reader-(?:config|position)-(.+)$/,
   /^tracker-(?:config|days)-(.+)$/,

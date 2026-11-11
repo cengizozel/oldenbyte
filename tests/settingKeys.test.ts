@@ -78,6 +78,8 @@ describe("instanceIdOf", () => {
 
   it.each([
     "widget-layout",
+    "chat-library",
+    "chat-library-conv-1790000000000-123",
     "widget-instances:dash-1",
     "dashboards",
     "notepad-registry",

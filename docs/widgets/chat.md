@@ -8,12 +8,15 @@ Responses stream token-by-token and conversations are saved.
 
 | Key | Value |
 |---|---|
-| `chat-{id}-index` | JSON: `{ config, activeId, characters: [{ id, name, emoji, persona, focus, memories }], activeCharacterId, conversations: [{ id, title, autoTitle, count, updatedAt, renamed, characterId }] }`. The conversation list holds metadata only. |
-| `chat-{id}-conv-{convId}` | JSON: `{ messages }` for one conversation. Loaded when the conversation is opened. |
+| `chat-library` | JSON: `{ conversations: [{ id, title, autoTitle, count, updatedAt, renamed, characterId, dashboardId }], characters: [{ id, name, emoji, persona, focus, memories, dashboardId }] }`. Shared by every Assistant widget of the user. The built-in Assistant is not in it (each widget's comes from its own `system` prompt). |
+| `chat-library-conv-{convId}` | JSON: `{ messages }` for one conversation. Loaded when the conversation is opened. |
+| `chat-{id}-index` | JSON: `{ config, activeId, activeCharacterId }`: the widget's own settings and what it has open. |
 
-Saving a conversation writes only its own key plus the index, so one long chat cannot push every other chat over the 1 MB value limit. Storage code lives in `lib/chat/storage.ts`.
+Saving a conversation writes only its own key plus the library, so one long chat cannot push every other chat over the 1 MB value limit. Storage code lives in `lib/chat/storage.ts`.
 
-**Migration.** Older installs kept everything in one `chat-widget-{id}` key. On load, when no index exists, that key is read, each conversation is copied to its own key, then the index is written, and the old key is removed only after every write succeeded. If any write fails the old key stays the source of truth and the copy is retried on the next save. A value that does not parse is left untouched, and a failed read makes the widget read-only (with a Retry button) rather than saving defaults over data.
+**Shared chats and characters.** Chats and characters belong to the user, not the widget: delete an Assistant and add another, and they are all still there. Each records the dashboard it was started on (`dashboardId`). The Chats and Characters panels and the data access menu list this dashboard's by default; the **All dashboards** chip in each (one setting, `config.allDashboards`) lists every dashboard's. All Assistants on a page share one copy of the library in memory, so a change in one shows in the others at once and two widgets never save over each other.
+
+**Migration.** Before the library, each widget kept its own chats (`chat-{id}-index` with the list and characters, `chat-{id}-conv-{convId}` for messages), and before that one `chat-widget-{id}` key. The first load with no `chat-library` reads every Assistant on every dashboard (migrating a `chat-widget-{id}` key to the split keys on the way), copies each non-empty conversation to `chat-library-conv-{convId}` and each character into the library, tagged with the widget's dashboard, and writes the library last. Any failed read or write stops it before the library is written, and the widget stays read-only (with a Retry button) rather than saving over data. The old keys are left as they were.
 
 `config` holds: `baseUrl, apiKey, model, system, useDashboard, dashboardWidgets, maxTokens, length, effort, useKiwix, kiwixUrl, kiwixSource, kiwixSourceTitle, useCalendar, useAnytype, anytypeUrl, anytypeApiKey, anytypeSpaceId, anytypeSpaceName, keepAlive`.
 
@@ -24,7 +27,7 @@ The oldest single-conversation shape (`{ config, messages }`) is migrated the sa
 - `model`: the model id, e.g. `llama3.2`. The settings panel can **Load models** from `{baseUrl}/models` to populate a picker.
 - `system`: optional system prompt. An always-on `BASE_IDENTITY` block (the assistant knows it lives in this dashboard) is prepended regardless.
 - `useDashboard`: dashboard lookup toggle; hands the model `read_widget`/`search_dashboard` tools (see below).
-- `dashboardWidgets`: which widgets the lookup may read, by instance id. A **missing key counts as included**, so newly added widgets are searchable by default.
+- `dashboardWidgets`: which widgets the lookup may read, by instance id. For a widget on this dashboard a **missing key counts as included**, so newly added widgets are searchable by default. A widget on another dashboard is listed under **All dashboards** and is read only once turned on; the model sees its title with the dashboard's name.
 - `maxTokens`: caps the reply length, sent upstream as `max_tokens`. `0` omits the field so the server uses its own default.
 - `length`: response-style preset (`default` / `concise` / `balanced` / `detailed`). Each appends a brevity instruction to the system prompt and, when selected, fills `maxTokens` with a suggested cap (which can then be edited). `concise` is roughly 2-3 sentences (256 tokens), `balanced` a paragraph or two (768), `detailed` is thorough with no cap.
 - `effort`: thinking budget for reasoning models (qwen3, deepseek-r1, ...), sent as OpenAI `reasoning_effort`. `default` omits the field; **`none` turns chain-of-thought off** (much faster for simple chats); `low`/`medium`/`high` scale it up. Servers/models without reasoning ignore it.
@@ -32,7 +35,9 @@ The oldest single-conversation shape (`{ config, messages }`) is migrated the sa
 - `useCalendar`: calendar read/write tools, backed by the dashboard Calendar widget's CalDAV account (see [Calendar access](#calendar-access)).
 - `useAnytype` / `anytypeUrl` / `anytypeApiKey` / `anytypeSpaceId` / `anytypeSpaceName`: Anytype lookup toggle and the paired connection.
 - `keepAlive`: model-residency preference for Ollama/LM Studio (see [Model residency](#model-residency-ollama--lm-studio)). `""` = server default, `"5m"`/`"30m"`/`"1h"` = linger that long, `"-1"` = stay loaded.
-- `characters` / `activeCharacterId`: personas with scoped memory (see [Characters](#characters--scoped-memory)). Each conversation records its `characterId`.
+- `allDashboards`: the Chats, Characters and data access lists show every dashboard's, not only this one's.
+
+The widget index also keeps `activeCharacterId`; the characters themselves are in the library (see [Characters](#characters--scoped-memory)). Each conversation records its `characterId`.
 
 ## Settings
 

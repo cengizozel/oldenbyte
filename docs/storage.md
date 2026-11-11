@@ -150,7 +150,7 @@ Per-widget keys (`<id>` is the instance ID):
 | TV | `tv-widget-<id>` |
 | Kiwix | `kiwix-widget-<id>` |
 | Anytype | `anytype-widget-<id>` |
-| Chat | `chat-<id>-index`, `chat-<id>-conv-<conversationId>` (legacy `chat-widget-<id>` is migrated by the widget); see [widgets/chat.md](widgets/chat.md) |
+| Chat | `chat-<id>-index` (the widget's settings); chats and characters are user-level in `chat-library` and `chat-library-conv-<conversationId>`. Older `chat-<id>-conv-*` and `chat-widget-<id>` keys are copied into the library once; see [widgets/chat.md](widgets/chat.md) |
 | Community (bank) | `bank-widget-<id>` (user settings), cache `bank-widget-<id>-cache` (last response) |
 | Digest page | cache `digest-ai-sections-<YYYY-MM-DD>` |
 | Digest page | `digest-skip`: JSON array of widget instance ids left out of the digest (the sections row of its model panel) |

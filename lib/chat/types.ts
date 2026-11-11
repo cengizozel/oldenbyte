@@ -47,12 +47,14 @@ export type Conversation = { id: string; title: string; messages: ChatMessage[];
 // the list renders without loading every conversation. `autoTitle` is the
 // title derived from the first message (the placeholder when renaming, and
 // the title again when a manual name is cleared).
-export type ConvMeta = { id: string; title: string; autoTitle: string; count: number; updatedAt: number; renamed?: boolean; characterId?: string };
+// `dashboardId` is the dashboard the chat was started on: chats are shared by
+// every Assistant, and each lists its own dashboard's by default.
+export type ConvMeta = { id: string; title: string; autoTitle: string; count: number; updatedAt: number; renamed?: boolean; characterId?: string; dashboardId?: string };
 
 // A persona with its own system prompt and a private, scoped memory about the
 // user. `focus` both shapes the memory and gates auto-capture: a character only
 // auto-remembers when it has a focus (so the plain Assistant stays memory-less).
-export type Character = { id: string; name: string; emoji: string; persona: string; focus: string; memories: string[] };
+export type Character = { id: string; name: string; emoji: string; persona: string; focus: string; memories: string[]; dashboardId?: string };
 
 export const DEFAULT_CHARACTER_ID = "default";
 
@@ -94,6 +96,9 @@ export type ChatConfig = {
   maxTokens: number; // cap on response length; 0 = no limit (server default)
   length: Length;    // response-style preset: brevity instruction + suggested cap
   textSize?: "sm" | "md" | "lg"; // message text: 14, 16 or 18px (default 14)
+  // Chats, characters and data access list every dashboard's, not only this
+  // one's (default off).
+  allDashboards?: boolean;
   effort: Effort;    // reasoning-model thinking budget
   useKiwix: boolean;       // let the model search the Kiwix library via tools
   kiwixUrl: string;        // kiwix-serve base URL; lookups search its books

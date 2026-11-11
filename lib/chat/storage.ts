@@ -1,19 +1,23 @@
 import * as storage from "@/lib/storage";
-import { listDashboardWidgets, type WidgetRosterItem } from "@/lib/dashboardContext";
+import { listDashboardWidgets, listWidgetsOfType, type WidgetRosterItem } from "@/lib/dashboardContext";
 import {
   DEFAULT_CHARACTER_ID, DEFAULT_CONFIG, defaultCharacter, newId, titleFrom,
   type Character, type ChatConfig, type ChatMessage, type Conversation, type ConvMeta,
 } from "./types";
 
-// Chat persistence. Each conversation lives under its own key, and a small
-// index key carries everything else (config, characters, active ids, and the
-// per-conversation metadata the history list shows). Older versions kept the
-// whole state in one key that grew without bound and eventually crossed the
-// server's 1 MB value limit; it is migrated on first load.
+// Chat persistence. Chats and characters are shared by every Assistant widget
+// (one library per user); each widget keeps only its own settings and which
+// chat and character it has open. Each conversation lives under its own key.
 //
-//   chat-widget-<widgetId>               legacy single key (read once, then removed)
-//   chat-<widgetId>-index                ChatIndex
-//   chat-<widgetId>-conv-<conversationId> { messages: ChatMessage[] }
+//   chat-library                          ChatLibrary: chat list + characters
+//   chat-library-conv-<conversationId>    { messages: ChatMessage[] }
+//   chat-<widgetId>-index                 the widget: config, activeId, activeCharacterId
+//
+// Before the library, each widget kept its own chats (chat-<widgetId>-index
+// with the list, chat-<widgetId>-conv-<id> for messages), and before that one
+// single key (chat-widget-<widgetId>). The first load copies every widget's
+// chats and characters into the library, tagged with the widget's dashboard;
+// the old keys are left as they were.
 
 export function chatKeys(widgetId: string) {
   return {
@@ -30,6 +34,12 @@ export type ChatIndex = {
   activeCharacterId: string;
   conversations: ConvMeta[];
 };
+
+// What every Assistant shares. The built-in Assistant is not in it: each
+// widget's own comes from its config (its system prompt).
+export type ChatLibrary = { conversations: ConvMeta[]; characters: Character[] };
+const LIBRARY_KEY = "chat-library";
+const libraryConvKey = (convId: string) => `chat-library-conv-${convId}`;
 
 // The legacy single-key value.
 type LegacyChatState = {
@@ -115,8 +125,12 @@ function serializeConversation(messages: ChatMessage[]): string {
 // Read one conversation's messages. A missing key is an empty conversation
 // (created but never saved); a failed read or an unreadable value is reported
 // so the caller never treats it as empty and saves over it.
-export async function loadConversation(widgetId: string, convId: string): Promise<{ ok: true; messages: ChatMessage[] } | { ok: false }> {
-  const res = await storage.getItemResult(chatKeys(widgetId).conv(convId));
+export async function loadConversation(convId: string): Promise<{ ok: true; messages: ChatMessage[] } | { ok: false }> {
+  return readConversationKey(libraryConvKey(convId));
+}
+
+async function readConversationKey(key: string): Promise<{ ok: true; messages: ChatMessage[] } | { ok: false }> {
+  const res = await storage.getItemResult(key);
   if (!res.ok) return { ok: false };
   if (res.value == null) return { ok: true, messages: [] };
   const messages = parseConversation(res.value);
@@ -167,7 +181,109 @@ export function loadChat(widgetId: string): Promise<LoadResult> {
   return p;
 }
 
+// ── The shared library ──────────────────────────────────────────────────────
+// One copy in memory for the page: every Assistant edits it and hears the
+// others' changes, so two widgets never save over each other's edits.
+let library: ChatLibrary | null = null;
+let libraryLoad: Promise<ChatLibrary | null> | null = null;
+const listeners = new Set<(lib: ChatLibrary, from: string) => void>();
+
+export function subscribeLibrary(fn: (lib: ChatLibrary, from: string) => void): () => void {
+  listeners.add(fn);
+  return () => { listeners.delete(fn); };
+}
+
+function loadLibrary(): Promise<ChatLibrary | null> {
+  if (library) return Promise.resolve(library);
+  if (!libraryLoad) {
+    libraryLoad = readLibrary().then(lib => {
+      if (lib && !library) library = lib;
+      libraryLoad = null; // a failure is retried on the next load
+      return library;
+    });
+  }
+  return libraryLoad;
+}
+
+async function readLibrary(): Promise<ChatLibrary | null> {
+  const res = await storage.getItemResult(LIBRARY_KEY);
+  if (!res.ok) return null;
+  if (res.value != null) {
+    try {
+      const v = JSON.parse(res.value);
+      if (!isObject(v)) return null;
+      return {
+        conversations: Array.isArray(v.conversations) ? v.conversations as ConvMeta[] : [],
+        characters: Array.isArray(v.characters) ? (v.characters as Character[]).filter(ch => ch.id !== DEFAULT_CHARACTER_ID) : [],
+      };
+    } catch {
+      return null;
+    }
+  }
+  // First load: gather every Assistant's chats and characters. Any failed
+  // read stops it, so nothing is written from a partial picture.
+  const widgets = await listWidgetsOfType("chat").catch(() => null);
+  if (!widgets) return null;
+  const conversations: ConvMeta[] = [];
+  const characters = new Map<string, Character>();
+  const copies: [string, ChatMessage[]][] = [];
+  for (const { id: widgetId, dashboardId } of widgets) {
+    const r = await readWidgetChat(widgetId);
+    if (!r.ok) return null;
+    const chat = r.chat;
+    for (const cv of chat.conversations) {
+      if (conversations.some(x => x.id === cv.id)) continue;
+      let msgs = chat.messages.get(cv.id);
+      if (!msgs) {
+        const m = await readConversationKey(chatKeys(widgetId).conv(cv.id));
+        if (!m.ok) return null;
+        msgs = m.messages;
+      }
+      if (!msgs.length) continue; // an empty starter chat
+      conversations.push({ ...cv, dashboardId });
+      copies.push([cv.id, msgs]);
+    }
+    for (const ch of chat.characters) {
+      if (ch.id !== DEFAULT_CHARACTER_ID && !characters.has(ch.id)) characters.set(ch.id, { ...ch, dashboardId });
+    }
+  }
+  const written = await Promise.all(copies.map(([id, msgs]) => storage.setItem(libraryConvKey(id), serializeConversation(msgs))));
+  if (!written.every(Boolean)) return null;
+  const lib: ChatLibrary = { conversations, characters: [...characters.values()] };
+  if (!(await storage.setItem(LIBRARY_KEY, JSON.stringify(lib)))) return null;
+  return lib;
+}
+
 async function readChat(widgetId: string): Promise<LoadResult> {
+  const lib = await loadLibrary();
+  if (!lib) return { ok: false };
+  const idx = await storage.getItemResult(chatKeys(widgetId).index);
+  if (!idx.ok) return { ok: false };
+  let index: Partial<ChatIndex> = {};
+  if (idx.value != null) {
+    try {
+      const v = JSON.parse(idx.value);
+      if (!isObject(v)) return { ok: false };
+      index = v as Partial<ChatIndex>;
+    } catch { return { ok: false }; }
+  }
+  const cfg = await upgradeConfig(index.config);
+  const chars = settleCharacters(cfg, lib.characters, index.activeCharacterId);
+  const conversations = lib.conversations;
+  if (!index.activeId || !conversations.some(cv => cv.id === index.activeId)) {
+    const fresh = freshStart(cfg, lib.characters, index.activeCharacterId);
+    return { ok: true, chat: { ...fresh, conversations: [...fresh.conversations, ...conversations] } };
+  }
+  const conv = await loadConversation(index.activeId);
+  if (!conv.ok) return { ok: false };
+  return {
+    ok: true,
+    chat: { config: cfg, ...chars, activeId: index.activeId, conversations, messages: new Map([[index.activeId, conv.messages]]), migrationPending: false },
+  };
+}
+
+// One widget's chats as kept before the library (used once, to fill it).
+async function readWidgetChat(widgetId: string): Promise<LoadResult> {
   const keys = chatKeys(widgetId);
   const idx = await storage.getItemResult(keys.index);
   if (!idx.ok) return { ok: false };
@@ -181,7 +297,7 @@ async function readChat(widgetId: string): Promise<LoadResult> {
     const conversations = Array.isArray(index.conversations) ? index.conversations : [];
     if (!conversations.length) return { ok: true, chat: freshStart(cfg, index.characters, index.activeCharacterId) };
     const activeId = index.activeId && conversations.some(cv => cv.id === index.activeId) ? index.activeId : conversations[0].id;
-    const conv = await loadConversation(widgetId, activeId);
+    const conv = await readConversationKey(keys.conv(activeId));
     if (!conv.ok) return { ok: false };
     return {
       ok: true,
@@ -261,41 +377,42 @@ function createKeyQueue() {
   return run;
 }
 
-// Saves for one widget. Values are read when a save actually runs, so queued
-// saves always write the newest state.
+// Saves for one widget: its own settings, the shared library, and
+// conversations. Values are read when a save actually runs, so queued saves
+// always write the newest state.
 export function createChatSaver(widgetId: string, source: {
   index: () => ChatIndex;
   conversation: (convId: string) => ChatMessage[] | undefined;
-  // Every conversation; only used to retry an unfinished legacy migration,
-  // when they are all in memory.
-  all: () => Map<string, ChatMessage[]>;
 }) {
   const keys = chatKeys(widgetId);
   const run = createKeyQueue();
-  let migrationPending = false;
 
   return {
-    setMigrationPending(v: boolean) { migrationPending = v; },
-
     saveIndex() {
+      // Everyone else sees the change at once; the write follows.
+      const snap = source.index();
+      const next: ChatLibrary = {
+        conversations: snap.conversations,
+        characters: snap.characters.filter(ch => ch.id !== DEFAULT_CHARACTER_ID),
+      };
+      library = next;
+      listeners.forEach(fn => fn(next, widgetId));
+      run(LIBRARY_KEY, () => storage.setItem(LIBRARY_KEY, JSON.stringify(library)));
       run(keys.index, async () => {
-        if (migrationPending) {
-          if (await writeSplit(widgetId, source.index(), source.all())) migrationPending = false;
-          return;
-        }
-        await storage.setItem(keys.index, JSON.stringify(source.index()));
+        const { config, activeId, activeCharacterId } = source.index();
+        await storage.setItem(keys.index, JSON.stringify({ config, activeId, activeCharacterId }));
       });
     },
 
     saveConversation(convId: string) {
-      run(keys.conv(convId), async () => {
+      run(libraryConvKey(convId), async () => {
         const msgs = source.conversation(convId);
-        if (msgs) await storage.setItem(keys.conv(convId), serializeConversation(msgs));
+        if (msgs) await storage.setItem(libraryConvKey(convId), serializeConversation(msgs));
       });
     },
 
     removeConversation(convId: string) {
-      run(keys.conv(convId), () => storage.removeItem(keys.conv(convId)));
+      run(libraryConvKey(convId), () => storage.removeItem(libraryConvKey(convId)));
     },
   };
 }

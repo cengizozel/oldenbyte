@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { Bot, Send, Square, Check, X, Loader, Database, MessageSquare, Plus, ChevronDown, Library, Power, Layers, CalendarDays, Paperclip, ArrowDown, type LucideIcon } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { effectiveTimezone, todayIn, TZ_EVENT } from "@/lib/timezone";
-import { listDashboardWidgets, getCalendarAccount, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
+import { listAllDashboardWidgets, dashboardOf, getCalendarAccount, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
 import { WidgetHeader, EmptyState, Chip, SmallButton } from "./ui/WidgetChrome";
 import { HIT_AREA, FOCUS_RING } from "./ui/Field";
 import { tagColor } from "@/lib/colors";
@@ -16,7 +16,7 @@ import {
   type Character, type ChatConfig, type ChatMessage, type ConvMeta, type Proposal,
 } from "@/lib/chat/types";
 import { daySeparators, fileToDataUrl } from "@/lib/chat/format";
-import { createChatSaver, loadChat, loadConversation, metaFor, touchMeta, type ChatIndex } from "@/lib/chat/storage";
+import { createChatSaver, loadChat, loadConversation, metaFor, subscribeLibrary, touchMeta, type ChatIndex } from "@/lib/chat/storage";
 import { buildSystemContent } from "@/lib/chat/prompt";
 import { applyMemoryOps, requestMemoryOps } from "@/lib/chat/memory";
 import { executeProposal } from "@/lib/chat/proposals";
@@ -118,24 +118,43 @@ export default function ChatWidget({
   // the delete) must not write them back.
   const deletedRef = useRef(new Set<string>());
 
+  // The dashboard this widget is on: chats and characters made here are
+  // tagged with it, and the lists show this dashboard's by default.
+  const dashRef = useRef("");
+  const [dashId, setDashId] = useState("");
+
   const saver = useMemo(() => createChatSaver(widget.id, {
     index: (): ChatIndex => ({
       config: configRef.current,
       activeId: activeIdRef.current,
       characters: charactersRef.current,
       activeCharacterId: activeCharacterIdRef.current,
-      conversations: conversationsRef.current,
+      // A chat started here before the dashboard was known gets it now.
+      conversations: conversationsRef.current.map(cv => (cv.dashboardId || !dashRef.current ? cv : { ...cv, dashboardId: dashRef.current })),
     }),
     conversation: id => cacheRef.current.get(id),
-    all: () => cacheRef.current,
+  }), [widget.id]);
+
+  // Another Assistant changed the shared chats or characters: take its list,
+  // keeping this widget's open chat (it may not be saved there yet) and its
+  // own built-in Assistant.
+  useEffect(() => subscribeLibrary((lib, from) => {
+    if (from === widget.id || !loadedRef.current) return;
+    const mine = conversationsRef.current.find(cv => cv.id === activeIdRef.current);
+    const list = lib.conversations.some(cv => cv.id === activeIdRef.current) || !mine ? lib.conversations : [mine, ...lib.conversations];
+    commitConversations(list);
+    const own = charactersRef.current.find(ch => ch.id === DEFAULT_CHARACTER_ID);
+    commitCharacters(own ? [own, ...lib.characters] : lib.characters);
   }), [widget.id]);
 
   useEffect(() => {
     let cancelled = false;
     loadedRef.current = false;
     setLoadState("loading");
-    loadChat(widget.id).then(res => {
+    Promise.all([loadChat(widget.id), dashboardOf(widget.id).catch(() => "")]).then(([res, dash]) => {
       if (cancelled) return;
+      dashRef.current = dash;
+      setDashId(dash);
       if (!res.ok) { setLoadState("failed"); return; }
       const chat = res.chat;
       cacheRef.current = new Map(chat.messages);
@@ -158,7 +177,6 @@ export default function ChatWidget({
       commitConversations(chat.conversations);
       commitActiveId(chat.activeId);
       commitMessages(chat.messages.get(chat.activeId) ?? []);
-      saver.setMigrationPending(chat.migrationPending);
       loadedRef.current = true;
       setLoadState("ready");
     });
@@ -202,11 +220,19 @@ export default function ChatWidget({
   // Roster of readable widgets (names only; content is fetched server-side
   // when the model explicitly calls a tool).
   const [roster, setRoster] = useState<WidgetRosterItem[]>([]);
+  // Chats, characters and this list show this dashboard's unless the
+  // widget is set to show every dashboard's.
+  const allDashboards = !!config.allDashboards;
+  const toggleAllDashboards = () => saveConfig({ ...configRef.current, allDashboards: !configRef.current.allDashboards });
+  const isHere = (dashboardId?: string) => !dashboardId || !dashId || dashboardId === dashId;
+  const shownRoster = allDashboards
+    ? [...roster.filter(w => isHere(w.dashboardId)), ...roster.filter(w => !isHere(w.dashboardId))]
+    : roster.filter(w => isHere(w.dashboardId));
   // @-mention picker state: the partial token being typed and its position.
   const [mention, setMention] = useState<{ query: string; start: number } | null>(null);
   const [mentionIdx, setMentionIdx] = useState(0);
   const mentionMatches = mention
-    ? roster.filter(w =>
+    ? shownRoster.filter(w =>
         w.title.toLowerCase().startsWith(mention.query.toLowerCase()) ||
         w.type.toLowerCase().startsWith(mention.query.toLowerCase())
       ).slice(0, 6)
@@ -216,7 +242,7 @@ export default function ChatWidget({
     const before = value.slice(0, caret);
     const m = before.match(/(^|\s)@([^\s@]*)$/);
     if (!m) { setMention(null); return; }
-    if (!roster.length) listDashboardWidgets().then(setRoster).catch(() => {});
+    if (!roster.length) listAllDashboardWidgets().then(setRoster).catch(() => {});
     setMention({ query: m[2], start: caret - m[2].length - 1 });
     setMentionIdx(0);
   }
@@ -238,9 +264,10 @@ export default function ChatWidget({
   // configured); enabling that widget's row grants agenda + calendar tools.
   const [calSource, setCalSource] = useState<CalendarSource | null>(null);
   useEffect(() => { getCalendarAccount().then(setCalSource).catch(() => {}); }, []);
-  // v3 semantics: widgets on the dashboard are readable unless explicitly
-  // toggled off, so any roster at all means sources are in play.
-  const sourceOn = (id: string) => config.dashboardWidgets[id] !== false;
+  // v3 semantics: widgets on this dashboard are readable unless explicitly
+  // toggled off. Widgets on other dashboards are off until turned on.
+  const sourceOn = (id: string, dashboardId?: string) =>
+    !dashboardId || !dashId || dashboardId === dashId ? config.dashboardWidgets[id] !== false : config.dashboardWidgets[id] === true;
   const calendarOn = !!(calSource && sourceOn(calSource.widgetId));
   // Image attachments: pending (pre-send) data URLs, the lightbox viewer, and
   // whether the selected model can see images (null = backend can't tell us).
@@ -284,7 +311,7 @@ export default function ChatWidget({
     const root = rootRef.current?.getBoundingClientRect();
     const b = btn.getBoundingClientRect();
     if (root) setMenuBox({ width: Math.min(240, b.right - root.left - 8), maxHeight: Math.max(120, root.bottom - b.bottom - 16) });
-    listDashboardWidgets().then(setRoster).catch(() => {});
+    listAllDashboardWidgets().then(setRoster).catch(() => {});
     setMenuOpen(true);
   }
   // Inline rename via the room-title pill above the messages.
@@ -398,7 +425,7 @@ export default function ChatWidget({
   function openSettings() {
     setSettingsOpen(true);
     // Roster for the data-access menu (names only, no data fetching).
-    listDashboardWidgets().then(setRoster).catch(() => setRoster([]));
+    listAllDashboardWidgets().then(setRoster).catch(() => setRoster([]));
   }
 
   function saveSettings(draft: ChatConfig) {
@@ -459,12 +486,12 @@ export default function ChatWidget({
   }
 
   // Flip one widget's data access.
-  function toggleWidgetAccess(id: string) {
+  function toggleWidgetAccess(id: string, dashboardId?: string) {
     saveConfig({
       ...config,
       sourcesVersion: 3,
-      // v3: missing entry = on, so toggling writes the explicit opposite.
-      dashboardWidgets: { ...config.dashboardWidgets, [id]: !sourceOn(id) },
+      // v3: missing entry = on here (off elsewhere), so toggling writes the explicit opposite.
+      dashboardWidgets: { ...config.dashboardWidgets, [id]: !sourceOn(id, dashboardId) },
     });
   }
 
@@ -530,7 +557,7 @@ export default function ChatWidget({
   async function messagesFor(id: string): Promise<ChatMessage[] | null> {
     const cached = cacheRef.current.get(id);
     if (cached) return cached;
-    const res = await loadConversation(widget.id, id);
+    const res = await loadConversation(id);
     if (!res.ok) return null;
     cacheRef.current.set(id, res.messages);
     return res.messages;
@@ -588,7 +615,7 @@ export default function ChatWidget({
 
   function newChatWith(characterId: string) {
     const id = newId();
-    switchTo(id, [], [metaFor(id, [], { characterId }), ...syncActive(conversationsRef.current)]);
+    switchTo(id, [], [metaFor(id, [], { characterId, dashboardId: dashRef.current || undefined }), ...syncActive(conversationsRef.current)]);
   }
 
   async function deleteChat(id: string) {
@@ -634,7 +661,7 @@ export default function ChatWidget({
   }
 
   function createCharacter() {
-    const ch: Character = { id: newId(), name: "New character", emoji: "🦊", persona: "", focus: "", memories: [] };
+    const ch: Character = { id: newId(), name: "New character", emoji: "🦊", persona: "", focus: "", memories: [], dashboardId: dashRef.current || undefined };
     saveCharacters([...charactersRef.current, ch], activeCharacterIdRef.current);
     setEditingChar(ch);
   }
@@ -649,6 +676,7 @@ export default function ChatWidget({
       persona: src.id === DEFAULT_CHARACTER_ID ? config.system : src.persona,
       focus: src.focus,
       memories: [],
+      dashboardId: dashRef.current || undefined,
     };
     saveCharacters([...charactersRef.current, ch], activeCharacterIdRef.current);
     setEditingChar(ch);
@@ -738,10 +766,11 @@ export default function ChatWidget({
     // dashboard are readable unless toggled off; an @-mention in the message
     // force-includes one even when its toggle is off.
     const lastUserText = [...history].reverse().find(m => m.role === "user")?.content ?? "";
-    const rosterNow = !cont ? await listDashboardWidgets().catch(() => [] as WidgetRosterItem[]) : [];
-    const dash = rosterNow.filter(w =>
-      sourceOn(w.id) || lastUserText.includes(`@${w.title}`)
-    );
+    const rosterNow = !cont ? await listAllDashboardWidgets().catch(() => [] as WidgetRosterItem[]) : [];
+    const dash = rosterNow
+      .filter(w => sourceOn(w.id, w.dashboardId) || lastUserText.includes(`@${w.title}`))
+      // A widget from another dashboard says where it is.
+      .map(w => (w.dashboardId && w.dashboardId !== dashId && w.dashboardName ? { ...w, title: `${w.title} (${w.dashboardName})` } : w));
 
     // Continuation streams into the existing message; otherwise append a placeholder.
     const before = cont ? history.slice(0, -1) : history;
@@ -992,30 +1021,37 @@ export default function ChatWidget({
                     {/* click-away backdrop */}
                     <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                     <div style={menuBox ?? undefined} className={`absolute right-0 top-6 z-50 w-60 overflow-y-auto overscroll-contain rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
-                      <p className={`px-2.5 pt-1.5 pb-1 text-sm opacity-70 ${c.label}`}>Data access</p>
-                      {/* One row per data-bearing widget on the dashboard; no master
-                          switch. A calendar widget's row also grants its tools. */}
-                      {roster.length === 0 && (
-                        <p className={`px-2.5 py-1.5 text-xs opacity-70 ${c.text}`}>No data widgets on this dashboard.</p>
+                      <div className="flex items-center justify-between gap-2 px-2.5 pt-1.5 pb-1">
+                        <p className={`text-sm opacity-80 ${c.label}`}>Data access</p>
+                        <Chip c={c} active={allDashboards} onClick={toggleAllDashboards} title="List widgets from every dashboard">All dashboards</Chip>
+                      </div>
+                      {/* One row per data-bearing widget; no master switch. A
+                          calendar widget's row also grants its tools. */}
+                      {shownRoster.length === 0 && (
+                        <p className={`px-2.5 py-1.5 text-sm opacity-80 ${c.text}`}>No data widgets on this dashboard.</p>
                       )}
-                      {roster.map(w => {
+                      {shownRoster.map((w, i) => {
+                        const here = !w.dashboardId || w.dashboardId === dashId;
                         const isCal = w.type === "calendar";
-                        const ready = !isCal || calSource?.widgetId === w.id;
-                        const on = sourceOn(w.id);
+                        const ready = !isCal || !here || calSource?.widgetId === w.id;
+                        const on = sourceOn(w.id, w.dashboardId);
+                        const heading = allDashboards && w.dashboardId !== shownRoster[i - 1]?.dashboardId;
                         return (
+                          <Fragment key={w.id}>
+                          {heading && <p className={`px-2.5 pt-2 pb-0.5 text-sm font-medium ${c.label}`}>{here ? "This dashboard" : w.dashboardName}</p>}
                           <button
-                            key={w.id}
-                            onClick={() => { if (ready) toggleWidgetAccess(w.id); }}
+                            onClick={() => { if (ready) toggleWidgetAccess(w.id, w.dashboardId); }}
                             title={!ready ? "Configure the Calendar widget first" : on ? "On: click to turn off" : "Off: click to turn on"}
                             className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/5 ${FOCUS_RING} ${c.text} ${ready ? "" : "opacity-70"}`}
                           >
                             {isCal ? <CalendarDays size={14} className={`shrink-0 opacity-70 ${c.label}`} /> : <Database size={14} className={`shrink-0 opacity-70 ${c.label}`} />}
                             <span className="flex-1 min-w-0 truncate">
                               {w.title}
-                              <span className={`ml-1.5 text-xs opacity-70 ${c.label}`}>{isCal ? "agenda + add events" : w.type}</span>
+                              <span className={`ml-1.5 text-xs opacity-70 ${c.label}`}>{isCal ? (here ? "agenda + add events" : "agenda") : w.type}</span>
                             </span>
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${on && ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
                           </button>
+                          </Fragment>
                         );
                       })}
                       <p className={`px-2.5 pt-2 pb-1 text-sm opacity-70 border-t ${c.border} mt-1 ${c.label}`}>Connections</p>
@@ -1064,9 +1100,10 @@ export default function ChatWidget({
       {historyOpen && (
         <HistoryPanel
           c={c}
-          conversations={conversations}
+          conversations={allDashboards ? conversations : conversations.filter(cv => cv.id === activeId || isHere(cv.dashboardId))}
           activeId={activeId}
           active={{ title: chatTitle, count: messages.length, autoTitle: titleFrom(messages) }}
+          filter={<Chip c={c} active={allDashboards} onClick={toggleAllDashboards} title="List chats from every dashboard">All dashboards</Chip>}
           onNew={newChat}
           onClose={() => setHistoryOpen(false)}
           onSelect={selectChat}
@@ -1079,8 +1116,9 @@ export default function ChatWidget({
       {charactersOpen && (
         <CharactersPanel
           c={c}
-          characters={characters}
+          characters={allDashboards ? characters : characters.filter(ch => ch.id === DEFAULT_CHARACTER_ID || ch.id === activeConvCharId || isHere(ch.dashboardId))}
           activeCharId={activeConvCharId}
+          filter={<Chip c={c} active={allDashboards} onClick={toggleAllDashboards} title="List characters from every dashboard">All dashboards</Chip>}
           onCreate={createCharacter}
           onClose={() => setCharactersOpen(false)}
           onActivate={activateCharacter}

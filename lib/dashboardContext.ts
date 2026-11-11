@@ -4,7 +4,7 @@
 // server-side by lib/widgetData.ts.
 
 import * as storage from "@/lib/storage";
-import { getActiveDataKeys, instancesKey, type DashboardsState } from "@/lib/dashboards";
+import { getActiveDataKeys, instancesKey, layoutKey, type DashboardsState } from "@/lib/dashboards";
 import { parseJson } from "@/lib/text";
 
 type TabLayoutItem = { i: string; tabs?: string[] };
@@ -18,7 +18,9 @@ async function readJSON<T>(key: string): Promise<T | null> {
   return parseJson<T | null>(await storage.getItem(key), null);
 }
 
-export type WidgetRosterItem = { id: string; title: string; type: string };
+// `dashboardId`/`dashboardName` say where the widget lives (set by the
+// all-dashboards listing).
+export type WidgetRosterItem = { id: string; title: string; type: string; dashboardId?: string; dashboardName?: string };
 
 export type CalendarAccount = {
   baseUrl: string;
@@ -57,8 +59,8 @@ export async function getCalendarAccount(): Promise<CalendarSource | null> {
  * Just the roster of data-bearing widgets on the active dashboard (no content
  * fetching). Drives the chat's data-source checkbox list.
  */
-export async function listDashboardWidgets(): Promise<WidgetRosterItem[]> {
-  const keys = await getActiveDataKeys();
+export async function listDashboardWidgets(dashboardId?: string): Promise<WidgetRosterItem[]> {
+  const keys = dashboardId ? { layout: layoutKey(dashboardId), instances: instancesKey(dashboardId) } : await getActiveDataKeys();
   const [layout, instances] = await Promise.all([
     readJSON<TabLayoutItem[]>(keys.layout),
     readJSON<Record<string, WidgetInstance>>(keys.instances),
@@ -72,6 +74,44 @@ export async function listDashboardWidgets(): Promise<WidgetRosterItem[]> {
   return ids
     .filter(id => instances[id] && ENTRY_TYPES.has(instances[id].type))
     .map(id => ({ id, title: instances[id].title, type: instances[id].type }));
+}
+
+async function dashboardList(): Promise<{ id: string; name: string }[]> {
+  const dashboards = await readJSON<DashboardsState>("dashboards");
+  return dashboards?.list?.length ? dashboards.list : [{ id: "default", name: "Main" }];
+}
+
+/** Data-bearing widgets on every dashboard, each tagged with its dashboard. */
+export async function listAllDashboardWidgets(): Promise<WidgetRosterItem[]> {
+  const out: WidgetRosterItem[] = [];
+  for (const d of await dashboardList()) {
+    for (const w of await listDashboardWidgets(d.id)) out.push({ ...w, dashboardId: d.id, dashboardName: d.name });
+  }
+  return out;
+}
+
+/** Every widget of a type on every dashboard, with the dashboard it is on. */
+export async function listWidgetsOfType(type: string): Promise<{ id: string; dashboardId: string }[]> {
+  const out: { id: string; dashboardId: string }[] = [];
+  for (const d of await dashboardList()) {
+    const instances = await readJSON<Record<string, WidgetInstance>>(instancesKey(d.id));
+    for (const w of Object.values(instances ?? {})) if (w.type === type) out.push({ id: w.id, dashboardId: d.id });
+  }
+  return out;
+}
+
+/**
+ * The dashboard a widget is on (with preloading, a mounted widget is not
+ * always on the active one). Falls back to the active dashboard.
+ */
+export async function dashboardOf(widgetId: string): Promise<string> {
+  const list = await dashboardList();
+  for (const d of list) {
+    const instances = await readJSON<Record<string, WidgetInstance>>(instancesKey(d.id));
+    if (instances?.[widgetId]) return d.id;
+  }
+  const dashboards = await readJSON<DashboardsState>("dashboards");
+  return dashboards?.activeId ?? list[0].id;
 }
 
 /**
