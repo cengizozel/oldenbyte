@@ -24,7 +24,7 @@ type YtView         = "list" | "thumbs" | "gallery";
 // the dashboard server reaches TubeArchivist, when the browser address is
 // not reachable from inside the server's container (a tailscale HTTPS name).
 // mark: which side gets a badge once links open on TubeArchivist, the archived
-// videos ("ta", the default) or the ones not archived yet ("yt"). only: list
+// videos ("ta", the default) or the ones not archived ("yt"). only: list
 // nothing until it is archived, which makes any badge moot.
 type TaConfig       = { url: string; token: string; open: "youtube" | "ta"; serverUrl?: string; mark?: "ta" | "yt"; only?: boolean };
 const taServer = (ta: TaConfig) => (ta.serverUrl?.trim() || ta.url).trim();
@@ -86,17 +86,21 @@ export default function YoutubeWidget({
   const shown = (filter ? videos.filter(v => v.channelId === filter) : videos)
     .filter(v => !onlyArchived || (archivedLoaded && archived.has(videoId(v.link))));
   // The badge beside the time: TA on archived videos, or YouTube on the ones
-  // not archived yet, by the mark setting; none when only archived videos show.
+  // not archived, by the mark setting; none when only archived videos show.
   const badgeFor = (v: Video) => {
     if (!taActive(config.ta) || config.ta.only) return null;
     const on = archived.has(videoId(v.link));
     const mark = config.ta.mark ?? "ta";
     if (mark === "ta" ? !on : on) return null;
-    return (
-      <span className={`shrink-0 text-xs font-medium tracking-widest px-1 py-0.5 rounded-md bg-black/10 dark:bg-white/15 ${c.label}`} title={mark === "ta" ? "Opens on TubeArchivist" : "Not in TubeArchivist yet; opens on YouTube"}>
-        {mark === "ta" ? "TA" : "YouTube"}
-      </span>
-    );
+    // The service's own mark, in the label color, instead of a text badge.
+    return mark === "ta"
+      ? <span role="img" aria-label="In TubeArchivist" title="Opens on TubeArchivist" className={`shrink-0 w-3.5 h-3.5 bg-current opacity-80 ${c.label}`} style={{ maskImage: "url(/tubearchivist.svg)", WebkitMaskImage: "url(/tubearchivist.svg)", maskSize: "contain", WebkitMaskSize: "contain", maskRepeat: "no-repeat", WebkitMaskRepeat: "no-repeat", maskPosition: "center", WebkitMaskPosition: "center" }} />
+      : (
+        <svg role="img" aria-label="Not in TubeArchivist" viewBox="0 0 24 24" className={`shrink-0 w-3.5 h-3.5 opacity-80 ${c.label}`} fill="currentColor">
+          <title>Not in TubeArchivist; opens on YouTube</title>
+          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.930.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.930 24 12 24 12s0-3.930-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+        </svg>
+      );
   };
   const filterName = filter ? videos.find(v => v.channelId === filter)?.channelName ?? "" : "";
   const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([videos, filter]);
@@ -589,7 +593,7 @@ export default function YoutubeWidget({
                   return (
                     <SettingsInfo
                       c={c}
-                      title={`${missing.length} of ${videos.length} not archived yet`}
+                      title={`${missing.length} of ${videos.length} not in TubeArchivist`}
                       items={shown.map(v => (
                         <a key={v.link} href={v.link} target="_blank" rel="noopener noreferrer" className={`hover:underline underline-offset-2 ${FOCUS_RING}`}>
                           <span className="opacity-70">{v.channelName}</span> - <span className={c.text}>{v.title}</span>
