@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
+import { useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
+import { FaceShownContext } from "./FlipCard";
 import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
 import { useWidgetFrame } from "@/lib/widgetFrame";
@@ -354,6 +355,15 @@ export function SettingsFace({
   const faceRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef(onCancel);
   cancelRef.current = onCancel;
+  // In a tab group the row steps aside while this face shows.
+  const group = useTabGroup();
+  const shown = useContext(FaceShownContext) ?? true;
+  const setFaceOpen = group?.setFaceOpen;
+  useEffect(() => {
+    if (!setFaceOpen) return;
+    setFaceOpen(shown);
+    return () => setFaceOpen(false);
+  }, [setFaceOpen, shown]);
   // Escape cancels, like the cross: only for a face that is shown (a flip
   // card's hidden back is mounted but inert) and that holds the focus, or
   // when nothing in particular does.

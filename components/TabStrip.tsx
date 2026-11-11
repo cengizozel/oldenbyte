@@ -39,6 +39,8 @@ type Props = {
   activeId: string;
   instances: Record<string, Widget>;
   editing: boolean;
+  // While the shown member's settings face is open the row steps aside.
+  hidden?: boolean;
   className?: string;
   onSelect: (id: string) => void;
   onUngroup: (id: string) => void;
@@ -71,7 +73,7 @@ function movedTo(order: string[], id: string, index: number): string[] {
   return rest;
 }
 
-export default function TabStrip({ order, activeId, instances, editing, className = "", onSelect, onUngroup, onReorder, onHosts }: Props) {
+export default function TabStrip({ order, activeId, instances, editing, hidden = false, className = "", onSelect, onUngroup, onReorder, onHosts }: Props) {
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const c = colorMap[instances[activeId]?.color ?? "neutral"];
   const frame = useWidgetFrame();
@@ -522,7 +524,7 @@ export default function TabStrip({ order, activeId, instances, editing, classNam
   }
 
   return (
-    <div className={`shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 pr-5 ${editing ? "cursor-grab" : ""} ${className}`}>
+    <div className={`shrink-0 flex items-center gap-3 pl-5 pt-[18px] pb-2.5 pr-5 ${editing ? "cursor-grab" : ""} ${hidden ? "hidden" : ""} ${className}`}>
       <div className="relative flex-1 min-w-0 flex items-center">
       <div
         ref={listRef}

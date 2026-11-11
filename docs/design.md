@@ -198,7 +198,10 @@ the palette `label` color at 50% opacity.
   first, then one `SettingsListControl` per control (label left, control
   right), all 36px tall and a hairline apart. Short options come first and
   the collection last, so nothing has to be scrolled past to reach a
-  setting. Copy inside a face is `SettingsNote`, errors `SettingsError`.
+  setting. A face replaces the whole card: in a tab group the tab row
+  hides while a member's face is open, so grouped and single settings
+  look the same. In the settings drawer, section titles are 12px semibold
+  uppercase overlines, distinct from row labels and their hints. Copy inside a face is `SettingsNote`, errors `SettingsError`.
   Every face has reset: it puts the fields back to the widget's defaults
   (the draft only; save applies it), after a "Back to defaults?" step that
   disarms by itself. The save row's three actions are 28px filled buttons

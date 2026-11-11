@@ -232,6 +232,18 @@ export default function WidgetGrid({
   const [moveMenuFor, setMoveMenuFor] = useState<string | null>(null);
   const otherDashboards = (dashboards ?? []).filter(d => d.id !== dashboardId);
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
+  // Groups whose shown member has its settings face open: the tab row hides
+  // and the member gets its top padding back (lib/tabGroup.ts).
+  const [faceOpen, setFaceOpenState] = useState<Record<string, boolean>>({});
+  const faceSetters = useRef(new Map<string, (open: boolean) => void>());
+  const faceSetterFor = (containerId: string) => {
+    let fn = faceSetters.current.get(containerId);
+    if (!fn) {
+      fn = (open: boolean) => setFaceOpenState(prev => (!!prev[containerId] === open ? prev : { ...prev, [containerId]: open }));
+      faceSetters.current.set(containerId, fn);
+    }
+    return fn;
+  };
   // The tile shown full screen (lib/widgetFrame.ts): lifted over a dimmed
   // backdrop in place, so the widget never remounts. Escape, the backdrop,
   // the header's button, or entering edit mode bring it back.
@@ -796,6 +808,7 @@ export default function WidgetGrid({
           activeId={activeId}
           instances={instances}
           editing={isEditMode}
+          hidden={!!faceOpen[item.i]}
           onSelect={tabId => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
           onUngroup={tabId => handleUngroupTab(item.i, tabId)}
           onReorder={order => handleReorderTabs(item.i, order)}
@@ -831,7 +844,7 @@ export default function WidgetGrid({
         seen.add(id);
         mounted.push({
           id,
-          extraClass: tabbed ? "!rounded-none !border-0 !shadow-none !pt-0" : "",
+          extraClass: tabbed ? `!rounded-none !border-0 !shadow-none ${faceOpen[item.i] ? "" : "!pt-0"}` : "",
           group: tabbed ? item.i : undefined,
         });
       }
@@ -969,6 +982,7 @@ export default function WidgetGrid({
                                 activeId={activeId}
                                 instances={instances}
                                 editing
+                                hidden={!!faceOpen[item.i]}
                                 onSelect={tabId => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
                                 onUngroup={tabId => handleUngroupTab(item.i, tabId)}
                                 onReorder={order => handleReorderTabs(item.i, order)}
@@ -1116,6 +1130,7 @@ export default function WidgetGrid({
               titleHost: tabHosts.current.get(group)?.titles[id] ?? null,
               actionsHost: tabHosts.current.get(group)?.actions ?? null,
               settingsHost: tabHosts.current.get(group)?.settings ?? null,
+              setFaceOpen: faceSetterFor(group),
             }}
           >
             {renderWidget(instances[id], extraClass, bankDefs)}

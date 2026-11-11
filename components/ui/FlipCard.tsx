@@ -1,7 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { createContext, type ReactNode } from "react";
 import type { ColorClasses } from "@/lib/widgets";
+
+// Whether the face a component sits on is the one showing. The back face is
+// always mounted (for the flip), so a settings face reads this to know when
+// it is really open. Null outside a flip card: an overlay face is mounted
+// only while open.
+export const FaceShownContext = createContext<boolean | null>(null);
 
 // The standard widget shell: rounded color card whose front face flips to a
 // settings back face with a 3D rotateY transition. Extracted from the pattern
@@ -47,7 +53,7 @@ export default function FlipCard({
           // it out of the tab order and the accessibility tree.
           inert={flipped}
         >
-          {front}
+          <FaceShownContext.Provider value={!flipped}>{front}</FaceShownContext.Provider>
         </div>
         <div
           className={`absolute inset-0 p-5 flex flex-col gap-3 rounded-2xl overflow-clip ${c.bg} ${backClassName}`}
@@ -59,7 +65,7 @@ export default function FlipCard({
           }}
           inert={!flipped}
         >
-          {back}
+          <FaceShownContext.Provider value={flipped}>{back}</FaceShownContext.Provider>
         </div>
       </div>
     </div>

@@ -23,6 +23,11 @@ export type TabGroupMembership = {
   titleHost: HTMLElement | null;
   actionsHost: HTMLElement | null;
   settingsHost: HTMLElement | null;
+  // A member's settings face replaces the whole card, the tab row included:
+  // the face reports when it shows, the row steps aside and the member gets
+  // its top padding back, so grouped settings look exactly like a single
+  // widget's (components/ui/WidgetChrome.tsx, SettingsFace).
+  setFaceOpen: (open: boolean) => void;
 };
 
 export const TabGroupContext = createContext<TabGroupMembership | null>(null);

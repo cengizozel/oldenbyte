@@ -79,7 +79,7 @@ export function Stepper({
       <button type="button" tabIndex={-1} aria-label={`Less ${label}`} disabled={disabled || value <= min} onClick={() => onChange(clamp(value - step))} className={btn}>
         <Minus size={12} />
       </button>
-      <span className="min-w-8 text-center text-sm tabular-nums">{shown}{unit && <span className="opacity-70">{unit}</span>}</span>
+      <span className="min-w-8 text-center text-sm tabular-nums">{shown}{unit && <span className="opacity-70 ml-0.5">{unit}</span>}</span>
       <button type="button" tabIndex={-1} aria-label={`More ${label}`} disabled={disabled || value >= max} onClick={() => onChange(clamp(value + step))} className={btn}>
         <Plus size={12} />
       </button>
@@ -93,7 +93,8 @@ export function Stepper({
 export function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col">
-      <h3 className="text-sm text-[var(--text-muted)] pt-5 pb-1">{title}</h3>
+      {/* An overline, so a section title never reads like a row's hint. */}
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] pt-6 pb-1.5">{title}</h3>
       <div className="flex flex-col divide-y divide-[var(--surface-border)]">{children}</div>
     </section>
   );
