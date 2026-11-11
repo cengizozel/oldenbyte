@@ -477,9 +477,6 @@ export default function YoutubeWidget({
             <div className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${selected ? "translate-x-0" : "translate-x-full"}`}>
               {selected && (
                 <>
-                  <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
-                    <span className="flex-1 min-w-0 text-sm font-medium truncate opacity-80">{selected.title}</span>
-                  </div>
                   <div className="flex-1 min-h-0 overflow-y-auto pr-3">
                     <div className="flex gap-2 mb-2">
                       <BackButton c={c} onClick={() => setSelected(null)} />
