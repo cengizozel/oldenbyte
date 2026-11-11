@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { CalendarRange, Plus, Pencil, Maximize2, Minimize2, Check, X, Trash2, FileText, Copy } from "lucide-react";
+import { CalendarRange, Plus, Pencil, Check, X, Trash2, FileText, Copy } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { SettingsInput, SettingsSelect, SettingsTextarea, HIT_AREA, FOCUS_RING } from "./ui/Field";
 import { WidgetHeader, Chip, SmallButton, EmptyState } from "./ui/WidgetChrome";
-import { TabGroupContext } from "@/lib/tabGroup";
+import { useWidgetFrame } from "@/lib/widgetFrame";
 
 // A fixed weekly schedule: the same seven-day time grid every week (classes,
 // gym, standing calls), as opposed to the Calendar widget's dated events.
@@ -149,8 +148,7 @@ export default function ScheduleWidget({
 
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
   const [loaded, setLoaded] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const expanded = useWidgetFrame()?.expanded ?? false; // full screen, from the grid
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -292,7 +290,6 @@ export default function ScheduleWidget({
     setSplitAsk(null);
   }
 
-  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     storage.getItem(storageKey).then(raw => {
@@ -316,20 +313,21 @@ export default function ScheduleWidget({
     return () => clearInterval(id);
   }, []);
 
-  // Escape backs out one layer: dialog faces first, then fullscreen.
+  // Escape backs out one dialog face at a time, and claims the key so the
+  // grid does not also close full screen; with no face open it is the grid's.
   useEffect(() => {
-    if (!expanded && !editor && !settingsOpen && !exportOpen && !splitAsk) return;
+    if (!editor && !settingsOpen && !exportOpen && !splitAsk) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      e.preventDefault();
       if (splitAsk) setSplitAsk(null);
       else if (editor) setEditor(null);
       else if (exportOpen) setExportOpen(false);
-      else if (settingsOpen) setSettingsOpen(false);
-      else setExpanded(false);
+      else setSettingsOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [expanded, editor, settingsOpen, exportOpen, splitAsk]);
+  }, [editor, settingsOpen, exportOpen, splitAsk]);
 
   function apply(next: Config) {
     setConfig(next);
@@ -442,8 +440,7 @@ export default function ScheduleWidget({
     const now = new Date();
     const nowY = (normMin(now.getHours() * 60 + now.getMinutes(), startHour) - startHour * 60) / 60 * HOUR_PX;
     const labels = big ? DAYS : DAYS_SHORT;
-    // Only one grid is mounted at a time (the tile hides while fullscreen is
-    // open), so drag math can read these without caring which one it is.
+    // One grid, in the tile or full screen, so drag math reads these as is.
     gridMetricsRef.current = { hourPx: HOUR_PX, startHour, hours };
 
     return (
@@ -586,9 +583,6 @@ export default function ScheduleWidget({
                 className={actionCls}
               >
                 <Pencil size={14} />
-              </button>
-              <button onClick={() => setExpanded(v => !v)} title={big ? "Close (Esc)" : "Expand"} aria-label={big ? "Close" : "Expand"} className={actionCls}>
-                {big ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </button>
             </>
           }
@@ -797,30 +791,9 @@ export default function ScheduleWidget({
   }
 
   return (
-    <>
-      <div className={`rounded-2xl border h-full relative group flex flex-col p-5 ${c.bg} ${c.border} ${c.glow} ${className}`}>
-        {expanded ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
-            <CalendarRange size={16} className={`${c.label} opacity-50`} />
-            <p className={`text-xs ${c.text} opacity-70`}>schedule is open in fullscreen</p>
-            <SmallButton c={c} onClick={() => setExpanded(false)}>Close</SmallButton>
-          </div>
-        ) : card(false)}
-      </div>
-
-      {expanded && mounted && createPortal(
-        <div
-          className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-          onMouseDown={e => { if (e.target === e.currentTarget) setExpanded(false); }}
-        >
-          <div className={`tw-overlay-in group w-[80vw] h-[80vh] max-w-[1400px] rounded-2xl border shadow-2xl relative flex flex-col p-6 ${c.bg} ${c.border}`}>
-            {/* The overlay draws its own header even when the widget is a tab. */}
-            <TabGroupContext.Provider value={null}>{card(true)}</TabGroupContext.Provider>
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
+    <div className={`rounded-2xl border h-full relative group flex flex-col p-5 ${c.bg} ${c.border} ${c.glow} ${className}`}>
+      {card(expanded)}
+    </div>
   );
 }
 

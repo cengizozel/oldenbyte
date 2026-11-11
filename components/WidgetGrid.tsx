@@ -17,6 +17,7 @@ import WidgetCard from "./WidgetCard";
 import WidgetShelf from "./WidgetShelf";
 import TabStrip from "./TabStrip";
 import { TabGroupContext, type TabGroupHosts } from "@/lib/tabGroup";
+import { WidgetFrameContext, type WidgetFrame } from "@/lib/widgetFrame";
 import NotebookWidget from "./NotepadWidget";
 import TextWidget from "./TextWidget";
 import RssWidget from "./RssWidget";
@@ -231,6 +232,27 @@ export default function WidgetGrid({
   const [moveMenuFor, setMoveMenuFor] = useState<string | null>(null);
   const otherDashboards = (dashboards ?? []).filter(d => d.id !== dashboardId);
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
+  // The tile shown full screen (lib/widgetFrame.ts): lifted over a dimmed
+  // backdrop in place, so the widget never remounts. Escape, the backdrop,
+  // the header's button, or entering edit mode bring it back.
+  const [expandedCell, setExpandedCell] = useState<string | null>(null);
+  const frameFor = (cellId: string): WidgetFrame => ({
+    editing,
+    expanded: expandedCell === cellId,
+    setExpanded: v => setExpandedCell(v ? cellId : null),
+  });
+  useEffect(() => { if (editing) setExpandedCell(null); }, [editing]);
+  useEffect(() => {
+    if (!expandedCell) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // After the widget's own handlers: one that used the key (a dialog
+      // closing, Typing restarting a run) prevents the default.
+      setTimeout(() => { if (!e.defaultPrevented) setExpandedCell(null); }, 0);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expandedCell]);
   // Where each tab group's row wants the shown widget's header icon and
   // actions (lib/tabGroup.ts). The state bump re-renders the members when a
   // row mounts or its shown tab changes, so their headers re-portal.
@@ -668,6 +690,25 @@ export default function WidgetGrid({
   }
 
   function renderWithTabs(item: TabLayoutItem, isEditMode: boolean) {
+    const inner = renderCell(item, isEditMode);
+    if (isEditMode || !inner) return inner;
+    const expanded = expandedCell === item.i;
+    return (
+      <WidgetFrameContext.Provider value={frameFor(item.i)}>
+        {/* The cell keeps its place; the frame inside it lifts to the viewport. */}
+        <div className="h-full">
+          <div
+            className={expanded ? "fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm p-4 sm:p-8 flex" : "h-full"}
+            onMouseDown={expanded ? e => { if (e.target === e.currentTarget) setExpandedCell(null); } : undefined}
+          >
+            <div className={expanded ? "tw-overlay-in w-full h-full min-h-0 max-w-[1400px] mx-auto" : "h-full"}>{inner}</div>
+          </div>
+        </div>
+      </WidgetFrameContext.Provider>
+    );
+  }
+
+  function renderCell(item: TabLayoutItem, isEditMode: boolean) {
     const hasTabs = (item.tabs?.length ?? 0) > 0;
     if (!hasTabs) {
       if (!instances[item.i]) return null;
@@ -1050,7 +1091,8 @@ export default function WidgetGrid({
         slots. Never moves in the tree, so widgets never remount. */}
     <div ref={parkingRef} aria-hidden className="fixed w-0 h-0 overflow-hidden invisible pointer-events-none">
       {mounted.map(({ id, extraClass, group }) => createPortal(
-        group ? (
+        <WidgetFrameContext.Provider value={frameFor(group ?? id)}>
+        {group ? (
           <TabGroupContext.Provider
             value={{
               containerId: group,
@@ -1062,7 +1104,8 @@ export default function WidgetGrid({
           >
             {renderWidget(instances[id], extraClass, bankDefs)}
           </TabGroupContext.Provider>
-        ) : renderWidget(instances[id], extraClass, bankDefs),
+        ) : renderWidget(instances[id], extraClass, bankDefs)}
+        </WidgetFrameContext.Provider>,
         getNode(id),
         id
       ))}

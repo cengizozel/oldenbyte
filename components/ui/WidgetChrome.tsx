@@ -1,9 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
-import { Pencil, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, type LucideIcon } from "lucide-react";
+import { useWidgetFrame } from "@/lib/widgetFrame";
+import { Pencil, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Ellipsis, Maximize2, Minimize2, type LucideIcon } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { FOCUS_RING, HIT_AREA } from "./Field";
 
@@ -131,6 +132,65 @@ export function SaveCancelRow({
 // small actions (docs/design.md). In a tab group it renders into the tab row
 // instead, see lib/tabGroup.ts. `after` renders inline after the title, for
 // a badge such as the arXiv category.
+// ── The header ───────────────────────────────────────────────────────────────
+// Every widget header, single or in a tab group, reads the same way: the
+// widget's identity (icon and name, or the tabs) on the left and one toggle
+// at the right end, the same glyph everywhere. The toggle swaps the identity
+// for the widget's options in the same row (its `after` and `right` content,
+// then a full-screen button every widget gets from the grid), and back. So
+// nothing else sits in a header by default: no always-on buttons, nothing
+// hover-only, no status text. Once the options are asked for, hover-only
+// buttons (the `opacity-0 group-hover:` chrome) show in full.
+
+// The two faces of a header row and how they trade places.
+export const HEADER_SWAP = {
+  main: "transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none",
+  mainHidden: "opacity-0 -translate-x-2 pointer-events-none",
+  pane: "absolute inset-0 flex items-center gap-2 min-w-0 transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none [&_.opacity-0:not(:hover)]:!opacity-90 dark:[&_.opacity-0:not(:hover)]:!opacity-70",
+  paneHidden: "opacity-0 translate-x-2 pointer-events-none",
+};
+
+// The toggle: an ellipsis that turns into a close cross with a quarter turn.
+// 24px tall in a 20px header line, so it takes no extra height.
+export function HeaderToggle({ c, open, onToggle, className = "" }: { c: ColorClasses; open: boolean; onToggle: () => void; className?: string }) {
+  const face = "absolute inset-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none";
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={open ? "Close options" : "Options"}
+      title={open ? "Close options" : "Options"}
+      onMouseDown={e => e.stopPropagation()}
+      onClick={onToggle}
+      className={`shrink-0 w-6 h-6 -my-0.5 flex items-center justify-center rounded-md transition-opacity ${c.label} ${FOCUS_RING} ${open ? "opacity-100" : "opacity-70 hover:opacity-100"} ${className}`}
+    >
+      <span className="relative block w-4 h-4" aria-hidden>
+        <Ellipsis size={16} className={`${face} ${open ? "opacity-0 rotate-90" : "opacity-100 rotate-0"}`} />
+        <X size={16} className={`${face} ${open ? "opacity-100 rotate-0" : "opacity-0 -rotate-90"}`} />
+      </span>
+    </button>
+  );
+}
+
+// Full screen for the tile this widget sits in (lib/widgetFrame.ts). Nothing
+// outside a grid tile (the digest page, previews).
+export function ExpandButton({ c }: { c: ColorClasses }) {
+  const frame = useWidgetFrame();
+  if (!frame) return null;
+  const label = frame.expanded ? "Exit full screen (Esc)" : "Full screen";
+  return (
+    <button
+      type="button"
+      onClick={() => frame.setExpanded(!frame.expanded)}
+      title={label}
+      aria-label={label}
+      className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
+    >
+      {frame.expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+    </button>
+  );
+}
+
 export function WidgetHeader({
   c, icon: Icon, title, after, right, panel = false, className = "",
 }: {
@@ -140,17 +200,34 @@ export function WidgetHeader({
   after?: ReactNode;
   right?: ReactNode;
   // The header of an overlay panel (a widget's history, insights, or an
-  // editor) rather than the widget's own: it draws in place even inside a
-  // tab group, where the tab keeps the widget's name and the panel's title
-  // and buttons head the panel below it.
+  // editor) rather than the widget's own: it draws in place, with its
+  // buttons always visible, even inside a tab group, where the tab keeps the
+  // widget's name and the panel's title and buttons head the panel below it.
   panel?: boolean;
   className?: string;
 }) {
   const group = useTabGroup();
-  if (group && !panel) {
+  const frame = useWidgetFrame();
+  const editing = frame?.editing ?? false;
+  const [open, setOpen] = useState(false);
+  useEffect(() => { if (editing) setOpen(false); }, [editing]);
+
+  if (panel) {
+    return (
+      <div className={`flex items-center justify-between gap-2 mb-3 shrink-0 ${className}`}>
+        <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
+          <Icon size={14} className="opacity-50 shrink-0" />
+          <span className="text-sm font-medium truncate">{title}</span>
+          {after}
+        </div>
+        {right && <div className="flex items-center gap-2 shrink-0">{right}</div>}
+      </div>
+    );
+  }
+  if (group) {
     // Inside a tab group the tab row is the header: every tab carries its
-    // widget's icon and title, and the shown tab's actions sit at the row's
-    // right end.
+    // widget's icon and title, and the shown tab's options go to the row's
+    // options pane (components/TabStrip.tsx adds the toggle and full screen).
     return (
       <>
         {group.iconHost && createPortal(<Icon size={14} className="opacity-50 shrink-0" />, group.iconHost)}
@@ -165,14 +242,23 @@ export function WidgetHeader({
       </>
     );
   }
+  const expand = !editing ? <ExpandButton c={c} /> : null;
+  const hasOptions = !!(after || right || expand);
   return (
-    <div className={`flex items-center justify-between gap-2 mb-3 shrink-0 ${className}`}>
-      <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
-        <Icon size={14} className="opacity-50 shrink-0" />
-        <span className="text-sm font-medium truncate">{title}</span>
-        {after}
+    <div className={`flex items-center gap-3 mb-3 shrink-0 min-h-5 ${className}`}>
+      <div className="relative flex-1 min-w-0 flex items-center">
+        <div inert={open} className={`flex items-center gap-1.5 min-w-0 ${c.label} ${HEADER_SWAP.main} ${open ? HEADER_SWAP.mainHidden : ""}`}>
+          <Icon size={14} className="opacity-50 shrink-0" />
+          <span className="text-sm font-medium truncate">{title}</span>
+        </div>
+        {hasOptions && (
+          <div inert={!open} className={`${HEADER_SWAP.pane} ${open ? "" : HEADER_SWAP.paneHidden}`}>
+            {after}
+            {(right || expand) && <div className="ml-auto flex items-center gap-2 shrink-0">{right}{expand}</div>}
+          </div>
+        )}
       </div>
-      {right && <div className="flex items-center gap-2 shrink-0">{right}</div>}
+      {hasOptions && !editing && <HeaderToggle c={c} open={open} onToggle={() => setOpen(v => !v)} />}
     </div>
   );
 }

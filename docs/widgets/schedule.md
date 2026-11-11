@@ -23,7 +23,7 @@ The grid defaults to 06:00 to 24:00. The day can start between 00:00 and 12:00 a
 - Drag an entry to move it; the ghost snaps to the grid. Moving one day of a multi-day entry asks before splitting it out of its group.
 - Overlapping entries share the column in side-by-side lanes.
 - **Export as text** shows the whole week as plain, copyable text, grouped by day.
-- The expand toggle floats the grid over a dimmed backdrop at 80% of the screen. Escape closes dialogs first, then the expanded view.
+- Full screen (behind the header toggle, like every widget) gives the grid the whole viewport, with hour rows at 52px, full day names and event times. Escape closes dialogs first, then full screen.
 
 Not digestable. The chat's `read_widget` tool reads it through `lib/widgetData.ts` (`readSchedule`).
 

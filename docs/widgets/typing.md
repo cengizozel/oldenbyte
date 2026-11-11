@@ -13,7 +13,7 @@ The front shows the next test as one line (for example "50 words · varied · 3s
 
 ## Input
 
-Input is word-based. You type a word and **Space** commits it and moves to the next one; letters you skipped count as missed, and extra letters past the end of the word show in dark red. Backspace only reaches back into the previous word when that word has a mistake. Only three lines show: once the caret passes the first line it stays on the second and finished lines scroll up out of view. **Tab** or **Escape** restarts from anywhere; an idle Escape closes the expanded view.
+Input is word-based. You type a word and **Space** commits it and moves to the next one; letters you skipped count as missed, and extra letters past the end of the word show in dark red. Backspace only reaches back into the previous word when that word has a mistake. Only three lines show: once the caret passes the first line it stays on the second and finished lines scroll up out of view. **Tab** or **Escape** restarts from anywhere; an idle Escape is left to the dashboard, which closes full screen on it.
 
 An optional get-ready countdown (off, 3 or 5 seconds) runs before each test.
 
@@ -43,6 +43,6 @@ The numbers are counted the way Monkeytype counts them (see the `tally` comment 
 
 ## Display
 
-The expand toggle floats the trainer over a dimmed backdrop at 80% of the screen. A live wpm counter runs during a test, and the header shows your best wpm. Not digestable.
+Full screen (behind the header toggle, like every widget) gives the trainer the whole viewport and larger type. A live wpm counter runs during a test, and the options line shows your best wpm. Not digestable.
 
 (component: `components/TypingWidget.tsx`)

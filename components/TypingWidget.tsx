@@ -1,14 +1,13 @@
 "use client";
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { Keyboard, RotateCcw, Target, Maximize2, Minimize2, Volume2, VolumeX, ChevronDown } from "lucide-react";
+import { Keyboard, RotateCcw, Target, Volume2, VolumeX, ChevronDown } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import { TYPING_WORDS } from "@/lib/typingWords";
 import { SIMPLE_WORDS } from "@/lib/simpleWords";
 import * as storage from "@/lib/storage";
 import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { TabGroupContext } from "@/lib/tabGroup";
+import { useWidgetFrame } from "@/lib/widgetFrame";
 import { WidgetHeader, Chip, SmallButton } from "@/components/ui/WidgetChrome";
 
 // A Monkeytype-style typing trainer. Input is word-based: you type a word and
@@ -333,7 +332,6 @@ export default function TypingWidget({
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
   const [stats, setStats] = useState<Stats>(DEFAULT_STATS);
   const [loaded, setLoaded] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
   const [words, setWordsState] = useState<string[]>([]);
   const [typedWords, setTypedWordsState] = useState<string[]>([]);
@@ -341,7 +339,7 @@ export default function TypingWidget({
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
   const [focused, setFocused] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const expanded = useWidgetFrame()?.expanded ?? false; // full screen, from the grid
   const [showOptions, setShowOptions] = useState(false); // the config bar, folded into one line until asked for
   const [counting, setCounting] = useState<number | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -375,7 +373,6 @@ export default function TypingWidget({
   const setCur = (s: string) => { curRef.current = s; setCurState(s); };
   const setCalm = (v: boolean) => { if (calmRef.current !== v) { calmRef.current = v; setCalmState(v); } };
 
-  useEffect(() => setMounted(true), []);
 
   // ── Load / persist ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -531,11 +528,9 @@ export default function TypingWidget({
     const inRun = runRef.current.start > 0 || counting !== null || finishedRef.current;
 
     // Escape and Tab restart from anywhere (mid-run, count-in, results). An
-    // idle Escape closes the fullscreen overlay instead.
+    // idle Escape is left to the grid, which closes full screen on it.
     if (k === "Escape") {
-      e.preventDefault();
-      if (inRun) reset(configRef.current);
-      else if (expanded) setExpanded(false);
+      if (inRun) { e.preventDefault(); reset(configRef.current); }
       return;
     }
     if (k === "Tab") { e.preventDefault(); reset(configRef.current); return; }
@@ -813,14 +808,6 @@ export default function TypingWidget({
               >
                 <RotateCcw size={14} />
               </button>
-              <button
-                onClick={() => setExpanded(v => !v)}
-                title={big ? "Close" : "Expand"}
-                aria-label={big ? "Close" : "Expand"}
-                className={`opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`}
-              >
-                {big ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-              </button>
             </>
           }
         />
@@ -1027,31 +1014,9 @@ export default function TypingWidget({
   }
 
   return (
-    <>
-      <div onMouseMove={onMouseMove} className={`rounded-2xl border h-full relative group flex flex-col p-5 ${c.bg} ${c.border} ${c.glow} ${className}`}>
-        {expanded ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
-            <Keyboard size={22} className={`${c.label} opacity-40`} />
-            <p className={`text-xs ${c.label} opacity-70`}>Typing trainer is open in fullscreen</p>
-            <SmallButton c={c} onClick={() => setExpanded(false)}>Close</SmallButton>
-          </div>
-        ) : card(false)}
-      </div>
-
-      {expanded && mounted && createPortal(
-        <div
-          className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-          onMouseDown={e => { if (e.target === e.currentTarget) setExpanded(false); }}
-          onMouseMove={onMouseMove}
-        >
-          <div className={`tw-overlay-in group w-[80vw] h-[80vh] max-w-[1200px] rounded-2xl border shadow-2xl relative flex flex-col p-6 ${c.bg} ${c.border}`}>
-            {/* The overlay draws its own header even when the widget is a tab. */}
-            <TabGroupContext.Provider value={null}>{card(true)}</TabGroupContext.Provider>
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
+    <div onMouseMove={onMouseMove} className={`rounded-2xl border h-full relative group flex flex-col p-5 ${c.bg} ${c.border} ${c.glow} ${className}`}>
+      {card(expanded)}
+    </div>
   );
 }
 

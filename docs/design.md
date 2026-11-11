@@ -100,9 +100,23 @@ the palette `label` color at 50% opacity.
 
 ## Controls
 
-- Header: `WidgetHeader` from `components/ui/WidgetChrome.tsx`: icon, title
-  (`text-sm font-medium`, palette label color) and an optional right-hand slot
-  for counts and small actions. Every widget shows its title.
+- Header: `WidgetHeader` from `components/ui/WidgetChrome.tsx`. Every header,
+  single or in a tab group, reads the same way: the widget's identity on the
+  left (icon and title, `text-sm font-medium`, palette label color; or the
+  tabs) and one toggle at the right end, the same ellipsis glyph on every
+  widget. Nothing else sits in a header by default: no always-on buttons,
+  nothing hover-only, no status text (a status like Typing's best wpm goes
+  on a line in the body). The toggle swaps the identity for the widget's
+  options in the same row (its `after` and `right` content, then a full
+  screen button every widget gets from the grid), the glyph turning into a
+  close cross, and the same spot brings the identity back. Hover-only
+  buttons show in full once the options are asked for. In layout edit mode
+  the toggle is gone and the tile's own controls take that corner.
+- Full screen: the grid (`lib/widgetFrame.ts`) lifts the tile over a dimmed,
+  blurred backdrop at the viewport's size minus a margin, keeping the widget
+  mounted so its state survives; a tab group goes up with its tab row.
+  Escape (when no widget dialog claims it), the backdrop, the header's
+  button, or entering edit mode bring it back.
 - Tab groups: the tab row is the header, in the same place and size as a
   single widget's header. The shown tab is the title (`text-sm font-medium`,
   with its widget's icon in front), the other tabs follow as icon and name at
@@ -111,15 +125,12 @@ the palette `label` color at 50% opacity.
   trailing edge catching up, a little overshoot); reduced motion gets a 150ms slide.
   A tab's icon and name are the ones its widget's header would show (a feed
   tab reads "BBC News", a weather tab its city), not the registry title;
-  and the shown widget's header actions sit behind one toggle at the row's
-  right end, the same glyph for every widget (an ellipsis that turns into a
-  close cross). The row shows tabs by default; the toggle slides the tabs
-  out and the actions in, left-aligned with the `right` group at the end as
-  in a single header, and the same spot brings the tabs back (so does
-  switching tab). Hover-only buttons show in full there, since they were
-  asked for. The toggle only exists when the open widget has actions, and
-  in layout edit mode the row carries no actions at all (the tile's own
-  controls sit in that corner). Members do not draw their own
+  and the shown widget's options sit behind the header toggle at the row's
+  right end, as in a single header: the row shows tabs by default, the
+  toggle slides the tabs out and the options in (the widget's header content
+  left-aligned, its `right` group and the tile's full screen button at the
+  end), and the same spot brings the tabs back (so does switching tab). In
+  layout edit mode the row carries no options at all. Members do not draw their own
   header row: `WidgetHeader` renders into the tab row through
   `lib/tabGroup.ts`, and they lose their top padding, so the first content
   line sits at the same height in a group as in a single widget. The header

@@ -477,7 +477,6 @@ export default function NotebookWidget({
             </div>
           ) : (
             <WidgetHeader
-              panel
               c={c}
               icon={NotebookPen}
               title={customName || widget.title}
@@ -592,6 +591,7 @@ export default function NotebookWidget({
       {historyOpen && (
         <div className={`absolute inset-0 z-30 rounded-2xl p-5 flex flex-col ${c.bg}`}>
           <WidgetHeader
+            panel
             c={c}
             icon={History}
             title="All notes"
