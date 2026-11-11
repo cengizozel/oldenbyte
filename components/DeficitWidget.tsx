@@ -224,11 +224,11 @@ export default function DeficitWidget({
           <div className="shrink-0 flex items-baseline justify-between gap-2">
             <div className="flex items-baseline gap-1.5 min-w-0">
               <span className={`text-2xl font-semibold tabular-nums leading-none ${p.reached ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>{fmtKg(p.estWeight)}</span>
-              <span className={`text-xs ${c.label} opacity-70`}>kg now</span>
+              <span className={`text-sm ${c.label} opacity-70`}>kg now</span>
             </div>
-            <span className={`text-xs tabular-nums ${c.label} opacity-70 shrink-0`}>goal {fmtKg(config.goalWeightKg)} kg</span>
+            <span className={`text-sm tabular-nums ${c.label} opacity-70 shrink-0`}>goal {fmtKg(config.goalWeightKg)} kg</span>
           </div>
-          <div className={`shrink-0 text-xs ${c.text} opacity-80 leading-relaxed`}>
+          <div className={`shrink-0 text-sm ${c.text} opacity-80 leading-relaxed`}>
             {p.reached ? (
               <span className="text-emerald-600 dark:text-emerald-400">goal reached</span>
             ) : (
@@ -249,25 +249,25 @@ export default function DeficitWidget({
           <div className="shrink-0 flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <button onClick={() => setViewDate(d => shiftDay(d, -1))} title="Previous day" aria-label="Previous day" className={`opacity-70 hover:opacity-100 ${iconBtnCls} ${c.label}`}><ChevronLeft size={14} /></button>
-              <span className={`text-xs font-medium ${c.label}`}>{fmtDay(viewDate)}{viewDate === today && " · today"}</span>
+              <span className={`text-sm font-medium ${c.label}`}>{fmtDay(viewDate)}{viewDate === today && " · today"}</span>
               <button onClick={() => setViewDate(d => shiftDay(d, 1))} disabled={viewDate >= today} title="Next day" aria-label="Next day" className={`opacity-70 hover:opacity-100 disabled:opacity-20 ${iconBtnCls} ${c.label}`}><ChevronRight size={14} /></button>
             </div>
             {/* Wraps to two lines in a narrow card instead of overflowing. */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-xs ${c.label}`} title="Calories eaten this day">
+              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-sm ${c.label}`} title="Calories eaten this day">
                 <SettingsInput inputMode="numeric" value={ate} onChange={e => setAte(e.target.value.replace(/[^\d]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="ate" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
                 <span className="opacity-70 shrink-0">kcal</span>
               </label>
-              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-xs ${c.label}`} title="Extra calories burned by exercise this day">
+              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-sm ${c.label}`} title="Extra calories burned by exercise this day">
                 <SettingsInput inputMode="numeric" value={burned} onChange={e => setBurned(e.target.value.replace(/[^\d]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="burned" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
                 <span className="opacity-70 shrink-0">kcal</span>
               </label>
-              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-xs ${c.label}`} title="Weigh-in this day, optional">
+              <label className={`flex-1 min-w-[6.5rem] flex items-center gap-1 text-sm ${c.label}`} title="Weigh-in this day, optional">
                 <SettingsInput inputMode="decimal" value={weight} onChange={e => setWeight(e.target.value.replace(/[^\d.]/g, ""))} onBlur={commitDay} onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} placeholder="weigh" className="!px-2 !py-1 !rounded-lg text-center min-w-0 flex-1" />
                 <span className="opacity-70 shrink-0">kg</span>
               </label>
             </div>
-            <div className={`text-xs tabular-nums ${c.label} opacity-70`}>
+            <div className={`text-sm tabular-nums ${c.label} opacity-70`}>
               burns <span className="font-medium">{fmtKcal(viewBurn)}</span>
               {viewDeficit !== null && <> · <span className={`font-medium ${viewDeficit >= 0 ? "" : "text-red-500"}`}>{fmtKcal(Math.abs(viewDeficit))}</span> {viewDeficit >= 0 ? "deficit" : "surplus"} · {fmtKg(Math.abs(viewDeficit) / KCAL_PER_KG * 1000)} g</>}
             </div>
