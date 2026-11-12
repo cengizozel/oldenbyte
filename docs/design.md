@@ -160,6 +160,11 @@ the palette `label` color at 50% opacity.
   Schedule grid, the Reader's page, the Upkeep chart. Off in edit mode and
   while a settings face is open. Custom widgets run in their own frame, so
   their gestures never reach it.
+- Too many options for the row: a widget's own options (its header content
+  and its `right` group) sit in `OptionsScroller`, which scrolls sideways by
+  finger, trackpad or mouse wheel and fades the edge that has more; color,
+  full screen and settings stay pinned after the divider, so they are always
+  in the same place. Same in a tab group's options row.
 - Tab groups: the tab row is the header, in the same place and size as a
   single widget's header. The shown tab is the title (`text-sm font-medium`,
   with its widget's icon in front), the other tabs follow as icon and name at

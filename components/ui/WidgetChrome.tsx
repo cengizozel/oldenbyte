@@ -175,6 +175,63 @@ export function SaveCancelRow({
 // instead, so every operation on a tile is in the one place.
 
 // The two faces of a header row and how they trade places.
+// A widget's own header options, in a row that can be narrower than they
+// are: they scroll sideways (finger, trackpad, or the mouse wheel), with a
+// soft fade at an edge that has more, and stay right-aligned when they fit.
+// The standard options after them (color, full screen, settings) sit outside
+// it, pinned, so they never scroll out of reach.
+export function OptionsScroller({ start, end, className = "" }: { start?: ReactNode; end?: ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      const next = { left: el.scrollLeft > 1, right: el.scrollLeft < max - 1 };
+      setEdges(e => (e.left === next.left && e.right === next.right ? e : next));
+    };
+    // Most mice have no sideways wheel: an up or down turn scrolls the row
+    // when it has more to show that way.
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      const max = el.scrollWidth - el.clientWidth;
+      if (max <= 0) return;
+      const next = Math.max(0, Math.min(max, el.scrollLeft + e.deltaY));
+      if (next === el.scrollLeft) return;
+      e.preventDefault();
+      el.scrollLeft = next;
+    };
+    measure();
+    el.addEventListener("scroll", measure, { passive: true });
+    el.addEventListener("wheel", onWheel, { passive: false });
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => { el.removeEventListener("scroll", measure); el.removeEventListener("wheel", onWheel); ro.disconnect(); };
+  }, []);
+  const fade = 16;
+  const mask = edges.left || edges.right
+    ? `linear-gradient(to right, ${edges.left ? "transparent" : "black"}, black ${fade}px, black calc(100% - ${fade}px), ${edges.right ? "transparent" : "black"})`
+    : undefined;
+  return (
+    <div
+      ref={ref}
+      className={`flex-1 min-w-0 flex overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
+      style={mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined}
+    >
+      {/* At least the row's width, so while everything fits the header
+          content stays left and the widget's buttons right; wider than that,
+          the row scrolls from its start. The padding leaves room for the
+          buttons' enlarged hit areas and focus rings. */}
+      <div className="min-w-full w-max shrink-0 flex items-center gap-2 px-1.5 py-1">
+        {start}
+        {end && <div className="ml-auto flex items-center gap-2">{end}</div>}
+      </div>
+    </div>
+  );
+}
+
 export const HEADER_SWAP = {
   main: "transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none",
   mainHidden: "opacity-0 -translate-x-2 pointer-events-none",
@@ -347,10 +404,7 @@ export function WidgetHeader({
         {group.iconHost && createPortal(<Icon size={14} className="opacity-50 shrink-0" />, group.iconHost)}
         {group.titleHost && createPortal(<>{title}</>, group.titleHost)}
         {group.active && group.actionsHost && (after || right) && createPortal(
-          <div className={`flex-1 flex items-center gap-2 min-w-0 ${className}`}>
-            {after}
-            {right && <div className="ml-auto flex items-center gap-2 shrink-0">{right}</div>}
-          </div>,
+          <OptionsScroller className={className} start={after} end={right} />,
           group.actionsHost
         )}
         {group.active && group.settingsHost && onSettings && createPortal(<SettingsButton c={c} onClick={onSettings} />, group.settingsHost)}
@@ -377,11 +431,10 @@ export function WidgetHeader({
               <div className="ml-auto flex items-center gap-2 shrink-0">{controls}</div>
             ) : (
               <>
-                {after}
-                {(right || settings || expand) && (
-                  <div className="ml-auto flex items-center gap-2 shrink-0">
-                    {right}
-                    {(after || right) && (settings || expand) && <HeaderDivider c={c} />}
+                {(after || right) && <OptionsScroller start={after} end={right} />}
+                {(after || right) && (settings || expand) && <HeaderDivider c={c} />}
+                {(settings || expand) && (
+                  <div className={`${after || right ? "" : "ml-auto "}flex items-center gap-2 shrink-0`}>
                     {expand}
                     {settings}
                   </div>
