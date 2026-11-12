@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 
 // The body of a tab group: one panel per tab, the active one shown, and a
 // sideways swipe to the neighbouring tab, the way phone apps page between
-// tabs. A finger drag follows the finger and settles on release; a trackpad's
-// two-finger sideways scroll does the same on a computer. A mouse drag never
-// does: on a computer that gesture selects text and drags things.
+// tabs. While a finger drags, the neighbouring tab rides in beside the shown
+// one, its real content already there (every tab stays mounted); on release
+// both finish the move together and the neighbour simply becomes the shown
+// tab, so nothing reloads or fades. A trackpad's two-finger sideways swipe
+// plays the same slide. A mouse drag never swipes: on a computer that gesture
+// selects text and drags things. Choosing a tab in the tab row stays an
+// instant switch.
 //
 // A swipe never starts on something that uses the gesture itself: text
-// fields, editors, sliders, canvases, draggable items, anything that scrolls
-// sideways, and any element marked data-no-swipe (the chess board, the
+// fields, editors, sliders, canvases, video, draggable items, anything that
+// scrolls sideways, and any element marked data-no-swipe (the chess board, the
 // schedule grid, a reading surface, a chart you scrub). Custom widgets run in
 // their own frame, so their gestures never reach this at all.
 
@@ -18,7 +22,9 @@ const BLOCK = 'input, textarea, select, [contenteditable=""], [contenteditable="
 const LOCK = 12;          // px of movement before deciding the direction
 const COMMIT = 0.25;      // share of the width that switches on release
 const FLICK = 0.5;        // px/ms that switches on release whatever the distance
-const DURATION = 170;
+const DURATION = 220;
+const EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)"; // fast start, soft landing
+const GAP = 12;           // px between the two panels while they move
 
 function blocked(target: EventTarget | null, root: Element): boolean {
   if (!(target instanceof Element)) return true;
@@ -40,18 +46,17 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
   const rootRef = useRef<HTMLDivElement>(null);
   const live = useRef({ ids, activeId, onSelect });
   useEffect(() => { live.current = { ids, activeId, onSelect }; });
-  // Direction the newly shown tab slides in from, set by a swipe.
-  const enter = useRef(0);
 
-  useEffect(() => {
-    const dir = enter.current;
-    if (!dir) return;
-    enter.current = 0;
-    const panel = rootRef.current?.querySelector<HTMLElement>(`[data-tab-panel="${CSS.escape(activeId)}"]`);
-    panel?.animate(
-      [{ transform: `translateX(${dir * 48}px)`, opacity: 0.4 }, { transform: "none", opacity: 1 }],
-      { duration: DURATION, easing: "ease-out" },
-    );
+  // After any switch, before the browser paints: drop the inline styles a
+  // swipe left on the panels, so React's display (shown or hidden) is all
+  // that applies and nothing flashes.
+  useLayoutEffect(() => {
+    rootRef.current?.querySelectorAll<HTMLElement>("[data-tab-panel]").forEach(p => {
+      p.style.transform = "";
+      p.style.transition = "";
+      p.style.willChange = "";
+      if (p.dataset.tabPanel !== activeId) p.style.display = "none";
+    });
   }, [activeId]);
 
   useEffect(() => {
@@ -61,13 +66,50 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
       const { ids: list, activeId: cur } = live.current;
       return list[list.indexOf(cur) + dir];
     };
-    const panelOf = (id: string) => root.querySelector<HTMLElement>(`[data-tab-panel="${CSS.escape(id)}"]`);
-    const go = (dir: number) => {
-      const next = neighbor(dir);
-      if (!next) return false;
-      enter.current = dir;
-      live.current.onSelect(next);
-      return true;
+    const panelOf = (id: string | undefined) => (id ? root.querySelector<HTMLElement>(`[data-tab-panel="${CSS.escape(id)}"]`) : null);
+    const width = () => root.clientWidth + GAP;
+
+    // The shown panel and, beside it, the neighbour in the drag's direction.
+    let cur: HTMLElement | null = null;
+    let peek: HTMLElement | null = null;
+    let peekDir = 0;
+    let animating = false;
+
+    const place = (offset: number, dir: number) => {
+      if (dir !== peekDir) {
+        if (peek) { peek.style.display = "none"; peek.style.transform = ""; }
+        peek = dir ? panelOf(neighbor(dir)) : null;
+        peekDir = dir;
+        if (peek) { peek.style.display = "block"; peek.style.willChange = "transform"; peek.style.transition = "none"; }
+      }
+      if (cur) cur.style.transform = `translateX(${offset}px)`;
+      if (peek) peek.style.transform = `translateX(${offset + peekDir * width()}px)`;
+    };
+    const begin = () => {
+      cur = panelOf(live.current.activeId);
+      peek = null;
+      peekDir = 0;
+      if (cur) { cur.style.willChange = "transform"; cur.style.transition = "none"; }
+    };
+    // Finish the move: to the neighbour (dir) or back to where it started (0).
+    const finish = (dir: number) => {
+      const to = dir && peekDir === dir ? dir : 0;
+      const next = to ? neighbor(to) : undefined;
+      animating = true;
+      for (const el of [cur, peek]) if (el) el.style.transition = `transform ${DURATION}ms ${EASE}`;
+      if (cur) cur.style.transform = `translateX(${-to * width()}px)`;
+      if (peek) peek.style.transform = `translateX(${(peekDir - to) * width()}px)`;
+      const done = () => {
+        animating = false;
+        if (next) {
+          live.current.onSelect(next); // the layout effect clears the styles
+        } else {
+          if (peek) { peek.style.display = "none"; peek.style.transform = ""; peek.style.transition = ""; peek.style.willChange = ""; }
+          if (cur) { cur.style.transform = ""; cur.style.transition = ""; cur.style.willChange = ""; }
+        }
+        cur = null; peek = null; peekDir = 0;
+      };
+      window.setTimeout(done, DURATION);
     };
 
     // ── Touch ───────────────────────────────────────────────────────────────
@@ -78,26 +120,19 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
     let start: { x: number; y: number; t: number } | null = null;
     let locked = false;
     let dx = 0;
-    let panel: HTMLElement | null = null;
     let swallowClick = false;
+    let frame = 0;
 
-    const settle = (el: HTMLElement | null) => {
-      if (!el) return;
-      el.style.transition = `transform ${DURATION}ms ease-out`;
-      el.style.transform = "";
-      window.setTimeout(() => { el.style.transition = ""; }, DURATION);
-    };
     const onStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1 || blocked(e.target, root)) { start = null; return; }
+      if (animating || e.touches.length !== 1 || blocked(e.target, root)) { start = null; return; }
       const t = e.touches[0];
       start = { x: t.clientX, y: t.clientY, t: performance.now() };
       locked = false;
       dx = 0;
-      panel = panelOf(live.current.activeId);
     };
     const onMove = (e: TouchEvent) => {
       if (!start) return;
-      if (e.touches.length !== 1) { if (locked) settle(panel); start = null; locked = false; return; } // a pinch
+      if (e.touches.length !== 1) { if (locked) finish(0); start = null; locked = false; return; } // a pinch
       const t = e.touches[0];
       dx = t.clientX - start.x;
       const dy = t.clientY - start.y;
@@ -105,11 +140,14 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
         if (Math.abs(dy) > LOCK && Math.abs(dy) >= Math.abs(dx)) { start = null; return; } // a scroll
         if (Math.abs(dx) < LOCK || Math.abs(dx) < Math.abs(dy) * 1.5) return;
         locked = true;
+        begin();
       }
       if (e.cancelable) e.preventDefault();
+      const dir = dx < 0 ? 1 : -1;
       // Past the first or last tab it only gives a little, like a rubber band.
-      const shown = neighbor(dx < 0 ? 1 : -1) ? dx : dx * 0.25;
-      if (panel) { panel.style.transition = "none"; panel.style.transform = `translateX(${shown}px)`; }
+      const offset = neighbor(dir) ? dx : dx * 0.25;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => place(offset, neighbor(dir) ? dir : 0));
     };
     const onEnd = (e: TouchEvent) => {
       if (!start) return;
@@ -118,20 +156,18 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
       start = null;
       locked = false;
       if (!wasLocked) return;
+      cancelAnimationFrame(frame);
       swallowClick = true; // the release ends a swipe, not a tap on what is under it
       window.setTimeout(() => { swallowClick = false; }, 350);
       const dir = dx < 0 ? 1 : -1;
-      const out = panel;
-      if (neighbor(dir) && e.type === "touchend" && (Math.abs(dx) > root.clientWidth * COMMIT || speed > FLICK)) {
-        if (out) { out.style.transition = ""; out.style.transform = ""; }
-        go(dir);
-      } else {
-        settle(out);
-      }
+      const commit = e.type === "touchend" && !!neighbor(dir) && (Math.abs(dx) > root.clientWidth * COMMIT || speed > FLICK);
+      place(neighbor(dir) ? dx : dx * 0.25, neighbor(dir) ? dir : 0);
+      requestAnimationFrame(() => finish(commit ? dir : 0));
     };
     const onClick = (e: MouseEvent) => { if (swallowClick) { e.preventDefault(); e.stopPropagation(); } };
 
     // ── Trackpad ────────────────────────────────────────────────────────────
+    // One sideways two-finger swipe plays the whole slide to the next tab.
     let acc = 0;
     let spent = false;
     let idle = 0;
@@ -139,9 +175,15 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
       if (e.ctrlKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY) || blocked(e.target, root)) return;
       window.clearTimeout(idle);
       idle = window.setTimeout(() => { acc = 0; spent = false; }, 160); // one gesture, one switch
-      if (spent) return;
+      if (spent || animating) return;
       acc += e.deltaX;
-      if (Math.abs(acc) > 70) { spent = true; go(acc > 0 ? 1 : -1); }
+      if (Math.abs(acc) < 70) return;
+      spent = true;
+      const dir = acc > 0 ? 1 : -1;
+      if (!neighbor(dir)) return;
+      begin();
+      place(0, dir);
+      requestAnimationFrame(() => finish(dir));
     };
 
     root.addEventListener("touchstart", onStart, { passive: true });
@@ -158,6 +200,7 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
       root.removeEventListener("click", onClick, true);
       root.removeEventListener("wheel", onWheel);
       window.clearTimeout(idle);
+      cancelAnimationFrame(frame);
     };
   }, [enabled]);
 

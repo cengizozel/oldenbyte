@@ -145,11 +145,15 @@ the palette `label` color at 50% opacity.
   Escape (when no widget dialog claims it), the backdrop, the header's
   button, or entering edit mode bring it back.
 - Swiping between tabs (`components/TabPanels.tsx`): a sideways finger
-  swipe on a tab group's content moves to the next or previous tab, following
-  the finger and settling on release (a quarter of the width or a flick
-  switches; past the first or last tab it only gives a little). On a computer
-  a two-finger sideways trackpad swipe does the same, one tab per gesture; a
-  mouse drag never does, since there it selects text and drags things. A
+  swipe on a tab group's content pages to the next or previous tab like a
+  phone app: the neighbouring tab rides in beside the shown one with its real
+  content (every tab stays mounted), and on release both finish the move
+  together (a quarter of the width or a flick switches, less springs back;
+  past the first or last tab it only gives a little). Nothing fades or
+  reloads. On a computer a two-finger sideways trackpad swipe plays the same
+  slide, one tab per gesture; a mouse drag never swipes, since there it
+  selects text and drags things. Choosing a tab in the tab row stays an
+  instant switch. A
   swipe never starts on a text field, editor, slider, canvas, video, draggable
   item, anything that scrolls sideways, or an element marked `data-no-swipe`.
   A widget whose own surface takes a drag marks it: the chess board, the
