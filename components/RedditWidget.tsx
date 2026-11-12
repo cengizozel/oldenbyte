@@ -12,7 +12,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup, Popover } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { REDDIT_API_KEY, parseRedditApi, type RedditApiConfig } from "@/lib/reddit";
 import { isDemoMode } from "@/lib/demo";
@@ -154,6 +154,7 @@ export default function RedditWidget({
   // Per-subreddit load state for the header counter (null = still loading).
   const [subStatus, setSubStatus] = useState<{ name: string; ok: boolean | null }[]>([]);
   const [statusOpen, setStatusOpen] = useState(false);
+  const statusBtnRef = useRef<HTMLButtonElement>(null);
   // Last good posts per subreddit, kept across scans: a rescan that fails for
   // a feed keeps showing what it had instead of dropping it.
   const receivedRef = useRef<Map<string, Post[]>>(new Map());
@@ -339,6 +340,7 @@ export default function RedditWidget({
               {/* How many subreddits made it; tap for the per-feed breakdown. */}
               {subStatus.length > 0 && (loading || subStatus.some(s => s.ok !== true)) && (
                 <button
+                  ref={statusBtnRef}
                   onClick={() => setStatusOpen(o => !o)}
                   title="Which subreddits loaded"
                   className={`text-sm tabular-nums font-medium ${subStatus.some(s => s.ok === false) ? "text-red-500/80" : `${c.label} opacity-70`} hover:opacity-100 transition-opacity ${FOCUS_RING}`}
@@ -346,10 +348,7 @@ export default function RedditWidget({
                   {subStatus.filter(s => s.ok).length}/{subStatus.length}
                 </button>
               )}
-              {statusOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setStatusOpen(false)} />
-                  <div className={`absolute right-0 top-5 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2 flex flex-col gap-1`}>
+              <Popover anchor={statusBtnRef} open={statusOpen} onClose={() => setStatusOpen(false)} align="right" className={`w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2 flex flex-col gap-1`}>
                     {subStatus.map(s => (
                       <span key={s.name} className="flex items-center justify-between gap-2 text-sm">
                         <span className={`truncate ${c.text} opacity-80`}>r/{s.name}</span>
@@ -358,9 +357,7 @@ export default function RedditWidget({
                         </span>
                       </span>
                     ))}
-                  </div>
-                </>
-              )}
+              </Popover>
               <RefreshButton c={c} busy={loading} onClick={() => fetchPosts(config, cacheKeyFor(config), true)} />
             </span>
           }

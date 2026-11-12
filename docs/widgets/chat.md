@@ -14,7 +14,7 @@ Responses stream token-by-token and conversations are saved.
 
 Saving a conversation writes only its own key plus the library, so one long chat cannot push every other chat over the 1 MB value limit. Storage code lives in `lib/chat/storage.ts`.
 
-**Shared chats and characters.** Chats and characters belong to the user, not the widget: delete an Assistant and add another, and they are all still there. Each records the dashboard it was started on (`dashboardId`). The Chats and Characters panels and the data access menu list this dashboard's by default; the **All dashboards** chip in each (one setting, `config.allDashboards`) lists every dashboard's. All Assistants on a page share one copy of the library in memory, so a change in one shows in the others at once and two widgets never save over each other.
+**Shared chats and characters.** Chats and characters belong to the user, not the widget: delete an Assistant and add another, and they are all still there. Each records the dashboard it was started on (`dashboardId`). The Chats and Characters panels and the Data access section of settings list this dashboard's by default; the **All dashboards** chip in each (one setting, `config.allDashboards`) lists every dashboard's. All Assistants on a page share one copy of the library in memory, so a change in one shows in the others at once and two widgets never save over each other.
 
 **Migration.** Before the library, each widget kept its own chats (`chat-{id}-index` with the list and characters, `chat-{id}-conv-{convId}` for messages), and before that one `chat-widget-{id}` key. The first load with no `chat-library` reads every Assistant on every dashboard (migrating a `chat-widget-{id}` key to the split keys on the way), copies each non-empty conversation to `chat-library-conv-{convId}` and each character into the library, tagged with the widget's dashboard, and writes the library last. Any failed read or write stops it before the library is written, and the widget stays read-only (with a Retry button) rather than saving over data. The old keys are left as they were.
 
@@ -61,7 +61,7 @@ Hover the widget and click the pencil. The panel is grouped into three sections:
 
 ## Dashboard lookup
 
-The **database icon** (behind the **+** by the send box) toggles "answer using my dashboard data". The dashboard snapshot is **not** injected into the prompt; the model reads it on demand through tools:
+What the model may read is chosen in the widget's settings, under **Data access**: a switch per widget (on for this dashboard's unless turned off; other dashboards' listed under **All dashboards** and off until turned on), plus switches for the Kiwix library and Anytype. Like every settings field it applies on Save. An @mention of a widget in a message includes it for that message even when its switch is off. The dashboard snapshot is **not** injected into the prompt; the model reads it on demand through tools:
 
 - The client gathers one text entry per data-bearing widget on the active dashboard (`gatherWidgetEntries` in [`lib/dashboardContext.ts`](../../lib/dashboardContext.ts)): the full Notepad history plus Text, Weather, Calendar, F1, Feed, Reddit, YouTube, arXiv, HF Daily, and Tracker snapshots.
 - The entries ship with each request, but only a one-line **roster** (id, title, type, size) enters the model's context, inside the `read_widget` tool description. The texts stay server-side until a tool reads them, so large dashboards no longer blow up the context window.

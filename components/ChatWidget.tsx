@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
-import { Bot, Send, Square, Check, X, Loader, Database, MessageSquare, Plus, ChevronDown, Library, Power, Layers, CalendarDays, Paperclip, ArrowDown, type LucideIcon } from "lucide-react";
+import { Bot, Send, Square, Check, X, Loader, MessageSquare, Plus, ChevronDown, Power, Paperclip, ArrowDown, type LucideIcon } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { effectiveTimezone, todayIn, TZ_EVENT } from "@/lib/timezone";
 import { listAllDashboardWidgets, dashboardOf, kindLabel, getCalendarAccount, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
-import { WidgetHeader, EmptyState, Chip, SmallButton } from "./ui/WidgetChrome";
+import { WidgetHeader, EmptyState, Chip, SmallButton, Popover } from "./ui/WidgetChrome";
 import { HIT_AREA, FOCUS_RING } from "./ui/Field";
 import { tagColor } from "@/lib/colors";
 import {
@@ -300,31 +300,9 @@ export default function ChatWidget({
   }
 
   const [powerOpen, setPowerOpen] = useState(false);
+  const powerBtnRef = useRef<HTMLButtonElement>(null);
   const [powerBusy, setPowerBusy] = useState(false);
   // Header overflow menu (clear conversation, context viewer).
-  const [menuOpen, setMenuOpen] = useState(false);
-  // The data access menu fits inside the card: as wide as there is room left
-  // of its button, and scrolling when the card is short.
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [menuBox, setMenuBox] = useState<{ width: number; maxHeight: number } | null>(null);
-  // Any press outside the menu closes it, inside the widget too (a backdrop
-  // element can't do that: the card's own layers sit above it).
-  const menuWrapRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDown = (e: PointerEvent) => { if (!menuWrapRef.current?.contains(e.target as Node)) setMenuOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuOpen(false); };
-    document.addEventListener("pointerdown", onDown, true);
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("keydown", onKey); };
-  }, [menuOpen]);
-  function openMenu(btn: HTMLElement) {
-    const root = rootRef.current?.getBoundingClientRect();
-    const b = btn.getBoundingClientRect();
-    if (root) setMenuBox({ width: Math.min(240, b.right - root.left - 8), maxHeight: Math.max(120, root.bottom - b.bottom - 16) });
-    listAllDashboardWidgets().then(setRoster).catch(() => {});
-    setMenuOpen(true);
-  }
   // Inline rename via the room-title pill above the messages.
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
@@ -451,14 +429,6 @@ export default function ChatWidget({
     setSettingsOpen(false);
   }
 
-  function clearChat() {
-    abortRef.current?.abort();
-    setStreaming(false);
-    commitMessages([]);
-    setError("");
-    saveConversation(activeIdRef.current, []);
-  }
-
   // Resolve a write proposal: only a user click here ever executes it.
   async function resolveProposal(msgIndex: number, propIndex: number, accept: boolean) {
     const msg = messagesRef.current[msgIndex];
@@ -497,23 +467,6 @@ export default function ChatWidget({
   }
 
   // Flip one widget's data access.
-  function toggleWidgetAccess(id: string, dashboardId?: string) {
-    saveConfig({
-      ...config,
-      sourcesVersion: 3,
-      // v3: missing entry = on here (off elsewhere), so toggling writes the explicit opposite.
-      dashboardWidgets: { ...config.dashboardWidgets, [id]: !sourceOn(id, dashboardId) },
-    });
-  }
-
-  function toggleKiwix() {
-    saveConfig({ ...config, useKiwix: !config.useKiwix });
-  }
-
-  function toggleAnytype() {
-    saveConfig({ ...config, useAnytype: !config.useAnytype });
-  }
-
   function startEdit(i: number) {
     setEditingIndex(i);
     setEditDraft(messagesRef.current[i].content);
@@ -930,7 +883,7 @@ export default function ChatWidget({
   }) as unknown as LucideIcon);
 
   return (
-    <div ref={rootRef} className={`rounded-2xl border flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
+    <div className={`rounded-2xl border flex flex-col h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}>
 
       {/* Header: single row, no divider (a border here reads like a tab bar).
           The chevron switches character; the model line after it opens the
@@ -944,7 +897,7 @@ export default function ChatWidget({
           after={
             <>
               <button
-                onClick={() => { setHistoryOpen(false); setMenuOpen(false); setCharactersOpen(true); }}
+                onClick={() => { setHistoryOpen(false); setCharactersOpen(true); }}
                 title="Switch character"
                 aria-label="Switch character"
                 className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}
@@ -956,6 +909,7 @@ export default function ChatWidget({
               <span className="relative flex items-center min-w-0">
                 {powerCapable ? (
                   <button
+                    ref={powerBtnRef}
                     onClick={e => { e.stopPropagation(); setPowerOpen(o => !o); }}
                     title={isLoaded ? `Model loaded on ${backend}: click to control how long it stays` : "Model not loaded: click for options"}
                     className={`flex items-center gap-1 min-w-0 text-sm opacity-70 hover:opacity-100 transition-opacity ${FOCUS_RING}`}
@@ -969,11 +923,7 @@ export default function ChatWidget({
                 ) : (
                   <span className="text-sm opacity-70 truncate">{config.model}</span>
                 )}
-                {powerOpen && powerCapable && (
-                  <>
-                    {/* click-away backdrop */}
-                    <div className="fixed inset-0 z-40" onClick={() => setPowerOpen(false)} />
-                    <div className={`absolute left-0 top-6 z-50 w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2.5 flex flex-col gap-2`}>
+                <Popover anchor={powerBtnRef} open={powerOpen && powerCapable} onClose={() => setPowerOpen(false)} className={`w-44 rounded-xl border ${c.border} ${c.bg} shadow-lg p-2.5 flex flex-col gap-2`}>
                       <p className={`text-sm opacity-70 ${c.label} flex items-center gap-1`}>
                         <Power size={12} /> Keep model loaded
                       </p>
@@ -1009,9 +959,7 @@ export default function ChatWidget({
                               ? "Using LM Studio's default (60m) idle unload."
                               : "Using Ollama's default linger."}
                       </p>
-                    </div>
-                  </>
-                )}
+                </Popover>
               </span>
             </>
           }
@@ -1020,87 +968,9 @@ export default function ChatWidget({
               <button onClick={newChat} title="New chat with the Assistant" aria-label="New chat" className={actionCls}>
                 <Plus size={14} />
               </button>
-              <button onClick={() => { setCharactersOpen(false); setMenuOpen(false); setHistoryOpen(true); }} title="Chats" aria-label="Chats" className={actionCls}>
+              <button onClick={() => { setCharactersOpen(false); setHistoryOpen(true); }} title="Chats" aria-label="Chats" className={actionCls}>
                 <MessageSquare size={14} />
               </button>
-              <div ref={menuWrapRef} className="relative">
-                <button onClick={e => { if (menuOpen) setMenuOpen(false); else openMenu(e.currentTarget); }} title="Data access: what the assistant may read" aria-label="Data access" className={menuOpen ? `opacity-90 ${HIT_AREA} ${FOCUS_RING} ${c.icon}` : actionCls}>
-                  <Database size={14} />
-                </button>
-                {menuOpen && (
-                  <>
-                    <div style={menuBox ?? undefined} className={`absolute right-0 top-6 z-50 w-60 overflow-y-auto overscroll-contain rounded-xl border ${c.border} ${c.bg} shadow-lg p-1 flex flex-col`}>
-                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-2.5 pt-1.5 pb-1">
-                        <p className={`text-sm whitespace-nowrap opacity-80 ${c.label}`}>Data access</p>
-                        <Chip c={c} active={allDashboards} onClick={toggleAllDashboards} title="List widgets from every dashboard">All dashboards</Chip>
-                      </div>
-                      {/* One row per data-bearing widget; no master switch. A
-                          calendar widget's row also grants its tools. */}
-                      {shownRoster.length === 0 && (
-                        <p className={`px-2.5 py-1.5 text-sm opacity-80 ${c.text}`}>No data widgets on this dashboard.</p>
-                      )}
-                      {shownRoster.map((w, i) => {
-                        const here = !w.dashboardId || w.dashboardId === dashId;
-                        const isCal = w.type === "calendar";
-                        const ready = !isCal || !here || calSource?.widgetId === w.id;
-                        const on = sourceOn(w.id, w.dashboardId);
-                        const heading = allDashboards && w.dashboardId !== shownRoster[i - 1]?.dashboardId;
-                        return (
-                          <Fragment key={w.id}>
-                          {heading && <p className={`px-2.5 pt-2 pb-0.5 text-sm font-medium ${c.label}`}>{here ? "This dashboard" : w.dashboardName}</p>}
-                          <button
-                            onClick={() => { if (ready) toggleWidgetAccess(w.id, w.dashboardId); }}
-                            title={!ready ? "Configure the Calendar widget first" : on ? "On: click to turn off" : "Off: click to turn on"}
-                            className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/5 ${FOCUS_RING} ${c.text} ${ready ? "" : "opacity-70"}`}
-                          >
-                            {isCal ? <CalendarDays size={14} className={`shrink-0 opacity-70 ${c.label}`} /> : <Database size={14} className={`shrink-0 opacity-70 ${c.label}`} />}
-                            <span className="flex-1 min-w-0 truncate">
-                              {w.title}
-                              {(() => {
-                                const kind = isCal ? (here ? "agenda and new events" : "agenda") : kindLabel(w.type);
-                                return kind.toLowerCase() === w.title.toLowerCase() ? null : <span className={`ml-1.5 text-sm opacity-70 ${c.label}`}>{kind}</span>;
-                              })()}
-                            </span>
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${on && ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
-                          </button>
-                          </Fragment>
-                        );
-                      })}
-                      <p className={`px-2.5 pt-2 pb-1 text-sm opacity-70 border-t ${c.border} mt-1 ${c.label}`}>Connections</p>
-                      {([
-                        { icon: Library, label: "Kiwix library", caption: (config.kiwixSkip?.length ? "selected books" : "all books"), on: config.useKiwix, ready: !!config.kiwixUrl, toggle: toggleKiwix, hint: "set up in settings" },
-                        { icon: Layers, label: "Anytype", caption: config.anytypeSpaceName || "", on: config.useAnytype, ready: !!(config.anytypeApiKey && config.anytypeSpaceId), toggle: toggleAnytype, hint: "pair in settings" },
-                      ] as const).map(row => (
-                        <button
-                          key={row.label}
-                          onClick={() => {
-                            if (row.ready) { row.toggle(); return; } // stays open for multi-toggling
-                            setMenuOpen(false);
-                            openSettings();
-                          }}
-                          title={row.ready ? (row.on ? "On: click to turn off" : "Off: click to turn on") : row.hint}
-                          className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/5 ${FOCUS_RING} ${c.text} ${row.ready ? "" : "opacity-70"}`}
-                        >
-                          <row.icon size={14} className={`shrink-0 opacity-70 ${c.label}`} />
-                          <span className="flex-1 min-w-0 truncate">
-                            {row.label}
-                            {row.caption && <span className={`ml-1.5 text-sm opacity-70 ${c.label}`}>{row.caption}</span>}
-                          </span>
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.on && row.ready ? "bg-emerald-500" : "bg-current opacity-20"}`} />
-                        </button>
-                      ))}
-                      <div className={`my-1 border-t ${c.border} opacity-70`} />
-                      <button
-                        onClick={() => { setMenuOpen(false); clearChat(); }}
-                        disabled={messages.length === 0}
-                        className={`text-left px-2.5 py-2 rounded-lg text-sm text-red-500 dark:text-red-400 hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 ${FOCUS_RING}`}
-                      >
-                        Clear conversation
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
             </>
           )}
         />

@@ -5,7 +5,7 @@ import { RefreshCw, Loader, ChevronRight } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { DEFAULT_CONFIG, EFFORT_OPTIONS, LENGTH_PRESETS, PRESETS, type ChatConfig, type Length } from "@/lib/chat/types";
 import { SettingsInput, SettingsSelect, SettingsTextarea, FOCUS_RING, Stepper } from "../ui/Field";
-import { listKiwixServers, listAnytypeConnections, type KnownKiwixServer, type KnownAnytype } from "@/lib/dashboardContext";
+import { listKiwixServers, listAnytypeConnections, listAllDashboardWidgets, dashboardOf, getCalendarAccount, kindLabel, type KnownKiwixServer, type KnownAnytype, type WidgetRosterItem } from "@/lib/dashboardContext";
 import { useModelServers } from "@/lib/useModelServers";
 import { Chip, SmallButton, SettingsFace, SettingsListControl } from "../ui/WidgetChrome";
 import Toggle from "../ui/Toggle";
@@ -21,6 +21,23 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
   onSave: (draft: ChatConfig) => void;
 }) {
   const [draft, setDraft] = useState<ChatConfig>(config);
+
+  // Data access: the widgets the model may read. On this dashboard a widget
+  // is readable unless turned off; on another it is off until turned on (only
+  // listed under All dashboards). A calendar row also grants its tools, for
+  // the calendar of this dashboard only.
+  const [roster, setRoster] = useState<WidgetRosterItem[] | null>(null);
+  const [here, setHere] = useState("");
+  const [calWidget, setCalWidget] = useState<string | null>(null);
+  useEffect(() => {
+    listAllDashboardWidgets().then(setRoster).catch(() => setRoster([]));
+    if (widgetId) dashboardOf(widgetId).then(setHere).catch(() => {});
+    getCalendarAccount().then(cal => setCalWidget(cal?.widgetId ?? null)).catch(() => {});
+  }, [widgetId]);
+  const isHere = (dashboardId?: string) => !dashboardId || !here || dashboardId === here;
+  const readable = (w: WidgetRosterItem) => isHere(w.dashboardId) ? draft.dashboardWidgets[w.id] !== false : draft.dashboardWidgets[w.id] === true;
+  const shownRoster = (roster ?? []).filter(w => draft.allDashboards || isHere(w.dashboardId))
+    .sort((a, b) => Number(!isHere(a.dashboardId)) - Number(!isHere(b.dashboardId)));
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -335,9 +352,64 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
           </div>)}
         </div>
 
-        <p className={`text-sm opacity-70 mt-1 ${c.label}`}>Data sources</p>
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <p className={`text-sm opacity-70 min-w-0 ${c.label}`}>Data access</p>
+            <Chip c={c} active={!!draft.allDashboards} onClick={() => setDraft(d => ({ ...d, allDashboards: !d.allDashboards }))} title="List widgets from every dashboard">All dashboards</Chip>
+          </div>
+          <p className="text-sm text-[var(--text-muted)] mb-1.5">What the model may read when you ask it something. Widgets on this dashboard are on unless you turn them off; widgets on other dashboards are off until you turn them on.</p>
+          {roster === null ? (
+            <p className="text-sm text-[var(--text-muted)] flex items-center gap-1.5"><Loader size={12} className="animate-spin" /> Loading widgets</p>
+          ) : shownRoster.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No widgets with data on this dashboard.</p>
+          ) : (
+            <div className="flex flex-col">
+              {shownRoster.map((w, i) => {
+                const local = isHere(w.dashboardId);
+                const isCal = w.type === "calendar";
+                const ready = !isCal || !local || calWidget === w.id;
+                const kind = isCal ? (local ? "agenda and new events" : "agenda") : kindLabel(w.type);
+                const heading = draft.allDashboards && w.dashboardId !== shownRoster[i - 1]?.dashboardId;
+                return (
+                  <div key={w.id}>
+                    {heading && <p className={`text-sm font-medium pt-2 pb-1 ${c.label}`}>{local ? "This dashboard" : w.dashboardName}</p>}
+                    <div className="flex items-center justify-between gap-3 py-1">
+                      <span className="min-w-0 truncate text-sm text-[var(--text-primary)]">
+                        {w.title}
+                        {kind.toLowerCase() !== w.title.toLowerCase() && <span className="ml-1.5 text-[var(--text-secondary)]">{kind}</span>}
+                        {!ready && <span className="ml-1.5 text-[var(--text-muted)]">set up the Calendar widget first</span>}
+                      </span>
+                      <Toggle
+                        checked={ready && readable(w)}
+                        onChange={() => { if (ready) setDraft(d => ({ ...d, sourcesVersion: 3, dashboardWidgets: { ...d.dashboardWidgets, [w.id]: !readable(w) } })); }}
+                        label={`Let the model read ${w.title}`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <p className={`text-sm font-medium pt-2 pb-1 ${c.label}`}>Connections</p>
+          {([
+            { key: "useKiwix", label: "Kiwix library", ready: !!draft.kiwixUrl.trim(), note: "set up below" },
+            { key: "useAnytype", label: "Anytype", ready: !!(draft.anytypeApiKey && draft.anytypeSpaceId), note: "pair below" },
+          ] as const).map(row => (
+            <div key={row.key} className="flex items-center justify-between gap-3 py-1">
+              <span className="min-w-0 truncate text-sm text-[var(--text-primary)]">
+                {row.label}
+                {!row.ready && <span className="ml-1.5 text-[var(--text-muted)]">{row.note}</span>}
+              </span>
+              <Toggle
+                checked={row.ready && !!draft[row.key]}
+                onChange={() => { if (row.ready) setDraft(d => ({ ...d, [row.key]: !d[row.key] })); }}
+                label={`Let the model use ${row.label}`}
+              />
+            </div>
+          ))}
+        </div>
 
-        <p className={`text-sm -mt-1 opacity-70 ${c.label}`}>Connections are set up here; what the model may access is chosen per chat from the ⋮ menu.</p>
+        <p className={`text-sm opacity-70 mt-1 ${c.label}`}>Connections</p>
 
         <div>
           <div className="flex items-center justify-between gap-2 mb-1">

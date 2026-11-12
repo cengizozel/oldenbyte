@@ -173,6 +173,10 @@ the palette `label` color at 50% opacity.
   panel's header (history, insights, chats, characters): the panel's own
   buttons scroll, and its close (the header's `onClose`, drawn the same on
   every panel) stays pinned at the right end.
+- Menus and lists that open from a button (`Popover`): drawn above the page
+  and placed against the button, below it or above when there is no room,
+  inside the window, so a scrolling row or a card edge never clips them; a
+  press elsewhere or Escape closes them.
 - Tab groups: the tab row is the header, in the same place and size as a
   single widget's header. The shown tab is the title (`text-sm font-medium`,
   with its widget's icon in front), the other tabs follow as icon and name at

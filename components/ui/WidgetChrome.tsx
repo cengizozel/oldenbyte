@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref, type RefObject } from "react";
 import { FaceShownContext } from "./FlipCard";
 import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
@@ -295,6 +295,59 @@ export function OptionsScroller({ start, end, className = "" }: { start?: ReactN
         {end && <div className="ml-auto flex items-center gap-2">{end}</div>}
       </div>
     </div>
+  );
+}
+
+// A small panel that opens from a button (a menu, a status list): drawn above
+// the page and placed against its button, so no scrolling row or card edge can
+// clip it; below the button, or above it when there is no room; inside the
+// window. A press anywhere else or Escape closes it.
+export function Popover({ anchor, open, onClose, align = "left", className = "", children }: {
+  anchor: RefObject<HTMLElement | null>;
+  open: boolean;
+  onClose: () => void;
+  align?: "left" | "right";
+  className?: string;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const close = useRef(onClose);
+  useEffect(() => { close.current = onClose; });
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return; }
+    const place = () => {
+      const a = anchor.current, el = ref.current;
+      if (!a || !el) return;
+      const r = a.getBoundingClientRect();
+      const w = el.offsetWidth, h = el.offsetHeight, m = 8;
+      const left = Math.max(m, Math.min(align === "right" ? r.right - w : r.left, window.innerWidth - w - m));
+      const below = r.bottom + 6;
+      const top = below + h > window.innerHeight - m && r.top - h - 6 > m ? r.top - h - 6 : below;
+      setPos(p => (p && p.top === top && p.left === left ? p : { top, left }));
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [open, align, anchor]);
+  useEffect(() => {
+    if (!open) return;
+    const down = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!ref.current?.contains(t) && !anchor.current?.contains(t)) close.current();
+    };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); };
+    document.addEventListener("pointerdown", down, true);
+    document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("pointerdown", down, true); document.removeEventListener("keydown", key); };
+  }, [open, anchor]);
+  if (!open || typeof document === "undefined") return null;
+  return createPortal(
+    <div ref={ref} className={`fixed z-[70] ${className}`} style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, visibility: pos ? "visible" : "hidden" }}>
+      {children}
+    </div>,
+    document.body,
   );
 }
 
