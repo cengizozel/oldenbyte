@@ -153,6 +153,7 @@ function PdfViewer({
       <div className="relative flex-1 min-h-0 min-w-0 flex flex-col">
       <div
         ref={containerRef}
+        data-no-swipe
         className={`flex-1 min-h-0 min-w-0 max-w-full overflow-auto ${zoom === 1 ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
         onClick={() => {
           if (dragRef.current?.moved) return; // a pan, not a click

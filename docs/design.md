@@ -144,6 +144,18 @@ the palette `label` color at 50% opacity.
   mounted so its state survives; a tab group goes up with its tab row.
   Escape (when no widget dialog claims it), the backdrop, the header's
   button, or entering edit mode bring it back.
+- Swiping between tabs (`components/TabPanels.tsx`): a sideways finger
+  swipe on a tab group's content moves to the next or previous tab, following
+  the finger and settling on release (a quarter of the width or a flick
+  switches; past the first or last tab it only gives a little). On a computer
+  a two-finger sideways trackpad swipe does the same, one tab per gesture; a
+  mouse drag never does, since there it selects text and drags things. A
+  swipe never starts on a text field, editor, slider, canvas, video, draggable
+  item, anything that scrolls sideways, or an element marked `data-no-swipe`.
+  A widget whose own surface takes a drag marks it: the chess board, the
+  Schedule grid, the Reader's page, the Upkeep chart. Off in edit mode and
+  while a settings face is open. Custom widgets run in their own frame, so
+  their gestures never reach it.
 - Tab groups: the tab row is the header, in the same place and size as a
   single widget's header. The shown tab is the title (`text-sm font-medium`,
   with its widget's icon in front), the other tabs follow as icon and name at

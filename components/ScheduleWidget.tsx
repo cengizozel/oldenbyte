@@ -455,7 +455,7 @@ export default function ScheduleWidget({
           el.scrollTop = Math.max(0, nowY - 2 * HOUR_PX);
         }}
       >
-        <div className="flex min-w-[520px]" ref={gridInnerRef} data-schedule-grid>
+        <div className="flex min-w-[520px]" ref={gridInnerRef} data-schedule-grid data-no-swipe>
           {/* time gutter */}
           <div className="w-11 shrink-0 relative" style={{ marginTop: 24, height: hours * HOUR_PX }}>
             {Array.from({ length: hours + 1 }, (_, h) => (

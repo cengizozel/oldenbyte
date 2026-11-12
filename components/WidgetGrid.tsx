@@ -16,6 +16,7 @@ import { isDemoMode } from "@/lib/demo";
 import WidgetCard from "./WidgetCard";
 import WidgetShelf from "./WidgetShelf";
 import TabStrip from "./TabStrip";
+import TabPanels from "./TabPanels";
 import { TabGroupContext, type TabGroupHosts } from "@/lib/tabGroup";
 import { WidgetFrameContext, type WidgetFrame } from "@/lib/widgetFrame";
 import NotebookWidget from "./NotepadWidget";
@@ -830,17 +831,13 @@ export default function WidgetGrid({
           onReorder={order => handleReorderTabs(item.i, order)}
           onHosts={hosts => setTabHostsFor(item.i, hosts)}
         />
-        <div className="flex-1 min-h-0 relative">
-          {[item.i, ...(item.tabs ?? [])].map(tabId => {
-            const w = instances[tabId];
-            if (!w) return null;
-            return (
-              <div key={tabId} className="absolute inset-0" style={{ display: tabId === activeId ? "block" : "none" }}>
-                {slot(tabId)}
-              </div>
-            );
-          })}
-        </div>
+        <TabPanels
+          ids={[item.i, ...(item.tabs ?? [])].filter(tabId => instances[tabId])}
+          activeId={activeId}
+          onSelect={tabId => setActiveTabs(prev => ({ ...prev, [item.i]: tabId }))}
+          enabled={!isEditMode && !faceOpen[item.i]}
+          render={slot}
+        />
        </div>
       </div>
     );

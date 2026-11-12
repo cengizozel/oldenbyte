@@ -595,7 +595,7 @@ export default function UpkeepWidget({
                         ))}
                       </div>}
                     </div>
-                    <svg viewBox="0 0 240 72" className="w-full touch-none cursor-crosshair" preserveAspectRatio="none" onPointerMove={onScrub} onPointerDown={onScrub} onPointerLeave={() => setScrub(null)}>
+                    <svg data-no-swipe viewBox="0 0 240 72" className="w-full touch-none cursor-crosshair" preserveAspectRatio="none" onPointerMove={onScrub} onPointerDown={onScrub} onPointerLeave={() => setScrub(null)}>
                       <line x1={2} y1={8} x2={238} y2={8} className="stroke-black/[0.06] dark:stroke-white/[0.07]" strokeWidth={1} strokeDasharray="2 3" />
                       {scrub && (
                         <line x1={x(scrub.t)} y1={6} x2={x(scrub.t)} y2={70} stroke="currentColor" className={c.label} strokeWidth={1} opacity={0.5} vectorEffect="non-scaling-stroke" />

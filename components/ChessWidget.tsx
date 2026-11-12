@@ -601,7 +601,7 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
             <div className="flex flex-col opacity-80">
               {(orient === "w" ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8]).map(r => <span key={r} className="flex-1 flex items-center justify-center">{r}</span>)}
             </div>
-            <div style={{ width: inner, height: inner }}>
+            <div data-no-swipe style={{ width: inner, height: inner }}>
               <Chessboard
                 options={{
                   id: `chess-${widget.id}`,
