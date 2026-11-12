@@ -934,23 +934,23 @@ export default function WidgetGrid({
           <>
             <div
               aria-hidden
-              className="absolute left-0 right-0 -top-[18px] h-4 pointer-events-none text-xs tabular-nums text-[var(--text-muted)]"
+              className="absolute left-0 right-0 -top-[18px] h-4 pointer-events-none text-xs font-medium tabular-nums text-[var(--text-secondary)]"
               style={{ display: "grid", gridTemplateColumns: `repeat(${COLS}, 1fr)`, gap: GAP }}
             >
               {Array.from({ length: COLS }).map((_, i) => (
-                <div key={i} className="relative flex items-start justify-center border-b border-x border-[var(--surface-border)] rounded-b-sm">
+                <div key={i} className="relative flex items-start justify-center border-b border-x border-[var(--surface-border-focus)] rounded-b-sm">
                   <span className="leading-none">{i + 1}</span>
                 </div>
               ))}
-              <span className="absolute right-1.5 top-0 leading-none text-[var(--text-secondary)]" title="Columns by rows">{COLS} × {numRows}</span>
+              <span className="absolute right-1.5 top-0 leading-none text-[var(--text-primary)]" title="Columns by rows">{COLS} × {numRows}</span>
             </div>
             <div
               aria-hidden
-              className="absolute top-0 -left-[18px] w-4 pointer-events-none text-xs tabular-nums text-[var(--text-muted)]"
+              className="absolute top-0 -left-[18px] w-4 pointer-events-none text-xs font-medium tabular-nums text-[var(--text-secondary)]"
               style={{ display: "grid", gridTemplateRows: `repeat(${numRows}, ${rowHeight}px)`, gap: GAP }}
             >
               {Array.from({ length: numRows }).map((_, i) => (
-                <div key={i} className="flex items-center justify-start border-r border-y border-[var(--surface-border)] rounded-r-sm">
+                <div key={i} className="flex items-center justify-start border-r border-y border-[var(--surface-border-focus)] rounded-r-sm">
                   <span className="leading-none">{i + 1}</span>
                 </div>
               ))}
