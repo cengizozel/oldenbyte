@@ -146,23 +146,28 @@ the palette `label` color at 50% opacity.
   button, or entering edit mode bring it back.
 - Swiping between tabs (`components/TabPanels.tsx`): a sideways finger
   swipe on a tab group's content pages to the next or previous tab like a
-  phone app: the neighbouring tab rides in beside the shown one with its real
-  content (every tab stays mounted), and on release both finish the move
-  together (a quarter of the width or a flick switches, less springs back;
-  past the first or last tab it only gives a little). Nothing fades or
-  reloads. On a computer a two-finger sideways trackpad swipe plays the same
-  slide, one tab per gesture; a mouse drag never swipes, since there it
-  selects text and drags things. Choosing a tab in the tab row stays an
-  instant switch. A
-  swipe never starts on a text field, editor, slider, canvas, video, draggable
-  item, anything that scrolls sideways, or an element marked `data-no-swipe`.
+  phone's photo viewer. The tabs on either side of the shown one stay laid
+  out off to the side (hidden and inert, `data-offstage`), so a swipe only
+  reveals them; the content moves in the same event as the finger, from the
+  moment the gesture is recognised; on release the speed of the finger's last
+  80ms decides (30% of the width, or a flick toward the neighbour, switches)
+  and the slide continues at that speed, decelerating into place. The tab is
+  chosen on release, so the underline travels with the slide, and a new swipe
+  during a slide finishes it at once and carries on. Past the first or last
+  tab it only gives a little. On a computer a two-finger sideways trackpad
+  swipe plays the same slide, one tab per gesture; a mouse drag never swipes,
+  since there it selects text and drags things. Choosing a tab in the tab row
+  stays an instant switch. A swipe never starts on a text field, editor,
+  slider, canvas, video, draggable item, anything that scrolls sideways, or
+  an element marked `data-no-swipe`.
   A widget whose own surface takes a drag marks it: the chess board, the
   Schedule grid, the Reader's page, the Upkeep chart. Off in edit mode and
   while a settings face is open. Custom widgets run in their own frame, so
   their gestures never reach it.
 - Too many options for the row: a widget's own options (its header content
   and its `right` group) sit in `OptionsScroller`, which scrolls sideways by
-  finger, trackpad or mouse wheel and fades the edge that has more; color,
+  finger, trackpad, mouse wheel or a mouse drag (gliding on after release,
+  never pressing the button it started on) and fades the edge that has more; color,
   full screen and settings stay pinned after the divider, so they are always
   in the same place. Same in a tab group's options row.
 - Tab groups: the tab row is the header, in the same place and size as a

@@ -68,11 +68,12 @@ function findButton(widget: HTMLElement, selector: string): HTMLElement | null {
 
 // A header action (settings, refresh, full screen): it sits on the options
 // face, inert while the face is closed, but laid out, and a programmatic
-// click works there; only hidden members (display none) are skipped. So the
+// click works there; only hidden members are skipped (display none, or a tab
+// laid out off to the side for swiping, data-offstage). So the
 // keys work with the options closed.
 function findHeaderAction(cell: HTMLElement, selector: string): HTMLElement | null {
   return Array.from(cell.querySelectorAll<HTMLElement>(selector))
-    .find(el => el.getClientRects().length > 0 && !(el as HTMLButtonElement).disabled) ?? null;
+    .find(el => el.getClientRects().length > 0 && !el.closest("[data-offstage]") && !(el as HTMLButtonElement).disabled) ?? null;
 }
 
 // Lets React commit a state change (tab switch, settings flip) before focusing.

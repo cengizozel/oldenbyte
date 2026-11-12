@@ -938,7 +938,7 @@ export default function WidgetGrid({
               style={{ display: "grid", gridTemplateColumns: `repeat(${COLS}, 1fr)`, gap: GAP }}
             >
               {Array.from({ length: COLS }).map((_, i) => (
-                <div key={i} className="relative flex items-start justify-center border-b border-x border-[var(--surface-border-focus)] rounded-b-sm">
+                <div key={i} className="relative flex items-start justify-center border-b border-x border-[color-mix(in_srgb,var(--text-muted)_70%,transparent)] rounded-b-sm">
                   <span className="leading-none">{i + 1}</span>
                 </div>
               ))}
@@ -950,7 +950,7 @@ export default function WidgetGrid({
               style={{ display: "grid", gridTemplateRows: `repeat(${numRows}, ${rowHeight}px)`, gap: GAP }}
             >
               {Array.from({ length: numRows }).map((_, i) => (
-                <div key={i} className="flex items-center justify-start border-r border-y border-[var(--surface-border-focus)] rounded-r-sm">
+                <div key={i} className="flex items-center justify-start border-r border-y border-[color-mix(in_srgb,var(--text-muted)_70%,transparent)] rounded-r-sm">
                   <span className="leading-none">{i + 1}</span>
                 </div>
               ))}

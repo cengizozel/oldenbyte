@@ -176,7 +176,8 @@ export function SaveCancelRow({
 
 // The two faces of a header row and how they trade places.
 // A widget's own header options, in a row that can be narrower than they
-// are: they scroll sideways (finger, trackpad, or the mouse wheel), with a
+// are: they scroll sideways (finger, trackpad, mouse wheel, or a mouse drag
+// that carries on a little after letting go, like the tab row), with a
 // soft fade at an edge that has more, and stay right-aligned when they fit.
 // The standard options after them (color, full screen, settings) sit outside
 // it, pinned, so they never scroll out of reach.
@@ -202,13 +203,74 @@ export function OptionsScroller({ start, end, className = "" }: { start?: ReactN
       e.preventDefault();
       el.scrollLeft = next;
     };
+    // A mouse drag scrolls the row and does not press the button it started
+    // on; letting go mid-drag keeps it gliding and slowing to a stop.
+    let drag: { x: number; left: number; moved: boolean; id: number } | null = null;
+    let samples: { t: number; x: number }[] = [];
+    let glide = 0;
+    let swallow = false;
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse" || e.button !== 0 || el.scrollWidth <= el.clientWidth) return;
+      cancelAnimationFrame(glide);
+      drag = { x: e.clientX, left: el.scrollLeft, moved: false, id: e.pointerId };
+      samples = [{ t: e.timeStamp, x: e.clientX }];
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      if (!drag.moved) {
+        if (Math.abs(dx) < 5) return;
+        drag.moved = true;
+        try { el.setPointerCapture(e.pointerId); } catch { /* moves still arrive over the row */ }
+      }
+      el.scrollLeft = drag.left - dx;
+      samples.push({ t: e.timeStamp, x: e.clientX });
+      while (samples.length > 2 && e.timeStamp - samples[0].t > 80) samples.shift();
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const moved = drag.moved;
+      drag = null;
+      if (!moved) return;
+      swallow = true;
+      window.setTimeout(() => { swallow = false; }, 0);
+      const a = samples[0], b = samples[samples.length - 1];
+      let v = a && b && b.t > a.t ? -(b.x - a.x) / (b.t - a.t) : 0; // px/ms in scroll direction
+      let last = performance.now();
+      const step = (now: number) => {
+        const dt = Math.max(0, now - last);
+        last = now;
+        if (Math.abs(v) < 0.02) return;
+        el.scrollLeft += v * dt;
+        v *= Math.pow(0.995, dt); // friction
+        glide = requestAnimationFrame(step);
+      };
+      glide = requestAnimationFrame(step);
+    };
+    const onClick = (e: MouseEvent) => { if (swallow) { e.preventDefault(); e.stopPropagation(); } };
+
     measure();
     el.addEventListener("scroll", measure, { passive: true });
     el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+    el.addEventListener("click", onClick, true);
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     if (el.firstElementChild) ro.observe(el.firstElementChild);
-    return () => { el.removeEventListener("scroll", measure); el.removeEventListener("wheel", onWheel); ro.disconnect(); };
+    return () => {
+      el.removeEventListener("scroll", measure);
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("pointerdown", onDown);
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", onUp);
+      el.removeEventListener("pointercancel", onUp);
+      el.removeEventListener("click", onClick, true);
+      cancelAnimationFrame(glide);
+      ro.disconnect();
+    };
   }, []);
   const fade = 16;
   const mask = edges.left || edges.right

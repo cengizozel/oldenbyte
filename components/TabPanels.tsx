@@ -4,14 +4,22 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { flushSync } from "react-dom";
 
 // The body of a tab group: one panel per tab, the active one shown, and a
-// sideways swipe to the neighbouring tab, the way phone apps page between
-// tabs. While a finger drags, the neighbouring tab rides in beside the shown
-// one, its real content already there (every tab stays mounted); on release
-// the tab is chosen at once (the tab row's underline sets off with the slide)
-// while both panels finish the move together, so nothing reloads or fades. A trackpad's two-finger sideways swipe
-// plays the same slide. A mouse drag never swipes: on a computer that gesture
-// selects text and drags things. Choosing a tab in the tab row stays an
-// instant switch.
+// sideways swipe to the neighbouring tab, the way a phone's photo viewer pages.
+//
+// What makes it feel stuck to the finger:
+// - The tabs on either side of the shown one are kept laid out, off to the
+//   side and hidden (inert, so nothing can focus or click them), so a swipe
+//   only reveals what is already there instead of building it mid-gesture.
+// - The content moves in the same event as the finger, no frame later, and
+//   from the moment the gesture is recognised, with no jump.
+// - On release the speed is the finger's last ~80ms, not the average, and the
+//   finishing slide starts at that speed and decelerates into place, its
+//   length set by the distance left, so a flick stays a flick.
+// On release the tab is chosen at once (the tab row's underline sets off with
+// the slide) while the old panel stays on screen until the slide ends. A
+// trackpad's two-finger sideways swipe plays the same slide; a mouse drag
+// never swipes, since on a computer that gesture selects text and drags.
+// Choosing a tab in the tab row stays an instant switch.
 //
 // A swipe never starts on something that uses the gesture itself: text
 // fields, editors, sliders, canvases, video, draggable items, anything that
@@ -20,12 +28,11 @@ import { flushSync } from "react-dom";
 // their own frame, so their gestures never reach this at all.
 
 const BLOCK = 'input, textarea, select, [contenteditable=""], [contenteditable="true"], canvas, video, [draggable="true"], [data-no-swipe]';
-const LOCK = 12;          // px of movement before deciding the direction
-const COMMIT = 0.25;      // share of the width that switches on release
-const FLICK = 0.5;        // px/ms that switches on release whatever the distance
-const DURATION = 220;
-const EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)"; // fast start, soft landing
-const GAP = 12;           // px between the two panels while they move
+const LOCK = 10;          // px of movement before deciding the direction
+const COMMIT = 0.3;       // share of the width that switches on release
+const FLICK = 0.35;       // px/ms toward a neighbour that switches whatever the distance
+const GAP = 12;           // px between neighbouring panels
+const VELOCITY_WINDOW = 80; // ms of finger movement that set the release speed
 
 function blocked(target: EventTarget | null, root: Element): boolean {
   if (!(target instanceof Element)) return true;
@@ -37,6 +44,40 @@ function blocked(target: EventTarget | null, root: Element): boolean {
   return false;
 }
 
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+// Lay the panels out for the shown tab: it in place, its neighbours ready off
+// to either side (hidden and inert), the rest not rendered at all.
+function arrange(root: HTMLElement | null, list: string[], activeId: string, enabled: boolean) {
+  if (!root) return;
+  const i = list.indexOf(activeId);
+  root.querySelectorAll<HTMLElement>("[data-tab-panel]").forEach(p => {
+    const k = list.indexOf(p.dataset.tabPanel ?? "");
+    const side = enabled && i >= 0 && Math.abs(k - i) === 1 ? Math.sign(k - i) : 0;
+    p.style.transition = "";
+    p.style.willChange = "";
+    if (k === i) {
+      p.style.display = "block";
+      p.style.transform = "";
+      p.style.visibility = "";
+      p.removeAttribute("inert");
+      delete p.dataset.offstage;
+    } else if (side) {
+      p.style.display = "block";
+      p.style.transform = `translateX(calc(${side * 100}% + ${side * GAP}px))`;
+      p.style.visibility = "hidden";
+      p.setAttribute("inert", "");
+      p.dataset.offstage = "";
+    } else {
+      p.style.display = "none";
+      p.style.transform = "";
+      p.style.visibility = "";
+      p.removeAttribute("inert");
+      delete p.dataset.offstage;
+    }
+  });
+}
+
 export default function TabPanels({ ids, activeId, onSelect, enabled, render }: {
   ids: string[];
   activeId: string;
@@ -45,26 +86,21 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
   render: (id: string) => ReactNode;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const live = useRef({ ids, activeId, onSelect });
-  useEffect(() => { live.current = { ids, activeId, onSelect }; });
+  const live = useRef({ ids, activeId, onSelect, enabled });
+  useEffect(() => { live.current = { ids, activeId, onSelect, enabled }; });
 
   // The tab a finishing swipe is sliding away from: kept on screen until the
   // slide ends, though the new tab is already the chosen one.
   const [hold, setHold] = useState<string | null>(null);
   const holdRef = useRef<string | null>(null);
 
-  // After any switch, before the browser paints: drop the inline styles a
-  // swipe left on the panels, so React's display (shown or hidden) is all
-  // that applies and nothing flashes. Not while a swipe is still sliding.
+  // After any switch, before the browser paints. Not while a swipe slides.
+  const idsKey = ids.join("|");
   useLayoutEffect(() => {
-    if (holdRef.current) return;
-    rootRef.current?.querySelectorAll<HTMLElement>("[data-tab-panel]").forEach(p => {
-      p.style.transform = "";
-      p.style.transition = "";
-      p.style.willChange = "";
-      if (p.dataset.tabPanel !== activeId) p.style.display = "none";
-    });
-  }, [activeId]);
+    live.current = { ids, activeId, onSelect, enabled };
+    if (!holdRef.current) arrange(rootRef.current, ids, activeId, enabled);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, enabled, idsKey]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -74,12 +110,11 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
       return list[list.indexOf(cur) + dir];
     };
     const panelOf = (id: string | undefined) => (id ? root.querySelector<HTMLElement>(`[data-tab-panel="${CSS.escape(id)}"]`) : null);
-    const width = () => root.clientWidth + GAP;
+    const span = () => root.clientWidth + GAP;
 
-    // The shown panel and, beside it, the neighbour in the drag's direction.
     let cur: HTMLElement | null = null;
-    let peek: HTMLElement | null = null;
-    let peekDir = 0;
+    let before: HTMLElement | null = null; // the tab to the left
+    let after: HTMLElement | null = null;  // the tab to the right
     // The slide still finishing, so a new swipe can complete it at once and
     // carry on from the next tab without waiting.
     let pending: { timer: number; done: () => void } | null = null;
@@ -91,30 +126,40 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
       p.done();
     };
 
-    const place = (offset: number, dir: number) => {
-      if (dir !== peekDir) {
-        if (peek) { peek.style.display = "none"; peek.style.transform = ""; }
-        peek = dir ? panelOf(neighbor(dir)) : null;
-        peekDir = dir;
-        if (peek) { peek.style.display = "block"; peek.style.willChange = "transform"; peek.style.transition = "none"; }
-      }
-      if (cur) cur.style.transform = `translateX(${offset}px)`;
-      if (peek) peek.style.transform = `translateX(${offset + peekDir * width()}px)`;
-    };
     const begin = () => {
       cur = panelOf(live.current.activeId);
-      peek = null;
-      peekDir = 0;
-      if (cur) { cur.style.willChange = "transform"; cur.style.transition = "none"; }
+      before = panelOf(neighbor(-1));
+      after = panelOf(neighbor(1));
+      for (const el of [cur, before, after]) {
+        if (!el) continue;
+        el.style.transition = "none";
+        el.style.willChange = "transform";
+      }
+      for (const el of [before, after]) if (el) { el.style.visibility = "visible"; el.style.display = "block"; }
     };
-    // Finish the move: to the neighbour (dir) or back to where it started (0).
-    const finish = (dir: number) => {
-      const to = dir && peekDir === dir ? dir : 0;
+    const place = (offset: number) => {
+      const w = span();
+      if (cur) cur.style.transform = `translateX(${offset}px)`;
+      if (before) before.style.transform = `translateX(${offset - w}px)`;
+      if (after) after.style.transform = `translateX(${offset + w}px)`;
+    };
+    // Finish the move from `offset`: to the neighbour in `to` (1 or -1) or
+    // back (0), starting at `speed` px/ms and decelerating into place.
+    const finish = (offset: number, to: number, speed: number) => {
+      const w = span();
+      const target = -to * w;
+      const remaining = Math.abs(target - offset);
+      const v = Math.max(Math.abs(speed), 0.6);
+      // Twice distance over speed is what a curve that starts at that speed
+      // and eases to a stop takes; clamped so nothing crawls or snaps.
+      const ms = Math.round(clamp((2 * remaining) / v, to ? 180 : 160, to ? 380 : 300));
+      const ease = "cubic-bezier(0.25, 0.6, 0.3, 1)";
       const next = to ? neighbor(to) : undefined;
-      for (const el of [cur, peek]) if (el) el.style.transition = `transform ${DURATION}ms ${EASE}`;
-      if (cur) cur.style.transform = `translateX(${-to * width()}px)`;
-      if (peek) peek.style.transform = `translateX(${(peekDir - to) * width()}px)`;
-      const leaving = cur, arriving = peek;
+      for (const el of [cur, before, after]) if (el) el.style.transition = `transform ${ms}ms ${ease}`;
+      if (cur) cur.style.transform = `translateX(${target}px)`;
+      if (before) before.style.transform = `translateX(${target - w}px)`;
+      if (after) after.style.transform = `translateX(${target + w}px)`;
+      const leaving = cur;
       if (next && leaving) {
         // Choose the tab now, keeping the old panel shown for the slide.
         holdRef.current = leaving.dataset.tabPanel ?? null;
@@ -124,25 +169,17 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
         // before React has re-rendered.
         live.current = { ...live.current, activeId: next };
       }
-      const clear = (el: HTMLElement | null) => { if (el) { el.style.transform = ""; el.style.transition = ""; el.style.willChange = ""; } };
       const done = () => {
         pending = null;
         if (next) {
-          // Hide the old panel first, then drop the offsets, so it never
-          // jumps back into view for a frame.
           holdRef.current = null;
           flushSync(() => setHold(null));
-          if (leaving) leaving.style.display = "none";
-          clear(leaving);
-          clear(arriving);
-        } else {
-          if (arriving) arriving.style.display = "none";
-          clear(arriving);
-          clear(leaving);
         }
+        const { ids: list, activeId: shown, enabled: on } = live.current;
+        arrange(root, list, shown, on); // shown tab in place, its new neighbours ready
       };
-      cur = null; peek = null; peekDir = 0;
-      pending = { timer: window.setTimeout(done, DURATION), done };
+      cur = null; before = null; after = null;
+      pending = { timer: window.setTimeout(done, ms), done };
     };
 
     // ── Touch ───────────────────────────────────────────────────────────────
@@ -150,55 +187,61 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
     // and inside a scroller the browser would claim a sideways drag and cancel
     // the pointer. A non-passive touchmove can tell it not to, once the
     // gesture is clearly sideways; a vertical one is left to scroll.
-    let start: { x: number; y: number; t: number } | null = null;
+    let start: { x: number; y: number } | null = null;
+    let origin = 0;           // finger x where the swipe was recognised
     let locked = false;
-    let dx = 0;
+    let offset = 0;
+    let samples: { t: number; x: number }[] = [];
     let swallowClick = false;
-    let frame = 0;
 
+    const offsetFor = (dx: number) => {
+      // Past the first or last tab it only gives a little, like a rubber band.
+      const dir = dx < 0 ? 1 : -1;
+      return neighbor(dir) ? dx : dx * 0.25;
+    };
     const onStart = (e: TouchEvent) => {
       if (e.touches.length !== 1 || blocked(e.target, root)) { start = null; return; }
       fastForward(); // a swipe during the last one's slide finishes it now
       const t = e.touches[0];
-      start = { x: t.clientX, y: t.clientY, t: performance.now() };
+      start = { x: t.clientX, y: t.clientY };
       locked = false;
-      dx = 0;
+      offset = 0;
+      samples = [{ t: e.timeStamp, x: t.clientX }];
     };
     const onMove = (e: TouchEvent) => {
       if (!start) return;
-      if (e.touches.length !== 1) { if (locked) finish(0); start = null; locked = false; return; } // a pinch
+      if (e.touches.length !== 1) { if (locked) finish(offset, 0, 0); start = null; locked = false; return; } // a pinch
       const t = e.touches[0];
-      dx = t.clientX - start.x;
+      const dx = t.clientX - start.x;
       const dy = t.clientY - start.y;
       if (!locked) {
         if (Math.abs(dy) > LOCK && Math.abs(dy) >= Math.abs(dx)) { start = null; return; } // a scroll
         if (Math.abs(dx) < LOCK || Math.abs(dx) < Math.abs(dy) * 1.5) return;
         locked = true;
+        origin = t.clientX; // the content starts here, so it never jumps
         begin();
       }
       if (e.cancelable) e.preventDefault();
-      const dir = dx < 0 ? 1 : -1;
-      // Past the first or last tab it only gives a little, like a rubber band.
-      const offset = neighbor(dir) ? dx : dx * 0.25;
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => place(offset, neighbor(dir) ? dir : 0));
+      samples.push({ t: e.timeStamp, x: t.clientX });
+      while (samples.length > 2 && e.timeStamp - samples[0].t > VELOCITY_WINDOW) samples.shift();
+      offset = offsetFor(t.clientX - origin);
+      place(offset);
     };
     const onEnd = (e: TouchEvent) => {
       if (!start) return;
       const wasLocked = locked;
-      const speed = Math.abs(dx) / Math.max(1, performance.now() - start.t);
       start = null;
       locked = false;
       if (!wasLocked) return;
-      cancelAnimationFrame(frame);
       swallowClick = true; // the release ends a swipe, not a tap on what is under it
       window.setTimeout(() => { swallowClick = false; }, 350);
-      const dir = dx < 0 ? 1 : -1;
-      const commit = e.type === "touchend" && !!neighbor(dir) && (Math.abs(dx) > root.clientWidth * COMMIT || speed > FLICK);
-      // The panels already sit where the last move put them, so the slide
-      // and the choice of tab can start right away.
-      place(neighbor(dir) ? dx : dx * 0.25, neighbor(dir) ? dir : 0);
-      finish(commit ? dir : 0);
+      const first = samples[0], last = samples[samples.length - 1];
+      const speed = last && first && last.t > first.t ? (last.x - first.x) / (last.t - first.t) : 0; // px/ms, signed
+      const dir = offset < 0 ? 1 : -1;
+      const towards = speed * -dir > 0; // still moving toward the neighbour
+      const commit = e.type === "touchend" && !!neighbor(dir) &&
+        ((Math.abs(offset) > root.clientWidth * COMMIT && speed * dir <= FLICK) || (towards && Math.abs(speed) > FLICK));
+      finish(offset, commit ? dir : 0, commit ? speed : 0);
     };
     const onClick = (e: MouseEvent) => { if (swallowClick) { e.preventDefault(); e.stopPropagation(); } };
 
@@ -219,8 +262,8 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
       const dir = acc > 0 ? 1 : -1;
       if (!neighbor(dir)) return;
       begin();
-      place(0, dir);
-      requestAnimationFrame(() => finish(dir));
+      place(0);
+      requestAnimationFrame(() => finish(0, dir, 2));
     };
 
     root.addEventListener("touchstart", onStart, { passive: true });
@@ -237,7 +280,7 @@ export default function TabPanels({ ids, activeId, onSelect, enabled, render }: 
       root.removeEventListener("click", onClick, true);
       root.removeEventListener("wheel", onWheel);
       window.clearTimeout(idle);
-      cancelAnimationFrame(frame);
+      fastForward();
     };
   }, [enabled]);
 
