@@ -169,7 +169,10 @@ the palette `label` color at 50% opacity.
   finger, trackpad, mouse wheel or a mouse drag (gliding on after release,
   never pressing the button it started on) and fades the edge that has more; color,
   full screen and settings stay pinned after the divider, so they are always
-  in the same place. Same in a tab group's options row.
+  in the same place. Same in a tab group's options row, and in an overlay
+  panel's header (history, insights, chats, characters): the panel's own
+  buttons scroll, and its close (the header's `onClose`, drawn the same on
+  every panel) stays pinned at the right end.
 - Tab groups: the tab row is the header, in the same place and size as a
   single widget's header. The shown tab is the title (`text-sm font-medium`,
   with its widget's icon in front), the other tabs follow as icon and name at

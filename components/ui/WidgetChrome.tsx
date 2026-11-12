@@ -426,7 +426,7 @@ export function ExpandButton({ c }: { c: ColorClasses }) {
 }
 
 export function WidgetHeader({
-  c, icon: Icon, title, after, right, onSettings, panel = false, className = "",
+  c, icon: Icon, title, after, right, onSettings, onClose, panel = false, className = "",
 }: {
   c: ColorClasses;
   icon: LucideIcon;
@@ -441,6 +441,9 @@ export function WidgetHeader({
   // buttons always visible, even inside a tab group, where the tab keeps the
   // widget's name and the panel's title and buttons head the panel below it.
   panel?: boolean;
+  // A panel's close: drawn by the header, pinned at the row's right end, so
+  // it is the same on every panel and never scrolls out of reach.
+  onClose?: () => void;
   className?: string;
 }) {
   const group = useTabGroup();
@@ -450,14 +453,21 @@ export function WidgetHeader({
   useEffect(() => { setOpen(false); }, [editing]); // back to the identity on any mode change
 
   if (panel) {
+    // Same rule as a widget's header: the panel's own buttons scroll sideways
+    // when the card is too narrow for them, and its close stays pinned.
     return (
-      <div className={`flex items-center justify-between gap-2 mb-4 shrink-0 ${className}`}>
-        <div className={`flex items-center gap-1.5 min-w-0 ${c.label}`}>
+      <div className={`flex items-center gap-2 mb-4 shrink-0 ${className}`}>
+        <div className={`flex items-center gap-1.5 min-w-0 max-w-[60%] shrink-0 ${c.label}`}>
           <Icon size={14} className="opacity-50 shrink-0" />
           <span className="text-sm font-medium truncate">{title}</span>
           {after}
         </div>
-        {right && <div className="flex items-center gap-2 shrink-0">{right}</div>}
+        {right ? <OptionsScroller end={right} /> : <div className="flex-1" />}
+        {onClose && (
+          <button type="button" onClick={onClose} title="Close" aria-label="Close" className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}>
+            <X size={14} />
+          </button>
+        )}
       </div>
     );
   }

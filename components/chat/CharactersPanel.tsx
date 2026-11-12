@@ -28,11 +28,11 @@ export function CharactersPanel({ c, characters, activeCharId, filter, onCreate,
           panel
           icon={Users}
           title="Characters"
+          onClose={onClose}
           right={
             <>
               {filter}
               <button onClick={onCreate} title="New character" aria-label="New character" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><Plus size={14} /></button>
-              <button onClick={onClose} title="Close" aria-label="Close" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><X size={14} /></button>
             </>
           }
         />

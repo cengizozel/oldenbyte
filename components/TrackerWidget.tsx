@@ -496,11 +496,7 @@ export default function TrackerWidget({
               c={c}
               icon={History}
               title="History"
-              right={
-                <button onClick={() => { setHistoryOpen(false); setDetailDate(null); setEditRowId(null); }} className={`opacity-70 hover:opacity-100 ${iconBtnCls} ${c.label}`} title="Close" aria-label="Close">
-                  <X size={14} />
-                </button>
-              }
+              onClose={() => { setHistoryOpen(false); setDetailDate(null); setEditRowId(null); }}
             />
           )}
 

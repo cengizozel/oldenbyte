@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { NotebookPen, X, Bold, Italic, Underline, List, History, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { NotebookPen, Bold, Italic, Underline, List, History, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { formatDate, localDateStr } from "@/lib/format";
@@ -594,11 +594,7 @@ export default function NotebookWidget({
             c={c}
             icon={History}
             title="All notes"
-            right={
-              <button onClick={() => setHistoryOpen(false)} className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`} title="Close" aria-label="Close">
-                <X size={14} />
-              </button>
-            }
+            onClose={() => setHistoryOpen(false)}
           />
           <div className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col">
             {history.length === 0 ? (

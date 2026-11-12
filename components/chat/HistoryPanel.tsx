@@ -35,14 +35,12 @@ export default function HistoryPanel({ c, conversations, activeId, active, filte
           icon={MessageSquare}
           title="Chats"
           panel
+          onClose={onClose}
           right={
             <>
               {filter}
               <button onClick={onNew} title="New chat with the Assistant" aria-label="New chat" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}>
                 <Plus size={14} />
-              </button>
-              <button onClick={onClose} title="Close" aria-label="Close" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}>
-                <X size={14} />
               </button>
             </>
           }
