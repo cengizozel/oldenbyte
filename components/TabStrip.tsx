@@ -449,8 +449,12 @@ export default function TabStrip({ order, activeId, instances, editing, hidden =
     if (st.raf) cancelAnimationFrame(st.raf);
     let last = performance.now();
     const step = (now: number) => {
-      const dt = Math.min(0.032, (now - last) / 1000) || 0.016;
-      last = now;
+      // The first frame's timestamp can precede the moment this effect ran
+      // (it is the frame's start time), which made the step negative and
+      // threw the spring far past its target. Clamp it to a sane positive step.
+      const raw = (now - last) / 1000;
+      const dt = raw > 0 ? Math.min(0.032, raw) : 0.016;
+      last = Math.max(last, now);
       const forward = st.r.target - st.r.x + (st.l.target - st.l.x) >= 0;
       const lead = forward ? st.r : st.l, trail = forward ? st.l : st.r;
       const h = dt / 4;
