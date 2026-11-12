@@ -1,5 +1,6 @@
 "use client";
 
+import { useModelServers } from "@/lib/useModelServers";
 import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -203,6 +204,9 @@ export default function DigestPage() {
       generateSummary(next);
     }
   }
+
+  // Model servers to offer: shared with the Assistant's settings.
+  const servers = useModelServers();
 
   const PRESETS = [
     { label: "OpenAI", url: "https://api.openai.com/v1" },
@@ -806,7 +810,28 @@ export default function DigestPage() {
                 {!loadingModels && (
                   <button onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey, draft.model || model)} className="inline-flex items-center min-h-6 text-[15px] font-ui text-[var(--text-secondary)] hover:text-[var(--text-primary)]">load models</button>
                 )}
+                <button onClick={servers.find} disabled={servers.finding} title="Look for Ollama, LM Studio or llama.cpp on this server and on hosts your widgets use" className="inline-flex items-center min-h-6 text-[15px] font-ui text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-60">
+                  {servers.finding ? "finding servers…" : "find servers"}
+                </button>
               </div>
+              {/* One click: a connection an Assistant already uses, or a server just found. */}
+              {(() => {
+                const offers = servers.offers(draft.baseUrl, draft.model);
+                if (!offers.length) return servers.nothingFound ? <p className="font-ui text-[15px] text-[var(--text-secondary)]">No model server answered on the usual ports. Enter its address above.</p> : null;
+                return (
+                  <div className="flex items-start gap-3">
+                    <span className="font-ui text-[15px] text-[var(--text-secondary)] w-20 shrink-0 min-h-6 flex items-center">found</span>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {offers.map(o => (
+                        <button key={o.key} title={`${o.url} (${o.note})`} onClick={() => { setDraft(d => ({ ...d, baseUrl: o.url, model: o.model })); setModelsError(""); loadModelsFor(o.url, draft.apiKey, o.model); }}
+                          className="inline-flex items-center min-h-6 font-ui text-[15px] text-[var(--text-primary)] hover:text-[var(--text-secondary)] underline underline-offset-4 decoration-[var(--surface-border)]">
+                          use {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               {modelsError && <p className="font-ui text-[15px] text-red-400 leading-snug">{modelsError}</p>}
               {/* Sections: every digestable widget on your dashboards; click one to leave it out */}
               {sections.length > 0 && (

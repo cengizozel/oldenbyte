@@ -5,7 +5,8 @@ import { RefreshCw, Loader, ChevronRight } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { DEFAULT_CONFIG, EFFORT_OPTIONS, LENGTH_PRESETS, PRESETS, type ChatConfig, type Length } from "@/lib/chat/types";
 import { SettingsInput, SettingsSelect, SettingsTextarea, FOCUS_RING, Stepper } from "../ui/Field";
-import { listKiwixServers, listAnytypeConnections, listModelConnections, knownHosts, type KnownKiwixServer, type KnownAnytype, type KnownModelServer } from "@/lib/dashboardContext";
+import { listKiwixServers, listAnytypeConnections, type KnownKiwixServer, type KnownAnytype } from "@/lib/dashboardContext";
+import { useModelServers } from "@/lib/useModelServers";
 import { Chip, SmallButton, SettingsFace, SettingsListControl } from "../ui/WidgetChrome";
 import Toggle from "../ui/Toggle";
 
@@ -29,20 +30,9 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
   const [kiwixError, setKiwixError] = useState("");
   const [knownKiwix, setKnownKiwix] = useState<KnownKiwixServer[]>([]);
   const [knownAnytype, setKnownAnytype] = useState<KnownAnytype[]>([]);
-  // Model servers: ones another Assistant already uses, and ones found by
-  // looking on the usual ports of hosts this dashboard already talks to.
-  const [knownModels, setKnownModels] = useState<KnownModelServer[]>([]);
-  const [found, setFound] = useState<{ url: string; kind: string; models: string[] }[] | null>(null);
-  const [finding, setFinding] = useState(false);
-  async function findServers() {
-    setFinding(true);
-    try {
-      const hosts = await knownHosts();
-      const res = await fetch(`/api/chat?discover=1&hosts=${encodeURIComponent(hosts.join(","))}`);
-      const data = await res.json();
-      setFound(Array.isArray(data.servers) ? data.servers : []);
-    } catch { setFound([]); } finally { setFinding(false); }
-  }
+  // Model servers: ones another Assistant already uses, and ones found on the
+  // usual ports (lib/useModelServers, shared with the digest).
+  const servers = useModelServers(widgetId);
   function pickServer(url: string, model: string) {
     const next = { ...draft, baseUrl: url, model };
     setDraft(next);
@@ -51,7 +41,6 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
   useEffect(() => {
     listKiwixServers().then(setKnownKiwix).catch(() => {});
     listAnytypeConnections().then(setKnownAnytype).catch(() => {});
-    listModelConnections(widgetId).then(setKnownModels).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // An Anytype widget's connection not already in use here.
@@ -197,8 +186,8 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
         <div>
           <div className="flex items-center justify-between gap-2 mb-1">
             <p className={`text-sm opacity-70 ${c.label}`}>Model server</p>
-            <SmallButton c={c} onClick={findServers} disabled={finding} title="Look for Ollama, LM Studio or llama.cpp on this server and on hosts your other widgets use">
-              {finding ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            <SmallButton c={c} onClick={servers.find} disabled={servers.finding} title="Look for Ollama, LM Studio or llama.cpp on this server and on hosts your other widgets use">
+              {servers.finding ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Find servers
             </SmallButton>
           </div>
@@ -212,17 +201,13 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
           {/* One click: a connection another Assistant already uses, or a
               server just found. Hidden for the one already entered. */}
           {(() => {
-            const cur = draft.baseUrl.trim().replace(/\/+$/, "").toLowerCase();
-            const offers = [
-              ...knownModels.filter(k => !(k.url.toLowerCase() === cur && k.model === draft.model)).map(k => ({ key: `k|${k.url}|${k.model}`, url: k.url, model: k.model, note: "from another Assistant" })),
-              ...(found ?? []).filter(f => f.url.toLowerCase() !== cur).map(f => ({ key: `f|${f.url}`, url: f.url, model: f.models[0], note: `${f.kind}, ${f.models.length} model${f.models.length === 1 ? "" : "s"}` })),
-            ];
-            if (offers.length === 0) return found && found.length === 0 ? <p className="text-sm text-[var(--text-muted)] mt-1.5">No model server answered on the usual ports. Enter its address above.</p> : null;
+            const offers = servers.offers(draft.baseUrl, draft.model);
+            if (offers.length === 0) return servers.nothingFound ? <p className="text-sm text-[var(--text-muted)] mt-1.5">No model server answered on the usual ports. Enter its address above.</p> : null;
             return (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {offers.map(o => (
                   <Chip key={o.key} c={c} onClick={() => pickServer(o.url, o.model)} title={`${o.url} (${o.note})`}>
-                    Use {o.url.replace(/^https?:\/\//, "").replace(/\/v1$/, "")}{o.model ? ` · ${o.model}` : ""}
+                    Use {o.label}
                   </Chip>
                 ))}
               </div>
