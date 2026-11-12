@@ -64,4 +64,4 @@ Next.js 16, TypeScript, Tailwind CSS 4, Prisma with SQLite, react-grid-layout. A
 
 ## License
 
-[MIT](LICENSE)
+Copyright (c) 2026 Cengiz Ozel. Licensed under the [GNU Affero General Public License v3.0](LICENSE): free to use, change and self-host; anyone who offers a modified version as a service must publish its source.
