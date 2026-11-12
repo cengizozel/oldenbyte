@@ -234,8 +234,12 @@ export function OptionsScroller({ start, end, className = "" }: { start?: ReactN
       if (!moved) return;
       swallow = true;
       window.setTimeout(() => { swallow = false; }, 0);
-      const a = samples[0], b = samples[samples.length - 1];
-      let v = a && b && b.t > a.t ? -(b.x - a.x) / (b.t - a.t) : 0; // px/ms in scroll direction
+      // Glide only if the pointer was still moving when it let go: speed from
+      // the last 80ms before the release, nothing if it had paused, capped.
+      const recent = samples.filter(p => e.timeStamp - p.t <= 80);
+      const a = recent[0], b = recent[recent.length - 1];
+      let v = recent.length >= 2 && b.t > a.t ? -(b.x - a.x) / (b.t - a.t) : 0; // px/ms in scroll direction
+      v = Math.max(-2, Math.min(2, v));
       let last = performance.now();
       const step = (now: number) => {
         const dt = Math.max(0, now - last);
