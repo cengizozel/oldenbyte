@@ -10,7 +10,7 @@ import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { RefreshButton, ScrollFades, LoadingState, EmptyState, WidgetHeader, BackButton, SettingsFace, SettingsField, Chip } from "@/components/ui/WidgetChrome";
+import { RefreshButton, ScrollFades, LoadingState, EmptyState, ErrorState, WidgetHeader, BackButton, SettingsFace, SettingsField, Chip } from "@/components/ui/WidgetChrome";
 
 const CATEGORY_GROUPS = [
   {
@@ -177,6 +177,7 @@ export default function ArxivWidget({
   const [config, setConfig]             = useState<ArxivConfig>(DEFAULT);
   const [cache, setCache]               = useState<Cache | null>(null);
   const [loading, setLoading]           = useState(false);
+  const [failed, setFailed]             = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft]               = useState<ArxivConfig>(DEFAULT);
   const [selected, setSelected]         = useState<Paper | null>(null);
@@ -206,6 +207,7 @@ export default function ArxivWidget({
     const ctrl = new AbortController();
     fetchAbort.current = ctrl;
     setLoading(true);
+    setFailed(false);
     try {
       const load = async (url: string): Promise<Paper[]> => {
         const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${cfg.limit ?? 25}${force ? "&refresh=1" : ""}`, { signal: ctrl.signal });
@@ -223,7 +225,8 @@ export default function ArxivWidget({
       setCache(newCache);
       await storage.setItem(cacheKey, JSON.stringify(newCache));
     } catch {
-      /* leave existing cache (or an aborted, superseded fetch) */
+      // Keep the existing cache; an aborted, superseded fetch is not a failure.
+      if (!ctrl.signal.aborted) setFailed(true);
     } finally {
       if (fetchAbort.current === ctrl) setLoading(false);
     }
@@ -292,6 +295,8 @@ export default function ArxivWidget({
                       </li>
                     ))}
                   </ul>
+                ) : failed ? (
+                  <ErrorState c={c} busy={loading} onRetry={() => fetchPapers(config, true)}>could not load papers</ErrorState>
                 ) : (
                   <EmptyState c={c} action={t("empty.arxiv")} />
                 )}

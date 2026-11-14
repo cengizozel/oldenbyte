@@ -103,6 +103,21 @@ export function EmptyState({ c, action, children }: { c: ColorClasses; action?: 
   );
 }
 
+// Standard load-failure state: same placement and casing as EmptyState, plus
+// a retry. A widget that is configured but could not load shows this, never
+// its "add ..." empty copy, which would read as lost settings.
+export function ErrorState({ c, children, onRetry, busy }: { c: ColorClasses; children: ReactNode; onRetry: () => void; busy?: boolean }) {
+  return (
+    <div className="flex-1 h-full min-h-0 flex flex-col items-center justify-center gap-3 text-center px-4">
+      <p className={`text-sm opacity-70 ${c.text}`}>{children}</p>
+      <SmallButton c={c} onClick={onRetry} disabled={busy}>
+        <RefreshCw size={14} className={busy ? "animate-spin" : ""} />
+        Try again
+      </SmallButton>
+    </div>
+  );
+}
+
 // Bottom row of a settings face: reset on the left (back to defaults, asked
 // first), cancel and save on the right. Real 28px buttons on a fill, 16px
 // glyphs, so they read as the face's actions and not as stray marks.

@@ -12,7 +12,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, SettingsInfo, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, ErrorState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, SettingsInfo, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { youtubeCacheKey } from "@/lib/cacheKeys";
@@ -114,6 +114,7 @@ export default function YoutubeWidget({
   const [loading, setLoading]           = useState(false);
   const [resolving, setResolving]       = useState(false);
   const [error, setError]               = useState("");
+  const [failed, setFailed]             = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft]               = useState<YoutubeConfig>(DEFAULT);
   const [chInput, setChInput]           = useState("");
@@ -263,6 +264,7 @@ export default function YoutubeWidget({
     fetchAbort.current = ctrl;
     setLoading(true);
     setError("");
+    setFailed(false);
     try {
       const results = await Promise.all(
         cfg.channels.map(async ch => {
@@ -296,6 +298,7 @@ export default function YoutubeWidget({
     } catch (e) {
       if ((e as Error).name === "AbortError" || ctrl.signal.aborted) return false;
       setError("Failed to load videos.");
+      setFailed(true);
       return false;
     } finally {
       if (fetchAbort.current === ctrl) setLoading(false);
@@ -466,6 +469,8 @@ export default function YoutubeWidget({
                   )
                 ) : videos.length ? (
                   <EmptyState c={c}>nothing from {filterName || "this channel"} right now</EmptyState>
+                ) : failed && config.channels.length ? (
+                  <ErrorState c={c} busy={loading} onRetry={() => fetchVideos(config, cacheKeyFor(config), true)}>could not load videos</ErrorState>
                 ) : (
                   <EmptyState c={c} action={t("empty.youtube")} />
                 )}

@@ -9,7 +9,7 @@ import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { RefreshButton, ScrollFades, LoadingState, WidgetHeader, Chip, BackButton, SettingsFace, SettingsField } from "@/components/ui/WidgetChrome";
+import { RefreshButton, ScrollFades, LoadingState, ErrorState, WidgetHeader, Chip, BackButton, SettingsFace, SettingsField } from "@/components/ui/WidgetChrome";
 
 type HFPaper = {
   id: string;
@@ -39,6 +39,7 @@ export default function HuggingFaceWidget({
   const [config, setConfig]             = useState<HFConfig>(DEFAULT);
   const [papers, setPapers]             = useState<HFPaper[]>([]);
   const [loading, setLoading]           = useState(false);
+  const [failed, setFailed]             = useState(false);
   const [selected, setSelected]         = useState<HFPaper | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft]               = useState<HFConfig>(DEFAULT);
@@ -66,14 +67,16 @@ export default function HuggingFaceWidget({
     const ctrl = new AbortController();
     fetchAbort.current = ctrl;
     setLoading(true);
+    setFailed(false);
     try {
       const res = await fetch(`/api/hf?limit=${cfg.limit}${force ? "&refresh=1" : ""}`, { signal: ctrl.signal });
       if (!res.ok) throw new Error();
       const data: HFPaper[] = await res.json();
       setPapers(data);
       await storage.setItem(`hf-papers-${cfg.limit}-${today}`, JSON.stringify(data));
-    } catch {}
-    finally { if (fetchAbort.current === ctrl) setLoading(false); }
+    } catch {
+      if (!ctrl.signal.aborted) setFailed(true);
+    } finally { if (fetchAbort.current === ctrl) setLoading(false); }
   }
 
   function handleSave() {
@@ -112,7 +115,9 @@ export default function HuggingFaceWidget({
                 className="absolute inset-0 overflow-y-auto pr-3"
                 onScroll={listFade.onScroll}
               >
-                {!papers.length ? (
+                {!papers.length && failed && !loading ? (
+                  <ErrorState c={c} onRetry={() => fetchPapers(config, true)}>could not load papers</ErrorState>
+                ) : !papers.length ? (
                   <LoadingState c={c} />
                 ) : (
                   <ul className="flex flex-col">

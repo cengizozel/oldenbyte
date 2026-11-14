@@ -12,7 +12,7 @@ import { SettingsInput, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
 import { timeAgo } from "@/lib/chat/format";
 import { favoriteId, loadFavorites, refreshFavorites, subscribeFavorites, toggleFavorite, type Favorite } from "@/lib/favorites";
 import { useScrollFade } from "@/lib/useScrollFade";
-import { WidgetHeader, Chip, RefreshButton, ScrollFades, LoadingState, EmptyState, SettingsFace, SettingsField, SettingsError } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, RefreshButton, ScrollFades, LoadingState, EmptyState, ErrorState, SettingsFace, SettingsField, SettingsError } from "@/components/ui/WidgetChrome";
 
 type RssItem = { title: string; link: string; pubDate: string };
 type RssConfig = { url: string; limit: number; name?: string };
@@ -43,6 +43,7 @@ export default function RssWidget({
   const [loading, setLoading] = useState(false);
   const { ref: scrollRef, onScroll, topFade, bottomFade } = useScrollFade([items]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<RssConfig>(DEFAULT);
   // Aborts the previous feed request so a slow initial load can never land
@@ -101,6 +102,7 @@ export default function RssWidget({
     fetchAbort.current = ctrl;
     setLoading(true);
     setError("");
+    setFailed(false);
     try {
       const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}&limit=${limit}${force ? "&refresh=1" : ""}`, { signal: ctrl.signal });
       if (!res.ok) throw new Error();
@@ -113,6 +115,7 @@ export default function RssWidget({
     } catch (e) {
       if ((e as Error).name === "AbortError") return false;
       setError("Failed to load feed. Check the URL.");
+      setFailed(true);
       return false;
     } finally {
       if (fetchAbort.current === ctrl) setLoading(false);
@@ -197,6 +200,8 @@ export default function RssWidget({
                     </li>
                   ))}
                 </ul>
+              ) : failed && config.url ? (
+                <ErrorState c={c} busy={loading} onRetry={() => fetchFeed(config.url, config.limit, `${storageKey}-${today}`, true)}>could not load this feed</ErrorState>
               ) : (
                 <EmptyState c={c} action={t("empty.rss")} />
               )}

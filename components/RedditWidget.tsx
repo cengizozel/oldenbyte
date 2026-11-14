@@ -12,7 +12,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup, Popover } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, ErrorState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup, Popover } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { REDDIT_API_KEY, parseRedditApi, type RedditApiConfig } from "@/lib/reddit";
 import { isDemoMode } from "@/lib/demo";
@@ -92,6 +92,7 @@ export default function RedditWidget({
   const [posts, setPosts]               = useState<Post[]>([]);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState("");
+  const [failed, setFailed]             = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // The settings face is always mounted on the back of the FlipCard, so
   // `autoFocus` there would grab focus at page load (and on iOS zoom the page
@@ -212,6 +213,7 @@ export default function RedditWidget({
     if (retryRef.current.timer) { clearTimeout(retryRef.current.timer); retryRef.current.timer = null; }
     setLoading(true);
     setError("");
+    setFailed(false);
     try {
       // Fire them all at once: the server serves cached feeds instantly and
       // queues the uncached ones against Reddit's rate limit — those can take
@@ -284,6 +286,7 @@ export default function RedditWidget({
     } catch {
       if (ctrl.signal.aborted) return false;
       setError("Failed to load posts. Check the subreddit names.");
+      setFailed(true);
       return false;
     } finally {
       if (fetchAbort.current === ctrl) setLoading(false);
@@ -423,6 +426,8 @@ export default function RedditWidget({
                 </ul>
               ) : posts.length ? (
                 <EmptyState c={c}>nothing from r/{filter} right now</EmptyState>
+              ) : failed && config.subreddits.length ? (
+                <ErrorState c={c} busy={loading} onRetry={() => fetchPosts(config, cacheKeyFor(config), true)}>could not load posts</ErrorState>
               ) : (
                 <EmptyState c={c} action={t("empty.reddit")} />
               )}

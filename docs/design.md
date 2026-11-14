@@ -258,6 +258,9 @@ the palette `label` color at 50% opacity.
   open-externally link.
 - Empty states: `EmptyState`, centered, 14px at 70%. Never inside a styled
   frame (a player area, a dashed box) unless the frame is the control itself.
+- Load failures: `ErrorState`, same placement as `EmptyState` plus a Try
+  again button. A configured widget that could not load shows it, never its
+  "add ..." empty copy, which reads as lost settings.
 
 - Setting groups: a connection or optional integration (TubeArchivist,
   the Reddit API) is a `SettingsGroup`, one row with its name, a one-line
