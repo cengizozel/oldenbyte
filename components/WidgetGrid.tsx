@@ -910,7 +910,7 @@ export default function WidgetGrid({
     <div className={`flex flex-col gap-2 ${fillViewport ? "flex-1 min-h-0" : ""}`}>
 
       {/* Grid */}
-      <div ref={containerRef} data-widget-grid data-active={active ? "true" : "false"} className={`relative ${fillViewport ? "flex-1 min-h-0" : ""} ${editing && !gridReady ? "[&_.react-grid-item]:!transition-none" : ""}`}>
+      <div ref={containerRef} data-widget-grid data-fill-viewport={fillViewport ? "true" : "false"} data-active={active ? "true" : "false"} className={`relative ${fillViewport ? "flex-1 min-h-0" : ""} ${editing && !gridReady ? "[&_.react-grid-item]:!transition-none" : ""}`}>
         {editing && size.width > 0 && (
           <div
             className="absolute inset-0 pointer-events-none z-0"

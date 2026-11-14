@@ -70,7 +70,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen md:h-screen bg-[var(--page-bg)] flex flex-col px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6 gap-4 md:gap-5 md:overflow-hidden">
+    <div className="min-h-screen has-[[data-active=true][data-fill-viewport=true]]:h-screen has-[[data-active=true][data-fill-viewport=true]]:overflow-hidden bg-[var(--page-bg)] flex flex-col px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6 gap-4 md:gap-5">
       <TopBar
         editing={editing}
         onToggleEdit={() => setEditing(e => !e)}
