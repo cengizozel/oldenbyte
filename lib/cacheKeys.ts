@@ -23,7 +23,8 @@ export function youtubeCacheKey(widgetId: string, day: string, channels: Youtube
 
 type RedditSub = { name: string; period: string; limit: number };
 export function redditCacheKey(widgetId: string, day: string, subreddits: RedditSub[]): string {
-  return `reddit-widget-${widgetId}-v3-${day}-${subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",")}`;
+  const sig = subreddits.map(s => `${s.name}:${s.period}:${s.limit}`).join(",");
+  return `reddit-widget-${widgetId}-v4-${day}-${hashSig(sig)}`;
 }
 
 // F1 data changes during a race weekend, so it is cached per local hour.

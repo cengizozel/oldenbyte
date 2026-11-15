@@ -78,3 +78,13 @@ describe("parseRedditApi", () => {
     expect(parseRedditApi(JSON.stringify({ clientId: " id ", clientSecret: "s" }))).toEqual({ clientId: "id", clientSecret: "s" });
   });
 });
+
+describe("redditCacheKey", () => {
+  it("stays under the settings key cap however many subreddits there are", async () => {
+    const { redditCacheKey } = await import("../lib/cacheKeys");
+    const subs = Array.from({ length: 60 }, (_, i) => ({ name: `averylongsubredditname${i}`, period: "week", limit: 10 }));
+    const key = redditCacheKey("reddit-1794427747630", "2026-11-15", subs);
+    expect(key.length).toBeLessThanOrEqual(256);
+    expect(redditCacheKey("reddit-1794427747630", "2026-11-15", subs.slice(1))).not.toBe(key);
+  });
+});
