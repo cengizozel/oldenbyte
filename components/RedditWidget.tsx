@@ -460,6 +460,13 @@ export default function RedditWidget({
                         />
                     ) : undefined}
                   />
+                  <p className={`-mt-1 mb-3 text-sm opacity-70 ${c.text}`}>
+                    {[
+                      `r/${selected.subreddit}`,
+                      selected.pubDate ? timeAgo(selected.pubDate) : "",
+                      selected.score > 0 ? `${formatCount(selected.score)} points` : "",
+                    ].filter(Boolean).join(" · ")}
+                  </p>
                   {sanitizeRedditHtml(selected.content) ? (
                     <div
                       className={`text-sm leading-relaxed break-words ${c.text} opacity-80
