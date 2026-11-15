@@ -78,7 +78,7 @@ export function BackButton({ c, onClick, label = "Back to list" }: { c: ColorCla
 // once. Without an image the title sits beside the back button.
 export function DetailHead({ c, onBack, href, title, image }: { c: ColorClasses; onBack: () => void; href: string; title: string; image?: ReactNode }) {
   const titleLink = (extra: string) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={`text-sm font-medium leading-snug break-words hover:underline underline-offset-2 ${c.text} ${FOCUS_RING} ${extra}`}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={`text-base font-medium leading-snug break-words hover:underline underline-offset-2 ${c.text} ${FOCUS_RING} ${extra}`}>
       {title}
     </a>
   );
