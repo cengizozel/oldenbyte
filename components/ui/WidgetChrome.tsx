@@ -72,6 +72,29 @@ export function BackButton({ c, onClick, label = "Back to list" }: { c: ColorCla
   );
 }
 
+// Top of an item's detail view (a post, video, paper): back, then the item's
+// image when it has one, with the title below it. Image and title both open
+// the item, so there is no separate external-link icon and the title appears
+// once. Without an image the title sits beside the back button.
+export function DetailHead({ c, onBack, href, title, image }: { c: ColorClasses; onBack: () => void; href: string; title: string; image?: ReactNode }) {
+  const titleLink = (extra: string) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={`text-sm font-medium leading-snug break-words hover:underline underline-offset-2 ${c.text} ${FOCUS_RING} ${extra}`}>
+      {title}
+    </a>
+  );
+  return (
+    <div className="flex flex-col gap-2 mb-3">
+      <div className="flex gap-2">
+        <BackButton c={c} onClick={onBack} />
+        {image ? (
+          <a href={href} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden className="flex-1 min-w-0 block">{image}</a>
+        ) : titleLink("flex-1 min-w-0 self-center")}
+      </div>
+      {image && titleLink("pl-11")}
+    </div>
+  );
+}
+
 export function ScrollFades({ c, top, bottom }: { c: ColorClasses; top: boolean; bottom: boolean }) {
   return (
     <>

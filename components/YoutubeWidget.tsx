@@ -12,7 +12,7 @@ import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
 import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, ErrorState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, SettingsInfo, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, ErrorState, FilterChip, DetailHead, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, SettingsInfo, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { youtubeCacheKey } from "@/lib/cacheKeys";
@@ -483,24 +483,22 @@ export default function YoutubeWidget({
               {selected && (
                 <>
                   <div className="flex-1 min-h-0 overflow-y-auto pr-3">
-                    <div className="flex gap-2 mb-2">
-                      <BackButton c={c} onClick={() => setSelected(null)} />
-                      {thumbUrl(selected.link, true) ? (
-                        <a href={hrefFor(selected)} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 block">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={thumbUrl(selected.link, true)} alt="" onLoad={unpulse} className="w-full aspect-video object-cover rounded-xl bg-black/10 dark:bg-white/10 animate-pulse" />
-                        </a>
-                      ) : (
-                        <a href={hrefFor(selected)} target="_blank" rel="noopener noreferrer" className={`flex-1 min-w-0 self-center text-sm font-medium leading-snug break-words hover:underline underline-offset-2 ${c.text} ${FOCUS_RING}`}>{selected.title}</a>
-                      )}
-                    </div>
+                    <DetailHead
+                      c={c}
+                      onBack={() => setSelected(null)}
+                      href={hrefFor(selected)}
+                      title={details?.title || selected.title}
+                      image={thumbUrl(selected.link, true) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumbUrl(selected.link, true)} alt="" onLoad={unpulse} className="w-full aspect-video object-cover rounded-xl bg-black/10 dark:bg-white/10 animate-pulse" />
+                      ) : undefined}
+                    />
                     {loadingDetails ? (
                       <LoadingState c={c} />
                     ) : detailsError ? (
                       <p className="text-red-400 text-sm">{detailsError}</p>
                     ) : details ? (
                       <div className="flex flex-col gap-2">
-                        <p className={`text-sm font-medium leading-snug break-words ${c.text}`}>{details.title || selected.title}</p>
                         <p className={`text-sm opacity-70 ${c.text}`}>
                           {[
                             details.author,

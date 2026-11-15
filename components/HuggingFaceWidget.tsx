@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Sparkles, ExternalLink } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { formatCount, formatDate, localDateStr } from "@/lib/format";
 import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { RefreshButton, ScrollFades, LoadingState, ErrorState, WidgetHeader, Chip, BackButton, SettingsFace, SettingsField } from "@/components/ui/WidgetChrome";
+import { RefreshButton, ScrollFades, LoadingState, ErrorState, WidgetHeader, Chip, DetailHead, SettingsFace, SettingsField } from "@/components/ui/WidgetChrome";
 
 type HFPaper = {
   id: string;
@@ -143,18 +142,12 @@ export default function HuggingFaceWidget({
             <div className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${selected ? "translate-x-0" : "translate-x-full"}`}>
               {selected && (
                 <>
-                  <div className={`flex items-stretch gap-2 mb-3 shrink-0 ${c.text}`}>
-                    <BackButton c={c} onClick={() => setSelected(null)} />
-                    <span className="flex-1 min-w-0 self-center text-sm font-medium leading-snug break-words opacity-80">{selected.title}</span>
-                    <a href={selected.link} target="_blank" rel="noopener noreferrer" aria-label="Open on Hugging Face" className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
-                      <ExternalLink size={14} />
-                    </a>
-                  </div>
                   <div
                     ref={detailFade.ref}
                     className="flex-1 min-h-0 overflow-y-auto pr-3"
                     onScroll={detailFade.onScroll}
                   >
+                    <DetailHead c={c} onBack={() => setSelected(null)} href={selected.link} title={selected.title} />
                     <div className="flex flex-col gap-2">
                       {selected.authors.length > 0 && (
                         <p className={`text-sm opacity-70 leading-snug break-words ${c.text}`}>

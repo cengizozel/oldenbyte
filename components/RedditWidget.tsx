@@ -2,7 +2,7 @@
 
 import { useT } from "@/lib/useT";
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Plus, X, ExternalLink, Flame } from "lucide-react";
+import { Plus, X, Flame } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { timeAgo, formatCount, localDateStr } from "@/lib/format";
@@ -10,9 +10,9 @@ import { decodeEntities, parseJson } from "@/lib/text";
 import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import { SettingsInput, FOCUS_RING, HIT_AREA, Stepper } from "@/components/ui/Field";
+import { SettingsInput, FOCUS_RING, Stepper } from "@/components/ui/Field";
 import Toggle from "@/components/ui/Toggle";
-import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, ErrorState, FilterChip, BackButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup, Popover } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, RefreshButton, ScrollFades, LoadingState, EmptyState, ErrorState, FilterChip, DetailHead, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsError, ROW_ACTION, SettingsAddRow, SettingsGroup, Popover } from "@/components/ui/WidgetChrome";
 import { useFeedFilter } from "@/lib/useFeedFilter";
 import { REDDIT_API_KEY, parseRedditApi, type RedditApiConfig } from "@/lib/reddit";
 import { isDemoMode } from "@/lib/demo";
@@ -439,21 +439,17 @@ export default function RedditWidget({
           <div className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${selected ? "translate-x-0" : "translate-x-full"}`}>
             {selected && (
               <>
-                <div className={`flex items-center gap-1.5 mb-3 shrink-0 ${c.text}`}>
-                  <span className="flex-1 min-w-0 text-sm font-medium truncate opacity-80">{selected.title}</span>
-                  <a href={selected.link} target="_blank" rel="noopener noreferrer" aria-label="Open on Reddit" className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
-                    <ExternalLink size={12} />
-                  </a>
-                </div>
                 <div ref={detail.ref} className="flex-1 min-h-0 overflow-y-auto pr-3" onScroll={detail.onScroll}>
                   {/* The detail view always shows the post image when there is
                       one (linking to the post, like the title); the settings
                       toggle only governs list thumbnails. */}
-                  <div className="flex gap-2 mb-3">
-                    <BackButton c={c} onClick={() => setSelected(null)} />
-                    {(selected.image || selected.thumbnail) ? (
-                      <a href={selected.link} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 block">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <DetailHead
+                    c={c}
+                    onBack={() => setSelected(null)}
+                    href={selected.link}
+                    title={selected.title}
+                    image={(selected.image || selected.thumbnail) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={selected.image || selected.thumbnail}
                           alt=""
@@ -462,11 +458,8 @@ export default function RedditWidget({
                           onError={e => { if (selected.thumbnail && e.currentTarget.src !== selected.thumbnail) e.currentTarget.src = selected.thumbnail; }}
                           className="w-full max-h-80 object-contain rounded-xl bg-black/5"
                         />
-                      </a>
-                    ) : (
-                      <p className={`flex-1 min-w-0 self-center text-sm font-medium leading-snug break-words ${c.text}`}>{selected.title}</p>
-                    )}
-                  </div>
+                    ) : undefined}
+                  />
                   {sanitizeRedditHtml(selected.content) ? (
                     <div
                       className={`text-sm leading-relaxed break-words ${c.text} opacity-80

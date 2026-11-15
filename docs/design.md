@@ -258,6 +258,10 @@ the palette `label` color at 50% opacity.
   open-externally link.
 - Empty states: `EmptyState`, centered, 14px at 70%. Never inside a styled
   frame (a player area, a dashed box) unless the frame is the control itself.
+- Detail views (a post, video, paper): `DetailHead`. Back, then the image
+  when there is one with the title below it, or the title beside back when
+  there is none. Image and title open the item; no separate external-link
+  icon, and the title appears once.
 - Load failures: `ErrorState`, same placement as `EmptyState` plus a Try
   again button. A configured widget that could not load shows it, never its
   "add ..." empty copy, which reads as lost settings.

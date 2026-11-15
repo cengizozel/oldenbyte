@@ -2,15 +2,15 @@
 
 import { useT } from "@/lib/useT";
 import { useState, useEffect, useRef } from "react";
-import { BookOpen, ExternalLink } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { formatDate, localDateStr } from "@/lib/format";
 import { parseJson } from "@/lib/text";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "@/components/ui/FlipCard";
-import { SettingsSelect, HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
-import { RefreshButton, ScrollFades, LoadingState, EmptyState, ErrorState, WidgetHeader, BackButton, SettingsFace, SettingsField, Chip } from "@/components/ui/WidgetChrome";
+import { SettingsSelect } from "@/components/ui/Field";
+import { RefreshButton, ScrollFades, LoadingState, EmptyState, ErrorState, WidgetHeader, DetailHead, SettingsFace, SettingsField, Chip } from "@/components/ui/WidgetChrome";
 
 const CATEGORY_GROUPS = [
   {
@@ -310,18 +310,12 @@ export default function ArxivWidget({
                 const p = parseContent(selected.content);
                 return (
                   <>
-                    <div className={`flex items-stretch gap-2 mb-3 shrink-0 ${c.text}`}>
-                      <BackButton c={c} onClick={() => setSelected(null)} />
-                      <span className="flex-1 min-w-0 self-center text-sm font-medium leading-snug break-words opacity-80">{selected.title}</span>
-                      <a href={selected.link} target="_blank" rel="noopener noreferrer" aria-label="Open on arXiv" className={`shrink-0 opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING}`}>
-                        <ExternalLink size={14} />
-                      </a>
-                    </div>
                     <div
                       ref={detailFade.ref}
                       className="flex-1 min-h-0 overflow-y-auto pr-3"
                       onScroll={detailFade.onScroll}
                     >
+                      <DetailHead c={c} onBack={() => setSelected(null)} href={selected.link} title={selected.title} />
                       <div className="flex flex-col gap-2">
                         {p.authors && (
                           <p className={`text-sm opacity-70 leading-snug break-words ${c.text}`}>{p.authors}</p>
