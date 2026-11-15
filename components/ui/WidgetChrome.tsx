@@ -90,7 +90,7 @@ export function DetailHead({ c, onBack, href, title, image }: { c: ColorClasses;
           <a href={href} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden className="flex-1 min-w-0 block">{image}</a>
         ) : titleLink("flex-1 min-w-0 self-center")}
       </div>
-      {image && titleLink("pl-11")}
+      {image && titleLink("")}
     </div>
   );
 }
