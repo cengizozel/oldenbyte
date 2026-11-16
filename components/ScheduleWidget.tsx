@@ -515,6 +515,11 @@ export default function ScheduleWidget({
                     >
                       {big && <span className="block font-mono text-xs opacity-80">{fmt(ev.start)}–{fmt(ev.end)}</span>}
                       <span className="block font-medium truncate text-xs">{ev.title}</span>
+                      {/* Has a description: a folded corner, like a spreadsheet note.
+                          Hover shows it; a tap opens the entry. */}
+                      {ev.description && (
+                        <span aria-hidden className="absolute top-0 right-0 w-2.5 h-2.5 bg-[#16181c]/45 pointer-events-none" style={{ clipPath: "polygon(0 0, 100% 0, 100% 100%)" }} />
+                      )}
                     </button>
                   );
                 })}

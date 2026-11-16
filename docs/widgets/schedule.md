@@ -22,6 +22,7 @@ The grid defaults to 06:00 to 24:00. The day can start between 00:00 and 12:00 a
 - Click an empty slot (or **+**) to add an entry there; click an entry to edit it. Times use 15-minute steppers, and an entry can be set by end time or by duration (5 minutes to 16 hours).
 - Drag an entry to move it; the ghost snaps to the grid. Moving one day of a multi-day entry asks before splitting it out of its group.
 - Overlapping entries share the column in side-by-side lanes.
+- An entry with a description shows a small folded corner at its top right; the description itself appears on hover and in the editor, never on the block.
 - **Export as text** shows the whole week as plain, copyable text, grouped by day.
 - Full screen (behind the header toggle, like every widget) gives the grid the whole viewport, with hour rows at 52px, full day names and event times. Escape closes dialogs first, then full screen.
 
