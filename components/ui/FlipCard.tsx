@@ -57,7 +57,10 @@ export default function FlipCard({
           style={{
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
-            pointerEvents: flipped ? "none" : "auto",
+            // The shown face inherits pointer events rather than forcing
+            // them on, so edit mode's pass-through (presses fall to the
+            // tile, which drags) reaches the content too.
+            pointerEvents: flipped ? "none" : undefined,
           }}
           // The hidden face stays in the DOM for the flip animation; inert keeps
           // it out of the tab order and the accessibility tree.
@@ -71,7 +74,7 @@ export default function FlipCard({
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
             transform: "rotateY(180deg)",
-            pointerEvents: flipped ? "auto" : "none",
+            pointerEvents: flipped ? undefined : "none",
           }}
           inert={!flipped}
         >

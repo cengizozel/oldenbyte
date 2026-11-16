@@ -515,9 +515,6 @@ export default function ScheduleWidget({
                     >
                       {big && <span className="block font-mono text-xs opacity-80">{fmt(ev.start)}–{fmt(ev.end)}</span>}
                       <span className="block font-medium truncate text-xs">{ev.title}</span>
-                      {big && ev.description && bottom - top > 56 && (
-                        <span className="block text-xs opacity-80 overflow-hidden">{ev.description}</span>
-                      )}
                     </button>
                   );
                 })}
