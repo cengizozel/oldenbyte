@@ -490,6 +490,22 @@ export default function WidgetGrid({
     return () => ro.disconnect();
   }, []);
 
+  // The window height below the grid's top edge: in the scrolling two-column
+  // layout a row is as tall as it would be in the full layout, so widgets keep
+  // their proportions instead of shrinking to a fixed strip.
+  const [viewportBelowTop, setViewportBelowTop] = useState(0);
+  useEffect(() => {
+    const measure = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setViewportBelowTop(window.innerHeight - top);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
   // Layout edits are a draft until confirmed: nothing is written while edit
   // mode is on, so a reload (or the cross) leaves the saved layout untouched.
   // Leaving edit mode writes both at once: the check saves the new
@@ -541,6 +557,9 @@ export default function WidgetGrid({
   const rowHeight = size.height > 0
     ? Math.floor((size.height - (numRows - 1) * GAP) / numRows)
     : 200;
+
+  // Bottom page padding (24px) under the grid in the full layout.
+  const twoRowPx = Math.max(160, Math.floor((viewportBelowTop - 24 - (numRows - 1) * GAP) / numRows));
 
   async function handleExport() {
     const res = await fetch("/api/settings/export");
@@ -1105,7 +1124,7 @@ export default function WidgetGrid({
             className="grid gap-4 pb-4"
             style={{
               gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-              gridAutoRows: "120px",
+              gridAutoRows: `${twoRowPx}px`,
               gridAutoFlow: "row dense",
             }}
           >
