@@ -315,7 +315,7 @@ export default function BookmarksWidget({
               padding alone (scrollbar clearance) reads as off-center. */}
           <div ref={ref} onScroll={onScroll} className={`absolute inset-0 overflow-y-auto ${view === "icon" || view === "grid" ? "px-3" : "pr-3"}`}>
             {view === "icon" && (
-              <div className="grid gap-2 -mt-1" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${iconSize + 12}px, 1fr))` }}>
+              <div className="grid gap-2 -mt-1" style={{ gridTemplateColumns: `repeat(auto-fill, ${iconSize + 12}px)`, justifyContent: "space-between" }}>
                 {shown.map(bm => (
                   <a
                     key={bm.id}
@@ -332,7 +332,10 @@ export default function BookmarksWidget({
             )}
 
             {view === "grid" && (
-              <div className="grid gap-2 -mt-1.5" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(iconSize + 16, 64)}px, 1fr))` }}>
+              // Fixed-width tiles, like a phone home screen: a column is added
+              // only when a whole tile fits and spare room spreads between
+              // columns, so widening the card never narrows a tile or its name.
+              <div className="grid gap-2 -mt-1.5" style={{ gridTemplateColumns: `repeat(auto-fill, ${Math.max(iconSize + 24, 88)}px)`, justifyContent: "space-between" }}>
                 {shown.map(bm => (
                   <a
                     key={bm.id}
