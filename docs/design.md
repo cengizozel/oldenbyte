@@ -262,6 +262,12 @@ the palette `label` color at 50% opacity.
   when there is one with the title below it, or the title beside back when
   there is none. Image and title open the item; no separate external-link
   icon, and the title appears once.
+- Editor and settings faces end in `SaveCancelRow`: 28px filled buttons,
+  a destructive action on the left (reset, or delete with `onDelete`; both
+  ask first), cancel and save on the right, or a single close without save.
+  Never bare icons.
+- Text areas (`SettingsTextarea`) grow with their text up to 320px, then
+  scroll; the corner handle resizes them by hand.
 - Load failures: `ErrorState`, same placement as `EmptyState` plus a Try
   again button. A configured widget that could not load shows it, never its
   "add ..." empty copy, which reads as lost settings.

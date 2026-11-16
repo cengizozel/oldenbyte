@@ -1,6 +1,7 @@
 "use client";
 
 import { Minus, Plus } from "lucide-react";
+import { useLayoutEffect, useRef } from "react";
 import { useT } from "@/lib/useT";
 
 import type { ReactNode,
@@ -36,8 +37,22 @@ export function SettingsSelect({ className = "", ...props }: SelectHTMLAttribute
   return <select {...props} className={`${FIELD_CLASS} ${className}`} />;
 }
 
+// Grows with its text from `rows` up to a cap (then scrolls), so what was
+// written is readable without scrolling a two-line box. The corner handle
+// still resizes it by hand; the next edit fits it to the text again.
+const TEXTAREA_MAX_PX = 320;
+
 export function SettingsTextarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={`${FIELD_CLASS} resize-none ${className}`} />;
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const full = el.scrollHeight + (el.offsetHeight - el.clientHeight);
+    if (el.scrollHeight > 0) el.style.height = `${Math.min(full, TEXTAREA_MAX_PX)}px`;
+    else el.style.height = "";
+  }, [props.value]);
+  return <textarea ref={ref} {...props} className={`${FIELD_CLASS} resize-y ${className}`} />;
 }
 
 // A number with minus and plus: the modern face of a number field, used where

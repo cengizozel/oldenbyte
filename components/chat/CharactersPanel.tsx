@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Users, Plus, X, Check, Pencil, Copy, Trash2 } from "lucide-react";
+import { Users, Plus, X, Pencil, Copy, Trash2 } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { DEFAULT_CHARACTER_ID, type Character } from "@/lib/chat/types";
 import { SettingsInput, SettingsTextarea, HIT_AREA, FOCUS_RING } from "../ui/Field";
-import { WidgetHeader, SmallButton } from "../ui/WidgetChrome";
+import { WidgetHeader, SmallButton, SaveCancelRow } from "../ui/WidgetChrome";
 
 // Characters list: pick and manage personas.
 export function CharactersPanel({ c, characters, activeCharId, filter, onCreate, onClose, onActivate, onEdit, onDuplicate, onDelete }: {
@@ -86,12 +86,6 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
           icon={Users}
           title="Edit character"
           panel
-          right={
-            <>
-              <button onClick={onCancel} title="Cancel" aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${HIT_AREA} ${FOCUS_RING}`}><X size={14} /></button>
-              <button onClick={() => onSave(charDraft)} title="Save" aria-label="Save" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${HIT_AREA} ${FOCUS_RING}`}><Check size={14} /></button>
-            </>
-          }
         />
       </div>
       <div className="flex-1 min-h-0 overflow-auto px-4 pb-4 flex flex-col gap-3">
@@ -126,6 +120,9 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
             </div>
           </>
         )}
+      </div>
+      <div className="px-4 pb-4 pt-2 shrink-0">
+        <SaveCancelRow c={c} onSave={() => onSave(charDraft)} onCancel={onCancel} />
       </div>
     </div>
   );

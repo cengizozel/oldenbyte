@@ -2,11 +2,11 @@
 
 import { zoned } from "@/lib/timezone";
 import { useEffect, useRef, useState } from "react";
-import { CalendarRange, Plus, Check, X, Trash2, FileText, Copy } from "lucide-react";
+import { CalendarRange, Plus, Check, FileText, Copy } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { SettingsInput, SettingsSelect, SettingsTextarea, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { WidgetHeader, Chip, SmallButton, EmptyState, SettingsFace, SettingsField, SettingsError } from "./ui/WidgetChrome";
+import { WidgetHeader, Chip, SmallButton, EmptyState, SettingsFace, SettingsField, SettingsError, SaveCancelRow } from "./ui/WidgetChrome";
 import { useWidgetFrame } from "@/lib/widgetFrame";
 
 // A fixed weekly schedule: the same seven-day time grid every week (classes,
@@ -555,7 +555,6 @@ export default function ScheduleWidget({
 
   // ── Card (shared between the grid tile and the fullscreen overlay) ─────────
   const actionCls = `opacity-0 group-hover:opacity-90 dark:group-hover:opacity-70 [@media(hover:none)]:!opacity-90 dark:[@media(hover:none)]:!opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.icon}`;
-  const iconBtnCls = `${HIT_AREA} ${FOCUS_RING}`;
 
   function card(big: boolean) {
     return (
@@ -677,20 +676,7 @@ export default function ScheduleWidget({
               })()}
             </div>
             {editor.error && <p className="text-red-400 text-sm">{editor.error}</p>}
-            <div className="flex items-center gap-3 mt-auto">
-              {editor.id && (
-                <button onClick={deleteEntry} title="Delete entry" aria-label="Delete entry" className={`text-red-400/80 hover:text-red-400 ${iconBtnCls}`}>
-                  <Trash2 size={14} />
-                </button>
-              )}
-              <span className="flex-1" />
-              <button onClick={() => setEditor(null)} title="Cancel" aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${iconBtnCls}`}>
-                <X size={14} />
-              </button>
-              <button onClick={saveEditor} title="Save" aria-label="Save" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${iconBtnCls}`}>
-                <Check size={14} />
-              </button>
-            </div>
+            <SaveCancelRow c={c} onSave={saveEditor} onCancel={() => setEditor(null)} onDelete={editor.id ? deleteEntry : undefined} />
           </div>
         )}
 
@@ -737,11 +723,7 @@ export default function ScheduleWidget({
             <pre className={`flex-1 min-h-0 overflow-auto text-sm leading-relaxed font-mono whitespace-pre rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-primary)] p-3`}>
               {exportText()}
             </pre>
-            <div className="flex items-center justify-end">
-              <button onClick={() => setExportOpen(false)} title="Close" aria-label="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${iconBtnCls}`}>
-                <X size={14} />
-              </button>
-            </div>
+            <SaveCancelRow c={c} onCancel={() => setExportOpen(false)} />
           </div>
         )}
 

@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Upload, RotateCcw, X, Loader, Maximize2, BookOpen, Folder, FolderPlus, FileText, ZoomIn, ZoomOut, List, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, Upload, X, Loader, Maximize2, BookOpen, Folder, FolderPlus, FileText, ZoomIn, ZoomOut, List, ExternalLink } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { colorMap, type Widget } from "@/lib/widgets";
 import FlipCard from "@/components/ui/FlipCard";
 import { FOCUS_RING, HIT_AREA } from "@/components/ui/Field";
-import { WidgetHeader, SmallButton, LoadingState, EmptyState } from "@/components/ui/WidgetChrome";
+import { WidgetHeader, SmallButton, LoadingState, EmptyState, SaveCancelRow } from "@/components/ui/WidgetChrome";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
 
@@ -929,18 +929,8 @@ export default function ReaderWidget({
               }}
             />
 
-            <div className="flex items-center justify-between mt-2 shrink-0">
-              <button onClick={handleReset} className={`${c.label} opacity-40 hover:opacity-70 ${HIT_AREA} ${FOCUS_RING}`} title="Remove file" aria-label="Remove file">
-                <RotateCcw size={14} />
-              </button>
-              <button
-                onClick={() => { setSettingsOpen(false); setError(""); }}
-                className={`text-neutral-400 hover:text-neutral-600 ${HIT_AREA} ${FOCUS_RING}`}
-                title="Cancel"
-                aria-label="Cancel"
-              >
-                <X size={14} />
-              </button>
+            <div className="mt-2 shrink-0">
+              <SaveCancelRow c={c} onReset={handleReset} resetLabel="Remove file" onCancel={() => { setSettingsOpen(false); setError(""); }} />
             </div>
           </>
         }

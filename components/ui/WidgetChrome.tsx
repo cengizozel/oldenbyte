@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
 import { useT } from "@/lib/useT";
 import { useWidgetFrame } from "@/lib/widgetFrame";
-import { Plus, Check, X, RotateCcw, Loader, RefreshCw, ChevronLeft, Maximize2, Minimize2, SlidersHorizontal, type LucideIcon, Palette } from "lucide-react";
+import { Plus, Check, X, RotateCcw, Trash2, Loader, RefreshCw, ChevronLeft, Maximize2, Minimize2, SlidersHorizontal, type LucideIcon, Palette } from "lucide-react";
 import { colorMap, type ColorClasses, type WidgetColor } from "@/lib/widgets";
 import { currentTheme, THEME_EVENT } from "@/lib/theme";
 import { FOCUS_RING, HIT_AREA, SettingsInput } from "./Field";
@@ -141,56 +141,68 @@ export function ErrorState({ c, children, onRetry, busy }: { c: ColorClasses; ch
   );
 }
 
-// Bottom row of a settings face: reset on the left (back to defaults, asked
-// first), cancel and save on the right. Real 28px buttons on a fill, 16px
-// glyphs, so they read as the face's actions and not as stray marks.
+// Bottom row of a settings face or editor: a destructive action on the left
+// (reset to defaults, or delete the item being edited; both ask first), cancel
+// and save on the right. Real 28px buttons on a fill, 16px glyphs, so they read
+// as the face's actions and not as stray marks. Without onSave the right side
+// is a single close.
 const FACE_BUTTON = `w-7 h-7 flex items-center justify-center rounded-lg transition-colors bg-black/5 dark:bg-white/10 ${FOCUS_RING}`;
 export function SaveCancelRow({
   c,
   onSave,
   onCancel,
   onReset,
+  onDelete,
+  resetLabel,
   saving = false,
   saveDisabled = false,
 }: {
   c: ColorClasses;
-  onSave: () => void;
+  onSave?: () => void;
   onCancel: () => void;
   onReset?: () => void;
+  onDelete?: () => void;
+  resetLabel?: string;
   saving?: boolean;
   saveDisabled?: boolean;
 }) {
-  // Reset is destructive, so it asks first: the icon turns into a short
-  // question with a confirming button, and disarms by itself.
+  // The left action is destructive, so it asks first: the icon turns into a
+  // short question with a confirming button, and disarms by itself.
   const t = useT();
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirm, setConfirm] = useState(false);
   useEffect(() => {
-    if (!confirmReset) return;
-    const t = setTimeout(() => setConfirmReset(false), 5000);
+    if (!confirm) return;
+    const t = setTimeout(() => setConfirm(false), 5000);
     return () => clearTimeout(t);
-  }, [confirmReset]);
+  }, [confirm]);
+  const destroy = onDelete ?? onReset;
+  const question = onDelete ? t("common.deleteQuestion") : t("common.resetQuestion");
+  const verb = onDelete ? t("common.delete") : t("common.reset");
+  const label = onDelete ? t("common.delete") : resetLabel ?? t("common.backToDefaults");
   return (
     <div className="flex items-center justify-between gap-3 mt-auto min-h-6">
-      {onReset ? (
-        confirmReset ? (
+      {destroy ? (
+        confirm ? (
           <span className={`flex items-center gap-2 text-sm min-w-0 ${c.label}`}>
-            <span className="opacity-70 truncate">{t("common.resetQuestion")}</span>
-            <button type="button" onClick={() => { setConfirmReset(false); onReset(); }} className={`shrink-0 h-7 px-2.5 rounded-lg text-sm font-medium bg-black/10 dark:bg-white/15 text-red-600 dark:text-red-400 hover:bg-black/15 dark:hover:bg-white/20 ${FOCUS_RING}`}>{t("common.reset")}</button>
-            <button type="button" onClick={() => setConfirmReset(false)} className={`shrink-0 h-7 px-2.5 rounded-lg text-sm bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${FOCUS_RING}`}>{t("common.keep")}</button>
+            <span className="opacity-70 truncate">{question}</span>
+            <button type="button" onClick={() => { setConfirm(false); destroy(); }} className={`shrink-0 h-7 px-2.5 rounded-lg text-sm font-medium bg-black/10 dark:bg-white/15 text-red-600 dark:text-red-400 hover:bg-black/15 dark:hover:bg-white/20 ${FOCUS_RING}`}>{verb}</button>
+            <button type="button" onClick={() => setConfirm(false)} className={`shrink-0 h-7 px-2.5 rounded-lg text-sm bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${FOCUS_RING}`}>{t("common.keep")}</button>
           </span>
         ) : (
-          <button type="button" onClick={() => setConfirmReset(true)} className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`} title={t("common.backToDefaults")} aria-label={t("common.backToDefaults")}>
-            <RotateCcw size={16} />
+          <button type="button" onClick={() => setConfirm(true)} className={`${FACE_BUTTON} ${onDelete ? "text-red-600 dark:text-red-400 opacity-80" : `${c.label} opacity-70`} hover:opacity-100`} title={label} aria-label={label}>
+            {onDelete ? <Trash2 size={16} /> : <RotateCcw size={16} />}
           </button>
         )
       ) : <span />}
       <div className="flex items-center gap-2">
-        <button type="button" onClick={onCancel} title={t("common.cancel")} aria-label={t("common.cancel")} data-face-cancel className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`}>
+        <button type="button" onClick={onCancel} title={onSave ? t("common.cancel") : t("common.close")} aria-label={onSave ? t("common.cancel") : t("common.close")} data-face-cancel className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`}>
           <X size={16} />
         </button>
-        <button type="button" onClick={onSave} disabled={saving || saveDisabled} title={t("common.save")} aria-label={t("common.save")} data-face-save className={`${FACE_BUTTON} bg-black/10 dark:bg-white/15 hover:bg-black/15 dark:hover:bg-white/20 ${c.text} disabled:opacity-40`}>
-          {saving ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
-        </button>
+        {onSave && (
+          <button type="button" onClick={onSave} disabled={saving || saveDisabled} title={t("common.save")} aria-label={t("common.save")} data-face-save className={`${FACE_BUTTON} bg-black/10 dark:bg-white/15 hover:bg-black/15 dark:hover:bg-white/20 ${c.text} disabled:opacity-40`}>
+            {saving ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
+          </button>
+        )}
       </div>
     </div>
   );
