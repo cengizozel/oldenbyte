@@ -37,6 +37,17 @@ const DAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 // accent colors which are tuned for text on tinted backgrounds.
 const PALETTE = ["#e8b04b", "#7fc8a9", "#8ab4e8", "#c39be0", "#e08a9b", "#d9c26e", "#7fd0d6", "#a8b0bd"];
 
+// Ink for text and marks on a block: dark on light colors, white on dark
+// ones (custom colors can be anything), by relative luminance.
+const inkFor = (hex: string): string => {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return "#16181c";
+  const n = parseInt(m[1], 16);
+  const lin = (v: number) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  return L > 0.18 ? "#16181c" : "#ffffff";
+};
+
 const fmt = (mins: number) => {
   const m = ((mins % 1440) + 1440) % 1440;
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -505,12 +516,13 @@ export default function ScheduleWidget({
                         if (suppressClickRef.current) { suppressClickRef.current = false; return; }
                         openEditor(ev);
                       }}
-                      title={`${ev.title} (${fmt(ev.start)} to ${fmt(ev.end)})${ev.description ? `\n${ev.description}` : ""}\ndrag to move`}
-                      className={`absolute rounded-md px-1.5 py-0.5 text-left overflow-hidden text-[#16181c] hover:brightness-110 transition-[filter] touch-none select-none ${FOCUS_RING}`}
+                      title={`${ev.title}, ${fmt(ev.start)} to ${fmt(ev.end)}${ev.description ? `\n\n${ev.description}` : ""}`}
+                      className={`absolute rounded-md px-1.5 py-0.5 text-left overflow-hidden hover:brightness-110 transition-[filter] touch-none select-none ${FOCUS_RING}`}
                       style={{
                         top, height: Math.max(16, bottom - top - 2),
                         left: `calc(${lane * w}% + 2px)`, width: `calc(${w}% - 4px)`,
                         background: ev.color,
+                        color: inkFor(ev.color),
                       }}
                     >
                       {big && <span className="block font-mono text-xs opacity-80">{fmt(ev.start)}–{fmt(ev.end)}</span>}
@@ -518,7 +530,7 @@ export default function ScheduleWidget({
                       {/* Has a description: a folded corner, like a spreadsheet note.
                           Hover shows it; a tap opens the entry. */}
                       {ev.description && (
-                        <span aria-hidden className="absolute top-0 right-0 w-2.5 h-2.5 bg-[#16181c]/45 pointer-events-none" style={{ clipPath: "polygon(0 0, 100% 0, 100% 100%)" }} />
+                        <span aria-hidden className="absolute top-0 right-0 w-3.5 h-3.5 bg-current opacity-80 pointer-events-none" style={{ clipPath: "polygon(0 0, 100% 0, 100% 100%)" }} />
                       )}
                     </button>
                   );
@@ -531,11 +543,11 @@ export default function ScheduleWidget({
                 {/* Drag ghost: where the block lands on release */}
                 {drag && drag.day === dayIdx && (
                   <div
-                    className="absolute left-[2px] right-[2px] rounded-md border-2 border-dashed border-black/40 dark:border-white/50 pointer-events-none z-[7] px-1.5 py-0.5 text-[#16181c]"
+                    className="absolute left-[2px] right-[2px] rounded-md border-2 border-dashed border-black/40 dark:border-white/50 pointer-events-none z-[7] px-1.5 py-0.5"
                     style={{
                       top: (drag.startMin - startHour * 60) / 60 * HOUR_PX,
                       height: Math.max(16, drag.durMin / 60 * HOUR_PX - 2),
-                      background: drag.color, opacity: 0.75,
+                      background: drag.color, color: inkFor(drag.color), opacity: 0.75,
                     }}
                   >
                     <span className="block font-mono text-xs">{fmt(drag.startMin % 1440)}</span>
