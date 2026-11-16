@@ -315,7 +315,7 @@ export default function BookmarksWidget({
               padding alone (scrollbar clearance) reads as off-center. */}
           <div ref={ref} onScroll={onScroll} className={`absolute inset-0 overflow-y-auto ${view === "icon" || view === "grid" ? "px-3" : "pr-3"}`}>
             {view === "icon" && (
-              <div className="grid gap-2 -mt-1" style={{ gridTemplateColumns: `repeat(auto-fill, ${iconSize + 12}px)`, justifyContent: "space-between" }}>
+              <div className="grid gap-2 -mt-1" style={{ gridTemplateColumns: `repeat(auto-fill, ${iconSize + 12}px)`, justifyContent: "space-evenly" }}>
                 {shown.map(bm => (
                   <a
                     key={bm.id}
@@ -332,10 +332,11 @@ export default function BookmarksWidget({
             )}
 
             {view === "grid" && (
-              // Fixed-width tiles, like a phone home screen: a column is added
-              // only when a whole tile fits and spare room spreads between
-              // columns, so widening the card never narrows a tile or its name.
-              <div className="grid gap-2 -mt-1.5" style={{ gridTemplateColumns: `repeat(auto-fill, ${Math.max(iconSize + 24, 88)}px)`, justifyContent: "space-between" }}>
+              // Fixed-width tiles, wide enough for a name: a column is added
+              // only when a whole tile fits, and the spare room is spread
+              // evenly, the edges included, so columns sit centered and
+              // widening the card never narrows a tile or cuts its name.
+              <div className="grid gap-2 -mt-1.5" style={{ gridTemplateColumns: `repeat(auto-fill, ${Math.max(iconSize + 24, 88)}px)`, justifyContent: "space-evenly" }}>
                 {shown.map(bm => (
                   <a
                     key={bm.id}

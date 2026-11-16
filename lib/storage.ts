@@ -1,4 +1,5 @@
 import { isDemoMode, demoGetItem, demoSetItem, demoRemoveItem } from "@/lib/demo";
+import { isCacheKey } from "@/lib/settingKeys";
 
 // All persistence funnels through here. In demo mode every read and write is
 // redirected to an in-memory copy of the first-run seed (lib/demo), so the
@@ -29,6 +30,7 @@ export async function getItemResult(key: string): Promise<{ ok: boolean; value: 
     if (!res.ok) return { ok: false, value: null };
     const data = await res.json();
     rememberVersion(key, data.version);
+    if (typeof data.value === "string") stored.set(key, data.value); else stored.delete(key);
     return { ok: true, value: data.value ?? null };
   } catch {
     return { ok: false, value: null };
@@ -44,6 +46,12 @@ export async function getItemResult(key: string): Promise<{ ok: boolean; value: 
 // save. Keys this page never read are written unconditionally.
 const versions = new Map<string, number>();
 
+// The value the server is known to hold for each key this page read or wrote.
+// A write of that same value is skipped: widgets re-save their state as they
+// settle after a load, and those no-op writes cost a request each and showed
+// "Saving..." on a page nobody touched.
+const stored = new Map<string, string>();
+
 function rememberVersion(key: string, version: unknown) {
   if (typeof version === "number") versions.set(key, version);
   else versions.delete(key);
@@ -53,7 +61,17 @@ function rememberVersion(key: string, version: unknown) {
 // showing an edit that was never saved (detail: { key, reason }).
 export const SAVE_FAILED_EVENT = "savefailed";
 
+// Quiet writes are housekeeping, not the user's changes: caches (a feed's
+// items for the day) and bookkeeping a widget does on its own (when you last
+// visited, the article it opened at load). Losing one costs a refetch or a
+// stale badge, so they stay out of the "Saving..." count, the leave-page
+// prompt and the failure notice. Caches are quiet by key; others pass
+// { quiet: true }.
+const quietKeys = new Set<string>();
+const isQuiet = (key: string) => isCacheKey(key) || quietKeys.has(key);
+
 function reportSaveFailure(key: string, reason: string) {
+  if (isQuiet(key)) { console.warn(`background write failed: ${key}: ${reason}`); return; }
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(SAVE_FAILED_EVENT, { detail: { key, reason } }));
   }
@@ -132,6 +150,7 @@ async function send(key: string, value: string): Promise<boolean> {
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       if (typeof data.version === "number") versions.set(key, data.version);
+      stored.set(key, value);
       return true;
     }
     reportSaveFailure(key, typeof data.error === "string" ? data.error : `HTTP ${res.status}`);
@@ -145,8 +164,9 @@ async function send(key: string, value: string): Promise<boolean> {
 }
 
 function start(key: string, value: string): Promise<boolean> {
-  setPending(1);
-  const running = send(key, value).finally(() => setPending(-1));
+  const counted = !isQuiet(key);
+  if (counted) setPending(1);
+  const running = send(key, value).finally(() => { if (counted) setPending(-1); });
   const slot: Slot = { running };
   slots.set(key, slot);
   running.then(() => {
@@ -166,13 +186,18 @@ function start(key: string, value: string): Promise<boolean> {
 // error) resolves false and raises SAVE_FAILED_EVENT; callers that must not
 // continue after a failed write (migrations, deletes that depend on a copy)
 // check the result.
-export function setItem(key: string, value: string): Promise<boolean> {
+export function setItem(key: string, value: string, opts?: { quiet?: boolean }): Promise<boolean> {
   if (isDemoMode()) { demoSetItem(key, value); return Promise.resolve(true); }
+  if (opts?.quiet) quietKeys.add(key); else quietKeys.delete(key);
   const slot = slots.get(key);
+  if (!slot && stored.get(key) === value) return Promise.resolve(true);
   if (!slot) return start(key, value);
   return new Promise<boolean>(resolve => {
     if (slot.next) slot.next.value = value;
-    else { slot.next = { value, waiters: [] }; setPending(1); slot.running.finally(() => setPending(-1)); }
+    else {
+      slot.next = { value, waiters: [] };
+      if (!isQuiet(key)) { setPending(1); slot.running.finally(() => setPending(-1)); }
+    }
     slot.next.waiters.push(resolve);
   });
 }
@@ -180,6 +205,7 @@ export function setItem(key: string, value: string): Promise<boolean> {
 export async function removeItem(key: string): Promise<boolean> {
   if (isDemoMode()) { demoRemoveItem(key); return true; }
   versions.delete(key);
+  stored.delete(key);
   try {
     const res = check401(
       await fetch(`/api/settings?key=${encodeURIComponent(key)}`, {

@@ -36,7 +36,7 @@ export function useFirstSeen<T>(
       loadedRef.current = map;
       setFirstSeen(map);
       setLastVisit(Number(visit.value) || 0);
-      void storage.setItem(`${prefix}-visit`, String(Date.now()));
+      void storage.setItem(`${prefix}-visit`, String(Date.now()), { quiet: true });
     });
     return () => { cancelled = true; };
   }, [prefix]);
@@ -61,7 +61,7 @@ export function useFirstSeen<T>(
     const map = Object.fromEntries(kept);
     loadedRef.current = map;
     setFirstSeen(map);
-    void storage.setItem(`${prefix}-seen`, JSON.stringify(map));
+    void storage.setItem(`${prefix}-seen`, JSON.stringify(map), { quiet: true });
   }, [items, prefix, firstSeen]);
 
   return { firstSeen, lastVisit };

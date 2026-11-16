@@ -66,17 +66,19 @@ export default function KiwixWidget({
 
   const [randomBusy, setRandomBusy] = useState(false);
   const lastKey = `${storageKey}-last`;
-  async function openRandom(cfg: KiwixConfig) {
+  async function openRandom(cfg: KiwixConfig, auto = false) {
     if (!cfg.baseUrl || !cfg.source) return;
     try {
       const res = await fetch(`/api/kiwix?baseUrl=${encodeURIComponent(cfg.baseUrl)}&random=${encodeURIComponent(cfg.source)}`);
       const data = await res.json();
-      if (res.ok && data.url) openArticle({ title: data.title, url: data.url, snippet: "" }, cfg);
+      if (res.ok && data.url) openArticle({ title: data.title, url: data.url, snippet: "" }, cfg, auto);
     } catch { /* stays on the search prompt */ }
   }
 
-  async function openArticle(r: Result, cfg: KiwixConfig = config) {
-    storage.setItem(lastKey, JSON.stringify({ title: r.title, url: r.url }));
+  // `auto`: opened by the widget itself (home behaviour at load), so the
+  // remembered article is bookkeeping, saved quietly.
+  async function openArticle(r: Result, cfg: KiwixConfig = config, auto = false) {
+    storage.setItem(lastKey, JSON.stringify({ title: r.title, url: r.url }), { quiet: auto });
     setSelected(r);
     setExtract("");
     setArticleError("");
@@ -108,12 +110,12 @@ export default function KiwixWidget({
         setConfig(parsed);
         setDraft(parsed);
         // Home behaviour, once per load.
-        if (parsed.home === "random") openRandom(parsed);
+        if (parsed.home === "random") openRandom(parsed, true);
         else if (parsed.home === "last") {
           storage.getItem(lastKey).then(raw => {
             try {
               const last = raw ? JSON.parse(raw) : null;
-              if (last?.url?.startsWith(parsed.baseUrl.replace(/\/+$/, ""))) openArticle({ title: last.title, url: last.url, snippet: "" }, parsed);
+              if (last?.url?.startsWith(parsed.baseUrl.replace(/\/+$/, ""))) openArticle({ title: last.title, url: last.url, snippet: "" }, parsed, true);
             } catch {}
           });
         }
