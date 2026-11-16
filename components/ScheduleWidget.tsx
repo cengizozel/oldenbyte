@@ -526,7 +526,7 @@ export default function ScheduleWidget({
                       }}
                     >
                       {big && <span className="block font-mono text-xs opacity-80">{fmt(ev.start)}–{fmt(ev.end)}</span>}
-                      <span className="block font-medium truncate text-xs">{ev.title}</span>
+                      <span className={`block font-medium truncate ${bottom - top < 22 ? "text-xs leading-none" : "text-sm leading-tight"}`}>{ev.title}</span>
                       {/* Has a description: a folded corner, like a spreadsheet note.
                           Hover shows it; a tap opens the entry. */}
                       {ev.description && (
@@ -551,7 +551,7 @@ export default function ScheduleWidget({
                     }}
                   >
                     <span className="block font-mono text-xs">{fmt(drag.startMin % 1440)}</span>
-                    {drag.grouped && <span className="block text-xs font-medium">splits from group</span>}
+                    {drag.grouped && <span className="block text-sm leading-tight font-medium">splits from group</span>}
                   </div>
                 )}
               </div>

@@ -20,8 +20,8 @@ weight and the opacity steps below, never from shrinking.
 | 16px+ | `text-base`, `text-lg`, `text-2xl` | Headings of a detail view (a race name) and numbers read at a glance (temperature, timers, scores) |
 
 `text-xs` (12px) is only for labels that annotate a picture rather than being
-read on their own: chart and time-grid ticks (the Schedule hours and the text
-inside its time slots), the edit-mode rulers and size badge, the keyboard
+read on their own: chart and time-grid ticks (the Schedule hours and the time
+range printed inside its blocks; a block's title is read, so it is 14px, dropping to 12px only in a block too short to hold a 14px line), the edit-mode rulers and size badge, the keyboard
 target badges, and the remove bubble on an attachment thumbnail.
 
 Weight: `font-medium` for titles and list item titles, regular for everything
