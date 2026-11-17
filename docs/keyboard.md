@@ -23,13 +23,15 @@ Defaults, all pressed after the leader (**Space**):
 | `?` | Cheat sheet with the current bindings (any key closes it) |
 | `Escape` | Cancel a pending command; on a focused widget, leave it |
 
-Moves are spatial, as on a TV remote: the nearest widget past the target in that direction, preferring one in the same row (or column). They reach every widget, numbered or not. A move or a tab step moves the target (and its dot and ring), not the text cursor: putting the cursor in a note would make the next leader type a space. A number still focuses the widget's text field, ready to type.
+Moves are spatial, as on a TV remote: the nearest widget past the target in that direction, preferring one in the same row (or column). They reach every widget, numbered or not. A move or a tab step moves the target (and its teal logo and ring), not the text cursor: putting the cursor in a note would make the next leader type a space. A number still focuses the widget's text field, ready to type.
 
 Repeat: after a move, a tab step or a dashboard switch, the leader stays armed for the repeat window (1 second by default): pressing any of those keys again repeats without the leader, so `Space ] ]` goes two dashboards right and `Space l l j` walks the grid. Any other command key in the window runs as a fresh command on the widget just reached; any other key closes the window. Settings > Keyboard > Repeat keys turns it off, Repeat window sets the seconds (0.5 to 3).
 
+Holding the leader: while it is held down, nothing times out. Moves, tab steps and dashboard keys keep working for as long as it is held, and a widget number only marks the widget (its teal logo and ring) so the following keys are not typed into it; letting go of the leader focuses the last widget picked. The leader's own auto-repeat is ignored. Tapping works exactly as before, with the timeouts, so the two never conflict: the layer watches the leader's key-up (and a window blur, which swallows it). Settings > Keyboard > Hold to keep going turns it off.
+
 Tabs: Settings > Keyboard > Tabs picks how a tab group is reached. Tab keys (default): the widget number focuses the tab the group shows, at once, and `,` / `.` step through its tabs. Tab numbers: the older scheme, where a tab number may follow the widget number (`Space 2 2`), at the cost of a short wait after the widget number.
 
-The target dot: a small red dot on the corner of the target, kept for as long as it is the target, so you can see where commands land without pressing the leader. Settings > Keyboard > Target dot turns it off.
+The target logo: the oldenbyte mark in the target's header (its options toggle) turns teal at full strength for as long as it is the target, so you can see where commands land without pressing the leader. Darker teal on light cards, the logo's own teal in dark mode. Settings > Keyboard > Target logo turns it off.
 
 While the leader is pending, every widget shows its number and every tab group shows its tab keys. A pending command times out after 1.5 seconds by default; Settings > Keyboard > Time to answer sets it (0.5 to 10 seconds, stored in the same config as `timeout`).
 
@@ -66,4 +68,4 @@ Note that the typing widget's field is a focusable element rather than a text in
 
 Settings > Keyboard has an on/off switch (default on), the leader, and one field per action. Click a field (or press Enter on it) and press the new key; Escape cancels. Keys are single characters; digits are reserved for widget numbers. Giving an action a key that another action already uses swaps the two. "Reset to defaults" restores the table above.
 
-The config is stored per user under the `keyboard-config` setting as `{ enabled, leader, timeout, mark, markAlways, dot, repeat, repeatWindow, tabMode, bindings: { [actionId]: key } }`. An action added after a config was saved takes its default key; if the user's own binding already holds that key, theirs wins and the new action stays unbound until they give it one. The layer reads it at startup and applies changes immediately through the `keyboardconfigchange` window event. A leader other than Space should be a key Vimium does not bind, or Vimium will take it first.
+The config is stored per user under the `keyboard-config` setting as `{ enabled, leader, timeout, mark, markAlways, dot, repeat, repeatWindow, hold, tabMode, bindings: { [actionId]: key } }`. An action added after a config was saved takes its default key; if the user's own binding already holds that key, theirs wins and the new action stays unbound until they give it one. The layer reads it at startup and applies changes immediately through the `keyboardconfigchange` window event. A leader other than Space should be a key Vimium does not bind, or Vimium will take it first.

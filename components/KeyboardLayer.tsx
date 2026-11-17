@@ -142,6 +142,12 @@ export default function KeyboardLayer({
   const catcherRef = useRef<HTMLInputElement>(null);
   const phaseRef = useRef<Phase | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Holding the leader: while it is down, timeouts wait for its release
+  // (deferredRef), and a widget pick is only marked (landRef) and focused on
+  // release, so the next keys are not typed into the widget.
+  const heldRef = useRef(false);
+  const deferredRef = useRef<(() => void) | null>(null);
+  const landRef = useRef<HTMLElement | null>(null);
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Focus before the leader, restored when a command does not move it.
   const prevFocusRef = useRef<HTMLElement | null>(null);
@@ -163,7 +169,8 @@ export default function KeyboardLayer({
     window.addEventListener(KEYBOARD_EVENT, onChange);
     return () => window.removeEventListener(KEYBOARD_EVENT, onChange);
   }, []);
-  // The dot follows the target while the setting is on.
+  // The target logo (data-kb-target, styled in globals.css) follows the
+  // target while the setting is on.
   useEffect(() => {
     const target = targetRef.current;
     if (config.dot && config.enabled && target?.isConnected) target.setAttribute("data-kb-target", "");
@@ -218,17 +225,48 @@ export default function KeyboardLayer({
   function clearTimer() {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
+    deferredRef.current = null;
   }
 
   function arm(onTimeout: () => void, seconds = latest.current.config.timeout) {
     clearTimer();
-    timerRef.current = setTimeout(onTimeout, seconds * 1000);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      if (heldRef.current) deferredRef.current = onTimeout;
+      else onTimeout();
+    }, seconds * 1000);
+  }
+
+  // Focus a picked widget, or while the leader is held, mark it and keep
+  // listening; it is focused when the leader is let go.
+  function land(cell: HTMLElement) {
+    if (!heldRef.current) { focusCell(cell); return; }
+    clearTimer();
+    showMark(cell);
+    landRef.current = cell;
+    prevFocusRef.current = null;
+    phaseRef.current = { kind: "leader" };
+    setBadges(badgesFor(visibleCells()));
+  }
+
+  // The leader key came up (or the window lost focus, which swallows it).
+  function release() {
+    if (!heldRef.current) return;
+    heldRef.current = false;
+    const cell = landRef.current;
+    landRef.current = null;
+    if (!phaseRef.current) return;
+    if (cell?.isConnected) { focusCell(cell); return; }
+    const pending = deferredRef.current;
+    deferredRef.current = null;
+    pending?.();
   }
 
   // End the pending command. With restore, focus goes back where it was before
   // the leader; otherwise the catcher is just blurred (Vimium resumes).
   function finish(restore = true) {
     clearTimer();
+    landRef.current = null;
     phaseRef.current = null;
     setBadges([]);
     setHelpOpen(false);
@@ -241,6 +279,7 @@ export default function KeyboardLayer({
 
   function focusCell(cell: HTMLElement) {
     clearTimer();
+    landRef.current = null;
     phaseRef.current = null;
     setBadges([]);
     prevFocusRef.current = null;
@@ -406,6 +445,17 @@ export default function KeyboardLayer({
     e.stopPropagation();
     if (phase.kind === "help" || e.key === "Escape") { finish(); return; }
 
+    // The leader again: its auto-repeat while held is ignored; a fresh press
+    // (tapping it during a repeat window) re-arms the command.
+    if (e.key === latest.current.config.leader) {
+      if (e.repeat) return;
+      heldRef.current = latest.current.config.hold;
+      phaseRef.current = { kind: "leader" };
+      setBadges(badgesFor(visibleCells()));
+      arm(() => { const c = landRef.current; if (c?.isConnected) focusCell(c); else finish(false); });
+      return;
+    }
+
     if (phase.kind === "repeat") {
       const cfg = latest.current.config;
       const again = actionForKey(cfg, e.key);
@@ -424,10 +474,10 @@ export default function KeyboardLayer({
         const cell = phase.cell;
         clearTimer();
         phaseRef.current = null;
-        afterRender(() => focusCell(cell));
+        afterRender(() => land(cell));
         return;
       }
-      focusCell(phase.cell);
+      land(phase.cell);
       return;
     }
 
@@ -440,10 +490,10 @@ export default function KeyboardLayer({
         // A tab group waits for an optional tab key, then focuses.
         phaseRef.current = { kind: "tab", cell };
         setBadges(badgesFor(cells, cell));
-        arm(() => focusCell(cell));
+        arm(() => land(cell));
         return;
       }
-      focusCell(cell);
+      land(cell);
       return;
     }
 
@@ -477,8 +527,13 @@ export default function KeyboardLayer({
       if (target?.closest('[role="dialog"], [aria-modal="true"], dialog')) return;
       if (document.querySelector('[aria-modal="true"]:not([aria-hidden="true"])')) return;
       e.preventDefault();
+      heldRef.current = cfg.hold;
       startLeader();
     }
+    function onKeyUp(e: KeyboardEvent) {
+      if (e.key === latest.current.config.leader || (latest.current.config.leader === " " && e.code === "Space")) release();
+    }
+    const onWindowBlur = () => release();
     // A click on a card picks it: the mark shows there for a moment.
     function onPointerDown(e: PointerEvent) {
       if (!latest.current.config.enabled) return;
@@ -486,9 +541,13 @@ export default function KeyboardLayer({
       if (cell) showMark(cell);
     }
     window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("blur", onWindowBlur);
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => {
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("blur", onWindowBlur);
       document.removeEventListener("pointerdown", onPointerDown, true);
     };
   // The handlers read everything through refs; register once.
@@ -640,8 +699,8 @@ export function KeyboardSettings() {
         </SettingsRow>
       )}
       {config.enabled && (
-        <SettingsRow label="Target dot" hint="A small red dot on the widget your commands act on, always shown.">
-          <Toggle checked={config.dot} onChange={() => update({ ...config, dot: !config.dot })} label="Target dot" />
+        <SettingsRow label="Target logo" hint="The logo in the header of the widget your commands act on turns teal, always shown.">
+          <Toggle checked={config.dot} onChange={() => update({ ...config, dot: !config.dot })} label="Target logo" />
         </SettingsRow>
       )}
       {config.enabled && (
@@ -657,6 +716,11 @@ export function KeyboardSettings() {
             <option value="current">Tab keys</option>
             <option value="number">Tab numbers</option>
           </SettingsSelect>
+        </SettingsRow>
+      )}
+      {config.enabled && (
+        <SettingsRow label="Hold to keep going" hint={`While ${keyLabel(config.leader)} is held, nothing times out; a widget number focuses on release.`}>
+          <Toggle checked={config.hold} onChange={() => update({ ...config, hold: !config.hold })} label="Hold to keep going" />
         </SettingsRow>
       )}
       {config.enabled && (

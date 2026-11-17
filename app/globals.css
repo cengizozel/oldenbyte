@@ -270,19 +270,15 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 
-/* The keyboard target dot: a small red point on the corner of the widget
-   commands act on (components/KeyboardLayer, Settings > Keyboard > Target dot). */
-[data-kb-target]:not(.react-grid-item) { position: relative; }
-[data-kb-target]::after {
-  content: "";
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  width: 7px;
-  height: 7px;
-  border-radius: 9999px;
-  background: #ef4444;
-  box-shadow: 0 0 6px 2px rgb(239 68 68 / 0.55);
-  pointer-events: none;
-  z-index: 40;
+/* The keyboard target: the oldenbyte mark in its header (the options toggle)
+   turns the logo's teal at full strength, so where commands land shows on
+   the widget itself (components/KeyboardLayer, Settings > Keyboard > Target
+   logo). Darker teal on the light pastel cards, the logo's own teal in dark;
+   both clear 3:1 against every widget palette. */
+[data-kb-target] [data-header-toggle][aria-expanded="false"] {
+  color: #0d9488;
+  opacity: 1;
+}
+.dark [data-kb-target] [data-header-toggle][aria-expanded="false"] {
+  color: #5eead4;
 }

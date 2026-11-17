@@ -33,14 +33,18 @@ export type KeyboardConfig = {
   // `mark` seconds after a click or a keyboard pick, or kept on with markAlways.
   mark: number;
   markAlways: boolean;
-  // A small dot on the target's corner that stays, so where commands land is
-  // always visible without the leader.
+  // The target's header logo (the options toggle) turns teal and stays so,
+  // so where commands land is always visible without the leader.
   dot: boolean;
   // After a repeatable command (dashboards, tabs, moves) the leader stays
   // armed for `repeatWindow` seconds: the same kind of key again repeats it
   // without the leader (tmux's repeat), any other key is read as a command.
   repeat: boolean;
   repeatWindow: number;
+  // While the leader key is held down nothing times out: moves, tabs and
+  // dashboard keys keep working, and a widget number only marks the widget
+  // until the leader is released, then focuses it.
+  hold: boolean;
   // "current": a widget number focuses the widget on the tab it shows, and
   // the tab keys step through tabs. "number": a tab number may follow the
   // widget number (the older two-digit scheme).
@@ -85,6 +89,7 @@ export const DEFAULT_KEYBOARD: KeyboardConfig = {
   dot: true,
   repeat: true,
   repeatWindow: 1,
+  hold: true,
   tabMode: "current",
   bindings: {
     moveLeft: "h",
@@ -200,6 +205,7 @@ export function parseKeyboardConfig(raw: string | null): KeyboardConfig {
     markAlways: typeof parsed.markAlways === "boolean" ? parsed.markAlways : false,
     dot: typeof parsed.dot === "boolean" ? parsed.dot : DEFAULT_KEYBOARD.dot,
     repeat: typeof parsed.repeat === "boolean" ? parsed.repeat : DEFAULT_KEYBOARD.repeat,
+    hold: typeof parsed.hold === "boolean" ? parsed.hold : DEFAULT_KEYBOARD.hold,
     repeatWindow: (() => {
       const n = Number(parsed.repeatWindow);
       return Number.isFinite(n) && parsed.repeatWindow != null ? Math.min(REPEAT_RANGE.max, Math.max(REPEAT_RANGE.min, n)) : DEFAULT_KEYBOARD.repeatWindow;
