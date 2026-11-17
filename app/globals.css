@@ -289,3 +289,28 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; marg
   color: #062925;
   box-shadow: 0 0 0 2px #5eead4, 0 0 10px 1px rgb(94 234 212 / 0.45);
 }
+
+/* Scrollbars: one thin, quiet bar everywhere. Left alone, Chromium (and with
+   it the desktop app) draws the system's classic bar on Linux and Windows: a
+   white track with arrow buttons, in every widget that scrolls. The thumb
+   takes the color of the text around it, so it follows each widget's palette
+   and the theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, currentColor 30%, transparent) transparent;
+}
+/* Chromium and Safari: the same look with their own parts, which also lets
+   the thumb be rounded and the arrow buttons go. */
+@supports selector(::-webkit-scrollbar) {
+  * { scrollbar-width: auto; scrollbar-color: auto; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, currentColor 28%, transparent);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, currentColor 50%, transparent); background-clip: padding-box; }
+}
