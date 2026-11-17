@@ -87,26 +87,27 @@ function LiveTag({ detail }: { detail: string }) {
 function Featured({ c, m, tz }: { c: ColorClasses; m: Match; tz: string }) {
   const live = m.state === "in";
   const scored = m.home.score !== null && m.away.score !== null;
-  const name = (s: Side) => <span className={`min-w-0 text-sm font-medium leading-snug text-center line-clamp-2 ${c.text}`}>{s.name}</span>;
+  // Each team takes half the card, crest centered over its name; the time
+  // sits between the crests, at their height.
+  const team = (s: Side) => (
+    <div className="min-w-0 flex flex-col items-center gap-1.5">
+      <Crest side={s} px={36} />
+      <span className={`w-full text-sm font-medium leading-snug text-center line-clamp-2 ${c.text}`}>{s.name}</span>
+    </div>
+  );
   return (
     <div className="rounded-xl bg-black/5 dark:bg-white/10 p-3 flex flex-col gap-2">
       <p className={`text-sm opacity-70 truncate text-center ${c.label}`}>{live ? m.competition : `${dayLabel(m.date, tz)} · ${m.competition}`}</p>
-      {/* Crests in the outer thirds, so each sits over the middle of its
-          team's name below, which gets a full half of the card. */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div className="flex justify-center"><Crest side={m.home} px={40} /></div>
-        <div className="flex flex-col items-center text-center">
-          <span className={`text-xl font-semibold tabular-nums leading-tight ${c.text}`}>
+      <div className="relative grid grid-cols-2 gap-2">
+        {team(m.home)}
+        {team(m.away)}
+        <div className="absolute left-1/2 top-0 h-9 -translate-x-1/2 flex flex-col items-center justify-center text-center">
+          <span className={`text-lg font-semibold tabular-nums leading-tight ${c.text}`}>
             {scored ? <>{m.home.score} <span className="opacity-50">-</span> {m.away.score}</> : timeOf(m.date, tz)}
           </span>
-          {live && <LiveTag detail={m.detail} />}
         </div>
-        <div className="flex justify-center"><Crest side={m.away} px={40} /></div>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        {name(m.home)}
-        {name(m.away)}
-      </div>
+      {live && <div className="flex justify-center"><LiveTag detail={m.detail} /></div>}
       {m.venue && <p className={`text-sm opacity-70 truncate text-center ${c.label}`}>{m.venue}</p>}
     </div>
   );
