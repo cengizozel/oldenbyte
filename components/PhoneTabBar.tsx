@@ -21,7 +21,7 @@ export default function PhoneTabBar({ active, onDashboard, onSettings }: {
   return (
     <nav
       aria-label="Main"
-      className="fixed left-0 right-0 bottom-0 z-[60] flex items-stretch border-t border-[var(--surface-border)] bg-[var(--surface)]"
+      className="ob-tabbar fixed left-0 right-0 bottom-0 z-[60] flex items-stretch border-t border-[var(--surface-border)] bg-[var(--surface)]"
       style={{ height: `calc(${PHONE_TAB_BAR}px + env(safe-area-inset-bottom, 0px))`, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       {onDashboard ? (

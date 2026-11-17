@@ -1,6 +1,7 @@
 "use client";
 
 import PhoneTabBar from "@/components/PhoneTabBar";
+import { useShell } from "@/lib/useShell";
 import { usePhone } from "@/components/MobileNav";
 import { useModelServers } from "@/lib/useModelServers";
 import { HIT_AREA, FOCUS_RING, SettingsInput, SettingsRow, SettingsSection, SettingsSelect } from "@/components/ui/Field";
@@ -75,6 +76,7 @@ const defaultModelsFor = (url: string) => (/openai\.com/i.test(url) ? OPENAI_MOD
 
 export default function DigestPage() {
   const phone = usePhone();
+  useShell(); // inside the phone app the app draws the bar
   const [mode] = useState<"digest" | "full" | "ai">("ai");
   const [sections, setSections]   = useState<Section[]>([]);
   // Widgets left out of the digest (instance ids), chosen in the model panel.
@@ -766,7 +768,7 @@ export default function DigestPage() {
     const iconButton = `w-11 h-11 flex items-center justify-center rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] ${FOCUS_RING}`;
     const chip = (on: boolean) => `h-9 px-3 rounded-lg text-sm ${FOCUS_RING} ${on ? "bg-[var(--text-primary)] text-[var(--page-bg)] font-medium" : "bg-black/5 dark:bg-white/10 text-[var(--text-primary)]"}`;
     return (
-      <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)] pb-[calc(76px+env(safe-area-inset-bottom,0px))]">
+      <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)] pb-[calc(var(--ob-bar)+16px+env(safe-area-inset-bottom,0px))]">
         <PhoneTabBar active="digest" />
         <header className="flex items-start justify-between gap-3 px-4 pt-3">
           <div className="min-w-0">

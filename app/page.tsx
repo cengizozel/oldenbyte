@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import TopBar from "@/components/TopBar";
+import { SHELL_EDIT_EVENT } from "@/lib/shell";
+import { useShell } from "@/lib/useShell";
 import { usePhone } from "@/components/MobileNav";
 import WidgetGrid from "@/components/WidgetGrid";
 import KeyboardLayer from "@/components/KeyboardLayer";
@@ -107,6 +109,17 @@ export default function Home() {
   // the change. The panes are moved directly, not through state: a render per
   // touch move would redraw every widget.
   const phone = usePhone();
+  // Inside the phone app (lib/shell.ts) each tab is a page of its own. The
+  // Settings tab asks for "/?view=settings": the settings alone, no widgets.
+  useShell();
+  const [settingsOnly, setSettingsOnly] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("view") === "settings") setSettingsOnly(true);
+    // "Edit the layout" was tapped in the Settings tab; the app passes it on.
+    const onEdit = () => setEditing(true);
+    window.addEventListener(SHELL_EDIT_EVENT, onEdit);
+    return () => window.removeEventListener(SHELL_EDIT_EVENT, onEdit);
+  }, []);
   const panes = useRef(new Map<string, HTMLDivElement>());
   const sw = useRef<{ x: number; y: number; t: number; lock: "h" | "v" | null; dx: number; to: string | null } | null>(null);
   const SWIPE_BLOCK = 'input, textarea, select, [contenteditable=""], [contenteditable="true"], canvas, video, [draggable="true"], [data-no-swipe], [role="dialog"], .touch-none';
@@ -196,13 +209,14 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen has-[[data-active=true][data-fill-viewport=true]]:h-screen has-[[data-active=true][data-fill-viewport=true]]:overflow-hidden bg-[var(--page-bg)] flex flex-col px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6 gap-4 md:gap-5 max-[599px]:pb-[calc(76px+env(safe-area-inset-bottom,0px))]">
+    <div className="min-h-screen has-[[data-active=true][data-fill-viewport=true]]:h-screen has-[[data-active=true][data-fill-viewport=true]]:overflow-hidden bg-[var(--page-bg)] flex flex-col px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6 gap-4 md:gap-5 max-[599px]:pb-[calc(var(--ob-bar)+16px+env(safe-area-inset-bottom,0px))]">
       <TopBar
         editing={editing}
         onToggleEdit={() => setEditing(e => !e)}
         onCancelEdit={requestCancelEdit}
         dashboards={dashboards}
         onDashboardsChange={handleDashboardsChange}
+        settingsOnly={settingsOnly}
       />
       {confirmDiscard && (
         <ConfirmDialog
@@ -214,12 +228,12 @@ export default function Home() {
           onConfirm={discardEdit}
         />
       )}
-      <KeyboardLayer
+      {!settingsOnly && <KeyboardLayer
         dashboards={dashboards}
         onDashboardsChange={handleDashboardsChange}
         onToggleEdit={() => setEditing(e => !e)}
-      />
-      {dashboards && visited.map(id => {
+      />}
+      {dashboards && !settingsOnly && visited.map(id => {
         const active = id === dashboards.activeId;
         return (
           <div

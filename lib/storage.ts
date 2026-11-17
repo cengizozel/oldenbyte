@@ -1,5 +1,6 @@
 import { isDemoMode, demoGetItem, demoSetItem, demoRemoveItem } from "@/lib/demo";
 import { isCacheKey } from "@/lib/settingKeys";
+import { noteSaved } from "@/lib/shell";
 
 // All persistence funnels through here. In demo mode every read and write is
 // redirected to an in-memory copy of the first-run seed (lib/demo), so the
@@ -191,6 +192,7 @@ export function setItem(key: string, value: string, opts?: { quiet?: boolean }):
   if (opts?.quiet) quietKeys.add(key); else quietKeys.delete(key);
   const slot = slots.get(key);
   if (!slot && stored.get(key) === value) return Promise.resolve(true);
+  if (!isQuiet(key)) noteSaved(); // inside the phone app: the other tabs are now behind
   if (!slot) return start(key, value);
   return new Promise<boolean>(resolve => {
     if (slot.next) slot.next.value = value;
@@ -206,6 +208,7 @@ export async function removeItem(key: string): Promise<boolean> {
   if (isDemoMode()) { demoRemoveItem(key); return true; }
   versions.delete(key);
   stored.delete(key);
+  noteSaved();
   try {
     const res = check401(
       await fetch(`/api/settings?key=${encodeURIComponent(key)}`, {

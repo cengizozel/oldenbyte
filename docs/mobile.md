@@ -45,6 +45,15 @@ On a phone a widget's settings do not turn the card over: they rise in a sheet f
 
 Under 600px the digest drops the newspaper masthead for the frame's shape: "Digest" as the title with the date under it, a button to write it again and one for setup, each section a card that folds, and the writing in its own serif face. Setup is a sheet with the server presets as chips, address, model and key as fields, the sections as switches, and cancel and save at the bottom. Before a model is set the page shows one sentence and a "Set up a model" button.
 
+### Inside the app
+
+The phone app draws what floats over the page with the phone's own controls, and shows the website under it (`lib/shell.ts`, and `src/app/shell` in the app's repository). So far that is the bar at the bottom: Apple's tab bar on an iPhone, Google's on Android, with one page of the website per tab: `/`, `/digest` and `/?view=settings` (the settings alone, no widgets).
+
+- The app sets `window.__obShell` to `"ios"` or `"android"` before the page loads and marks the document with `data-ob-shell`. The page then leaves its own bar out and the room for it (`--ob-bar` in `globals.css`).
+- Each tab is a page of its own, and a page that saves over a value another page changed is refused (`lib/storage.ts`). So a page tells the app when it saved something (`oldenbyte:changed`), and the app loads a tab that is behind again when it is next shown.
+- "Edit the layout" in the Settings tab sends `oldenbyte:edit-layout`; the app switches to the Dashboard tab and fires the same event on its window, which starts editing.
+- The server says its pages can do this with `"shell"` in `features` on `/api/v1/server`. An app talking to an older server shows the one full-screen page as before.
+
 ## The jump button
 
 A floating round button with the oldenbyte mark, like iOS AssistiveTouch. It is shown on the visible dashboard, on phones only, and not while editing the layout or with a widget in full screen.

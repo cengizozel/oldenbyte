@@ -13,6 +13,7 @@ import Toggle from "@/components/ui/Toggle";
 import { KeyboardSettings } from "@/components/KeyboardLayer";
 import { PhoneSettings, usePhone } from "@/components/MobileNav";
 import PhoneTabBar from "@/components/PhoneTabBar";
+import { tellShell } from "@/lib/shell";
 import { DataSettings } from "@/components/DataSettings";
 import { DevicesSettings } from "@/components/DevicesSettings";
 import { CustomWidgetsSettings } from "@/components/CustomWidgetsSettings";
@@ -806,7 +807,7 @@ function SettingsPanel({
         aria-hidden={!open}
         inert={!open}
         tabIndex={-1}
-        className={`fixed top-0 right-0 h-full z-50 flex flex-col outline-none duration-300 ease-in-out ${phone ? "w-full bg-[var(--page-bg)] pb-[calc(60px+env(safe-area-inset-bottom,0px))]" : "w-80 max-w-full bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl"} ${open ? "translate-x-0 visible transition-transform" : "translate-x-full invisible transition-[transform,visibility]"}`}
+        className={`fixed top-0 right-0 h-full z-50 flex flex-col outline-none duration-300 ease-in-out ${phone ? "w-full bg-[var(--page-bg)] pb-[calc(var(--ob-bar)+env(safe-area-inset-bottom,0px))]" : "w-80 max-w-full bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl"} ${open ? "translate-x-0 visible transition-transform" : "translate-x-full invisible transition-[transform,visibility]"}`}
       >
         <div className={`flex items-center justify-between ${phone ? "px-4 pt-3 pb-1" : "px-5 pt-5 pb-4 border-b border-[var(--surface-border)]"}`}>
           <span className={phone ? "text-2xl font-semibold text-[var(--text-primary)]" : "text-base font-medium text-[var(--text-primary)]"}>Settings</span>
@@ -1195,7 +1196,10 @@ export default function TopBar({
   onCancelEdit,
   dashboards,
   onDashboardsChange,
+  settingsOnly = false,
 }: {
+  // Inside the phone app's Settings tab (lib/shell.ts): the settings alone.
+  settingsOnly?: boolean;
   editing?: boolean;
   onToggleEdit?: () => void;
   onCancelEdit?: () => void;
@@ -1274,7 +1278,7 @@ export default function TopBar({
 
   const settingsPanel = (
     <SettingsPanel
-      open={settingsOpen}
+      open={settingsOpen || settingsOnly}
       onClose={() => setSettingsOpen(false)}
       theme={theme}
       onTheme={applyTheme}
@@ -1287,10 +1291,11 @@ export default function TopBar({
       preload={preload}
       onTogglePreload={togglePreload}
       returnFocusRef={settingsButtonRef}
-      phone={phone}
-      onEditLayout={onToggleEdit}
+      phone={phone || settingsOnly}
+      onEditLayout={settingsOnly ? () => tellShell({ type: "oldenbyte:edit-layout" }) : onToggleEdit}
     />
   );
+  if (settingsOnly) return settingsPanel;
 
   if (phone) {
     const activeName = dashboards?.list.find(d => d.id === dashboards.activeId)?.name ?? "oldenbyte";
