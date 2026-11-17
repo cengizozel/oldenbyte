@@ -465,17 +465,23 @@ export default function DigestPage() {
     if (!raw) return null;
     try {
       const cfg = JSON.parse(raw);
-      if (!cfg?.baseUrl || !cfg.username || !cfg.calendars?.length) return null;
+      const hasAccount = !!(cfg?.baseUrl && cfg.username && cfg.calendars?.length);
+      const links = Array.isArray(cfg?.links) ? cfg.links : [];
+      if (!hasAccount && !links.length) return null;
       const start = new Date();
       const end = new Date(start.getTime() + 2 * 86400000);
       const fmt = (d: Date) => localDateStr(d);
-      const res = await fetch("/api/caldav", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "events", baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password, calendars: cfg.calendars, start: fmt(start), end: fmt(end), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
+      const range = { start: fmt(start), end: fmt(end), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+      // The account's calendars and the plain .ics links, like the widget.
+      const ask = async (payload: Record<string, unknown>) => {
+        const res = await fetch("/api/caldav", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, ...range }) });
+        return res.ok ? ((await res.json()).events ?? []) : [];
+      };
+      const parts = await Promise.all([
+        hasAccount ? ask({ op: "events", baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password, calendars: cfg.calendars }) : [],
+        links.length ? ask({ op: "ics", links }) : [],
+      ]);
+      const data = { events: parts.flat().sort((x: { start: string }, y: { start: string }) => x.start.localeCompare(y.start)) };
       type Ev = { start: string; allDay: boolean; title: string; location?: string };
       const events: Ev[] = data.events ?? [];
       if (!events.length) return null;

@@ -138,16 +138,20 @@ async function readWeather(userId: string, id: string, title: string): Promise<s
 async function readCalendar(userId: string, id: string, title: string, opts?: ReadOpts): Promise<string> {
   const cfg = await readJSON<{
     baseUrl: string; username: string; password: string;
-    calendars: CalDAVCalendar[]; days?: number;
+    calendars: CalDAVCalendar[]; days?: number; links?: { name: string; url: string }[];
   }>(userId, `calendar-widget-${id}`);
-  if (!cfg?.baseUrl || !cfg.username || !cfg.calendars?.length) return "The calendar widget is not connected.";
+  const hasAccount = !!(cfg?.baseUrl && cfg.username && cfg.calendars?.length);
+  // Plain .ics links are read like subscriptions: a calendar whose events come from its source.
+  const linked: CalDAVCalendar[] = (cfg?.links ?? []).map(l => ({ name: l.name, url: l.url, readOnly: true, source: l.url }));
+  if (!cfg || (!hasAccount && !linked.length)) return "The calendar widget is not connected.";
   const days = cfg.days ?? 7;
   // Anchor "today" and the window to the USER's day (relayed by the chat
   // client), not the server's UTC date — at 9pm in a UTC-5 zone those differ.
   const start = userToday(opts);
   const end = new Date(Date.parse(start) + days * 86400000).toISOString().slice(0, 10);
   const account = { baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password };
-  const settled = await Promise.allSettled(cfg.calendars.slice(0, 20).map(c => listEvents(account, c, start, end, undefined, opts?.timezone)));
+  const all = [...(hasAccount ? cfg.calendars : []), ...linked].slice(0, 20);
+  const settled = await Promise.allSettled(all.map(c => listEvents(account, c, start, end, undefined, opts?.timezone)));
   const events = settled.flatMap(r => (r.status === "fulfilled" ? r.value : []));
   events.sort((a, b) => a.start.localeCompare(b.start));
   if (!events.length) return `## ${title} (Calendar)\nToday is ${start}. No events in the next ${days} days.`;

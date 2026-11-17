@@ -122,6 +122,28 @@ Accepts any of `registrationEnabled` (boolean), `inviteCode` (string, stored has
 
 ---
 
+## Widget data
+
+Routes behind the newer widgets. All need a signed-in user; outbound requests go through the per-user guard in `lib/ssrf.ts` (the local network for the admin, public addresses for everyone else).
+
+### `GET /api/markets?symbols=AAPL,BTC-USD[&refresh=1]`
+One entry per symbol, in order: `{ symbol, name, currency, price, prevClose, change, changePct, digits, points }`, or `{ symbol, error }`. Cached per symbol like the feeds.
+
+### `GET /api/monitor?url=<address>`
+`{ up, status, ms, error? }`. Up means an answer below HTTP 500. Kept for 20 seconds per user and address.
+
+### `GET /api/server-stats`
+Admin only. `{ cpu, cores, load, mem: { used, total }, disk: { used, total } | null, uptime, temp }` for the machine running the dashboard.
+
+### `GET /api/docker`
+Admin only. `{ containers: [{ id, name, image, state, status }] }`, or 404 `{ error: "not_connected" }` until Docker is connected (see [widgets/docker.md](widgets/docker.md)).
+
+### `POST /api/dns-stats`
+Body `{ kind: "adguard" | "pihole", url, username?, password }`. Returns `{ queries, blocked, percent, avgMs, blocklist }`.
+
+### `POST /api/caldav` with `op: "ics"`
+Body `{ op: "ics", links: [{ name, url }], start, end, timezone? }`: events from plain `.ics` or `webcal` links, no account. Returns `{ events, failures }` like `op: "events"`.
+
 ## Digest
 
 ### `POST /api/digest`

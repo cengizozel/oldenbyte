@@ -3,7 +3,7 @@
 import { activeTimezone } from "@/lib/timezone";
 import { useT } from "@/lib/useT";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarDays, Loader, Plug } from "lucide-react";
+import { CalendarDays, Loader, Plug, X } from "lucide-react";
 import Toggle from "@/components/ui/Toggle";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -13,7 +13,7 @@ import { tagColor } from "@/lib/colors";
 import { useScrollFade } from "@/lib/useScrollFade";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput } from "./ui/Field";
-import { ScrollFades, EmptyState, LoadingState, WidgetHeader, Chip, SmallButton, SettingsFace, SettingsField, SettingsListRow, SettingsError } from "./ui/WidgetChrome";
+import { ScrollFades, EmptyState, LoadingState, WidgetHeader, Chip, SmallButton, SettingsFace, SettingsField, SettingsListRow, SettingsError, SettingsAddRow, LIST_TITLE_INPUT, ROW_ACTION } from "./ui/WidgetChrome";
 
 type Calendar = { name: string; url: string; readOnly?: boolean };
 type CalEvent = {
@@ -25,10 +25,14 @@ type CalendarConfig = {
   username: string;
   password: string;
   calendars: Calendar[]; // the selected (displayed) calendars
+  // Published .ics feeds shown without an account (a Google "secret address",
+  // an iCloud public calendar, any webcal link). Read-only by nature.
+  links?: { name: string; url: string }[];
   days: number;          // agenda window
 };
 
-const DEFAULT: CalendarConfig = { baseUrl: "", username: "", password: "", calendars: [], days: 7 };
+const DEFAULT: CalendarConfig = { baseUrl: "", username: "", password: "", calendars: [], links: [], days: 7 };
+const isLink = (s: string) => /^(https?|webcal):\/\/\S+$/i.test(s.trim());
 
 // Demo mode seeds a fake "demo" account (lib/demo.ts) since the sandbox can't
 // reach a real CalDAV server; answer it with a believable agenda instead.
@@ -72,12 +76,14 @@ export default function CalendarWidget({
   const [available, setAvailable] = useState<Calendar[]>([]);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState("");
+  const [linkInput, setLinkInput] = useState("");
   const { ref, onScroll, topFade, bottomFade } = useScrollFade<HTMLDivElement>([events]);
   // Aborts the previous events request so a slow initial load can never land
   // over a newly saved account or calendar selection.
   const fetchAbort = useRef<AbortController | null>(null);
 
-  const configured = (cfg: CalendarConfig) => !!(cfg.baseUrl && cfg.username && cfg.calendars.length);
+  const hasAccount = (cfg: CalendarConfig) => !!(cfg.baseUrl && cfg.username && cfg.calendars.length);
+  const configured = (cfg: CalendarConfig) => hasAccount(cfg) || !!cfg.links?.length;
 
   const fetchEvents = useCallback(async (cfg: CalendarConfig) => {
     if (!configured(cfg)) return;
@@ -93,23 +99,32 @@ export default function CalendarWidget({
     try {
       const start = new Date();
       const end = new Date(start.getTime() + (cfg.days || 7) * 86400000);
-      const res = await fetch("/api/caldav", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          op: "events",
-          baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password,
-          calendars: cfg.calendars,
-          start: localDateStr(start), end: localDateStr(end),
-          // Convert event times into this device's zone (UTC- and TZID-stamped
-          // times would otherwise show the server's wall clock).
-          timezone: activeTimezone(),
-        }),
-        signal: ctrl.signal,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load events.");
-      setEvents(data.events ?? []);
+      // Convert event times into this device's zone (UTC- and TZID-stamped
+      // times would otherwise show the server's wall clock).
+      const range = { start: localDateStr(start), end: localDateStr(end), timezone: activeTimezone() };
+      const ask = async (payload: Record<string, unknown>): Promise<CalEvent[]> => {
+        const res = await fetch("/api/caldav", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, ...range }),
+          signal: ctrl.signal,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to load events.");
+        if (!data.events?.length && data.failures?.length) throw new Error(String(data.failures[0]));
+        return data.events ?? [];
+      };
+      // The account's calendars and the plain links load side by side; one
+      // failing does not hide the other.
+      const jobs: Promise<CalEvent[]>[] = [];
+      if (hasAccount(cfg)) jobs.push(ask({ op: "events", baseUrl: cfg.baseUrl, username: cfg.username, password: cfg.password, calendars: cfg.calendars }));
+      if (cfg.links?.length) jobs.push(ask({ op: "ics", links: cfg.links }));
+      const settled = await Promise.allSettled(jobs);
+      if (ctrl.signal.aborted) return;
+      const got = settled.flatMap(r => (r.status === "fulfilled" ? r.value : []));
+      const failed = settled.find(r => r.status === "rejected") as PromiseRejectedResult | undefined;
+      if (failed && !got.length) throw failed.reason;
+      setEvents(got.sort((a, b) => a.start.localeCompare(b.start)));
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
       setError(String(e instanceof Error ? e.message : e));
@@ -170,9 +185,21 @@ export default function CalendarWidget({
     }
   }
 
+  function addLink() {
+    setConnectError("");
+    const url = linkInput.trim();
+    if (!isLink(url)) { setConnectError("A calendar link starts with https:// or webcal://."); return; }
+    if (draft.links?.some(l => l.url === url)) { setLinkInput(""); return; }
+    // A first name from the address, to be renamed in the row.
+    let name = "Calendar";
+    try { name = new URL(url.replace(/^webcal:/i, "https:")).hostname.replace(/^www\./, ""); } catch {}
+    setDraft(d => ({ ...d, links: [...(d.links ?? []), { name, url }] }));
+    setLinkInput("");
+  }
+
   async function handleSave() {
-    if (!draft.calendars.length) {
-      setConnectError("Connect and pick at least one calendar.");
+    if (!draft.calendars.length && !draft.links?.length) {
+      setConnectError("Connect and pick at least one calendar, or add a calendar link.");
       return;
     }
     setConfig(draft);
@@ -293,6 +320,34 @@ export default function CalendarWidget({
           </div>
         </SettingsField>
       )}
+      <SettingsField c={c} label="Calendar links" hint="A published .ics address, no account needed: Google Calendar's secret address in iCal format, an iCloud public calendar, any webcal link. Read-only.">
+        <SettingsAddRow c={c} value={linkInput} onChange={setLinkInput} onAdd={addLink} placeholder="https://.../basic.ics" />
+        {(draft.links?.length ?? 0) > 0 && (
+          <div className="flex flex-col gap-1.5">
+            {draft.links!.map((l, i) => (
+              <SettingsListRow
+                key={l.url}
+                leading={<span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(l.name).dot }} />}
+                title={
+                  <input
+                    value={l.name}
+                    onChange={e => setDraft(d => ({ ...d, links: d.links!.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))}
+                    aria-label="Calendar name"
+                    title={l.url}
+                    maxLength={60}
+                    className={`${LIST_TITLE_INPUT} ${c.text}`}
+                  />
+                }
+                actions={
+                  <button type="button" onClick={() => setDraft(d => ({ ...d, links: d.links!.filter((_, j) => j !== i) }))} aria-label={`Remove ${l.name}`} title="Remove" className={`${ROW_ACTION} ${c.label}`}>
+                    <X size={14} />
+                  </button>
+                }
+              />
+            ))}
+          </div>
+        )}
+      </SettingsField>
       <SettingsField c={c} label="Days ahead" inline>
         {[7, 14, 30].map(n => (
           <Chip key={n} c={c} active={draft.days === n} onClick={() => setDraft(d => ({ ...d, days: n }))}>

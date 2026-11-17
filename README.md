@@ -18,13 +18,14 @@ A self-hosted personal dashboard. Drag and resize widgets, keep several dashboar
 
 | Kind | Widgets |
 |---|---|
-| **Feeds** | Feed (RSS, with favorites), Reddit, YouTube (with TubeArchivist), arXiv, HF Daily |
+| **Feeds** | Feed (RSS, with favorites), Reddit, YouTube (with TubeArchivist), arXiv, HF Daily, Releases |
 | **Notes** | Notepad (daily, with a calendar), Text, Todo |
-| **Links** | Bookmarks, Search |
-| **Time** | Calendar (CalDAV), Schedule, Clock |
+| **Links** | Bookmarks, Search, Embed |
+| **Time** | Calendar (CalDAV or a plain .ics link), Schedule, Clock |
 | **Habits** | Tracker, Rhythm, Upkeep, Deficit |
-| **Live** | Weather, F1 |
+| **Live** | Weather, F1, Markets |
 | **Library** | Reader (PDF and EPUB), Kiwix, Anytype |
+| **Server** | Server stats, Monitor, Docker, DNS (AdGuard Home, Pi-hole) |
 | **Media** | TV (IPTV) |
 | **Play** | Chess (Stockfish), Typing |
 | **AI** | Chat |

@@ -1,14 +1,18 @@
 # Calendar Widget
 
-An agenda of upcoming events from a CalDAV server. Works with Nextcloud, Radicale, and any other RFC 4791 server.
+An agenda of upcoming events from a CalDAV server (Nextcloud, Radicale, any other RFC 4791 server), from plain .ics links with no account, or both together.
 
 ## Storage Keys
 
 | Key | Value |
 |---|---|
-| `calendar-widget-{id}` | JSON: `{ baseUrl, username, password, calendars: [{ name, url, readOnly? }], days }` |
+| `calendar-widget-{id}` | JSON: `{ baseUrl, username, password, calendars: [{ name, url, readOnly? }], links: [{ name, url }], days }` |
 
 `calendars` holds only the selected (displayed) calendars; `days` is the agenda window (7, 14, or 30). Credentials are stored with the widget config in the database and ride each request to `/api/caldav`; the server keeps no copy of its own.
+
+## Calendar links
+
+A published `.ics` feed needs no account: Google Calendar's "secret address in iCal format", an iCloud public calendar, a sports schedule, any `webcal://` link. Paste it under **Calendar links** in settings and give it a name. Links are read-only. The server fetches the feed (`POST /api/caldav` with `op: "ics"`), expands recurring events and merges them with the account's calendars; one source failing does not hide the other. The widget, the Chat reader and the digest all include them.
 
 ## CalDAV Setup
 
@@ -18,7 +22,7 @@ The card flips to a settings panel:
 2. **Username** and **app password**
 3. **Connect**: lists the account's calendars; check the ones to show
 4. **Days ahead**: 7 / 14 / 30
-5. Save (requires at least one calendar selected). Reset clears everything.
+5. Save (requires at least one calendar selected, or one calendar link). Reset clears everything.
 
 **Nextcloud**: do not use your account password. Create an app password under *Settings, Security* and use the URL ending in `/remote.php/dav`. The settings panel repeats this hint. Radicale and other servers take their usual base URL and credentials the same way.
 

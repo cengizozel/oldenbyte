@@ -45,6 +45,13 @@ import ScheduleWidget from "./ScheduleWidget";
 import SearchWidget from "./SearchWidget";
 import TodoWidget from "./TodoWidget";
 import ClockWidget from "./ClockWidget";
+import MarketsWidget from "./MarketsWidget";
+import ReleasesWidget from "./ReleasesWidget";
+import ServerWidget from "./ServerWidget";
+import MonitorWidget from "./MonitorWidget";
+import DockerWidget from "./DockerWidget";
+import DnsWidget from "./DnsWidget";
+import EmbedWidget from "./EmbedWidget";
 import BankWidget from "./BankWidget";
 import type { BankWidgetDef } from "@/lib/widgetBank";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
@@ -116,6 +123,13 @@ const WIDGET_COMPONENTS: Record<Exclude<WidgetType, "custom" | "empty">, Compone
   search: SearchWidget,
   todo: TodoWidget,
   clock: ClockWidget,
+  markets: MarketsWidget,
+  releases: ReleasesWidget,
+  server: ServerWidget,
+  monitor: MonitorWidget,
+  docker: DockerWidget,
+  dns: DnsWidget,
+  embed: EmbedWidget,
 };
 
 function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, BankWidgetDef> = {}) {

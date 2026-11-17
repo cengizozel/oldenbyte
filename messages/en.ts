@@ -42,9 +42,14 @@ const en = {
     text: "add text",
     arxiv: "choose a category",
     weather: "choose a location",
-    calendar: "connect a CalDAV calendar",
+    calendar: "connect a calendar",
     tv: "add a channel",
     clock: "add a city",
+    markets: "add a symbol",
+    releases: "add a project",
+    monitor: "add a site",
+    dns: "connect a DNS blocker",
+    embed: "add a page address",
   },
 } as const;
 
