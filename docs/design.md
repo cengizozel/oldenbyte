@@ -282,6 +282,10 @@ the palette `label` color at 50% opacity.
   collection is always `SettingsAddRow`; read-only information is
   `SettingsInfo`, an inset block with a heading and bullets.
 
+## A window too short for the grid
+
+The full layout fits every row into the window. Below 440px of room under the top bar (a browser snapped to a strip, a small floating window) that leaves cards that are only a header, so there the rows keep the height they would have in a window with 660px of room and the page scrolls.
+
 ## A large figure above a list
 
 Upkeep and Tracker open with one large figure (a ring with a number in it) above a list. `components/ui/CollapsingHero.tsx` gives it two sizes, so a short card is not all ring:

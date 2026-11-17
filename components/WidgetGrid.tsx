@@ -34,7 +34,12 @@ const GAP = 16;
 // OVERVIEW_MS.
 const OVERVIEW_WIDTH = 1200;
 const OVERVIEW_HEIGHT = 650; // a 16:10 screen at that width, less the top bar
-const OVERVIEW_MS = 340;
+const OVERVIEW_MS = 200;
+const OVERVIEW_NUDGE = 1.06; // how much larger than fitted it starts and leaves
+// Below this much room under the top bar the full layout stops fitting the
+// rows to the window, and lays them out as for a window with this much.
+const SHORT_WINDOW = 440;
+const SHORT_WINDOW_AS = 660;
 
 type TabLayoutItem = LayoutItem & { tabs?: string[] };
 
@@ -521,14 +526,19 @@ export default function WidgetGrid({
   // ── Phone overview (docs/mobile.md) ───────────────────────────────────────
   // The desktop arrangement, live, scaled to fit the phone: the grid is laid
   // out OVERVIEW_WIDTH wide (so the full layout renders) and a transform
-  // shrinks it. Opening zooms out from the widget on screen; a tap on a tile
-  // zooms into it and lands on that widget in the stacked list. The layout is
-  // forced by `overviewOn` rather than left to the measured width, so the
-  // switch and the transform land in the same commit and nothing flashes.
+  // shrinks it. It fades in at very nearly its final size, and a tap on a
+  // tile fades it out toward that tile and lands on the widget in the stacked
+  // list. (It used to zoom all the way out of and into a widget. A browser
+  // draws a scaling layer at the largest size the animation reaches, so that
+  // zoom made a phone draw the whole desktop grid at full size first: slow to
+  // start and not smooth. Staying near the final size keeps what is drawn
+  // small.) The layout is forced by `overviewOn` rather than left to the
+  // measured width, so the switch and the transform land in the same commit
+  // and nothing flashes.
   const phone = usePhone();
   type Ov = {
     // prep: measure the room; place: fitted but unseen, to measure the tiles;
-    // enter: drawn where the stacked widget was; open: fitted; zoom: into a tile.
+    // enter: unseen, a touch larger than fitted; open: fitted; zoom: leaving.
     phase: "prep" | "place" | "enter" | "open" | "zoom";
     s: number;      // the scale that fits the grid to the screen width
     vh: number;     // the grid's laid-out height before scaling
@@ -541,18 +551,6 @@ export default function WidgetGrid({
   const ovAnchor = useRef<{ id: string; top: number; left: number; width: number } | null>(null);
   const ovLand = useRef<{ id: string; y: number } | null>(null);
   const ovOpenAt = useRef(0);
-  // True while the overview is zooming in or out. Only then is the grid kept
-  // as one ready-drawn layer (will-change), which is what makes the zoom
-  // smooth; at rest it is drawn at the size it is shown, which costs a phone
-  // far less graphics memory.
-  const [ovMoving, setOvMoving] = useState(false);
-  useEffect(() => {
-    if (!ov) { setOvMoving(false); return; }
-    if (ov.phase === "enter" || ov.phase === "zoom") { setOvMoving(true); return; }
-    if (ov.phase !== "open") return;
-    const t = setTimeout(() => setOvMoving(false), OVERVIEW_MS + 80);
-    return () => clearTimeout(t);
-  }, [ov]);
   const overviewOn = !!ov && phone && !editing && active;
 
   const isMobile = phone || (size.width > 0 && size.width < 600);
@@ -568,7 +566,12 @@ export default function WidgetGrid({
 
   // Whether the grid should fill the viewport height (no page scroll) vs.
   // grow with content and let the page scroll.
-  const fillViewport = overviewOn ? true : editing ? !isMobile : viewMode === "full";
+  // A window too short for that (a browser snapped to a strip, a small
+  // floating window): fitting every row into it leaves cards that are only a
+  // header. There the grid keeps the row height it would have in a window of
+  // ordinary height and the page scrolls instead.
+  const shortWindow = !overviewOn && !isMobile && viewportBelowTop > 0 && viewportBelowTop < SHORT_WINDOW;
+  const fillViewport = overviewOn ? true : shortWindow ? false : editing ? !isMobile : viewMode === "full";
 
   const numRows = Math.max(...layout.map(l => l.y + l.h), 1);
 
@@ -581,7 +584,7 @@ export default function WidgetGrid({
     if (!el || !container) return null;
     const c = container.getBoundingClientRect(), r = el.getBoundingClientRect();
     const k = cur.tf.k;
-    return { x: (r.left - c.left) / k, y: (r.top - c.top) / k, w: r.width / k };
+    return { x: (r.left - c.left) / k, y: (r.top - c.top) / k, w: r.width / k, h: r.height / k };
   }
 
   function openOverview() {
@@ -607,9 +610,11 @@ export default function WidgetGrid({
     const outer = outerRef.current;
     const v = tileRect(id, ov);
     if (!outer || !v) { setOv(null); return; }
-    const k = outer.clientWidth / v.w;
+    // Grow a little around the chosen tile while fading out.
+    const k = ov.tf.k * OVERVIEW_NUDGE;
+    const cx = v.x + v.w / 2, cy = v.y + v.h / 2;
     ovLand.current = { id, y: outer.getBoundingClientRect().top };
-    setOv({ ...ov, phase: "zoom", tf: { x: -v.x * k, y: -v.y * k, k }, animate: true });
+    setOv({ ...ov, phase: "zoom", tf: { x: ov.tf.x + cx * (ov.tf.k - k), y: ov.tf.y + cy * (ov.tf.k - k), k }, animate: true });
     setTimeout(() => setOv(null), OVERVIEW_MS);
   }
 
@@ -625,12 +630,9 @@ export default function WidgetGrid({
       const oy = Math.max(0, (outer.clientHeight - vh * s) / 2);
       setOv({ phase: "place", s, vh, oy, tf: { x: 0, y: oy, k: s }, animate: false });
     } else if (ov.phase === "place") {
-      const a = ovAnchor.current;
-      const v = a ? tileRect(a.id, ov) : null;
-      if (!a || !v) { ovOpenAt.current = 0; setOv({ ...ov, phase: "open" }); return; }
-      const o = outer.getBoundingClientRect();
-      const k = a.width / v.w;
-      setOv({ ...ov, phase: "enter", tf: { x: a.left - o.left - v.x * k, y: a.top - o.top - v.y * k, k } });
+      // Start a touch larger than fitted, around the grid's middle.
+      const k = ov.s * OVERVIEW_NUDGE;
+      setOv({ ...ov, phase: "enter", tf: { x: (OVERVIEW_WIDTH * (ov.s - k)) / 2, y: ov.oy + (ov.vh * (ov.s - k)) / 2, k } });
     } else if (ov.phase === "enter") {
       let second = 0;
       const first = requestAnimationFrame(() => {
@@ -707,7 +709,9 @@ export default function WidgetGrid({
     el.setAttribute("data-kb-focus", "");
     setTimeout(() => el.removeAttribute("data-kb-focus"), 1400);
   }
-  const rowHeight = size.height > 0
+  const rowHeight = shortWindow
+    ? Math.floor((SHORT_WINDOW_AS - 24 - (numRows - 1) * GAP) / numRows)
+    : size.height > 0
     ? Math.floor((size.height - (numRows - 1) * GAP) / numRows)
     : 200;
 
@@ -1107,13 +1111,11 @@ export default function WidgetGrid({
           height: ov.vh || undefined,
           transformOrigin: "0 0",
           transform: `translate(${ov.tf.x}px, ${ov.tf.y}px) scale(${ov.tf.k})`,
-          transition: ov.animate ? `transform ${OVERVIEW_MS}ms cubic-bezier(0.25, 0.6, 0.3, 1)` : "none",
-          opacity: ov.phase === "prep" || ov.phase === "place" ? 0 : 1,
-          // will-change only while it moves. Kept on at rest, the browser
-          // holds this whole layer at full resolution while it is shown at a
-          // third of its size, and a phone short of graphics memory drops
-          // pieces of the page.
-          willChange: ovMoving ? "transform" : undefined,
+          transition: ov.animate ? `transform ${OVERVIEW_MS}ms cubic-bezier(0.25, 0.6, 0.3, 1), opacity ${OVERVIEW_MS}ms ease-out` : "none",
+          opacity: ov.phase === "open" ? 1 : 0,
+          // No will-change: with it the browser holds this whole layer at
+          // full resolution while it is shown at a third of its size, and a
+          // phone short of graphics memory drops pieces of the page.
         } : undefined}
       >
         {editing && size.width > 0 && (
@@ -1337,8 +1339,11 @@ export default function WidgetGrid({
           </div>
         ) : (
           <div
-            className="h-full grid gap-4"
+            className={`grid gap-4 ${shortWindow ? "pb-4" : "h-full"}`}
             style={{
+              // In a short window the rows have a height of their own and the
+              // page scrolls; otherwise they share the height there is.
+              ...(shortWindow ? { height: numRows * rowHeight + (numRows - 1) * GAP + 16 } : null),
               // minmax(0, 1fr) keeps every track the same width even when a
               // widget's content is intrinsically wide; paired with min-w-0 on
               // cells so no widget can stop shrinking and squeeze the others.
@@ -1374,7 +1379,7 @@ export default function WidgetGrid({
                     >
                       <span
                         className="max-w-[92%] truncate rounded-full font-medium shadow-lg bg-[var(--text-primary)] text-[var(--surface)]"
-                        style={{ fontSize: 12 / ov.s, lineHeight: 1.3, padding: `${3 / ov.s}px ${9 / ov.s}px` }}
+                        style={{ fontSize: 14 / ov.s, lineHeight: 1.3, padding: `${3 / ov.s}px ${9 / ov.s}px` }}
                       >
                         {nameOf(activeTabs[item.i] ?? item.i)}
                       </span>
