@@ -11,7 +11,9 @@ import "react-resizable/css/styles.css";
 import type { Widget, WidgetType, WidgetSize } from "@/lib/widgets";
 import { colorMap, widgets as widgetDefs, defaultSizeFor, instanceOf } from "@/lib/widgets";
 import { WidgetActiveContext, usePageVisible } from "@/lib/activeDashboard";
-import { layoutKey, instancesKey, DASHBOARD_RELOAD_EVENT, type DashboardMeta } from "@/lib/dashboards";
+import { layoutKey, instancesKey, DASHBOARD_RELOAD_EVENT, MOBILE_JUMP_KEY, MOBILE_JUMP_EVENT, type DashboardMeta } from "@/lib/dashboards";
+import { listDashboardWidgets } from "@/lib/dashboardContext";
+import { JumpButton, usePhone, type JumpItem } from "./MobileNav";
 import { isDemoMode } from "@/lib/demo";
 import WidgetCard from "./WidgetCard";
 import WidgetShelf from "./WidgetShelf";
@@ -48,6 +50,12 @@ const TvWidget = dynamic(() => import("./TvWidget"), { ssr: false });
 
 const COLS = 4;
 const GAP = 16;
+// The phone overview lays the grid out this wide (past the 1150px where the
+// full layout starts), caps a row's height so a two-row dashboard is not
+// stretched down the whole phone, and animates over this long.
+const OVERVIEW_WIDTH = 1200;
+const OVERVIEW_ROW_MAX = 520;
+const OVERVIEW_MS = 340;
 
 type TabLayoutItem = LayoutItem & { tabs?: string[] };
 
@@ -551,7 +559,32 @@ export default function WidgetGrid({
     return () => clearTimeout(id);
   }, [editing]);
 
-  const isMobile = size.width > 0 && size.width < 600;
+  // ── Phone overview (docs/mobile.md) ───────────────────────────────────────
+  // The desktop arrangement, live, scaled to fit the phone: the grid is laid
+  // out OVERVIEW_WIDTH wide (so the full layout renders) and a transform
+  // shrinks it. Opening zooms out from the widget on screen; a tap on a tile
+  // zooms into it and lands on that widget in the stacked list. The layout is
+  // forced by `overviewOn` rather than left to the measured width, so the
+  // switch and the transform land in the same commit and nothing flashes.
+  const phone = usePhone();
+  type Ov = {
+    // prep: measure the room; place: fitted but unseen, to measure the tiles;
+    // enter: drawn where the stacked widget was; open: fitted; zoom: into a tile.
+    phase: "prep" | "place" | "enter" | "open" | "zoom";
+    s: number;      // the scale that fits the grid to the screen width
+    vh: number;     // the grid's laid-out height before scaling
+    oy: number;     // top offset that centers a short grid
+    tf: { x: number; y: number; k: number };
+    animate: boolean;
+  };
+  const [ov, setOv] = useState<Ov | null>(null);
+  const outerRef = useRef<HTMLDivElement>(null);
+  const ovAnchor = useRef<{ id: string; top: number; left: number; width: number } | null>(null);
+  const ovLand = useRef<{ id: string; y: number } | null>(null);
+  const ovOpenAt = useRef(0);
+  const overviewOn = !!ov && phone && !editing && active;
+
+  const isMobile = phone || (size.width > 0 && size.width < 600);
 
   // View-mode layout band: full 4-col grid that fits the viewport, a scrolling
   // 2-col reflow for narrow windows, and a stacked list on phones. Four
@@ -559,13 +592,150 @@ export default function WidgetGrid({
   // narrowest the widgets are drawn for; below that two proper columns beat
   // four squeezed ones.
   const viewMode: "stack" | "two" | "full" =
-    size.width === 0 ? "full" : size.width < 600 ? "stack" : size.width < 1150 ? "two" : "full";
+    overviewOn ? "full" : phone ? "stack"
+    : size.width === 0 ? "full" : size.width < 600 ? "stack" : size.width < 1150 ? "two" : "full";
 
   // Whether the grid should fill the viewport height (no page scroll) vs.
   // grow with content and let the page scroll.
-  const fillViewport = editing ? !isMobile : viewMode === "full";
+  const fillViewport = overviewOn ? true : editing ? !isMobile : viewMode === "full";
 
   const numRows = Math.max(...layout.map(l => l.y + l.h), 1);
+
+  const cellEl = (id: string) =>
+    containerRef.current?.querySelector<HTMLElement>(`[data-cell-id="${CSS.escape(id)}"]`) ?? null;
+
+  // A tile's box in the grid's own (unscaled) pixels.
+  function tileRect(id: string, cur: Ov) {
+    const el = cellEl(id), container = containerRef.current;
+    if (!el || !container) return null;
+    const c = container.getBoundingClientRect(), r = el.getBoundingClientRect();
+    const k = cur.tf.k;
+    return { x: (r.left - c.left) / k, y: (r.top - c.top) / k, w: r.width / k };
+  }
+
+  function openOverview() {
+    const container = containerRef.current;
+    if (!container || ov) return;
+    // Zoom out from the widget showing most of itself.
+    let best: HTMLElement | null = null;
+    let bestVisible = -Infinity;
+    for (const el of Array.from(container.querySelectorAll<HTMLElement>("[data-cell-id]"))) {
+      const r = el.getBoundingClientRect();
+      const visible = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+      if (visible > bestVisible) { bestVisible = visible; best = el; }
+    }
+    if (!best) return;
+    const r = best.getBoundingClientRect();
+    ovAnchor.current = { id: best.dataset.cellId!, top: r.top, left: r.left, width: r.width };
+    setOv({ phase: "prep", s: 1, vh: 0, oy: 0, tf: { x: 0, y: 0, k: 1 }, animate: false });
+  }
+
+  function zoomTo(id: string) {
+    // Not while the opening animation runs: the tiles are still moving.
+    if (!ov || ov.phase !== "open" || performance.now() - ovOpenAt.current < OVERVIEW_MS) return;
+    const outer = outerRef.current;
+    const v = tileRect(id, ov);
+    if (!outer || !v) { setOv(null); return; }
+    const k = outer.clientWidth / v.w;
+    ovLand.current = { id, y: outer.getBoundingClientRect().top };
+    setOv({ ...ov, phase: "zoom", tf: { x: -v.x * k, y: -v.y * k, k }, animate: true });
+    setTimeout(() => setOv(null), OVERVIEW_MS);
+  }
+
+  // The steps before the first paint of the overview run back to back in
+  // layout effects, so the eye only sees the zoom.
+  useLayoutEffect(() => {
+    if (!ov || !overviewOn) return;
+    const outer = outerRef.current;
+    if (!outer) return;
+    if (ov.phase === "prep") {
+      const s = outer.clientWidth / OVERVIEW_WIDTH;
+      const vh = Math.min(outer.clientHeight / s, numRows * OVERVIEW_ROW_MAX + (numRows - 1) * GAP);
+      const oy = Math.max(0, (outer.clientHeight - vh * s) / 2);
+      setOv({ phase: "place", s, vh, oy, tf: { x: 0, y: oy, k: s }, animate: false });
+    } else if (ov.phase === "place") {
+      const a = ovAnchor.current;
+      const v = a ? tileRect(a.id, ov) : null;
+      if (!a || !v) { ovOpenAt.current = 0; setOv({ ...ov, phase: "open" }); return; }
+      const o = outer.getBoundingClientRect();
+      const k = a.width / v.w;
+      setOv({ ...ov, phase: "enter", tf: { x: a.left - o.left - v.x * k, y: a.top - o.top - v.y * k, k } });
+    } else if (ov.phase === "enter") {
+      let second = 0;
+      const first = requestAnimationFrame(() => {
+        second = requestAnimationFrame(() => {
+          ovOpenAt.current = performance.now();
+          setOv(cur => cur && cur.phase === "enter" ? { ...cur, phase: "open", tf: { x: 0, y: cur.oy, k: cur.s }, animate: true } : cur);
+        });
+      });
+      return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ov, overviewOn]);
+
+  // Out of the overview: the stacked list is back in this same commit, so put
+  // the chosen widget where its zoomed tile was.
+  useLayoutEffect(() => {
+    const land = ovLand.current;
+    if (ov || !land) return;
+    ovLand.current = null;
+    const el = cellEl(land.id);
+    if (el) window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - land.y), behavior: "instant" });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ov]);
+
+  // The overview belongs to a phone looking at this dashboard: leaving any of
+  // that (rotating wide, editing, switching dashboards) drops it.
+  useEffect(() => {
+    if (ov && (!phone || editing || !active)) { ovLand.current = null; setOv(null); }
+  }, [ov, phone, editing, active]);
+  useEffect(() => {
+    if (!ov) return;
+    const onResize = () => { ovLand.current = null; setOv(null); };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [ov]);
+
+  // The jump button: on unless turned off in Settings > Phone.
+  const [jumpOn, setJumpOn] = useState(true);
+  useEffect(() => {
+    storage.getItem(MOBILE_JUMP_KEY).then(v => setJumpOn(v !== "0"));
+    const onChange = (e: Event) => setJumpOn(!!(e as CustomEvent).detail);
+    window.addEventListener(MOBILE_JUMP_EVENT, onChange);
+    return () => window.removeEventListener(MOBILE_JUMP_EVENT, onChange);
+  }, []);
+
+  // Names as the widgets show them (a feed's own name, a notepad's), for the
+  // jump list and the overview labels; the type's title until they arrive.
+  const [titles, setTitles] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!phone || !active || !loaded || editing) return;
+    let cancelled = false;
+    listDashboardWidgets(dashboardId).then(list => {
+      if (!cancelled) setTitles(Object.fromEntries(list.map(w => [w.id, w.title])));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [phone, active, loaded, editing, dashboardId, instances]);
+  const nameOf = (id: string) => titles[id] || instances[id]?.title || "Widget";
+
+  // Every widget in reading order, a tab group's members under its first.
+  const jumpItems: JumpItem[] = [...layout]
+    .sort((a, b) => a.y === b.y ? a.x - b.x : a.y - b.y)
+    .flatMap(item => [item.i, ...(item.tabs ?? [])]
+      .filter(id => instances[id])
+      .map((id, n) => ({ id, label: nameOf(id), member: n > 0 })));
+
+  function jumpTo(widgetId: string) {
+    const item = layout.find(l => l.i === widgetId || l.tabs?.includes(widgetId));
+    if (!item) return;
+    if ((item.tabs?.length ?? 0) > 0) setActiveTabs(prev => ({ ...prev, [item.i]: widgetId }));
+    if (ov) { zoomTo(item.i); return; }
+    const el = cellEl(item.i);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.setAttribute("data-kb-focus", "");
+    setTimeout(() => el.removeAttribute("data-kb-focus"), 1400);
+  }
   const rowHeight = size.height > 0
     ? Math.floor((size.height - (numRows - 1) * GAP) / numRows)
     : 200;
@@ -938,10 +1108,37 @@ export default function WidgetGrid({
       />
     )}
 
-    <div className={`flex flex-col gap-2 ${fillViewport ? "flex-1 min-h-0" : ""}`}>
+    {active && phone && jumpOn && loaded && !editing && expandedCell === null && (
+      <JumpButton
+        items={jumpItems}
+        overview={overviewOn}
+        onTap={() => { if (ov) zoomTo(ovAnchor.current && cellEl(ovAnchor.current.id) ? ovAnchor.current.id : layout[0]?.i ?? ""); else openOverview(); }}
+        onJump={jumpTo}
+      />
+    )}
+
+    <div ref={outerRef} className={`flex flex-col gap-2 ${fillViewport ? "flex-1 min-h-0" : ""} ${overviewOn ? "relative overflow-hidden touch-none" : ""}`}>
 
       {/* Grid */}
-      <div ref={containerRef} data-widget-grid data-fill-viewport={fillViewport ? "true" : "false"} data-active={active ? "true" : "false"} className={`relative ${fillViewport ? "flex-1 min-h-0" : ""} ${editing && !gridReady ? "[&_.react-grid-item]:!transition-none" : ""}`}>
+      <div
+        ref={containerRef}
+        data-widget-grid
+        data-fill-viewport={fillViewport ? "true" : "false"}
+        data-active={active ? "true" : "false"}
+        className={`relative ${fillViewport ? "flex-1 min-h-0" : ""} ${editing && !gridReady ? "[&_.react-grid-item]:!transition-none" : ""}`}
+        style={overviewOn && ov ? {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: OVERVIEW_WIDTH,
+          height: ov.vh || undefined,
+          transformOrigin: "0 0",
+          transform: `translate(${ov.tf.x}px, ${ov.tf.y}px) scale(${ov.tf.k})`,
+          transition: ov.animate ? `transform ${OVERVIEW_MS}ms cubic-bezier(0.25, 0.6, 0.3, 1)` : "none",
+          opacity: ov.phase === "prep" || ov.phase === "place" ? 0 : 1,
+          willChange: "transform",
+        } : undefined}
+      >
         {editing && size.width > 0 && (
           <div
             className="absolute inset-0 pointer-events-none z-0"
@@ -1125,7 +1322,7 @@ export default function WidgetGrid({
                 const widget = instances[item.i];
                 if (!widget) return null;
                 return (
-                  <div key={item.i} data-cell-index={cellOrder.get(item.i)} className="h-80 shrink-0">
+                  <div key={item.i} data-cell-index={cellOrder.get(item.i)} data-cell-id={item.i} className="h-80 shrink-0 scroll-mt-3">
                     {renderWithTabs(item, false)}
                   </div>
                 );
@@ -1178,13 +1375,33 @@ export default function WidgetGrid({
                 <div
                   key={item.i}
                   data-cell-index={cellOrder.get(item.i)}
-                  className="min-h-0 min-w-0"
+                  data-cell-id={item.i}
+                  className={`min-h-0 min-w-0 ${overviewOn ? "relative" : ""}`}
                   style={{
                     gridColumn: `${item.x + 1} / span ${item.w}`,
                     gridRow: `${item.y + 1} / span ${item.h}`,
                   }}
                 >
                   {renderWithTabs(item, false)}
+                  {/* In the phone overview a tile is one target: a tap zooms
+                      into it. The name is sized against the scale so it reads
+                      at phone size. */}
+                  {overviewOn && ov && (
+                    <button
+                      type="button"
+                      onClick={() => zoomTo(item.i)}
+                      aria-label={`Open ${nameOf(activeTabs[item.i] ?? item.i)}`}
+                      className="absolute inset-0 z-[80] flex items-end justify-center rounded-2xl"
+                      style={{ paddingBottom: 12 / ov.s }}
+                    >
+                      <span
+                        className="max-w-[92%] truncate rounded-full font-medium shadow-lg bg-[var(--text-primary)] text-[var(--surface)]"
+                        style={{ fontSize: 12 / ov.s, lineHeight: 1.3, padding: `${3 / ov.s}px ${9 / ov.s}px` }}
+                      >
+                        {nameOf(activeTabs[item.i] ?? item.i)}
+                      </span>
+                    </button>
+                  )}
                 </div>
               );
             })}

@@ -11,6 +11,7 @@ import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
 import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, setActiveTimezone, TZ_AUTO } from "@/lib/timezone";
 import Toggle from "@/components/ui/Toggle";
 import { KeyboardSettings } from "@/components/KeyboardLayer";
+import { PhoneSettings } from "@/components/MobileNav";
 import { DataSettings } from "@/components/DataSettings";
 import { NEW_DASHBOARD_EVENT } from "@/lib/keyboard";
 import { FOCUS_RING, HIT_AREA, SettingsRow, SettingsSection } from "@/components/ui/Field";
@@ -849,6 +850,7 @@ function SettingsPanel({
           </SettingsSection>
 
           <KeyboardSettings />
+          <PhoneSettings />
 
           <SettingsSection title="Time">
             <SettingsRow label="Timezone">

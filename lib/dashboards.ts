@@ -50,6 +50,11 @@ export async function getActiveDataKeys(): Promise<{ layout: string; instances: 
 export const PRELOAD_KEY = "preload-dashboards";
 export const PRELOAD_EVENT = "preloadchange";
 
+// Settings > Phone: the floating jump button (components/MobileNav). On unless
+// stored as "0"; MOBILE_JUMP_EVENT (detail: boolean) applies a change at once.
+export const MOBILE_JUMP_KEY = "mobile-jump";
+export const MOBILE_JUMP_EVENT = "mobilejumpchange";
+
 // Fired (detail: dashboard id) when another grid wrote to that dashboard's
 // layout and instances keys, e.g. a widget moved there, so a mounted grid for
 // it reloads from storage instead of later overwriting the change with its

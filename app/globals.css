@@ -248,10 +248,11 @@ body {
 
 /* The widget cell focused from the keyboard (components/KeyboardLayer). */
 [data-kb-focus] {
-  outline: 2px solid var(--text-muted);
+  outline: 2.5px solid #0d9488;
   outline-offset: 3px;
   border-radius: 1rem;
 }
+.dark [data-kb-focus] { outline-color: #5eead4; }
 
 /* iOS browsers zoom the page in when a text field with text under 16px gets
    focus, and leave it zoomed. On touch screens give every text field 16px. */
@@ -271,14 +272,20 @@ input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* The keyboard target: the oldenbyte mark in its header (the options toggle)
-   turns the logo's teal at full strength, so where commands land shows on
-   the widget itself (components/KeyboardLayer, Settings > Keyboard > Target
-   logo). Darker teal on the light pastel cards, the logo's own teal in dark;
-   both clear 3:1 against every widget palette. */
+   becomes a filled teal badge with the mark knocked out in a dark or white
+   ink, so where commands land shows on the widget itself in every theme
+   (components/KeyboardLayer, Settings > Keyboard > Target logo). A filled
+   shape reads at a glance where a recolored 16px outline did not, grey theme
+   and pale cards included. The ring above uses the same teal. */
 [data-kb-target] [data-header-toggle][aria-expanded="false"] {
-  color: #0d9488;
+  background: #0d9488;
+  color: #ffffff;
   opacity: 1;
+  border-radius: 7px;
+  box-shadow: 0 0 0 2px #0d9488;
 }
 .dark [data-kb-target] [data-header-toggle][aria-expanded="false"] {
-  color: #5eead4;
+  background: #5eead4;
+  color: #062925;
+  box-shadow: 0 0 0 2px #5eead4, 0 0 10px 1px rgb(94 234 212 / 0.45);
 }

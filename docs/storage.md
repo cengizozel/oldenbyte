@@ -117,6 +117,7 @@ Global keys:
 | `widget-instances` / `widget-instances:<id>` | Instance ID to Widget config map, per dashboard |
 | `preload-dashboards` | `"1"` to mount every dashboard at page load |
 | `keyboard-config` | Keyboard layer: `{ enabled, leader, bindings: { [action]: key } }` (see [keyboard.md](keyboard.md)) |
+| `mobile-jump` | Phone jump button, on unless `"0"` (see [mobile.md](mobile.md)) |
 | `theme` | `"dark"` or `"light"` (mirrored to `localStorage` for the pre-paint script) |
 | `timezone` | IANA timezone chosen in settings (empty means follow the device) |
 | `topbar-phrase` | Left TopBar field config |

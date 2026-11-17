@@ -12,7 +12,7 @@ A self-hosted personal dashboard. Drag and resize widgets, keep several dashboar
 - **AI assistant** for any OpenAI-compatible model (Ollama, LM Studio, llama.cpp, ...). It reads your widgets, Kiwix and Anytype on request, with characters that keep their own memory.
 - **Morning digest** at `/digest`: a newspaper-style briefing of your widgets (below).
 - **Your data**: Settings shows everything stored for your account. Backups export and import from edit mode.
-- Works on phones.
+- **Works on phones**: a zoomed-out overview of the whole dashboard and a floating button to jump between widgets. See [docs/mobile.md](docs/mobile.md).
 
 ## Widgets
 

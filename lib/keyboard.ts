@@ -41,6 +41,9 @@ export type KeyboardConfig = {
   // without the leader (tmux's repeat), any other key is read as a command.
   repeat: boolean;
   repeatWindow: number;
+  // The number badges on widgets (and tab numbers) while a command is
+  // pending. Off for people who know their numbers and want a clean screen.
+  badges: boolean;
   // While the leader key is held down nothing times out: moves, tabs and
   // dashboard keys keep working, and a widget number only marks the widget
   // until the leader is released, then focuses it.
@@ -90,6 +93,7 @@ export const DEFAULT_KEYBOARD: KeyboardConfig = {
   repeat: true,
   repeatWindow: 1,
   hold: true,
+  badges: true,
   tabMode: "current",
   bindings: {
     moveLeft: "h",
@@ -206,6 +210,7 @@ export function parseKeyboardConfig(raw: string | null): KeyboardConfig {
     dot: typeof parsed.dot === "boolean" ? parsed.dot : DEFAULT_KEYBOARD.dot,
     repeat: typeof parsed.repeat === "boolean" ? parsed.repeat : DEFAULT_KEYBOARD.repeat,
     hold: typeof parsed.hold === "boolean" ? parsed.hold : DEFAULT_KEYBOARD.hold,
+    badges: typeof parsed.badges === "boolean" ? parsed.badges : DEFAULT_KEYBOARD.badges,
     repeatWindow: (() => {
       const n = Number(parsed.repeatWindow);
       return Number.isFinite(n) && parsed.repeatWindow != null ? Math.min(REPEAT_RANGE.max, Math.max(REPEAT_RANGE.min, n)) : DEFAULT_KEYBOARD.repeatWindow;

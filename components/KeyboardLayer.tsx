@@ -536,7 +536,9 @@ export default function KeyboardLayer({
     const onWindowBlur = () => release();
     // A click on a card picks it: the mark shows there for a moment.
     function onPointerDown(e: PointerEvent) {
-      if (!latest.current.config.enabled) return;
+      // Mouse and pen only: on a touch screen there is no keyboard to aim, and
+      // every tap would leave the marker on a card.
+      if (!latest.current.config.enabled || e.pointerType === "touch") return;
       const cell = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-cell-index]") : null;
       if (cell) showMark(cell);
     }
@@ -574,7 +576,7 @@ export default function KeyboardLayer({
         className="fixed -left-[9999px] top-0 w-px h-px opacity-0"
       />
 
-      {badges.map(b => (
+      {config.badges && badges.map(b => (
         <span
           key={b.key}
           aria-hidden
@@ -677,6 +679,11 @@ export function KeyboardSettings() {
             unit="s"
             onChange={v => update({ ...config, timeout: v })}
           />
+        </SettingsRow>
+      )}
+      {config.enabled && (
+        <SettingsRow label="Widget numbers" hint={`The number on each widget while ${keyLabel(config.leader)} is pending. The keys work either way.`}>
+          <Toggle checked={config.badges} onChange={() => update({ ...config, badges: !config.badges })} label="Widget numbers" />
         </SettingsRow>
       )}
       {config.enabled && (
