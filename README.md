@@ -30,7 +30,7 @@ A self-hosted personal dashboard. Drag and resize widgets, keep several dashboar
 | **Play** | Chess (Stockfish), Typing |
 | **AI** | Chat |
 
-New widgets can also be single JSON files in `widget-bank/`, no React needed. See [docs/widget-bank.md](docs/widget-bank.md).
+New widgets can also be single JSON files in `widget-bank/`, no React needed. See [docs/widget-bank.md](docs/widget-bank.md). Add-ons connect a built-in widget to one more self-hosted service, also as a JSON file. See [docs/addons.md](docs/addons.md).
 
 Each widget is documented in [docs/widgets/](docs/widgets/).
 

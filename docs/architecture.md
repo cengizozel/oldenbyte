@@ -46,7 +46,7 @@ app/
     rss/                # RSS/Atom feed parser (Feed and arXiv widgets)
     settings/           # Key-value store CRUD + export/import
     setup/              # First-run admin account creation
-    tubearchivist/      # TubeArchivist ping and archived-video check for the YouTube widget
+    addons/             # Add-ons: list, upload, and making their requests (docs/addons.md)
     tv/                 # IPTV proxy: M3U channel lists, HLS playlists, stream segments
     upload/             # File upload handler
     weather/            # Open-Meteo proxy (geocoding search + forecast)
@@ -109,6 +109,7 @@ lib/
 tests/                  # Vitest unit tests (caldav, rss, settingKeys, ssrf, text)
 tools/anytype-bridge/   # Optional write bridge for Anytype (Python)
 widget-bank/            # Community widget definitions (one JSON file each)
+addons/                 # Add-ons for built-in widgets (one JSON file each)
 instrumentation.ts      # Startup: SESSION_SECRET check, table creation/migration, maintenance
 proxy.ts                # Auth gate: 401 for API calls, redirect to /login for pages
 next.config.ts          # Standalone output, security headers, body size limit
@@ -136,7 +137,7 @@ All widget configuration, layout, and content is stored as strings in the `Setti
 Routes that fetch a URL the user supplies go through `lib/ssrf.ts`:
 
 - `safeFetch` resolves the host and rejects private, loopback, link-local, metadata, CGNAT, benchmarking (198.18.0.0/15), IETF (192.0.0.0/24), NAT64 and 6to4 addresses, re-checking every redirect hop. The fetch itself runs through an undici agent whose DNS lookup refuses private addresses again at connect time, so a host that re-resolves after the check (DNS rebinding) cannot reach the LAN. `/api/proxy` and `/api/rss` use it for every account.
-- The self-hosted integrations (Kiwix, CalDAV, Anytype, TubeArchivist, TV playlists, chat, model control and digest LLM servers) legitimately live on the LAN or tailnet. Those routes call `actAs(user)` from `lib/requestUser.ts` right after their auth check and fetch through `userFetch`, which calls `fetchForUser`. Admin accounts may reach private addresses; every other account gets the same public-only check as `safeFetch`, so it cannot use the server to reach the owner's network. Library code (`lib/kiwix.ts`, `lib/caldav.ts`, `lib/anytype.ts`, `lib/widgetData.ts`) uses `userFetch` too, and falls back to the strict check when no user is set.
+- The self-hosted integrations (Kiwix, CalDAV, Anytype, add-ons such as TubeArchivist, TV playlists, chat, model control and digest LLM servers) legitimately live on the LAN or tailnet. Those routes call `actAs(user)` from `lib/requestUser.ts` right after their auth check and fetch through `userFetch`, which calls `fetchForUser`. Admin accounts may reach private addresses; every other account gets the same public-only check as `safeFetch`, so it cannot use the server to reach the owner's network. Library code (`lib/kiwix.ts`, `lib/caldav.ts`, `lib/anytype.ts`, `lib/widgetData.ts`) uses `userFetch` too, and falls back to the strict check when no user is set.
 
 `readCappedText` reads response bodies with a byte cap so a huge upstream cannot exhaust memory.
 

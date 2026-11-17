@@ -1,0 +1,23 @@
+{
+  "id": "invidious",
+  "slot": "youtube.archive",
+  "name": "Invidious",
+  "description": "A private front end for YouTube. Every video opens on your Invidious instance.",
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "https://invidious.example.com"
+    }
+  ],
+  "ping": {
+    "path": "/api/v1/stats",
+    "ok": {
+      "path": "$.software.name",
+      "equals": "invidious"
+    },
+    "version": "$.software.version"
+  },
+  "open": "{config.url}/watch?v={id}"
+}

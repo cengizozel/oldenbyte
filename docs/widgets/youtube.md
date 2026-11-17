@@ -8,7 +8,7 @@ Displays recent videos from one or more YouTube channels. Channels are added by 
 |---|---|
 | `youtube-widget-{id}` | JSON: `{ channels: YoutubeChannel[]; view: "list" \| "thumbs" \| "gallery" }` |
 | `youtube-widget-{id}-{YYYY-MM-DD}-{hash}` | Daily cache of the combined video list |
-| `youtube-tubearchivist` | JSON: `{ url, token, open: "youtube" \| "ta", serverUrl? }`, one TubeArchivist connection shared by every YouTube widget. `url` is what the browser opens; `serverUrl`, when set, is what the dashboard server uses for the archive check (needed when `url` is a tailscale HTTPS name, which a Docker container cannot reach) |
+| `youtube-archive` | JSON: `{ addon, values, open: "youtube" \| "archive", mark?, only? }`, one archive connection shared by every YouTube widget. `addon` is the add-on's id and `values` what the user typed into its fields |
 
 `YoutubeChannel` is `{ channelId: string; name: string; limit: number; filterMembers?: boolean; includeShorts?: boolean }`.
 
@@ -41,11 +41,13 @@ Videos from multiple channels are combined and sorted newest first. A video with
 
 Clicking a title slides in a detail panel (thumbnail, author, length, view count, description) from `GET /api/youtube?video={link}`, which reads the video's watch page server-side.
 
-## TubeArchivist
+## Archive
 
-The settings card has an optional TubeArchivist section: server URL and API token, a **Test** button (`op: "ping"`), and an **Open on** choice of YouTube or TubeArchivist. The connection is saved once under `youtube-tubearchivist` and used by every YouTube widget; a connection saved on a single widget by an older version seeds the shared one.
+The settings card has an optional Archive section: a place your videos also live. What it can be is decided by add-ons for the `youtube.archive` slot ([addons.md](../addons.md)); oldenbyte ships [TubeArchivist](https://www.tubearchivist.com/) and Invidious, and the upload button adds one from a file. Pick one, fill in its fields, **Test** the connection, and choose **Open on**: YouTube or the archive. The connection is saved once under `youtube-archive` and used by every YouTube widget.
 
-With **Open on: TubeArchivist**, the widget sends the IDs of the shown videos to `POST /api/tubearchivist` (`op: "check"`). Videos found in the archive link to `{url}/video/{id}`; the rest still open on YouTube. **Badge on** picks which side gets a mark: the TubeArchivist logo on archived videos (default) or the YouTube logo on the ones not archived (`ta.mark`: `"ta"` or `"yt"`). **Only archived videos** (`ta.only`) lists nothing until it is in the archive, waits for the archive check before showing the list, and makes badges unnecessary, so none show. The server remembers answers briefly, and the refresh button skips that memory. The token travels in the request body, never in a URL.
+With **Open on** set to the archive, the widget sends the IDs of the shown videos to `POST /api/addons/run` (`op: "has"`). Videos the archive has link to it; the rest still open on YouTube. **Badge on** picks which side gets a mark: the archive's icon on the videos it has (default) or the YouTube logo on the ones it does not (`mark`: `"archive"` or `"youtube"`). **Only archived videos** (`only`) lists nothing until it is in the archive, waits for the check before showing the list, and makes badges unnecessary, so none show. These two settings are offered only for an archive that can be asked per video; a front end like Invidious has everything. The server remembers answers briefly, and the refresh button skips that memory. The user's values travel in the request body, never in a URL.
+
+A TubeArchivist connection from before add-ons (the `youtube-tubearchivist` key, or one saved on a single widget by an even older version) is carried over to the TubeArchivist add-on the first time a YouTube widget loads.
 
 ## Config Migration
 
@@ -69,4 +71,4 @@ Top and bottom gradient fades are toggled via `ResizeObserver` and scroll events
 
 Clicking a channel name shows only that channel's videos from the feed; clicking it again, the chip's x in the header, or Escape shows everything again (`lib/useFeedFilter.ts`).
 
-The archive check (TA badges) re-runs every 10 minutes while the widget is on screen, and when it becomes visible again, so videos TubeArchivist downloads after the list loaded get their badge without a reload.
+The archive check (badges) re-runs every 10 minutes while the widget is on screen, and when it becomes visible again, so videos the archive downloads after the list loaded get their badge without a reload.

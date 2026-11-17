@@ -2,7 +2,7 @@
 
 All routes are under `/api`. The middleware (`proxy.ts`) lets `/api/auth` (and `/api/auth/state`), `/api/setup` and `/api/register` through without a session; every other route needs a valid session cookie or, for scripts, an `Authorization: Bearer <API_KEY>` header (see [auth.md](./auth.md)). Unauthenticated API calls return `401 {"error":"Unauthorized"}`. Apps sign in with a device token instead and have a stable, versioned set of routes of their own: see [api-v1.md](./api-v1.md). Each handler then checks the session against the database (`requireUser` / `requireAdmin` in `lib/http.ts`) and scopes all data to the signed-in user. An account with `mustChangePassword` set gets `403 {"error":"password_change_required"}` from every route except `/api/me` and `/api/account/password`.
 
-Routes that fetch a URL the client supplies (Kiwix, CalDAV, Anytype, TubeArchivist, TV, chat, model, digest) let admin accounts reach LAN and tailnet addresses; for every other account the URL must resolve to a public address. `/api/proxy` and `/api/rss` are public-only for everyone. See [architecture.md](./architecture.md#outbound-fetches-and-ssrf).
+Routes that fetch a URL the client supplies (Kiwix, CalDAV, Anytype, add-ons, TV, chat, model, digest) let admin accounts reach LAN and tailnet addresses; for every other account the URL must resolve to a public address. `/api/proxy` and `/api/rss` are public-only for everyone. See [architecture.md](./architecture.md#outbound-fetches-and-ssrf).
 
 ---
 
@@ -461,15 +461,9 @@ All modes go through the server feed cache. Errors return `500` (`503` for video
 
 ---
 
-## TubeArchivist
+## Add-ons
 
-### `POST /api/tubearchivist`
-Bridge to a [TubeArchivist](https://www.tubearchivist.com/) server for the YouTube widget. POST so the API token rides in the body, never a URL. `url` (http or https) and `token` are required.
-
-- `{ op: "ping", url, token }` returns `{ "ok": true, "version": "..." }`. A rejected token is reported as an error.
-- `{ op: "check", url, token, ids, force? }` returns `{ "archived": ["<videoId>", ...] }`, the subset of up to 100 `ids` present in the archive. Answers are cached per server and token: "archived" for an hour, "not archived" for 2 minutes; `force: true` skips the cache. If TubeArchivist is unreachable, the last known answer is kept.
-
-Errors return `503`.
+`/api/addons` and `/api/addons/run`: see [addons.md](./addons.md#api). The YouTube widget's archive (TubeArchivist, Invidious) goes through them.
 
 ---
 
