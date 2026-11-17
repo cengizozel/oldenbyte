@@ -4,6 +4,27 @@ On a phone-width window (under 600px) the dashboard stacks its widgets in one co
 
 Code: `components/MobileNav.tsx` (the button, `usePhone`, the Settings > Phone section) and the "Phone overview" block in `components/WidgetGrid.tsx`.
 
+## Install it like an app
+
+The dashboard is an installable web app. Open it in the phone's browser and add it to the home screen:
+
+- iPhone and iPad (Safari): Share, then Add to Home Screen.
+- Android (Chrome): the menu, then Install app or Add to Home screen.
+- Desktop Chrome and Edge offer Install in the address bar too.
+
+It then has its own icon and opens full screen, without the browser's bars. On an iPhone the installed app keeps its own sign-in, separate from Safari's, so sign in once inside it.
+
+What this is not: it does not work offline (there is no service worker; the dashboard needs its server), and it is not in an app store. A store app is a separate project.
+
+The pieces: `app/manifest.ts` (served at `/manifest.webmanifest`, which `proxy.ts` lets through without a session, since browsers fetch it without one and an install has to work from the sign-in page), the icons in `public/` (`icon-192.png`, `icon-512.png`, and the full-bleed `icon-maskable-512.png` Android crops to its own shape), `app/apple-icon.png` for iOS, and the `appleWebApp` and theme color entries in `app/layout.tsx`. To redraw the icons after changing the logo:
+
+```
+magick -background none -density 900 public/logo.svg -resize 512x512 -strip public/icon-512.png
+magick -background none -density 600 public/logo.svg -resize 192x192 -strip public/icon-192.png
+```
+
+The maskable and Apple icons use the same mark at 72% on a full `#141414` square.
+
 ## The jump button
 
 A floating round button with the oldenbyte mark, like iOS AssistiveTouch. It is shown on the visible dashboard, on phones only, and not while editing the layout or with a widget in full screen.

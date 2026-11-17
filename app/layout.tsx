@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Playfair_Display } from "next/font/google";
 import Script from "next/script";
 import ThemeHotkey from "@/components/ThemeHotkey";
@@ -14,6 +14,18 @@ const playfair = Playfair_Display({
 
 export const metadata: Metadata = {
   title: "oldenbyte. a place to settle",
+  applicationName: "oldenbyte",
+  // Installed to an iPhone's home screen it opens full screen, under this name.
+  // (Android and desktop browsers read app/manifest.ts instead.)
+  appleWebApp: { capable: true, title: "oldenbyte", statusBarStyle: "default" },
+};
+
+// The browser's own bars take the page color of the theme in use.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+    { media: "(prefers-color-scheme: dark)", color: "#111111" },
+  ],
 };
 
 export default function RootLayout({

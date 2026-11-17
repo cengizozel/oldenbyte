@@ -3,7 +3,9 @@ import { verifySessionToken, apiKeyValid, bearerAllowed, SESSION_COOKIE } from "
 
 // Paths reachable without a session: the login page and the unauthenticated
 // auth endpoints (state probe, login, logout, first-run setup, registration).
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/setup", "/api/register"];
+// /manifest.webmanifest: browsers fetch the web app manifest without the
+// session cookie, and an install must work from the sign-in page too.
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/setup", "/api/register", "/manifest.webmanifest"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
