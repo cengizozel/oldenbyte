@@ -41,7 +41,7 @@ export function useModelServers(exceptWidgetId?: string) {
     return [
       ...known
         .filter(k => !(k.url.toLowerCase() === cur && k.model === currentModel))
-        .map(k => ({ key: `k|${k.url}|${k.model}`, url: k.url, model: k.model, note: "used by an Assistant", label: label(k.url, k.model) })),
+        .map(k => ({ key: `k|${k.url}|${k.model}`, url: k.url, model: k.model, note: "used by a Chat widget", label: label(k.url, k.model) })),
       ...(found ?? [])
         .filter(f => f.url.toLowerCase() !== cur && !known.some(k => k.url.toLowerCase() === f.url.toLowerCase()))
         .map(f => ({ key: `f|${f.url}`, url: f.url, model: f.models[0] ?? "", note: `${f.kind}, ${f.models.length} model${f.models.length === 1 ? "" : "s"}`, label: label(f.url, f.models[0] ?? "") })),

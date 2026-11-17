@@ -893,7 +893,7 @@ export default function ChatWidget({
           onSettings={settingsOpen ? undefined : openSettings}
           c={c}
           icon={AvatarIcon}
-          title={activeCharacter?.name ?? "Assistant"}
+          title={activeCharacter && activeCharacter.id !== DEFAULT_CHARACTER_ID ? activeCharacter.name : "Chat"}
           after={
             <>
               <button
@@ -965,7 +965,7 @@ export default function ChatWidget({
           }
           right={!settingsOpen && (
             <>
-              <button onClick={newChat} title="New chat with the Assistant" aria-label="New chat" className={actionCls}>
+              <button onClick={newChat} title="New chat" aria-label="New chat" className={actionCls}>
                 <Plus size={14} />
               </button>
               <button onClick={() => { setCharactersOpen(false); setHistoryOpen(true); }} title="Chats" aria-label="Chats" className={actionCls}>

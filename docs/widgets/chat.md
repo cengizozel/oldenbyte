@@ -8,15 +8,15 @@ Responses stream token-by-token and conversations are saved.
 
 | Key | Value |
 |---|---|
-| `chat-library` | JSON: `{ conversations: [{ id, title, autoTitle, count, updatedAt, renamed, characterId, dashboardId }], characters: [{ id, name, emoji, persona, focus, memories, dashboardId }] }`. Shared by every Assistant widget of the user. The built-in Assistant is not in it (each widget's comes from its own `system` prompt). |
+| `chat-library` | JSON: `{ conversations: [{ id, title, autoTitle, count, updatedAt, renamed, characterId, dashboardId }], characters: [{ id, name, emoji, persona, focus, memories, dashboardId }] }`. Shared by every Chat widget of the user. The built-in assistant character is not in it (each widget's comes from its own `system` prompt). |
 | `chat-library-conv-{convId}` | JSON: `{ messages }` for one conversation. Loaded when the conversation is opened. |
 | `chat-{id}-index` | JSON: `{ config, activeId, activeCharacterId }`: the widget's own settings and what it has open. |
 
 Saving a conversation writes only its own key plus the library, so one long chat cannot push every other chat over the 1 MB value limit. Storage code lives in `lib/chat/storage.ts`.
 
-**Shared chats and characters.** Chats and characters belong to the user, not the widget: delete an Assistant and add another, and they are all still there. Each records the dashboard it was started on (`dashboardId`). The Chats and Characters panels and the Data access section of settings list this dashboard's by default; the **All dashboards** chip in each (one setting, `config.allDashboards`) lists every dashboard's. All Assistants on a page share one copy of the library in memory, so a change in one shows in the others at once and two widgets never save over each other.
+**Shared chats and characters.** Chats and characters belong to the user, not the widget: delete a Chat widget and add another, and they are all still there. Each records the dashboard it was started on (`dashboardId`). The Chats and Characters panels and the Data access section of settings list this dashboard's by default; the **All dashboards** chip in each (one setting, `config.allDashboards`) lists every dashboard's. All Chat widgets on a page share one copy of the library in memory, so a change in one shows in the others at once and two widgets never save over each other.
 
-**Migration.** Before the library, each widget kept its own chats (`chat-{id}-index` with the list and characters, `chat-{id}-conv-{convId}` for messages), and before that one `chat-widget-{id}` key. The first load with no `chat-library` reads every Assistant on every dashboard (migrating a `chat-widget-{id}` key to the split keys on the way), copies each non-empty conversation to `chat-library-conv-{convId}` and each character into the library, tagged with the widget's dashboard, and writes the library last. Any failed read or write stops it before the library is written, and the widget stays read-only (with a Retry button) rather than saving over data. The old keys are left as they were.
+**Migration.** Before the library, each widget kept its own chats (`chat-{id}-index` with the list and characters, `chat-{id}-conv-{convId}` for messages), and before that one `chat-widget-{id}` key. The first load with no `chat-library` reads every Chat widget on every dashboard (migrating a `chat-widget-{id}` key to the split keys on the way), copies each non-empty conversation to `chat-library-conv-{convId}` and each character into the library, tagged with the widget's dashboard, and writes the library last. Any failed read or write stops it before the library is written, and the widget stays read-only (with a Retry button) rather than saving over data. The old keys are left as they were.
 
 `config` holds: `baseUrl, apiKey, model, system, useDashboard, dashboardWidgets, maxTokens, length, effort, useKiwix, kiwixUrl, kiwixSource, kiwixSourceTitle, useCalendar, useAnytype, anytypeUrl, anytypeApiKey, anytypeSpaceId, anytypeSpaceName, keepAlive`.
 
@@ -137,8 +137,8 @@ This widget is not `digestable`.
 
 The settings help with the server address in three ways, since the request is made by the dashboard's server and `localhost` therefore rarely means what a user expects.
 
-- **Reuse.** Connections other Assistant widgets already use are offered under the address field (`listModelConnections` in `lib/dashboardContext.ts`); one click fills the address and model.
-- **Default for new widgets.** The last connection saved by any Assistant is kept under the global key `chat-last-connection`; a widget with no connection starts from it.
+- **Reuse.** Connections other Chat widgets already use are offered under the address field (`listModelConnections` in `lib/dashboardContext.ts`); one click fills the address and model.
+- **Default for new widgets.** The last connection saved by any Chat widget is kept under the global key `chat-last-connection`; a widget with no connection starts from it.
 - **Find servers.** `GET /api/chat?discover=1&hosts=a,b` probes the usual ports (11434 Ollama, 1234 LM Studio, 8080 llama.cpp) on this server, the Docker host, and up to eight hosts the caller's other widgets already use, with a 1.5 second limit each and through the same guarded fetch as a normal model listing. It returns the servers that answered with their models.
 
 When listing models fails because nothing answered, the error says so and explains the `localhost` case instead of reporting "fetch failed".

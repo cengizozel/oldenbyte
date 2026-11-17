@@ -18,10 +18,10 @@ function add(g: Group, bytes: number, at: Date) {
 
 // User-level keys, by what they are for.
 function sharedLabel(key: string): string {
-  if (key === "chat-library" || key.startsWith("chat-library-conv-")) return "Assistant chats and characters";
+  if (key === "chat-library" || key.startsWith("chat-library-conv-")) return "Chats and characters";
   if (key === "favorites") return "Feed favorites";
   if (key === "dashboards" || key.startsWith("widget-layout") || key.startsWith("widget-instances")) return "Dashboards and layouts";
-  if (key === "chat-last-connection") return "Assistant model connection";
+  if (key === "chat-last-connection") return "Chat model connection";
   if (key === "notepad-registry") return "Notepad list";
   if (key.startsWith("youtube-")) return "YouTube and TubeArchivist";
   return "Preferences";
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
   const counts: Record<string, string> = {};
   if (lib) {
     const n = lib.conversations?.length ?? 0, m = lib.characters?.length ?? 0;
-    counts["Assistant chats and characters"] = `${n} ${n === 1 ? "chat" : "chats"}, ${m} ${m === 1 ? "character" : "characters"}`;
+    counts["Chats and characters"] = `${n} ${n === 1 ? "chat" : "chats"}, ${m} ${m === 1 ? "character" : "characters"}`;
   }
   if (Array.isArray(favs)) counts["Feed favorites"] = `${favs.length} ${favs.length === 1 ? "item" : "items"}`;
   counts["Dashboards and layouts"] = `${dashList.length} ${dashList.length === 1 ? "dashboard" : "dashboards"}`;

@@ -21,7 +21,7 @@ A self-hosted personal dashboard. Drag and resize widgets, keep several dashboar
 | **Notes** | Notepad (daily, with a calendar), Text, Bookmarks |
 | **Reading** | Feed (RSS, with favorites), Reddit, YouTube (with TubeArchivist), arXiv, HF Daily, Reader (PDF and EPUB), Kiwix, Anytype |
 | **Time** | Calendar (CalDAV), Schedule, Tracker, Rhythm, Upkeep |
-| **Other** | Weather, F1, Deficit, Typing, Chess (Stockfish), TV (IPTV), Assistant |
+| **Other** | Weather, F1, Deficit, Typing, Chess (Stockfish), TV (IPTV), Chat |
 
 New widgets can also be single JSON files in `widget-bank/`, no React needed. See [docs/widget-bank.md](docs/widget-bank.md).
 

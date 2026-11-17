@@ -94,7 +94,7 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
           <SettingsInput value={charDraft.name} onChange={e => set({ name: e.target.value })} placeholder="Education Coach" className="flex-1" />
         </div>
         {charDraft.id === DEFAULT_CHARACTER_ID ? (
-          <p className="text-sm text-[var(--text-muted)] leading-relaxed">This is the default Assistant. Edit its system prompt in Settings; it doesn&apos;t keep memory. Create a new character for a persona with its own scoped memory.</p>
+          <p className="text-sm text-[var(--text-muted)] leading-relaxed">This is the built-in assistant. Edit its system prompt in Settings; it doesn&apos;t keep memory. Create a new character for a persona with its own scoped memory.</p>
         ) : (
           <>
             <div>

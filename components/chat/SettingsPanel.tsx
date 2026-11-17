@@ -597,7 +597,7 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
         </div>
 
         <div>
-          <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Assistant writes</p>
+          <p className={`text-sm mb-1 opacity-70 ${c.label}`}>What it may change</p>
           {([
             ["calendarWriteMode", "Calendar"],
             ["anytypeWriteMode", "Anytype"],

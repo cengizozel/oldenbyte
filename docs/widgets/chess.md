@@ -13,7 +13,7 @@ Play an ongoing game of chess against the [Stockfish](https://stockfishchess.org
 - **Review.** Checks each of your moves and marks inaccuracies (`?!`, 0.6 pawns or more), mistakes (`?`, 1.5) and blunders (`??`, 3). Clicking a marked move shows the position before it with the played move in red and the better one in green.
 - **Daily puzzle.** Lichess's puzzle of the day (`/api/chess/puzzle`, no key, cached for an hour). Any mate counts as solving it.
 - **Record.** Won, drawn and lost per engine Elo, the last 30 results, the win streak, and the daily puzzle streak.
-- **Assistant.** The chat reads the game: moves, position, whose turn, the engine's evaluation and best move of the live position, the review, and the record.
+- **Chat.** The chat widget reads the game: moves, position, whose turn, the engine's evaluation and best move of the live position, the review, and the record.
 
 ## Storage Keys
 
