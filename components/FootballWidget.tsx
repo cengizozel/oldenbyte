@@ -81,25 +81,33 @@ function LiveTag({ detail }: { detail: string }) {
   );
 }
 
-// The match on show: the one being played, else the next one.
+// The match on show: the one being played, else the next one. The two crests
+// face each other with the kickoff time (or the score) between them, the way
+// a fixture is drawn everywhere.
 function Featured({ c, m, tz }: { c: ColorClasses; m: Match; tz: string }) {
   const live = m.state === "in";
-  const row = (s: Side) => (
-    <div className="flex items-center gap-2 min-w-0">
-      <Crest side={s} px={24} />
-      <span className={`flex-1 min-w-0 truncate text-sm font-medium ${c.text}`}>{s.name}</span>
-      {s.score !== null && <span className={`shrink-0 text-lg font-medium tabular-nums ${c.text}`}>{s.score}</span>}
-    </div>
-  );
+  const scored = m.home.score !== null && m.away.score !== null;
+  const name = (s: Side) => <span className={`min-w-0 text-sm font-medium leading-snug text-center line-clamp-2 ${c.text}`}>{s.name}</span>;
   return (
     <div className="rounded-xl bg-black/5 dark:bg-white/10 p-3 flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        {live ? <LiveTag detail={m.detail} /> : <span className={`text-sm font-medium ${c.text}`}>{dayLabel(m.date, tz)} · {timeOf(m.date, tz)}</span>}
-        <span className={`min-w-0 truncate text-sm opacity-70 ${c.label}`}>{m.competition}</span>
+      <p className={`text-sm opacity-70 truncate text-center ${c.label}`}>{live ? m.competition : `${dayLabel(m.date, tz)} · ${m.competition}`}</p>
+      {/* Crests in the outer thirds, so each sits over the middle of its
+          team's name below, which gets a full half of the card. */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div className="flex justify-center"><Crest side={m.home} px={40} /></div>
+        <div className="flex flex-col items-center text-center">
+          <span className={`text-xl font-semibold tabular-nums leading-tight ${c.text}`}>
+            {scored ? <>{m.home.score} <span className="opacity-50">-</span> {m.away.score}</> : timeOf(m.date, tz)}
+          </span>
+          {live && <LiveTag detail={m.detail} />}
+        </div>
+        <div className="flex justify-center"><Crest side={m.away} px={40} /></div>
       </div>
-      {row(m.home)}
-      {row(m.away)}
-      {m.venue && <p className={`text-sm opacity-70 truncate ${c.label}`}>{m.venue}</p>}
+      <div className="grid grid-cols-2 gap-2">
+        {name(m.home)}
+        {name(m.away)}
+      </div>
+      {m.venue && <p className={`text-sm opacity-70 truncate text-center ${c.label}`}>{m.venue}</p>}
     </div>
   );
 }
