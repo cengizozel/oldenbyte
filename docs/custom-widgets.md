@@ -171,6 +171,7 @@ What is left, stated plainly:
 - An elevated widget with `network` can send anything it can read to anywhere. That is what the power means, and what the warning says.
 - The sandbox depends on the browser enforcing iframe sandboxing and content security policy. It was tested in Chromium and Firefox against a widget that tries eleven ways out.
 - Listed in the catalog is not reviewed. `reviewed` means another person read that exact file.
+- A widget's summary is text it wrote itself. The Chat widget is told so when it reads one, but treat a summary like any text from outside: it can try to talk the model into things.
 
 ## Storage
 
@@ -184,6 +185,8 @@ What is left, stated plainly:
 | Setting `ext-summary-<instance>` | Its published summary |
 
 A placed widget is `{ type: "ext", ext: "<yours|community>/<id>" }` in the dashboard's instances. Its keys are cleaned up with the rest of a removed widget's data.
+
+A backup holds the placed widgets and their data, not the widget files. After restoring on another server, install the files again (upload, or the Community tab); until then those widgets say their file is not installed.
 
 ## API
 
