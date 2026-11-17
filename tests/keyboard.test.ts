@@ -49,3 +49,37 @@ describe("rebind", () => {
     expect(actionForKey(c, "r")).toBe("settings");
   });
 });
+
+describe("parseKeyboardConfig: actions added later", () => {
+  const old = (bindings: Record<string, string>) => JSON.stringify({ enabled: true, leader: " ", bindings });
+  const before = { options: "o", fullScreen: "f", settings: "e", refresh: "r", prevDashboard: "[", nextDashboard: "]", newDashboard: "n", editLayout: "l", help: "?" };
+
+  it("moves layout editing off its old default l so the moves get h j k l", () => {
+    const c = parseKeyboardConfig(old(before));
+    expect(c.bindings.editLayout).toBe("g");
+    expect(c.bindings.moveRight).toBe("l");
+    expect(c.bindings.moveLeft).toBe("h");
+    expect(c.bindings.nextTab).toBe(".");
+  });
+
+  it("keeps a key the user chose for layout editing", () => {
+    const c = parseKeyboardConfig(old({ ...before, editLayout: "y" }));
+    expect(c.bindings.editLayout).toBe("y");
+    expect(c.bindings.moveRight).toBe("l");
+  });
+
+  it("leaves a new action unbound when the user's own key holds its default", () => {
+    const c = parseKeyboardConfig(old({ ...before, refresh: "h" }));
+    expect(c.bindings.refresh).toBe("h");
+    expect(c.bindings.moveLeft).toBe("");
+    expect(actionForKey(c, "h")).toBe("refresh");
+    expect(actionForKey(c, "ArrowLeft")).toBe("moveLeft");
+  });
+
+  it("defaults the new options", () => {
+    const c = parseKeyboardConfig(old(before));
+    expect(c.repeat).toBe(true);
+    expect(c.tabMode).toBe("current");
+    expect(c.dot).toBe(true);
+  });
+});

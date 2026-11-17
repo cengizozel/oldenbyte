@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import TopBar from "@/components/TopBar";
 import WidgetGrid from "@/components/WidgetGrid";
 import KeyboardLayer from "@/components/KeyboardLayer";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { isEditableTarget } from "@/lib/keyboard";
 import { widgets } from "@/lib/widgets";
 import { getDashboards, saveDashboards, PRELOAD_KEY, PRELOAD_EVENT, type DashboardsState } from "@/lib/dashboards";
 import { maybeSeedFirstRun } from "@/lib/seed";
@@ -18,7 +20,36 @@ export default function Home() {
   // between them keeps widget state instead of reloading everything. Widgets
   // can read useWidgetActive() (lib/activeDashboard) to idle while hidden.
   const [visited, setVisited] = useState<string[]>([]);
-  const editControls = useRef<Record<string, { cancel: () => void }>>({});
+  const editControls = useRef<Record<string, { cancel: () => void; isDirty: () => boolean }>>({});
+  // Leaving layout editing without saving: asks first when anything changed.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const discardEdit = () => {
+    if (dashboards) editControls.current[dashboards.activeId]?.cancel();
+    setConfirmDiscard(false);
+    setEditing(false);
+  };
+  const requestCancelEdit = () => {
+    const dirty = dashboards ? editControls.current[dashboards.activeId]?.isDirty() : false;
+    if (dirty) setConfirmDiscard(true);
+    else discardEdit();
+  };
+  const requestCancelRef = useRef(requestCancelEdit);
+  useEffect(() => { requestCancelRef.current = requestCancelEdit; });
+  // Escape while editing the layout does what the cross does. Captured ahead
+  // of the keyboard layer (whose Escape also leaves demo mode), but not from
+  // a text field, a menu or a dialog, which keep their own Escape.
+  useEffect(() => {
+    if (!editing || confirmDiscard) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const t = e.target instanceof Element ? e.target : null;
+      if (isEditableTarget(t) || t?.closest('[role="dialog"], [role="menu"], [aria-modal="true"], dialog')) return;
+      e.preventDefault();
+      requestCancelRef.current();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [editing, confirmDiscard]);
   // Settings > Performance: mount every dashboard at load, not just on first visit.
   const [preload, setPreload] = useState(false);
 
@@ -74,10 +105,20 @@ export default function Home() {
       <TopBar
         editing={editing}
         onToggleEdit={() => setEditing(e => !e)}
-        onCancelEdit={() => { if (dashboards) editControls.current[dashboards.activeId]?.cancel(); setEditing(false); }}
+        onCancelEdit={requestCancelEdit}
         dashboards={dashboards}
         onDashboardsChange={handleDashboardsChange}
       />
+      {confirmDiscard && (
+        <ConfirmDialog
+          title="Changes not saved"
+          detail="Your changes to this dashboard's layout will be lost."
+          cancelLabel="Go back"
+          confirmLabel="Discard changes"
+          onCancel={() => setConfirmDiscard(false)}
+          onConfirm={discardEdit}
+        />
+      )}
       <KeyboardLayer
         dashboards={dashboards}
         onDashboardsChange={handleDashboardsChange}

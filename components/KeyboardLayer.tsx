@@ -6,11 +6,11 @@ import type { DashboardsState } from "@/lib/dashboards";
 import {
   DEFAULT_KEYBOARD, KEYBOARD_ACTIONS, KEYBOARD_EVENT, NEW_DASHBOARD_EVENT, MAX_CELLS, MAX_TABS,
   cellDigit, cellFromKey, tabFromKey, actionForKey, isBindableKey, isEditableTarget, keyLabel, rebind,
-  loadKeyboardConfig, saveKeyboardConfig, TIMEOUT_RANGE, type KeyboardAction, type KeyboardConfig,
+  loadKeyboardConfig, saveKeyboardConfig, TIMEOUT_RANGE, REPEAT_RANGE, REPEATABLE, type KeyboardAction, type KeyboardConfig,
 } from "@/lib/keyboard";
 import Toggle from "@/components/ui/Toggle";
 import { exitDemoMode, isDemoMode } from "@/lib/demo";
-import { FOCUS_RING, SettingsRow, SettingsSection, Stepper } from "@/components/ui/Field";
+import { FOCUS_RING, SettingsRow, SettingsSection, SettingsSelect, Stepper } from "@/components/ui/Field";
 
 // Global keyboard layer: leader key, widget number badges, focus ring, cheat
 // sheet. It finds its targets through data attributes WidgetGrid puts on the
@@ -29,20 +29,57 @@ const FOCUSABLE_FIELDS =
   "input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset]):not([type=range]):not([type=file]):not([type=color]), textarea, select, [contenteditable='true'], [contenteditable='']";
 
 type Badge = { key: string; label: string; top: number; left: number; tab: boolean; target: boolean };
-type Phase = { kind: "leader" } | { kind: "tab"; cell: HTMLElement } | { kind: "help" };
+// "repeat": the window after a repeatable command, where the same keys work
+// again without the leader.
+type Phase = { kind: "leader" } | { kind: "tab"; cell: HTMLElement } | { kind: "help" } | { kind: "repeat" };
+type Direction = "left" | "right" | "up" | "down";
+const MOVES: Partial<Record<KeyboardAction, Direction>> = { moveLeft: "left", moveRight: "right", moveUp: "up", moveDown: "down" };
 
 // Rendered and not inside an inert subtree (the hidden face of a FlipCard).
 function isShown(el: Element): boolean {
   return el.getClientRects().length > 0 && !el.closest("[inert]");
 }
 
-function visibleCells(): HTMLElement[] {
+// Every shown cell of the visible dashboard, in reading order.
+function allCells(): HTMLElement[] {
   const grid = document.querySelector('[data-widget-grid][data-active="true"]');
   if (!grid) return [];
   return Array.from(grid.querySelectorAll<HTMLElement>("[data-cell-index]"))
     .filter(isShown)
-    .sort((a, b) => Number(a.dataset.cellIndex) - Number(b.dataset.cellIndex))
-    .slice(0, MAX_CELLS);
+    .sort((a, b) => Number(a.dataset.cellIndex) - Number(b.dataset.cellIndex));
+}
+
+// The numbered ones: the first ten.
+function visibleCells(): HTMLElement[] {
+  return allCells().slice(0, MAX_CELLS);
+}
+
+// The nearest cell in a direction, by position on screen (spatial navigation,
+// as on a TV remote): it must lie past the current cell's center that way;
+// cells that overlap it across the move (same row for left and right, same
+// column for up and down) win, then the closest edge, then the closest center.
+function cellToward(from: HTMLElement, dir: Direction, cells: HTMLElement[]): HTMLElement | null {
+  const a = from.getBoundingClientRect();
+  const horizontal = dir === "left" || dir === "right";
+  const sign = dir === "right" || dir === "down" ? 1 : -1;
+  let best: HTMLElement | null = null;
+  let bestScore = Infinity;
+  for (const cell of cells) {
+    if (cell === from) continue;
+    const b = cell.getBoundingClientRect();
+    const along = horizontal ? (b.left + b.width / 2) - (a.left + a.width / 2) : (b.top + b.height / 2) - (a.top + a.height / 2);
+    if (along * sign <= 1) continue;
+    const gap = horizontal
+      ? Math.max(0, sign > 0 ? b.left - a.right : a.left - b.right)
+      : Math.max(0, sign > 0 ? b.top - a.bottom : a.top - b.bottom);
+    const overlap = horizontal
+      ? Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+      : Math.min(a.right, b.right) - Math.max(a.left, b.left);
+    const across = horizontal ? Math.abs((b.top + b.height / 2) - (a.top + a.height / 2)) : Math.abs((b.left + b.width / 2) - (a.left + a.width / 2));
+    const score = (overlap > 0 ? 0 : 100000) + gap * 2 + across;
+    if (score < bestScore) { bestScore = score; best = cell; }
+  }
+  return best;
 }
 
 function tabButtons(cell: HTMLElement): HTMLElement[] {
@@ -126,6 +163,12 @@ export default function KeyboardLayer({
     window.addEventListener(KEYBOARD_EVENT, onChange);
     return () => window.removeEventListener(KEYBOARD_EVENT, onChange);
   }, []);
+  // The dot follows the target while the setting is on.
+  useEffect(() => {
+    const target = targetRef.current;
+    if (config.dot && config.enabled && target?.isConnected) target.setAttribute("data-kb-target", "");
+    else target?.removeAttribute("data-kb-target");
+  }, [config.dot, config.enabled]);
   // Settings flip: keep the mark on the target, or let it go.
   useEffect(() => {
     const target = targetRef.current;
@@ -145,8 +188,15 @@ export default function KeyboardLayer({
     markTimerRef.current = null;
   }
 
-  function showMark(cell: HTMLElement) {
+  function setTarget(cell: HTMLElement) {
+    if (targetRef.current !== cell) targetRef.current?.removeAttribute("data-kb-target");
     targetRef.current = cell;
+    const { dot, enabled } = latest.current.config;
+    if (dot && enabled) cell.setAttribute("data-kb-target", "");
+  }
+
+  function showMark(cell: HTMLElement) {
+    setTarget(cell);
     setRing(cell);
     clearMarkTimer();
     const { mark, markAlways } = latest.current.config;
@@ -170,9 +220,9 @@ export default function KeyboardLayer({
     timerRef.current = null;
   }
 
-  function arm(onTimeout: () => void) {
+  function arm(onTimeout: () => void, seconds = latest.current.config.timeout) {
     clearTimer();
-    timerRef.current = setTimeout(onTimeout, latest.current.config.timeout * 1000);
+    timerRef.current = setTimeout(onTimeout, seconds * 1000);
   }
 
   // End the pending command. With restore, focus goes back where it was before
@@ -210,6 +260,30 @@ export default function KeyboardLayer({
     if (!cell || !cell.isConnected) return null;
     const widget = (prev?.closest("[data-widget-id]") as HTMLElement | null) ?? widgetIn(cell);
     return widget ? { cell, widget } : null;
+  }
+
+  // The cell commands act on, if it is on the visible dashboard: the one
+  // holding focus before the leader, else the target.
+  function currentCell(): HTMLElement | null {
+    const cells = allCells();
+    const held = prevFocusRef.current?.closest<HTMLElement>("[data-cell-index]") ?? null;
+    if (held && cells.includes(held)) return held;
+    const t = targetRef.current;
+    return t && cells.includes(t) ? t : null;
+  }
+
+  // After a repeatable command (a move, a tab step, a dashboard switch). It
+  // moves the target, not the text cursor: focusing a widget's text field
+  // would make the next leader type a space, ending the walk. With repeat on,
+  // the leader stays armed for the repeat window.
+  function afterStep() {
+    const cfg = latest.current.config;
+    setBadges([]);
+    prevFocusRef.current = null;
+    if (!cfg.repeat) { finish(false); return; }
+    phaseRef.current = { kind: "repeat" };
+    catcherRef.current?.focus({ preventScroll: true });
+    arm(() => finish(false), cfg.repeatWindow);
   }
 
   function badgesFor(cells: HTMLElement[], only?: HTMLElement): Badge[] {
@@ -284,14 +358,39 @@ export default function KeyboardLayer({
       afterRender(() => focusCell(target.cell));
       return;
     }
+    const dir = MOVES[action];
+    if (dir) {
+      const cells = allCells();
+      if (!cells.length) { finish(); return; }
+      const from = currentCell();
+      const next = from ? cellToward(from, dir, cells) : cells[0];
+      if (next) {
+        showMark(next);
+        next.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+      }
+      afterStep();
+      return;
+    }
+    if (action === "prevTab" || action === "nextTab") {
+      const cell = currentCell();
+      if (!cell) { finish(); showHint("Focus a widget first: leader, then its number"); return; }
+      const tabs = tabButtons(cell);
+      if (tabs.length < 2) { finish(); showHint("This widget has no tabs"); return; }
+      const cur = Math.max(0, tabs.findIndex(t => t.getAttribute("aria-pressed") === "true"));
+      const step = action === "nextTab" ? 1 : -1;
+      tabs[(cur + step + tabs.length) % tabs.length].click();
+      showMark(cell);
+      afterStep();
+      return;
+    }
     if (action === "editLayout") { finish(false); toggleEdit(); return; }
     if (action === "newDashboard") { finish(false); window.dispatchEvent(new Event(NEW_DASHBOARD_EVENT)); return; }
     if (!d || d.list.length < 2) { finish(); return; }
     const i = d.list.findIndex(x => x.id === d.activeId);
     const step = action === "nextDashboard" ? 1 : -1;
-    finish(false);
     setRing(null);
     change({ ...d, activeId: d.list[(i + step + d.list.length) % d.list.length].id });
+    afterStep();
   }
 
   // Keys after the leader, read from the catcher (Vimium is in insert mode).
@@ -306,6 +405,16 @@ export default function KeyboardLayer({
     e.preventDefault();
     e.stopPropagation();
     if (phase.kind === "help" || e.key === "Escape") { finish(); return; }
+
+    if (phase.kind === "repeat") {
+      const cfg = latest.current.config;
+      const again = actionForKey(cfg, e.key);
+      if (again && REPEATABLE.includes(again)) { clearTimer(); runAction(again); return; }
+      // Any other command key closes the window and runs as a fresh command
+      // on the cell just reached; anything else simply closes it.
+      if (again || cellFromKey(e.key) !== null) phaseRef.current = { kind: "leader" };
+      else { finish(false); return; }
+    }
 
     if (phase.kind === "tab") {
       const tabs = tabButtons(phase.cell);
@@ -327,7 +436,7 @@ export default function KeyboardLayer({
       const cells = visibleCells();
       const cell = cells[n];
       if (!cell) { finish(); return; }
-      if (tabButtons(cell).length > 1) {
+      if (latest.current.config.tabMode === "number" && tabButtons(cell).length > 1) {
         // A tab group waits for an optional tab key, then focuses.
         phaseRef.current = { kind: "tab", cell };
         setBadges(badgesFor(cells, cell));
@@ -386,7 +495,7 @@ export default function KeyboardLayer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { leader, bindings } = config;
+  const { leader, bindings, tabMode, repeat } = config;
   const L = keyLabel(leader);
 
   return (
@@ -432,14 +541,16 @@ export default function KeyboardLayer({
             <span className="text-sm text-[var(--text-muted)]">Keyboard shortcuts</span>
             <ul className="flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
               <li className="flex items-center justify-between gap-3"><span>Focus widget 1 to 10</span><Kbd>{`${L} 1..9, 0`}</Kbd></li>
-              <li className="flex items-center justify-between gap-3"><span>Then pick a tab</span><Kbd>1..9</Kbd></li>
+              {tabMode === "number" && <li className="flex items-center justify-between gap-3"><span>Then pick a tab</span><Kbd>1..9</Kbd></li>}
               {KEYBOARD_ACTIONS.map(a => (
                 <li key={a.id} className="flex items-center justify-between gap-3">
                   <span>{a.label}</span><Kbd>{`${L} ${keyLabel(bindings[a.id])}`}</Kbd>
                 </li>
               ))}
+              <li className="flex items-center justify-between gap-3"><span>The arrow keys move too</span><Kbd>{`${L} arrows`}</Kbd></li>
               <li className="flex items-center justify-between gap-3"><span>Cancel, or leave the widget</span><Kbd>Escape</Kbd></li>
             </ul>
+            {repeat && <p className="text-sm text-[var(--text-muted)]">Moves, tab and dashboard keys repeat: press the key again without {L}.</p>}
             <p className="text-sm text-[var(--text-muted)]">Press any key to close.</p>
           </div>
         </div>
@@ -525,6 +636,44 @@ export function KeyboardSettings() {
             unit="s"
             disabled={config.markAlways}
             onChange={v => update({ ...config, mark: v })}
+          />
+        </SettingsRow>
+      )}
+      {config.enabled && (
+        <SettingsRow label="Target dot" hint="A small red dot on the widget your commands act on, always shown.">
+          <Toggle checked={config.dot} onChange={() => update({ ...config, dot: !config.dot })} label="Target dot" />
+        </SettingsRow>
+      )}
+      {config.enabled && (
+        <SettingsRow label="Tabs" hint={config.tabMode === "current"
+          ? `A widget number focuses the tab it shows; ${keyLabel(config.bindings.prevTab)} and ${keyLabel(config.bindings.nextTab)} switch tabs.`
+          : "A tab number may follow the widget number."}>
+          <SettingsSelect
+            aria-label="Tabs"
+            value={config.tabMode}
+            onChange={e => update({ ...config, tabMode: e.target.value === "number" ? "number" : "current" })}
+            className="!w-auto"
+          >
+            <option value="current">Tab keys</option>
+            <option value="number">Tab numbers</option>
+          </SettingsSelect>
+        </SettingsRow>
+      )}
+      {config.enabled && (
+        <SettingsRow label="Repeat keys" hint={`After a move, a tab key or ${keyLabel(config.bindings.nextDashboard)}, press it again without ${keyLabel(config.leader)}.`}>
+          <Toggle checked={config.repeat} onChange={() => update({ ...config, repeat: !config.repeat })} label="Repeat keys" />
+        </SettingsRow>
+      )}
+      {config.enabled && config.repeat && (
+        <SettingsRow label="Repeat window" hint="Seconds to press it again.">
+          <Stepper
+            label="seconds to repeat a key"
+            value={config.repeatWindow}
+            min={REPEAT_RANGE.min}
+            max={REPEAT_RANGE.max}
+            step={REPEAT_RANGE.step}
+            unit="s"
+            onChange={v => update({ ...config, repeatWindow: v })}
           />
         </SettingsRow>
       )}

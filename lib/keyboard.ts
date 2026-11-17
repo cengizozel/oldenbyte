@@ -10,6 +10,12 @@ import * as storage from "@/lib/storage";
 export type KeyboardAction =
   | "options"
   | "fullScreen"
+  | "moveLeft"
+  | "moveDown"
+  | "moveUp"
+  | "moveRight"
+  | "prevTab"
+  | "nextTab"
   | "settings"
   | "refresh"
   | "prevDashboard"
@@ -27,9 +33,22 @@ export type KeyboardConfig = {
   // `mark` seconds after a click or a keyboard pick, or kept on with markAlways.
   mark: number;
   markAlways: boolean;
+  // A small dot on the target's corner that stays, so where commands land is
+  // always visible without the leader.
+  dot: boolean;
+  // After a repeatable command (dashboards, tabs, moves) the leader stays
+  // armed for `repeatWindow` seconds: the same kind of key again repeats it
+  // without the leader (tmux's repeat), any other key is read as a command.
+  repeat: boolean;
+  repeatWindow: number;
+  // "current": a widget number focuses the widget on the tab it shows, and
+  // the tab keys step through tabs. "number": a tab number may follow the
+  // widget number (the older two-digit scheme).
+  tabMode: "current" | "number";
   bindings: Record<KeyboardAction, string>;
 };
 export const TIMEOUT_RANGE = { min: 0.5, max: 10, step: 0.5 };
+export const REPEAT_RANGE = { min: 0.5, max: 3, step: 0.25 };
 
 // One setting key for the whole config. Settings > Keyboard writes it and fires
 // KEYBOARD_EVENT (detail: KeyboardConfig) so the layer applies it at once.
@@ -40,6 +59,12 @@ export const NEW_DASHBOARD_EVENT = "keyboardnewdashboard";
 
 // Order here is the order in Settings > Keyboard and the cheat sheet.
 export const KEYBOARD_ACTIONS: { id: KeyboardAction; label: string }[] = [
+  { id: "moveLeft",      label: "Widget to the left" },
+  { id: "moveDown",      label: "Widget below" },
+  { id: "moveUp",        label: "Widget above" },
+  { id: "moveRight",     label: "Widget to the right" },
+  { id: "prevTab",       label: "Previous tab of the focused widget" },
+  { id: "nextTab",       label: "Next tab of the focused widget" },
   { id: "options",       label: "Options of the focused widget (the header toggle)" },
   { id: "fullScreen",    label: "Full screen for the focused widget" },
   { id: "settings",      label: "Settings of the focused widget" },
@@ -57,7 +82,17 @@ export const DEFAULT_KEYBOARD: KeyboardConfig = {
   timeout: 1.5,
   mark: 3,
   markAlways: false,
+  dot: true,
+  repeat: true,
+  repeatWindow: 1,
+  tabMode: "current",
   bindings: {
+    moveLeft: "h",
+    moveDown: "j",
+    moveUp: "k",
+    moveRight: "l",
+    prevTab: ",",
+    nextTab: ".",
     options: "o",
     fullScreen: "f",
     settings: "e",
@@ -65,10 +100,23 @@ export const DEFAULT_KEYBOARD: KeyboardConfig = {
     prevDashboard: "[",
     nextDashboard: "]",
     newDashboard: "n",
-    editLayout: "l",
+    editLayout: "g",
     help: "?",
   },
 };
+
+// Commands the repeat window applies to: stepping through something.
+export const REPEATABLE: KeyboardAction[] = ["moveLeft", "moveDown", "moveUp", "moveRight", "prevTab", "nextTab", "prevDashboard", "nextDashboard"];
+
+// Arrow keys always move, whatever the letter bindings.
+export const ARROW_ACTIONS: Record<string, KeyboardAction> = {
+  ArrowLeft: "moveLeft", ArrowDown: "moveDown", ArrowUp: "moveUp", ArrowRight: "moveRight",
+};
+
+// Defaults an action had before, so a stored config still holding one can be
+// moved off a key a newer action now claims (layout editing was "l" before
+// the moves took h j k l).
+const PREVIOUS_DEFAULTS: Partial<Record<KeyboardAction, string>> = { editLayout: "l" };
 
 // Widgets are numbered 1..9 then 0, so only the first ten cells of a dashboard
 // get a number (a two-digit scheme would clash with the tab key that follows).
@@ -112,7 +160,7 @@ export function rebind(config: KeyboardConfig, action: KeyboardAction, key: stri
 }
 
 export function actionForKey(config: KeyboardConfig, key: string): KeyboardAction | null {
-  return KEYBOARD_ACTIONS.find(a => config.bindings[a.id] === key)?.id ?? null;
+  return KEYBOARD_ACTIONS.find(a => config.bindings[a.id] === key)?.id ?? ARROW_ACTIONS[key] ?? null;
 }
 
 // Tolerant parse: anything missing or invalid falls back to the default, so an
@@ -122,9 +170,23 @@ export function parseKeyboardConfig(raw: string | null): KeyboardConfig {
   try { parsed = raw ? JSON.parse(raw) : null; } catch {}
   if (!parsed || typeof parsed !== "object") return DEFAULT_KEYBOARD;
   const bindings = { ...DEFAULT_KEYBOARD.bindings };
+  const stored = new Set<KeyboardAction>();
   for (const { id } of KEYBOARD_ACTIONS) {
     const k = parsed.bindings?.[id];
-    if (typeof k === "string" && isBindableKey(k)) bindings[id] = k;
+    if (typeof k === "string" && isBindableKey(k)) { bindings[id] = k; stored.add(id); }
+  }
+  // An action new since the config was saved takes its default key. If a
+  // stored binding already holds that key and it is that action's old
+  // default, the old action moves to its new default; a key the user chose
+  // wins, and the new action is left unbound instead.
+  for (const { id } of KEYBOARD_ACTIONS) {
+    if (stored.has(id)) continue;
+    const holder = KEYBOARD_ACTIONS.find(a => a.id !== id && stored.has(a.id) && bindings[a.id] === bindings[id]);
+    if (!holder) continue;
+    const freed = DEFAULT_KEYBOARD.bindings[holder.id];
+    const taken = KEYBOARD_ACTIONS.some(a => a.id !== holder.id && bindings[a.id] === freed);
+    if (PREVIOUS_DEFAULTS[holder.id] === bindings[id] && !taken) bindings[holder.id] = freed;
+    else bindings[id] = "";
   }
   const seconds = (v: unknown, fallback: number) => {
     const n = Number(v);
@@ -136,6 +198,13 @@ export function parseKeyboardConfig(raw: string | null): KeyboardConfig {
     timeout: seconds(parsed.timeout, DEFAULT_KEYBOARD.timeout),
     mark: seconds(parsed.mark, DEFAULT_KEYBOARD.mark),
     markAlways: typeof parsed.markAlways === "boolean" ? parsed.markAlways : false,
+    dot: typeof parsed.dot === "boolean" ? parsed.dot : DEFAULT_KEYBOARD.dot,
+    repeat: typeof parsed.repeat === "boolean" ? parsed.repeat : DEFAULT_KEYBOARD.repeat,
+    repeatWindow: (() => {
+      const n = Number(parsed.repeatWindow);
+      return Number.isFinite(n) && parsed.repeatWindow != null ? Math.min(REPEAT_RANGE.max, Math.max(REPEAT_RANGE.min, n)) : DEFAULT_KEYBOARD.repeatWindow;
+    })(),
+    tabMode: parsed.tabMode === "number" ? "number" : "current",
     bindings,
   };
 }

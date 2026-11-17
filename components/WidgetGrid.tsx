@@ -153,7 +153,7 @@ export default function WidgetGrid({
   widgets: Widget[];
   editing?: boolean;
   // Lets the TopBar cancel an edit session (revert to the pre-edit layout).
-  onRegisterEditControls?: (controls: { cancel: () => void }) => void;
+  onRegisterEditControls?: (controls: { cancel: () => void; isDirty: () => boolean }) => void;
   dashboardId?: string;
   // Every dashboard, so a tile can offer "move to" the other ones.
   dashboards?: DashboardMeta[];
@@ -423,6 +423,18 @@ export default function WidgetGrid({
       cancel: () => {
         if (editStartRef.current) applySnap(editStartRef.current);
         historyRef.current = { past: [], future: [] };
+      },
+      // Whether the layout or the widgets differ from when editing started.
+      // Only what is saved counts: positions, sizes, tab groups and widget
+      // settings, not which tab happens to be shown.
+      isDirty: () => {
+        const start = editStartRef.current;
+        if (!start) return false;
+        const shape = (layout: TabLayoutItem[]) => JSON.stringify(
+          [...layout].sort((a, b) => a.i.localeCompare(b.i)).map(l => [l.i, l.x, l.y, l.w, l.h, l.tabs ?? []])
+        );
+        const widgets = (inst: Record<string, Widget>) => JSON.stringify(Object.keys(inst).sort().map(k => [k, inst[k]]));
+        return shape(start.layout) !== shape(layoutRef.current) || widgets(start.instances) !== widgets(instancesRef.current);
       },
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
