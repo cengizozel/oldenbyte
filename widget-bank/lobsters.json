@@ -1,0 +1,18 @@
+{
+  "id": "lobsters",
+  "title": "Lobsters",
+  "description": "The hottest stories on lobste.rs right now.",
+  "color": "rose",
+  "defaultSize": { "w": 1, "h": 3 },
+  "fetch": {
+    "url": "https://lobste.rs/hottest.json",
+    "cacheMinutes": 30
+  },
+  "items": {
+    "path": "$",
+    "title": "$.title",
+    "link": "$.url || $.comments_url",
+    "meta": "$.score | count",
+    "limit": 12
+  }
+}

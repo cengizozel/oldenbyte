@@ -53,6 +53,9 @@ import DockerWidget from "./DockerWidget";
 import DnsWidget from "./DnsWidget";
 import EmbedWidget from "./EmbedWidget";
 import FootballWidget from "./FootballWidget";
+import RepositoryWidget from "./RepositoryWidget";
+import ChangesWidget from "./ChangesWidget";
+import HtmlWidget from "./HtmlWidget";
 import BankWidget from "./BankWidget";
 import type { BankWidgetDef } from "@/lib/widgetBank";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
@@ -132,6 +135,9 @@ const WIDGET_COMPONENTS: Record<Exclude<WidgetType, "custom" | "empty">, Compone
   dns: DnsWidget,
   embed: EmbedWidget,
   football: FootballWidget,
+  repository: RepositoryWidget,
+  changes: ChangesWidget,
+  html: HtmlWidget,
 };
 
 function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, BankWidgetDef> = {}) {

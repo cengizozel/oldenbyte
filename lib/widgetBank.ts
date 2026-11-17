@@ -128,9 +128,21 @@ const TRANSFORMS: Record<string, (v: unknown) => string> = {
 };
 
 // Resolve a value expression against data: "$.path | transform" or a literal.
-// Non-string literals (numbers) pass through.
+// Non-string literals (numbers) pass through. "a || b" takes the first
+// alternative that is not empty, so a missing field can fall back to another
+// ("$.url || $.comments_url") or to a literal ("$.name || unnamed").
 export function resolveValue(expr: unknown, data: unknown): unknown {
   if (typeof expr !== "string") return expr;
+  if (!expr.includes("||")) return resolveOne(expr, data);
+  const alternatives = expr.split("||").map(s => s.trim());
+  for (const alt of alternatives) {
+    const v = resolveOne(alt, data);
+    if (v !== undefined && v !== null && v !== "") return v;
+  }
+  return undefined;
+}
+
+function resolveOne(expr: string, data: unknown): unknown {
   const [head, ...pipes] = expr.split("|").map(s => s.trim());
   let value: unknown;
   if (head.startsWith("$.")) value = walkPath(data, head.slice(2));

@@ -47,7 +47,7 @@ It appears in the edit-mode picker under Community. Invalid files are skipped (t
 
 ## Path expressions
 
-Strings starting with `$.` select from the fetched JSON: `$.hits[0].title`. A pipe applies a built-in transform: `$.points | count`. Available transforms: `count` (1234 to 1.2K), `date`, `dateShort`, `timeAgo`, `clock`, `duration`, `upper`, `lower`. Inside a `list`, paths are relative to each array item.
+Strings starting with `$.` select from the fetched JSON: `$.hits[0].title`. A pipe applies a built-in transform: `$.points | count`. Available transforms: `count` (1234 to 1.2K), `date`, `dateShort`, `timeAgo`, `clock`, `duration`, `upper`, `lower`. Inside a `list`, paths are relative to each array item. `a || b` takes the first alternative that is not empty: `$.url || $.comments_url` for a field that may be missing, or `$.name || unnamed` to fall back to plain text.
 
 ## Primitives (`layout`)
 

@@ -202,3 +202,70 @@ describe("football", () => {
     expect(crest("", 16)).toBe("");
   });
 });
+
+import { resolveValue, validateDef } from "@/lib/widgetBank";
+import lobsters from "../widget-bank/lobsters.json";
+
+describe("widget files", () => {
+  it("falls back to the next alternative when a field is empty", () => {
+    const post = { url: "", comments_url: "https://lobste.rs/s/x", name: null };
+    expect(resolveValue("$.url || $.comments_url", post)).toBe("https://lobste.rs/s/x");
+    expect(resolveValue("$.url || $.comments_url", { url: "https://a.example", comments_url: "c" })).toBe("https://a.example");
+    expect(resolveValue("$.name || unnamed", post)).toBe("unnamed");
+    expect(resolveValue("$.missing || $.also", post)).toBeUndefined();
+  });
+  it("still applies transforms inside an alternative", () => {
+    expect(resolveValue("$.n | count || none", { n: 1234 })).toBe("1.2K");
+  });
+  it("accepts the Lobsters definition", () => {
+    expect(validateDef(lobsters)).toEqual([]);
+  });
+});
+
+import { mapRepo } from "@/lib/github";
+import { mapWatches } from "@/lib/changedetection";
+import { buildFrame } from "@/components/HtmlWidget";
+
+describe("repository", () => {
+  it("combines the repository with its open pull requests and issues", () => {
+    const info = mapRepo(
+      { full_name: "o/r", description: "d", html_url: "https://github.com/o/r", stargazers_count: 10, forks_count: 2, pushed_at: "2026-11-17T00:00:00Z", archived: false },
+      { total_count: 3, items: [{ number: 7, title: "Fix", html_url: "u", created_at: "2026-11-16T00:00:00Z", user: { login: "ann" } }] },
+      { total_count: 1, items: [{ number: 0, title: "" }] },
+    );
+    expect(info).toMatchObject({ name: "o/r", stars: 10, forks: 2, pulls: 3, issues: 1 });
+    expect(info.openPulls).toEqual([{ number: 7, title: "Fix", url: "u", at: "2026-11-16T00:00:00Z", user: "ann" }]);
+    expect(info.openIssues).toEqual([]);
+  });
+});
+
+describe("changes", () => {
+  it("names each watch and puts the newest change first", () => {
+    const rows = mapWatches({
+      a: { url: "https://a.example", title: null, page_title: "A page", last_changed: 0, last_checked: 5, last_error: false, viewed: false },
+      b: { url: "https://b.example", title: "Mine", last_changed: 100, last_checked: 100, last_error: false, viewed: false },
+      c: { url: "https://c.example/x", last_changed: 50, last_checked: 60, last_error: "timeout", viewed: true },
+    }, "http://cd.local/");
+    expect(rows.map(r => r.title)).toEqual(["Mine", "c.example/x", "A page"]);
+    expect(rows[0]).toMatchObject({ unseen: true, diff: "http://cd.local/diff/b" });
+    expect(rows[1]).toMatchObject({ unseen: false, error: "timeout" });
+    expect(rows[2].unseen).toBe(false);   // never changed: nothing unseen
+    expect(mapWatches([], "x")).toEqual([]);
+  });
+});
+
+describe("html widget", () => {
+  const look = { text: "rgb(1, 2, 3)", muted: "rgb(4, 5, 6)", dark: true };
+  it("keeps the frame off the network unless allowed", () => {
+    const off = buildFrame("<p>hi</p>", look, false);
+    expect(off).toContain("default-src 'none'");
+    expect(off).not.toContain("connect-src");
+    expect(off).toContain("<p>hi</p>");
+    expect(buildFrame("", look, true)).toContain("connect-src https: http:");
+  });
+  it("gives the frame the card's colors and scheme", () => {
+    const doc = buildFrame("", look, false);
+    expect(doc).toContain("--text: rgb(1, 2, 3)");
+    expect(doc).toContain("color-scheme: dark");
+  });
+});

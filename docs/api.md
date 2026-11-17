@@ -132,6 +132,12 @@ One entry per symbol, in order: `{ symbol, name, currency, price, prevClose, cha
 ### `GET /api/football?op=teams|league|team&league=<code>[&team=<id>]`
 `teams`: the league's teams. `league`: `{ name, matches, tables }`. `team`: `{ team, live, next, results, standing, leagueName }`. See [widgets/football.md](widgets/football.md).
 
+### `GET /api/repository?repo=owner/repo[&refresh=1]`
+`{ name, description, url, stars, forks, issues, pulls, pushedAt, archived, openPulls, openIssues }` for a GitHub repository. Cached like the feeds.
+
+### `POST /api/changedetection`
+Body `{ url, apiKey }`. Returns `{ watches: [{ id, title, url, changedAt, checkedAt, error, unseen, diff }] }`, newest change first.
+
 ### `GET /api/monitor?url=<address>`
 `{ up, status, ms, error? }`. Up means an answer below HTTP 500. Kept for 20 seconds per user and address.
 

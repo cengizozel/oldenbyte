@@ -51,6 +51,9 @@ const en = {
     dns: "connect a DNS blocker",
     embed: "add a page address",
     football: "choose a team or a league",
+    repository: "choose a repository",
+    changes: "connect changedetection.io",
+    html: "add your HTML",
   },
 } as const;
 

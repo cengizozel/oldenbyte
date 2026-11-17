@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "deficit" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "search" | "todo" | "clock" | "markets" | "releases" | "server" | "monitor" | "docker" | "dns" | "embed" | "football" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "deficit" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "search" | "todo" | "clock" | "markets" | "releases" | "server" | "monitor" | "docker" | "dns" | "embed" | "football" | "repository" | "changes" | "html" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -383,6 +383,36 @@ export const widgets: Widget[] = [
     color: "teal",
     title: "Football",
     description: "Football (soccer): follow a team or a league, with live scores, fixtures and tables.",
+    digestable: false,
+  },
+  {
+    id: "repository",
+    type: "repository",
+    defaultSize: { w: 1, h: 4 },
+    category: "feeds",
+    color: "neutral",
+    title: "Repository",
+    description: "A GitHub repository: stars, forks, and its newest open pull requests and issues.",
+    digestable: false,
+  },
+  {
+    id: "changes",
+    type: "changes",
+    defaultSize: { w: 1, h: 3 },
+    category: "server",
+    color: "amber",
+    title: "Changes",
+    description: "Pages you watch with changedetection.io, and which changed.",
+    digestable: false,
+  },
+  {
+    id: "html",
+    type: "html",
+    defaultSize: { w: 1, h: 2 },
+    category: "notes",
+    color: "neutral",
+    title: "HTML",
+    description: "Your own HTML, CSS and JavaScript, run in a sandbox.",
     digestable: false,
   },
   {
