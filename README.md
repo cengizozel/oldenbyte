@@ -23,7 +23,7 @@ A self-hosted personal dashboard. Drag and resize widgets, keep several dashboar
 | **Links** | Bookmarks, Search, Embed |
 | **Time** | Calendar (CalDAV or a plain .ics link), Schedule, Clock |
 | **Habits** | Tracker, Rhythm, Upkeep, Deficit |
-| **Live** | Weather, F1, Markets |
+| **Live** | Weather, F1, Football (a team or a league, live scores), Markets |
 | **Library** | Reader (PDF and EPUB), Kiwix, Anytype |
 | **Server** | Server stats, Monitor, Docker, DNS (AdGuard Home, Pi-hole) |
 | **Media** | TV (IPTV) |

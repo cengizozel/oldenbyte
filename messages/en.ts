@@ -50,6 +50,7 @@ const en = {
     monitor: "add a site",
     dns: "connect a DNS blocker",
     embed: "add a page address",
+    football: "choose a team or a league",
   },
 } as const;
 

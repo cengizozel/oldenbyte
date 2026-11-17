@@ -38,7 +38,7 @@ export function cacheExpiry(key: string, now = Date.now()): Date {
 // outside this list (global config, unknown families) never count as widget
 // data, so the leftover-data cleanup can only ever touch keys it understands.
 const WIDGET_KEYS: RegExp[] = [
-  /^(?:text|rss|reddit|youtube|arxiv|hf|weather|calendar|schedule|tv|kiwix|anytype|bank|search|todo|clock|markets|releases|monitor|docker|dns|embed)-widget-(.+?)(?:-cache)?$/,
+  /^(?:text|rss|reddit|youtube|arxiv|hf|weather|calendar|schedule|tv|kiwix|anytype|bank|search|todo|clock|markets|releases|monitor|docker|dns|embed|football)-widget-(.+?)(?:-cache)?$/,
   /^reddit-(.+?)-(?:seen|visit)$/,
   /^chat-widget-(.+)$/,
   /^chat-(?!library-)(.+?)-(?:index|conv-.+)$/, // chat-library-* is the shared chat library, global

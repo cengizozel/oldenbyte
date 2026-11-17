@@ -154,3 +154,51 @@ describe("embed", () => {
     expect(embedProblem("http://192.168.1.5:3000", { origin: "http://192.168.1.9:3847", https: false })).toBeNull();
   });
 });
+
+import { mapEvent, mapStandings } from "@/lib/football";
+import { crest, ordinal, outcome } from "@/components/FootballWidget";
+
+describe("football", () => {
+  const event = (state: string, hs: unknown, as: unknown) => ({
+    id: "1", date: "2026-11-21T13:00Z", league: { name: "Super Lig" },
+    competitions: [{ status: { type: { state, shortDetail: state === "in" ? "67'" : "FT" } }, venue: { fullName: "RAMS Park" },
+      competitors: [{ homeAway: "home", score: hs, team: { id: "432", displayName: "Galatasaray", shortDisplayName: "Galatasaray", logos: [{ href: "https://a.espncdn.com/i/teamlogos/soccer/500/432.png" }] } },
+        { homeAway: "away", score: as, team: { id: "9", displayName: "Samsunspor", logo: "https://a.espncdn.com/i/teamlogos/soccer/500/9.png" } }] }],
+  });
+  it("reads a finished match, with either score shape", () => {
+    const m = mapEvent(event("post", { displayValue: "2", value: 2 }, "1"));
+    expect(m.state).toBe("post");
+    expect([m.home.score, m.away.score]).toEqual([2, 1]);
+    expect(m.competition).toBe("Super Lig");
+    expect(m.venue).toBe("RAMS Park");
+  });
+  it("gives no score to a match that has not started", () => {
+    const m = mapEvent(event("pre", "0", "0"));
+    expect([m.home.score, m.away.score]).toEqual([null, null]);
+  });
+  it("keeps the minute of a match being played", () => {
+    const m = mapEvent(event("in", "1", "0"));
+    expect(m.state).toBe("in");
+    expect(m.detail).toBe("67'");
+  });
+  it("judges a result from the team's side", () => {
+    const m = mapEvent(event("post", "2", "1"));
+    expect(outcome(m, "432")).toBe("W");
+    expect(outcome(m, "9")).toBe("L");
+    expect(outcome(mapEvent(event("post", "1", "1")), "9")).toBe("D");
+    expect(outcome(m, "nobody")).toBeNull();
+  });
+  it("reads a table, sorted by rank, with what a position means", () => {
+    const row = (id: string, rank: number, pts: number, note?: object) => ({ team: { id, displayName: `T${id}`, logos: [{ href: "x" }] }, note,
+      stats: [{ name: "rank", value: rank }, { name: "gamesPlayed", value: 11 }, { name: "points", value: pts }, { name: "pointDifferential", value: 3, displayValue: "+3" }] });
+    const [t] = mapStandings({ children: [{ name: "League", standings: { entries: [row("b", 2, 20), row("a", 1, 28, { description: "Champions League", color: "#81D6AC" })] } }] });
+    expect(t.rows.map(r => r.id)).toEqual(["a", "b"]);
+    expect(t.rows[0]).toMatchObject({ rank: 1, points: 28, played: 11, gd: "+3", note: "Champions League", noteColor: "#81D6AC" });
+    expect(mapStandings({})).toEqual([]);
+  });
+  it("words positions and resizes crests through a reachable host", () => {
+    expect([1, 2, 3, 4, 11, 12, 13, 21, 22].map(ordinal)).toEqual(["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd"]);
+    expect(crest("https://a.espncdn.com/i/teamlogos/soccer/500/432.png", 16)).toBe("https://secure.espn.com/combiner/i?img=%2Fi%2Fteamlogos%2Fsoccer%2F500%2F432.png&w=32&h=32");
+    expect(crest("", 16)).toBe("");
+  });
+});

@@ -129,6 +129,9 @@ Routes behind the newer widgets. All need a signed-in user; outbound requests go
 ### `GET /api/markets?symbols=AAPL,BTC-USD[&refresh=1]`
 One entry per symbol, in order: `{ symbol, name, currency, price, prevClose, change, changePct, digits, points }`, or `{ symbol, error }`. Cached per symbol like the feeds.
 
+### `GET /api/football?op=teams|league|team&league=<code>[&team=<id>]`
+`teams`: the league's teams. `league`: `{ name, matches, tables }`. `team`: `{ team, live, next, results, standing, leagueName }`. See [widgets/football.md](widgets/football.md).
+
 ### `GET /api/monitor?url=<address>`
 `{ up, status, ms, error? }`. Up means an answer below HTTP 500. Kept for 20 seconds per user and address.
 

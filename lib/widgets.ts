@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "deficit" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "search" | "todo" | "clock" | "markets" | "releases" | "server" | "monitor" | "docker" | "dns" | "embed" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "deficit" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "search" | "todo" | "clock" | "markets" | "releases" | "server" | "monitor" | "docker" | "dns" | "embed" | "football" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -373,6 +373,16 @@ export const widgets: Widget[] = [
     color: "neutral",
     title: "Embed",
     description: "Another web page inside a widget.",
+    digestable: false,
+  },
+  {
+    id: "football",
+    type: "football",
+    defaultSize: { w: 1, h: 4 },
+    category: "live",
+    color: "teal",
+    title: "Football",
+    description: "Football (soccer): follow a team or a league, with live scores, fixtures and tables.",
     digestable: false,
   },
   {
