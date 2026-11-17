@@ -12,9 +12,11 @@ import { useEffect, useRef, useState, type ReactNode, type UIEvent, type WheelEv
 //
 // Compact is used when the card is short to begin with, and when the list is
 // scrolled: scrolling down shrinks the figure and slides it left, so more of
-// the list fits. Scrolling up at the top of the list brings it back. (It does
-// not come back by itself when the list is at the top: after shrinking, a
-// list may fit without scrolling, and it would grow and shrink in turns.)
+// the list fits. Scrolling back to the top of the list brings it back. One
+// case is different: when the list fits entirely once the figure has shrunk,
+// there is no "top" to scroll back to (it is already there), and returning
+// by itself would make the figure grow and shrink in turns. Then an upward
+// scroll or pull at the top brings it back.
 
 const COMPACT = 44;          // the figure's size when compact
 const ROW = 48;              // the compact row's height
@@ -44,6 +46,7 @@ export default function CollapsingHero({ figure, size, summary, status, children
   const [short, setShort] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const touchY = useRef(0);
+  const collapsedAt = useRef(0);
 
   useEffect(() => {
     const el = bodyRef.current;
@@ -57,7 +60,14 @@ export default function CollapsingHero({ figure, size, summary, status, children
 
   const compact = short || scrolled;
   const list: HeroList = {
-    onScroll: e => { if (e.currentTarget.scrollTop > 16) setScrolled(true); },
+    onScroll: e => {
+      const el = e.currentTarget;
+      if (el.scrollTop > 16) { if (!scrolled) { collapsedAt.current = performance.now(); setScrolled(true); } return; }
+      // Back at the top: the figure returns, as long as the list still has
+      // more than fits (so it was scrolled back up, not pushed to the top by
+      // growing) and the shrink has finished.
+      if (scrolled && el.scrollTop <= 0 && el.scrollHeight > el.clientHeight + 1 && performance.now() - collapsedAt.current > 400) setScrolled(false);
+    },
     onWheel: e => { if (e.deltaY < 0 && e.currentTarget.scrollTop <= 0) setScrolled(false); },
     onTouchStart: e => { touchY.current = e.touches[0]?.clientY ?? 0; },
     onTouchMove: e => { if ((e.touches[0]?.clientY ?? 0) - touchY.current > 24 && e.currentTarget.scrollTop <= 0) setScrolled(false); },
