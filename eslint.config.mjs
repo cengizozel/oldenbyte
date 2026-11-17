@@ -19,7 +19,7 @@ const config = [
     },
   },
   {
-    ignores: [".next/**", "node_modules/**", "public/**", "next-env.d.ts", "tools/**", "widget-bank/**"],
+    ignores: [".next/**", "node_modules/**", "public/**", "next-env.d.ts", "tools/**", "widget-bank/**", "app-bundle-out/**", ".app-bundle/**"],
   },
 ];
 

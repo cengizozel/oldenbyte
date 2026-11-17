@@ -3,6 +3,10 @@ import { Playfair_Display } from "next/font/google";
 import Script from "next/script";
 import ThemeHotkey from "@/components/ThemeHotkey";
 import SaveErrorNotice from "@/components/SaveErrorNotice";
+import AppHost, { APP_FETCH_SCRIPT } from "@/components/AppHost";
+
+// True only in the build that is packed into the apps (tools/app-bundle).
+const APP_BUNDLE = process.env.NEXT_PUBLIC_OB_APP === "1";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -40,6 +44,12 @@ export default function RootLayout({
         <Script id="theme-init" strategy="beforeInteractive">
           {`(function(){try{var c=document.documentElement.classList;var t=localStorage.getItem('theme');var th=(t==='dark'||t==='grey')?t:'light';if(th!=='light'){c.add('dark');if(th==='grey')c.add('grey')}var g={};try{g=JSON.parse(localStorage.getItem('glow')||'{}')||{}}catch(e){}var on=typeof g[th]==='boolean'?g[th]:th!=='light';if(on)c.add('glow')}catch(e){}})()`}
         </Script>
+        {APP_BUNDLE && (
+          <>
+            <Script id="app-fetch" strategy="beforeInteractive">{APP_FETCH_SCRIPT}</Script>
+            <AppHost />
+          </>
+        )}
         <ThemeHotkey />
         {children}
         <SaveErrorNotice />

@@ -50,3 +50,7 @@ dev.db
 # Anytype bridge (tools/anytype-bridge)
 tools/anytype-bridge/.venv/
 __pycache__/
+
+# the interface built as plain files for the apps (tools/app-bundle)
+/.app-bundle/
+/app-bundle-out/
