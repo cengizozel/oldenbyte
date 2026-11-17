@@ -320,4 +320,8 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; marg
 
 /* Inside the phone app's native shell: the app draws the bar. */
 [data-ob-shell] { --ob-bar: 0px; }
+/* Apple's bar floats over the page (the page shows through its glass), so the
+   page keeps room under its last line for it. Android's bar takes its own
+   space. */
+[data-ob-shell="ios"] { --ob-bar: 64px; }
 [data-ob-shell] .ob-tabbar { display: none; }
