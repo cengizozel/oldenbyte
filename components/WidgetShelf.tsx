@@ -5,6 +5,7 @@ import { GripVertical, Download, Upload, Search, Undo2, Redo2, Trash2, ChevronDo
 import type { Widget } from "@/lib/widgets";
 import { colorMap, WIDGET_CATEGORIES } from "@/lib/widgets";
 import { FOCUS_RING } from "@/components/ui/Field";
+import { UploadWidget, CommunityCatalog } from "@/components/CustomWidgetPicker";
 
 // Edit-mode widget picker. A draggable floating panel with search and
 // category groups, so the catalog stays usable as widget count grows.
@@ -12,6 +13,7 @@ import { FOCUS_RING } from "@/components/ui/Field";
 export default function WidgetShelf({
   templates,
   bankTemplates = [],
+  customTemplates = [],
   onAdd,
   onTemplateDragStart,
   onTemplateDragEnd,
@@ -26,6 +28,8 @@ export default function WidgetShelf({
 }: {
   templates: Widget[];
   bankTemplates?: Widget[];
+  // Installed custom widgets (lib/customWidgets.ts).
+  customTemplates?: Widget[];
   onAdd: (template: Widget) => void;
   onTemplateDragStart: (template: Widget) => void;
   onTemplateDragEnd: () => void;
@@ -77,6 +81,9 @@ export default function WidgetShelf({
   const dragging = useRef(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const [query, setQuery] = useState("");
+  // "Widgets": everything that can be added now. "Community": the catalog of
+  // custom widgets to install.
+  const [tab, setTab] = useState<"widgets" | "community">("widgets");
   // Collapsed = a small draggable pill, so the panel stops covering the grid
   // while arranging widgets. Remembered per device.
   const [collapsed, setCollapsed] = useState(() => {
@@ -125,10 +132,12 @@ export default function WidgetShelf({
     const matches = templates.filter(match);
     const built = WIDGET_CATEGORIES
       .map(cat => ({ id: cat.id as string, label: cat.label, items: matches.filter(t => (t.category ?? "notes") === cat.id).sort(byTitle) }));
-    // Community widgets come from the widget bank (JSON defs, not code).
-    built.push({ id: "community", label: "Community", items: bankTemplates.filter(match).sort(byTitle) });
+    // Widget files from the widget bank (JSON definitions, not code).
+    built.push({ id: "bank", label: "More", items: bankTemplates.filter(match).sort(byTitle) });
+    // Custom widgets the user uploaded or installed from the catalog.
+    built.push({ id: "custom", label: "Custom", items: customTemplates.filter(match).sort(byTitle) });
     return built.filter(g => g.items.length > 0);
-  }, [templates, bankTemplates, query]);
+  }, [templates, bankTemplates, customTemplates, query]);
 
   return (
     <div
@@ -184,8 +193,26 @@ export default function WidgetShelf({
 
       {collapsed ? null : (
       <>
+      <div role="tablist" aria-label="Widget sources" className="flex items-center gap-1 px-3 pb-2">
+        {([["widgets", "Widgets"], ["community", "Community"]] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={`h-7 px-2.5 rounded-lg text-sm ${FOCUS_RING} ${tab === id ? "bg-black/10 dark:bg-white/15 text-[var(--text-primary)] font-medium" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {/* Catalog */}
       <div className="flex-1 max-h-[50vh] overflow-y-auto px-3 pb-2 flex flex-col gap-2.5">
+        {tab === "community" ? (
+          <CommunityCatalog query={query} templates={customTemplates} onAdd={onAdd} />
+        ) : (
+        <>
         {groups.map(group => (
           <div key={group.id}>
             <div className="text-sm text-[var(--text-muted)] mb-1.5">
@@ -222,6 +249,9 @@ export default function WidgetShelf({
         ))}
         {groups.length === 0 && (
           <p className="text-sm text-[var(--text-muted)] py-2">No widgets match.</p>
+        )}
+        {!backupDisabled && <UploadWidget />}
+        </>
         )}
       </div>
 

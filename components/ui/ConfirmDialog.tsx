@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { FOCUS_RING } from "@/components/ui/Field";
 
 // The one modal confirmation: a short title, a line of detail, a safe choice
@@ -10,7 +11,8 @@ export default function ConfirmDialog({
   title, detail, cancelLabel, confirmLabel, onCancel, onConfirm,
 }: {
   title: string;
-  detail: string;
+  // A line of text, or a few short paragraphs for a warning.
+  detail: ReactNode;
   cancelLabel: string;
   confirmLabel: string;
   onCancel: () => void;
@@ -25,7 +27,9 @@ export default function ConfirmDialog({
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onCancel]);
-  return (
+  // Drawn on the page itself: a caller inside a moved or scaled box (a grid
+  // tile, the settings drawer, the picker) would otherwise pin it to that box.
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] bg-black/30 backdrop-blur-[2px] flex items-center justify-center p-4"
       onMouseDown={e => { if (e.target === e.currentTarget) onCancel(); }}
@@ -37,7 +41,7 @@ export default function ConfirmDialog({
         className="w-full max-w-sm bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl shadow-2xl p-5 flex flex-col gap-2"
       >
         <h2 id="confirm-title" className="text-base font-medium text-[var(--text-primary)]">{title}</h2>
-        <p className="text-sm text-[var(--text-secondary)]">{detail}</p>
+        <div className="text-sm text-[var(--text-secondary)] flex flex-col gap-2">{detail}</div>
         <div className="flex justify-end gap-2 mt-3">
           <button
             ref={safeRef}
@@ -56,6 +60,7 @@ export default function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

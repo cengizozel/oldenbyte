@@ -14,6 +14,7 @@ import { KeyboardSettings } from "@/components/KeyboardLayer";
 import { PhoneSettings } from "@/components/MobileNav";
 import { DataSettings } from "@/components/DataSettings";
 import { DevicesSettings } from "@/components/DevicesSettings";
+import { CustomWidgetsSettings } from "@/components/CustomWidgetsSettings";
 import { NEW_DASHBOARD_EVENT, OPEN_SETTINGS_EVENT } from "@/lib/keyboard";
 import { FOCUS_RING, HIT_AREA, SettingsRow, SettingsSection } from "@/components/ui/Field";
 
@@ -859,6 +860,7 @@ function SettingsPanel({
             </SettingsRow>
           </SettingsSection>
 
+          <CustomWidgetsSettings />
           <DevicesSettings />
           <DataSettings />
         </div>

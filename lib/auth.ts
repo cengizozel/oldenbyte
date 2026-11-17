@@ -12,7 +12,7 @@ const ALGO = "SHA-256";
 // The signing secret MUST be a strong value in production (it signs the auth
 // cookie; with no secret anyone could forge a session, and this repo is public).
 // Dev keeps a throwaway fallback so a local checkout runs without configuration.
-function getSecret(): string {
+export function getSecret(): string {
   const s = process.env.SESSION_SECRET;
   if (s && s.length >= 16) return s;
   if (process.env.NODE_ENV === "production") {

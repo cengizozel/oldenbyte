@@ -15,11 +15,16 @@ type AdminUser = {
   role: string;
   mustChangePassword: boolean;
   createdAt: string;
+  // Files kept for the account, and its own quota in MB (null: the default).
+  storage?: { uploads: number; library: number; widgets: number; total: number; quotaMb: number | null; unlimited: boolean };
 };
 type Config = {
-  registrationEnabled: boolean; hasInvite: boolean; feedCacheMinutes: number;
+  registrationEnabled: boolean; hasInvite: boolean; feedCacheMinutes: number; storageQuotaMb?: number;
   twitchConnected?: boolean; twitchFromEnv?: boolean; twitchClientId?: string;
 };
+
+const fmtBytes = (b: number) => (b < 1024 * 1024 ? `${Math.max(0, Math.round(b / 1024))} KB` : b < 1024 * 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${(b / 1024 / 1024 / 1024).toFixed(2)} GB`);
+const fmtMb = (mb: number) => (mb >= 1024 ? `${+(mb / 1024).toFixed(2)} GB` : `${mb} MB`);
 
 const cardClass =
   "bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl p-5 shadow-sm";
@@ -176,6 +181,42 @@ export default function AdminPage() {
     }
   }
 
+  // The default file quota, and one account's own (blank: the default).
+  async function saveDefaultQuota(mb: number) {
+    if (!config || !Number.isFinite(mb) || mb < 1) return;
+    try {
+      const res = await fetch("/api/admin/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storageQuotaMb: mb }),
+      });
+      if (!res.ok) throw new Error();
+      setConfig(await res.json());
+      setConfigMsg("Storage limit updated.");
+    } catch {
+      setConfigMsg("Could not update the storage limit.");
+    }
+  }
+
+  async function saveUserQuota(id: string, raw: string) {
+    const quotaMb = raw.trim() === "" ? null : Number(raw);
+    if (quotaMb !== null && (!Number.isFinite(quotaMb) || quotaMb < 1)) { setError("A storage limit is a number of MB, 1 or more."); return; }
+    const current = users?.find(u => u.id === id)?.storage?.quotaMb ?? null;
+    if (quotaMb === current) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "setQuota", quotaMb }),
+      });
+      if (!res.ok) throw new Error();
+      await loadUsers();
+    } catch {
+      setError("Could not set the storage limit.");
+    }
+  }
+
   async function saveFeedCache(minutes: number) {
     if (!config || !Number.isFinite(minutes) || minutes < 1) return;
     try {
@@ -329,6 +370,33 @@ export default function AdminPage() {
                     )}
                   </div>
 
+                  {u.storage && (
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <span className={HINT}>
+                        {u.storage.unlimited
+                          ? `Files: ${fmtBytes(u.storage.total)} used, no limit for admins`
+                          : `Files: ${fmtBytes(u.storage.total)} of ${fmtMb(u.storage.quotaMb ?? config?.storageQuotaMb ?? 0)} used`}
+                      </span>
+                      {!u.storage.unlimited && (
+                        <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                          Own limit
+                          <input
+                            key={`${u.id}:${u.storage.quotaMb ?? ""}`}
+                            type="number"
+                            min={1}
+                            defaultValue={u.storage.quotaMb ?? ""}
+                            placeholder={String(config?.storageQuotaMb ?? "")}
+                            aria-label={`Storage limit for ${u.username} in MB; empty for the default`}
+                            onBlur={e => saveUserQuota(u.id, e.target.value)}
+                            onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                            className={`${inputClass} !h-8 w-24 text-center tabular-nums`}
+                          />
+                          MB
+                        </label>
+                      )}
+                    </div>
+                  )}
+
                   {temps[u.id] && (
                     <div className="flex items-center gap-2 flex-wrap text-sm text-[var(--text-secondary)]">
                       <span>Temporary password</span>
@@ -415,6 +483,29 @@ export default function AdminPage() {
                   className={`${inputClass} w-20 text-center tabular-nums`}
                 />
                 <span className="text-sm text-[var(--text-secondary)]">min</span>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-5 border-t border-[var(--surface-border)] flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-0.5">
+                <span className={LABEL}>Storage per user</span>
+                <span className={HINT}>How much disk each account may fill with files: the library, uploads and custom widget files. An account can be given its own limit in the user list. Admins have no limit.</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <input
+                  type="number"
+                  min={1}
+                  value={config.storageQuotaMb ?? ""}
+                  aria-label="Default storage limit in MB"
+                  onChange={e => {
+                    const v = parseInt(e.target.value);
+                    setConfig(c => (c ? { ...c, storageQuotaMb: Number.isFinite(v) ? v : c.storageQuotaMb } : c));
+                  }}
+                  onBlur={e => saveDefaultQuota(parseInt(e.target.value))}
+                  onKeyDown={e => e.key === "Enter" && saveDefaultQuota(parseInt((e.target as HTMLInputElement).value))}
+                  className={`${inputClass} w-24 text-center tabular-nums`}
+                />
+                <span className="text-sm text-[var(--text-secondary)]">MB</span>
               </div>
             </div>
 

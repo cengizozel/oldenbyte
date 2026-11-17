@@ -12,6 +12,7 @@ import {
   clearTwitchApp,
 } from "@/lib/appconfig";
 import { requestToken } from "@/lib/twitch";
+import { defaultQuotaMb, setDefaultQuotaMb, QUOTA_MIN_MB, QUOTA_MAX_MB } from "@/lib/quota";
 
 // What the Admin page may know about the Twitch application: whether one is
 // connected, where it comes from, and its client ID. Never the secret.
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
     registrationEnabled: await isRegistrationEnabled(),
     hasInvite: await hasInviteCode(),
     feedCacheMinutes: await getFeedCacheMinutes(),
+    storageQuotaMb: await defaultQuotaMb(),
     ...(await twitchState()),
   });
 }
@@ -36,7 +38,7 @@ export async function PUT(request: NextRequest) {
   const admin = await requireAdmin(request);
   if (admin instanceof NextResponse) return admin;
 
-  let body: { registrationEnabled?: boolean; inviteCode?: string; feedCacheMinutes?: number; twitchClientId?: string; twitchClientSecret?: string; twitchDisconnect?: boolean };
+  let body: { storageQuotaMb?: number; registrationEnabled?: boolean; inviteCode?: string; feedCacheMinutes?: number; twitchClientId?: string; twitchClientSecret?: string; twitchDisconnect?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -52,6 +54,12 @@ export async function PUT(request: NextRequest) {
   }
   if (typeof body.feedCacheMinutes === "number" && Number.isFinite(body.feedCacheMinutes)) {
     await setFeedCacheMinutes(body.feedCacheMinutes);
+  }
+
+  // The file quota of accounts that have none of their own, in MB.
+  if (typeof body.storageQuotaMb === "number") {
+    if (!Number.isFinite(body.storageQuotaMb) || body.storageQuotaMb < QUOTA_MIN_MB || body.storageQuotaMb > QUOTA_MAX_MB) return badRequest(`The quota must be between ${QUOTA_MIN_MB} MB and ${QUOTA_MAX_MB} MB.`);
+    await setDefaultQuotaMb(body.storageQuotaMb);
   }
 
   // Twitch: the pair is tried against Twitch first, so a typo is refused
@@ -74,6 +82,7 @@ export async function PUT(request: NextRequest) {
     registrationEnabled: await isRegistrationEnabled(),
     hasInvite: await hasInviteCode(),
     feedCacheMinutes: await getFeedCacheMinutes(),
+    storageQuotaMb: await defaultQuotaMb(),
     ...(await twitchState()),
   });
 }

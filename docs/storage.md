@@ -126,6 +126,7 @@ Global keys:
 | `notepad-registry` | JSON array of every notepad instance ID ever created |
 | `youtube-archive` | Archive connection (an add-on and its values) shared by every YouTube widget |
 | `addons` | The account's own uploaded add-ons |
+| `custom-widgets`, `elevated-widgets` | Custom widgets: which are switched on, and the account's switches for elevated ones ([custom-widgets.md](./custom-widgets.md)) |
 | `reddit-api` | Reddit app credentials shared by every Reddit widget |
 
 Per-widget keys (`<id>` is the instance ID):

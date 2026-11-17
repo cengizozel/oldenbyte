@@ -47,6 +47,7 @@ app/
     settings/           # Key-value store CRUD + export/import
     setup/              # First-run admin account creation
     addons/             # Add-ons: list, upload, and making their requests (docs/addons.md)
+    custom-widgets/     # Custom widgets: files, elevated calls, media tickets, catalog (docs/custom-widgets.md)
     tv/                 # IPTV proxy: M3U channel lists, HLS playlists, stream segments
     upload/             # File upload handler
     weather/            # Open-Meteo proxy (geocoding search + forecast)

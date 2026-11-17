@@ -33,7 +33,7 @@ export function buildFrame(html: string, look: { text: string; muted: string; da
 <style>
 :root { color-scheme: ${look.dark ? "dark" : "light"}; --text: ${look.text}; --muted: ${look.muted}; }
 html, body { margin: 0; background: transparent; }
-body { font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); overflow-wrap: anywhere; }
+body { font: 14px/1.5 Arial, Helvetica, sans-serif; color: var(--text); overflow-wrap: anywhere; }
 a { color: inherit; }
 </style></head><body>${html}</body></html>`;
 }

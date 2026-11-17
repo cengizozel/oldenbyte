@@ -18,7 +18,9 @@ function hasDeviceToken(authHeader: string | null): boolean {
 // session cookie, and an install must work from the sign-in page too.
 // /api/v1/server and /api/v1/auth/login: what an app needs before it has a
 // token (is this an oldenbyte server, and signing in).
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/setup", "/api/register", "/manifest.webmanifest", "/api/v1/server", "/api/v1/auth/login"];
+// /api/custom-widgets/media: a custom widget's sandboxed frame has no cookie;
+// the route only answers a signed, expiring ticket the dashboard issued.
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/setup", "/api/register", "/manifest.webmanifest", "/api/v1/server", "/api/v1/auth/login", "/api/custom-widgets/media"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
@@ -64,7 +66,12 @@ export async function proxy(request: NextRequest) {
   // so there is nothing for another site to ride on, and no origin to check.
   const device = pathname.startsWith("/api/") && hasDeviceToken(authHeader);
 
-  if (pathname.startsWith("/api/") && !bearer && !device && crossOrigin(request)) {
+  // An app's sign-in sets no cookie and answers with a token in the body,
+  // which another site's page cannot read, so there is nothing to forge: a
+  // browser extension (its own origin) must be able to call it.
+  const appLogin = pathname === "/api/v1/auth/login";
+
+  if (pathname.startsWith("/api/") && !bearer && !device && !appLogin && crossOrigin(request)) {
     return NextResponse.json({ error: "Cross-origin request refused" }, { status: 403 });
   }
 

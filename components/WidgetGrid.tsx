@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import * as storage from "@/lib/storage";
 import { Layers, ArrowRightLeft, Trash2 } from "lucide-react";
@@ -22,6 +22,8 @@ import { TabGroupContext, type TabGroupHosts } from "@/lib/tabGroup";
 import { WidgetFrameContext, type WidgetFrame } from "@/lib/widgetFrame";
 import type { BankWidgetDef } from "@/lib/widgetBank";
 import { renderWidget } from "./widgetRegistry";
+import { useCustomWidgets } from "@/lib/useCustomWidgets";
+import { templateIdOf } from "@/lib/customWidgets";
 
 const COLS = 4;
 const GAP = 16;
@@ -151,6 +153,19 @@ export default function WidgetGrid({
       })
       .catch(() => {});
   }, []);
+
+  // Custom widgets (lib/customWidgets.ts): the installed files as templates.
+  const custom = useCustomWidgets();
+  const customTemplates = useMemo<Widget[]>(() => custom.widgets.map(w => ({
+    id: templateIdOf(w.ext),
+    type: "ext",
+    ext: w.ext,
+    color: w.manifest.color ?? "neutral",
+    title: w.manifest.name,
+    description: w.manifest.description,
+    digestable: w.manifest.digest === true,
+    defaultSize: w.manifest.defaultSize ?? { w: 1, h: 3 },
+  })), [custom.widgets]);
 
   const pageVisible = usePageVisible();
 
@@ -778,6 +793,7 @@ export default function WidgetGrid({
   // built-in types read it from the registry in lib/widgets.ts.
   function sizeFor(w: Widget | undefined): WidgetSize {
     if (w?.type === "custom") return (w.bankId ? bankDefs[w.bankId]?.defaultSize : undefined) ?? { w: 1, h: 3 };
+    if (w?.type === "ext") return customTemplates.find(t => t.ext === w.ext)?.defaultSize ?? { w: 1, h: 3 };
     return defaultSizeFor(w?.type ?? "empty");
   }
 
@@ -842,7 +858,7 @@ export default function WidgetGrid({
     const layoutIds = new Set(layout.map(l => l.i));
     // Bank widgets all share the "custom" type; siblings are same-def only.
     const sameType = Object.values(instances).filter(w =>
-      (template.type === "custom" ? w.bankId === template.bankId : w.type === template.type) && layoutIds.has(w.id)
+      (template.type === "custom" ? w.bankId === template.bankId : template.type === "ext" ? w.ext === template.ext : w.type === template.type) && layoutIds.has(w.id)
     );
     const title = sameType.length === 0
       ? template.title
@@ -1031,6 +1047,7 @@ export default function WidgetGrid({
       <WidgetShelf
         templates={widgets}
         bankTemplates={bankTemplates}
+        customTemplates={customTemplates}
         onAdd={addWidget}
         onUndo={undo}
         onRedo={redo}

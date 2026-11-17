@@ -6,9 +6,12 @@ import { requireAdmin, json, badRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { destroyAllSessions } from "@/lib/session";
 import { hashPassword } from "@/lib/password";
+import { setUserQuotaMb } from "@/lib/quota";
+import { ClientError } from "@/lib/http";
 
 const libraryDir = process.env.LIBRARY_DIR ?? path.join(process.cwd(), "data", "library");
 const uploadsDir = process.env.UPLOADS_DIR ?? path.join(process.cwd(), "data", "uploads");
+const widgetsDir = process.env.WIDGETS_DIR ?? path.join(process.cwd(), "data", "widgets");
 
 export async function DELETE(
   request: NextRequest,
@@ -39,6 +42,8 @@ export async function DELETE(
   ]);
   await rm(path.join(uploadsDir, targetId), { recursive: true, force: true });
   await rm(path.join(libraryDir, targetId), { recursive: true, force: true });
+  await rm(path.join(widgetsDir, targetId), { recursive: true, force: true });
+  await setUserQuotaMb(targetId, null);
 
   return json({ ok: true });
 }
@@ -52,17 +57,29 @@ export async function PATCH(
 
   const { id: targetId } = await params;
 
-  let body: { action?: string };
+  let body: { action?: string; quotaMb?: number | null };
   try {
     body = await request.json();
   } catch {
     return badRequest();
   }
 
-  if (body.action !== "resetPassword") return badRequest("Unknown action");
+  if (body.action !== "resetPassword" && body.action !== "setQuota") return badRequest("Unknown action");
 
   const target = await prisma.user.findUnique({ where: { id: targetId } });
   if (!target) return json({ error: "Not found" }, 404);
+
+  // { action: "setQuota", quotaMb: number | null }: this account's own file
+  // quota in MB; null puts it back on the default.
+  if (body.action === "setQuota") {
+    if (body.quotaMb !== null && typeof body.quotaMb !== "number") return badRequest("quotaMb must be a number or null");
+    try {
+      await setUserQuotaMb(targetId, body.quotaMb);
+    } catch (e) {
+      return badRequest(e instanceof ClientError ? e.message : "Could not set the quota");
+    }
+    return json({ ok: true, quotaMb: body.quotaMb });
+  }
 
   const temp = randomBytes(9).toString("base64url");
   await prisma.user.update({

@@ -26,6 +26,6 @@ A checklist of essentials, the third sibling of Tracker and Rhythm. Each item is
 - The history view plots the score over time, sampled hourly for the last two weeks or at midnight and noon for the last three months, with the last 7 days' average and share of time at 100, and a 14-day heatmap of each day's average score. Tapping a day lists that day's checks with their times (and the time they were turned off, if they were); a check can be removed there.
 - Add/rename/remove/reweight items in the settings card, set each one's span in days and hours, and drag an item's dot to arrange the list. The settings card's Order switch chooses between that arrangement (`custom`, the default) and `need`: items that are off first, heaviest first, then running items soonest to run out first.
 
-Upkeep is not `digestable`; the chat's `read_widget` tool reads it through `lib/widgetData.ts` (`readUpkeep`): the score now, how long it has been at 100, each item's state and time left, and the last 7 days' average.
+The built-in Upkeep is not `digestable`; the chat's `read_widget` tool reads it through `lib/widgetData.ts` (`readUpkeep`): the score now, how long it has been at 100, each item's state and time left, and the last 7 days' average.
 
 (component: `components/UpkeepWidget.tsx`)

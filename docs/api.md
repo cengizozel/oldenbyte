@@ -465,6 +465,8 @@ All modes go through the server feed cache. Errors return `500` (`503` for video
 
 `/api/addons` and `/api/addons/run`: see [addons.md](./addons.md#api). The YouTube widget's archive (TubeArchivist, Invidious) goes through them.
 
+`/api/custom-widgets` and the routes under it: see [custom-widgets.md](./custom-widgets.md#api).
+
 ---
 
 ## HF Daily
@@ -580,7 +582,7 @@ Accepts a `multipart/form-data` request with one file. Saves it to the user's ow
 ```json
 { "filename": "<uuid>.<ext>" }
 ```
-Accepted types: `.pdf`, `.epub`, up to 50 MB, and for non-admin accounts within the storage quota (uploads plus library, 2 GB by default, `USER_STORAGE_QUOTA_MB`; `413` when it would be exceeded). The Reader widget now uploads through `/api/library`; this route and `/api/files` remain for files uploaded before the library existed. Client errors return a JSON `error` with `400` (not multipart, no file part), `413` (too large) or `415` (unsupported type); anything else is a `500` with a generic message.
+Accepted types: `.pdf`, `.epub`, up to 50 MB, and for non-admin accounts within the storage quota (uploads, library and custom widget files together; the admin sets it on the Admin page, 2 GB until then; `413` when it would be exceeded). The Reader widget now uploads through `/api/library`; this route and `/api/files` remain for files uploaded before the library existed. Client errors return a JSON `error` with `400` (not multipart, no file part), `413` (too large) or `415` (unsupported type); anything else is a `500` with a generic message.
 
 ### `GET /api/files/<filename>`
 Serves one of the user's uploaded files (`<uuid>.pdf` or `<uuid>.epub`) from `UPLOADS_DIR/<userId>/`. Any other name, or another user's file, returns `404`.

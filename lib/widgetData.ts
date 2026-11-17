@@ -442,6 +442,13 @@ async function readChess(userId: string, id: string, title: string, opts?: ReadO
   return lines.join("\n");
 }
 
+// A custom widget (lib/customWidgets.ts) is read through the summary it
+// publishes about itself; its storage is its own business.
+async function readCustom(userId: string, id: string, title: string): Promise<string> {
+  const summary = (await read(userId, `ext-summary-${id}`))?.trim();
+  return summary ? `${title} (a custom widget, in its own words):\n${summary}` : `${title} is a custom widget that has not published a summary.`;
+}
+
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 // The user's local day/zone, relayed by the chat client so date-anchored
@@ -469,6 +476,7 @@ export async function readWidgetData(userId: string, id: string, type: string, t
       case "youtube":  return await readYoutube(userId, id, title);
       case "arxiv":    return await readArxiv(userId, id, title);
       case "hf":       return await readHf(userId, id, title);
+      case "ext":      return await readCustom(userId, id, title);
       default:         return `Widget type "${type}" has no readable data.`;
     }
   } catch (err) {

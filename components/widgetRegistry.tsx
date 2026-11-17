@@ -43,13 +43,14 @@ import ChangesWidget from "./ChangesWidget";
 import HtmlWidget from "./HtmlWidget";
 import TwitchWidget from "./TwitchWidget";
 import BankWidget from "./BankWidget";
+import CustomWidget from "./CustomWidget";
 import type { BankWidgetDef } from "@/lib/widgetBank";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
 const ChessWidget = dynamic(() => import("./ChessWidget"), { ssr: false });
 const TvWidget = dynamic(() => import("./TvWidget"), { ssr: false });
 
 type WidgetProps = { widget: Widget; className?: string };
-const WIDGET_COMPONENTS: Record<Exclude<WidgetType, "custom" | "empty">, ComponentType<WidgetProps>> = {
+const WIDGET_COMPONENTS: Record<Exclude<WidgetType, "custom" | "ext" | "empty">, ComponentType<WidgetProps>> = {
   notebook: NotebookWidget,
   text: TextWidget,
   rss: RssWidget,
@@ -93,6 +94,7 @@ const WIDGET_COMPONENTS: Record<Exclude<WidgetType, "custom" | "empty">, Compone
 export function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, BankWidgetDef> = {}) {
   const cls = `h-full ${extraClass}`;
   if (widget.type === "custom") return <BankWidget widget={widget} def={widget.bankId ? bankDefs[widget.bankId] : undefined} className={cls} />;
+  if (widget.type === "ext") return <CustomWidget widget={widget} className={cls} />;
   const Component = widget.type === "empty" ? undefined : WIDGET_COMPONENTS[widget.type];
   if (Component) return <Component widget={widget} className={cls} />;
   return <WidgetCard widget={widget} className={cls} />;

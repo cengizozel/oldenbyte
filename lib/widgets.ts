@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "deficit" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "search" | "todo" | "clock" | "markets" | "releases" | "server" | "monitor" | "docker" | "dns" | "embed" | "football" | "repository" | "changes" | "html" | "twitch" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "deficit" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "search" | "todo" | "clock" | "markets" | "releases" | "server" | "monitor" | "docker" | "dns" | "embed" | "football" | "repository" | "changes" | "html" | "twitch" | "custom" | "ext";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -32,6 +32,9 @@ export type Widget = {
   category?: WidgetCategory;
   // For type "custom": which widget-bank definition renders this instance.
   bankId?: string;
+  // For type "ext": which custom widget file (lib/customWidgets.ts) draws
+  // this instance, as "<yours|community>/<id>".
+  ext?: string;
   // Registry only: grid cells a new instance starts with. Stripped by
   // instanceOf() so it is never persisted on placed instances.
   defaultSize?: WidgetSize;

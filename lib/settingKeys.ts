@@ -52,6 +52,9 @@ const WIDGET_KEYS: RegExp[] = [
   /^bookmarks-config-(.+)$/,
   /^typing-(?:config|stats)-(.+)$/,
   /^chess-(.+)$/,
+  // Custom widgets (lib/customWidgets.ts): settings, data keys, summary.
+  /^ext-(?:widget|summary)-(.+)$/,
+  /^ext-data-(.+?):.+$/,
 ];
 
 // The widget instance a key belongs to, or null for caches, global config and

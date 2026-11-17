@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, Loader } from "lucide-react";
 import { SettingsSection, SettingsRow } from "@/components/ui/Field";
+import { useCustomWidgets } from "@/lib/useCustomWidgets";
 
 // Settings > Your data: everything stored for this account, the way the user
 // thinks of it (each dashboard's widgets, what is shared across dashboards,
@@ -10,7 +11,9 @@ import { SettingsSection, SettingsRow } from "@/components/ui/Field";
 // and sizes only; /api/settings/summary never sends values.
 
 type Group = { keys: number; bytes: number; updatedAt: number };
+type Files = { uploads: number; library: number; widgets: number; total: number; limit: number | null };
 type Summary = {
+  files?: Files;
   account: { username: string; createdAt: number; sessions: number } | null;
   dashboards: { id: string; name: string; widgets: (Group & { id: string; title: string; type: string })[] }[];
   shared: (Group & { label: string; detail: string })[];
@@ -37,12 +40,15 @@ export function DataSettings() {
   const [open, setOpen] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false); // collapsed to its summary line by default
 
+  // Read again when a custom widget file is added or removed: those change
+  // the files total while this panel stays mounted.
+  const { widgets: customWidgets } = useCustomWidgets();
   useEffect(() => {
     fetch("/api/settings/summary")
       .then(r => (r.ok ? r.json() : Promise.reject()))
       .then(setData)
       .catch(() => setFailed(true));
-  }, []);
+  }, [customWidgets]);
 
   const total = data
     ? [...data.shared, ...data.dashboards.flatMap(d => d.widgets), data.leftovers, data.caches].reduce((n, g) => n + g.bytes, 0)
@@ -72,6 +78,34 @@ export function DataSettings() {
             </span>
             <ChevronRight size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${expanded ? "rotate-90" : ""}`} />
           </button>
+          {data.files && (
+            <div className="flex flex-col gap-1.5 min-h-10 py-2">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm text-[var(--text-primary)]">Files</span>
+                <span className="text-sm text-[var(--text-muted)] tabular-nums">
+                  {data.files.limit === null ? `${size(data.files.total)} used, no limit` : `${size(data.files.total)} of ${size(data.files.limit)} used`}
+                </span>
+              </div>
+              {data.files.limit !== null && (
+                <div
+                  role="progressbar"
+                  aria-label="Storage used"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.min(100, Math.round((data.files.total / data.files.limit) * 100))}
+                  className="h-1.5 rounded-full bg-[var(--surface-border)] overflow-hidden"
+                >
+                  <div
+                    className={`h-full rounded-full ${data.files.total >= data.files.limit * 0.9 ? "bg-red-500" : "bg-[var(--text-muted)]"}`}
+                    style={{ width: `${Math.min(100, (data.files.total / data.files.limit) * 100)}%` }}
+                  />
+                </div>
+              )}
+              <span className="text-sm text-[var(--text-muted)] leading-snug">
+                Library {size(data.files.library)} · uploads {size(data.files.uploads)} · custom widgets {size(data.files.widgets)}
+              </span>
+            </div>
+          )}
           {expanded && <>
 
           <p className="pt-3 pb-1 text-sm font-medium text-[var(--text-secondary)]">Shared by every dashboard</p>

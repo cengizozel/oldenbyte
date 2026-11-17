@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { json, requireUser } from "@/lib/http";
 import { instanceIdOf, isCacheKey } from "@/lib/settingKeys";
+import { fileUsage, quotaBytes } from "@/lib/quota";
 
 // GET /api/settings/summary: what is stored for the signed-in user, grouped
 // the way they think of it (each dashboard's widgets, things shared across
@@ -84,7 +85,12 @@ export async function GET(request: NextRequest) {
   if (Array.isArray(favs)) counts["Feed favorites"] = `${favs.length} ${favs.length === 1 ? "item" : "items"}`;
   counts["Dashboards and layouts"] = `${dashList.length} ${dashList.length === 1 ? "dashboard" : "dashboards"}`;
 
+  // Files on the server's disk (uploads, the library, custom widget files)
+  // and the account's quota for them; null for admins, who have none.
+  const files = { ...(await fileUsage(user.id)), limit: await quotaBytes(user) };
+
   return json({
+    files,
     account: account ? { username: account.username, createdAt: account.createdAt.getTime(), sessions } : null,
     dashboards: dashList.map(d => ({
       id: d.id,

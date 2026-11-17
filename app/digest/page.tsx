@@ -15,7 +15,7 @@ import { localDateStr } from "@/lib/format";
 import { f1CacheKey, redditCacheKey, youtubeCacheKey } from "@/lib/cacheKeys";
 
 type TabLayoutItem = { i: string; tabs?: string[] };
-type WidgetInstance = { id: string; type: string; title: string };
+type WidgetInstance = { id: string; type: string; title: string; digestable?: boolean };
 
 type Entry = {
   text?: string;
@@ -399,6 +399,8 @@ export default function DigestPage() {
     const filtered = orderedIds.filter(id => {
       const w = instances[id];
       if (!w || w.type === "empty") return false;
+      // A custom widget joins when its manifest says it publishes a summary.
+      if (w.type === "ext") return w.digestable === true;
       const def = widgetDefs.find(d => d.type === w.type);
       return def?.digestable !== false;
     });
@@ -423,8 +425,15 @@ export default function DigestPage() {
       case "youtube":  return loadYoutube(id, widget);
       case "arxiv":    return loadArxiv(id, widget);
       case "hf":       return loadHf(id, widget);
+      case "ext":      return loadCustom(id, widget);
       default:         return null;
     }
+  }
+
+  // A custom widget (docs/custom-widgets.md): the summary it published.
+  async function loadCustom(id: string, widget: WidgetInstance): Promise<Section | null> {
+    const text = (await storage.getItem(`ext-summary-${id}`))?.trim();
+    return text ? { id, label: widget.title, type: "text", entries: [{ text }] } : null;
   }
 
   async function loadText(id: string, widget: WidgetInstance): Promise<Section | null> {
