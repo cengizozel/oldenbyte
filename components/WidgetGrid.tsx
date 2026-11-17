@@ -1095,7 +1095,12 @@ export default function WidgetGrid({
           transform: `translate(${ov.tf.x}px, ${ov.tf.y}px) scale(${ov.tf.k})`,
           transition: ov.animate ? `transform ${OVERVIEW_MS}ms cubic-bezier(0.25, 0.6, 0.3, 1)` : "none",
           opacity: ov.phase === "prep" || ov.phase === "place" ? 0 : 1,
-          willChange: "transform",
+          // No will-change here. It would make the browser keep this whole
+          // layer (the grid at desktop width, several screens tall) drawn at
+          // full resolution while it is shown at a third of its size: on a
+          // phone that is past what the graphics memory holds, and Android
+          // then drops pieces of the page (cards cut off, the top bar gone).
+          // Without it the layer is drawn at the size it is shown.
         } : undefined}
       >
         {editing && size.width > 0 && (

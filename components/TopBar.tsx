@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, type RefObject } from "react";
-import { Check, Loader, X, RotateCcw, LayoutGrid, Newspaper, Settings, ChevronDown, ChevronRight, Plus, Pencil, Search, LogOut, GripVertical } from "lucide-react";
+import { Check, Loader, X, LayoutGrid, Newspaper, Settings, ChevronDown, ChevronRight, Plus, Pencil, Search, LogOut, GripVertical } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { LOCALES } from "@/lib/i18n";
 import { setLocale, useLocale } from "@/lib/useT";
@@ -17,6 +17,8 @@ import { DevicesSettings } from "@/components/DevicesSettings";
 import { CustomWidgetsSettings } from "@/components/CustomWidgetsSettings";
 import { NEW_DASHBOARD_EVENT, OPEN_SETTINGS_EVENT } from "@/lib/keyboard";
 import { FOCUS_RING, HIT_AREA, SettingsRow, SettingsSection } from "@/components/ui/Field";
+import { SaveCancelRow } from "@/components/ui/WidgetChrome";
+import { colorMap } from "@/lib/widgets";
 
 // ── EditableField ─────────────────────────────────────────────────────────
 
@@ -203,32 +205,20 @@ function EditableField({
 
           {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
 
-          <div className="flex items-center justify-between mt-3">
-            <button
-              onClick={async () => {
+          {/* The same reset, cancel and save as a settings face. */}
+          <div className="mt-3">
+            <SaveCancelRow
+              c={colorMap.neutral}
+              onReset={async () => {
                 await storage.removeItem(storageKey);
                 setDisplay(defaultValue);
                 setConfig({ type: "text", value: defaultValue });
                 setOpen(false);
               }}
-              className="text-neutral-300 hover:text-neutral-500"
-              title="Reset to default"
-            >
-              <RotateCcw size={14} />
-            </button>
-            <div className="flex gap-3">
-              <button onClick={() => { setOpen(false); setError(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Cancel">
-                <X size={14} />
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={testing}
-                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
-                title={draft.type === "url" ? "Test & Save" : "Save"}
-              >
-                {testing ? <Loader size={14} className="animate-spin" /> : <Check size={14} />}
-              </button>
-            </div>
+              onCancel={() => { setOpen(false); setError(""); }}
+              onSave={handleSave}
+              saving={testing}
+            />
           </div>
         </div>
       )}
@@ -478,14 +468,9 @@ function DateDisplay({ timezone }: { timezone: string }) {
             ))}
           </div>
 
-          {/* The same filled cancel and save as a settings face. */}
-          <div className="flex items-center justify-end gap-2 mt-3">
-            <button type="button" onClick={() => setOpen(false)} title="Cancel" aria-label="Cancel" className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors bg-black/5 dark:bg-white/10 text-[var(--text-secondary)] opacity-70 hover:opacity-100 ${FOCUS_RING}`}>
-              <X size={16} />
-            </button>
-            <button type="button" onClick={handleSave} title="Save" aria-label="Save" className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors bg-black/10 dark:bg-white/15 hover:bg-black/15 dark:hover:bg-white/20 text-[var(--text-primary)] ${FOCUS_RING}`}>
-              <Check size={16} />
-            </button>
+          {/* The same cancel and save as a settings face. */}
+          <div className="mt-3">
+            <SaveCancelRow c={colorMap.neutral} onCancel={() => setOpen(false)} onSave={handleSave} />
           </div>
         </div>
       )}

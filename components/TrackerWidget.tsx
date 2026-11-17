@@ -2,7 +2,7 @@
 
 import { useT } from "@/lib/useT";
 import { useState, useEffect } from "react";
-import { Timer, Plus, Play, Pause, History, Trash2, X, Check, Flame, ChevronLeft, Pencil } from "lucide-react";
+import { Timer, Plus, Play, Pause, History, Trash2, X, Flame, ChevronLeft, Pencil } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { parseJson } from "@/lib/text";
@@ -10,7 +10,7 @@ import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
-import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsField, SettingsListRow, LIST_TITLE_INPUT, ROW_ACTION, SettingsAddRow } from "./ui/WidgetChrome";
+import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsField, SettingsListRow, LIST_TITLE_INPUT, ROW_ACTION, SettingsAddRow, SaveCancelButtons } from "./ui/WidgetChrome";
 
 type Item = { id: string; name: string };
 // All days of tracked time: date (YYYY-MM-DD, local) -> activity id -> seconds.
@@ -550,8 +550,7 @@ export default function TrackerWidget({
                             className={`w-9 text-sm text-right tabular-nums border border-[var(--surface-border)] rounded-md px-1.5 py-1 outline-none bg-[var(--surface)] ${c.text}`}
                           />
                           <span className={`text-sm opacity-70 ${c.label}`}>m</span>
-                          <button onClick={() => setEditRowId(null)} aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ml-1 ${iconBtnCls}`}><X size={14} /></button>
-                          <button onClick={() => saveRowEdit(detailDate, r.id)} aria-label="Save" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${iconBtnCls}`}><Check size={14} /></button>
+                          <SaveCancelButtons c={c} onCancel={() => setEditRowId(null)} onSave={() => saveRowEdit(detailDate, r.id)} className="ml-1" />
                         </span>
                       ) : (
                         <>

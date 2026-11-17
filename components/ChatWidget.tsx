@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
-import { Bot, Send, Square, Check, X, Loader, MessageSquare, Plus, ChevronDown, Power, Paperclip, ArrowDown, type LucideIcon } from "lucide-react";
+import { Bot, Send, Square, Loader, MessageSquare, Plus, ChevronDown, Power, Paperclip, ArrowDown, type LucideIcon } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import { isDemoMode } from "@/lib/demo";
 import { useWidgetActive } from "@/lib/activeDashboard";
 import { effectiveTimezone, todayIn, TZ_EVENT } from "@/lib/timezone";
 import { listAllDashboardWidgets, dashboardOf, kindLabel, getCalendarAccount, type WidgetRosterItem, type CalendarSource } from "@/lib/dashboardContext";
-import { WidgetHeader, EmptyState, Chip, SmallButton, Popover } from "./ui/WidgetChrome";
+import { WidgetHeader, EmptyState, Chip, SmallButton, Popover, SaveCancelButtons } from "./ui/WidgetChrome";
 import { HIT_AREA, FOCUS_RING } from "./ui/Field";
 import { tagColor } from "@/lib/colors";
 import {
@@ -1080,10 +1080,7 @@ export default function ChatWidget({
                         rows={Math.min(12, Math.max(3, editDraft.split("\n").length))}
                         className="w-full text-sm border border-[var(--surface-border)] rounded-xl px-3 py-2 outline-none focus:border-[var(--surface-border-focus)] bg-[var(--surface)] text-[var(--text-primary)] font-mono resize-y"
                       />
-                      <div className="flex items-center justify-end gap-3">
-                        <button onClick={cancelEdit} title="Cancel" aria-label="Cancel" className={`text-[var(--text-muted)] hover:text-[var(--text-primary)] ${HIT_AREA} ${FOCUS_RING}`}><X size={14} /></button>
-                        <button onClick={saveEdit} title="Save" aria-label="Save" className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${HIT_AREA} ${FOCUS_RING}`}><Check size={14} /></button>
-                      </div>
+                      <SaveCancelButtons c={c} onCancel={cancelEdit} onSave={saveEdit} className="justify-end" />
                     </div>
                   );
                 }

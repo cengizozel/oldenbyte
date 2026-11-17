@@ -194,16 +194,36 @@ export function SaveCancelRow({
           </button>
         )
       ) : <span />}
-      <div className="flex items-center gap-2">
-        <button type="button" onClick={onCancel} title={onSave ? t("common.cancel") : t("common.close")} aria-label={onSave ? t("common.cancel") : t("common.close")} data-face-cancel className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`}>
-          <X size={16} />
+      {/* While the question is up it has the row to itself: in a narrow
+          card there is no room for it beside cancel and save. */}
+      {!confirm && <SaveCancelButtons c={c} onSave={onSave} onCancel={onCancel} saving={saving} saveDisabled={saveDisabled} />}
+    </div>
+  );
+}
+
+// The cancel and save pair on their own, for an edit that happens inside a
+// row (a message being edited, a log entry) where the full row above has no
+// place. The same two filled buttons everywhere: nothing that saves or
+// cancels is drawn as a bare icon.
+export function SaveCancelButtons({ c, onSave, onCancel, saving = false, saveDisabled = false, className = "" }: {
+  c: ColorClasses;
+  onSave?: () => void;
+  onCancel: () => void;
+  saving?: boolean;
+  saveDisabled?: boolean;
+  className?: string;
+}) {
+  const t = useT();
+  return (
+    <div className={`flex items-center gap-2 shrink-0 ${className}`}>
+      <button type="button" onClick={onCancel} title={onSave ? t("common.cancel") : t("common.close")} aria-label={onSave ? t("common.cancel") : t("common.close")} data-face-cancel className={`${FACE_BUTTON} ${c.label} opacity-70 hover:opacity-100`}>
+        <X size={16} />
+      </button>
+      {onSave && (
+        <button type="button" onClick={onSave} disabled={saving || saveDisabled} title={t("common.save")} aria-label={t("common.save")} data-face-save className={`${FACE_BUTTON} bg-black/10 dark:bg-white/15 hover:bg-black/15 dark:hover:bg-white/20 ${c.text} disabled:opacity-40`}>
+          {saving ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
         </button>
-        {onSave && (
-          <button type="button" onClick={onSave} disabled={saving || saveDisabled} title={t("common.save")} aria-label={t("common.save")} data-face-save className={`${FACE_BUTTON} bg-black/10 dark:bg-white/15 hover:bg-black/15 dark:hover:bg-white/20 ${c.text} disabled:opacity-40`}>
-            {saving ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
-          </button>
-        )}
-      </div>
+      )}
     </div>
   );
 }
