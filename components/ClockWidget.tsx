@@ -68,7 +68,7 @@ export default function ClockWidget({ widget, className = "" }: { widget: Widget
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
   const [now, setNow] = useState<Date | null>(null);
-  const zones = useMemo(allZones, []);
+  const zones = useMemo(() => allZones(), []);
   const { ref, onScroll, topFade, bottomFade } = useScrollFade<HTMLDivElement>([config.zones.length]);
 
   useEffect(() => {
