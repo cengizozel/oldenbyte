@@ -16,7 +16,10 @@ type AdminUser = {
   mustChangePassword: boolean;
   createdAt: string;
 };
-type Config = { registrationEnabled: boolean; hasInvite: boolean; feedCacheMinutes: number };
+type Config = {
+  registrationEnabled: boolean; hasInvite: boolean; feedCacheMinutes: number;
+  twitchConnected?: boolean; twitchFromEnv?: boolean; twitchClientId?: string;
+};
 
 const cardClass =
   "bg-[var(--surface)] border border-[var(--surface-border)] rounded-2xl p-5 shadow-sm";
@@ -73,6 +76,11 @@ export default function AdminPage() {
 
   const [invite, setInvite] = useState("");
   const [configMsg, setConfigMsg] = useState("");
+  // Twitch application for the Twitch widget: typed here, kept on the server.
+  const [twitchId, setTwitchId] = useState("");
+  const [twitchSecret, setTwitchSecret] = useState("");
+  const [twitchMsg, setTwitchMsg] = useState("");
+  const [twitchBusy, setTwitchBusy] = useState(false);
 
   useEffect(() => {
     fetch("/api/me")
@@ -181,6 +189,29 @@ export default function AdminPage() {
       setConfigMsg("Feed cache updated.");
     } catch {
       setConfigMsg("Could not update feed cache.");
+    }
+  }
+
+  async function saveTwitch(disconnect = false) {
+    setTwitchMsg("");
+    if (!disconnect && (!twitchId.trim() || !twitchSecret.trim())) { setTwitchMsg("Enter both the client ID and the client secret."); return; }
+    setTwitchBusy(true);
+    try {
+      const res = await fetch("/api/admin/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(disconnect ? { twitchDisconnect: true } : { twitchClientId: twitchId, twitchClientSecret: twitchSecret }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Could not save.");
+      setConfig(data);
+      setTwitchId("");
+      setTwitchSecret("");
+      setTwitchMsg(disconnect ? "Twitch disconnected." : "Twitch connected.");
+    } catch (e) {
+      setTwitchMsg(String((e as Error).message));
+    } finally {
+      setTwitchBusy(false);
     }
   }
 
@@ -385,6 +416,52 @@ export default function AdminPage() {
                 />
                 <span className="text-sm text-[var(--text-secondary)]">min</span>
               </div>
+            </div>
+
+            {/* Twitch: the application the Twitch widget signs in with. */}
+            <div className="mt-5 pt-5 border-t border-[var(--surface-border)] flex flex-col gap-3">
+              <div className="flex flex-col gap-0.5">
+                <span className={LABEL}>Twitch</span>
+                <span className={HINT}>
+                  {config.twitchConnected
+                    ? config.twitchFromEnv
+                      ? "Connected from the server's environment (TWITCH_CLIENT_ID)."
+                      : `Connected with client ID ${config.twitchClientId}. The secret is kept on the server and is not shown again.`
+                    : "The Twitch widget needs a Twitch application: create one for free at dev.twitch.tv (Applications, Register), then enter its client ID and a client secret here. They are checked with Twitch before being saved."}
+                </span>
+              </div>
+              {!config.twitchFromEnv && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    value={twitchId}
+                    onChange={e => setTwitchId(e.target.value)}
+                    placeholder={config.twitchConnected ? "New client ID" : "Client ID"}
+                    aria-label="Twitch client ID"
+                    autoComplete="off"
+                    className={`${inputClass} flex-1 min-w-40`}
+                  />
+                  <input
+                    type="password"
+                    value={twitchSecret}
+                    onChange={e => setTwitchSecret(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && saveTwitch()}
+                    placeholder="Client secret"
+                    aria-label="Twitch client secret"
+                    autoComplete="new-password"
+                    className={`${inputClass} flex-1 min-w-40`}
+                  />
+                  <button type="button" onClick={() => saveTwitch()} disabled={twitchBusy} className={`h-10 px-4 rounded-xl text-sm font-medium disabled:opacity-50 ${SECONDARY_BUTTON}`}>
+                    {config.twitchConnected ? "Replace" : "Connect"}
+                  </button>
+                  {config.twitchConnected && (
+                    <button type="button" onClick={() => saveTwitch(true)} disabled={twitchBusy} className={`h-10 px-4 rounded-xl text-sm disabled:opacity-50 ${SECONDARY_BUTTON}`}>
+                      Disconnect
+                    </button>
+                  )}
+                </div>
+              )}
+              {twitchMsg && <p role="status" className={HINT}>{twitchMsg}</p>}
             </div>
           </section>
         )}

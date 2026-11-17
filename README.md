@@ -26,7 +26,7 @@ A self-hosted personal dashboard. Drag and resize widgets, keep several dashboar
 | **Live** | Weather, F1, Football (a team or a league, live scores), Markets |
 | **Library** | Reader (PDF and EPUB), Kiwix, Anytype |
 | **Server** | Server stats, Monitor, Docker, DNS (AdGuard Home, Pi-hole), Changes (changedetection.io) |
-| **Media** | TV (IPTV) |
+| **Media** | TV (IPTV), Twitch |
 | **Play** | Chess (Stockfish), Typing |
 | **AI** | Chat |
 

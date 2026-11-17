@@ -54,6 +54,7 @@ const en = {
     repository: "choose a repository",
     changes: "connect changedetection.io",
     html: "add your HTML",
+    twitch: "add a channel",
   },
 } as const;
 

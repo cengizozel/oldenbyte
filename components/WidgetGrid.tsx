@@ -56,6 +56,7 @@ import FootballWidget from "./FootballWidget";
 import RepositoryWidget from "./RepositoryWidget";
 import ChangesWidget from "./ChangesWidget";
 import HtmlWidget from "./HtmlWidget";
+import TwitchWidget from "./TwitchWidget";
 import BankWidget from "./BankWidget";
 import type { BankWidgetDef } from "@/lib/widgetBank";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
@@ -138,6 +139,7 @@ const WIDGET_COMPONENTS: Record<Exclude<WidgetType, "custom" | "empty">, Compone
   repository: RepositoryWidget,
   changes: ChangesWidget,
   html: HtmlWidget,
+  twitch: TwitchWidget,
 };
 
 function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, BankWidgetDef> = {}) {
@@ -1374,6 +1376,7 @@ export default function WidgetGrid({
                   <div
                     key={item.i}
                     data-cell-index={cellOrder.get(item.i)}
+                    data-cell-id={item.i}
                     className="min-h-0 min-w-0"
                     style={{
                       gridColumn: `span ${Math.min(item.w, 2)}`,

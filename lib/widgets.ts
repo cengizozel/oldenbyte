@@ -1,4 +1,4 @@
-export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "deficit" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "search" | "todo" | "clock" | "markets" | "releases" | "server" | "monitor" | "docker" | "dns" | "embed" | "football" | "repository" | "changes" | "html" | "custom";
+export type WidgetType = "notebook" | "ebook" | "empty" | "text" | "rss" | "reddit" | "youtube" | "f1" | "arxiv" | "hf" | "tracker" | "rhythm" | "upkeep" | "deficit" | "bookmarks" | "typing" | "chess" | "chat" | "kiwix" | "anytype" | "weather" | "calendar" | "schedule" | "tv" | "search" | "todo" | "clock" | "markets" | "releases" | "server" | "monitor" | "docker" | "dns" | "embed" | "football" | "repository" | "changes" | "html" | "twitch" | "custom";
 
 export type WidgetColor = "amber" | "sky" | "neutral" | "rose" | "teal" | "orange";
 
@@ -413,6 +413,16 @@ export const widgets: Widget[] = [
     color: "neutral",
     title: "HTML",
     description: "Your own HTML, CSS and JavaScript, run in a sandbox.",
+    digestable: false,
+  },
+  {
+    id: "twitch",
+    type: "twitch",
+    defaultSize: { w: 1, h: 3 },
+    category: "media",
+    color: "rose",
+    title: "Twitch",
+    description: "Which channels you follow are live, or the most watched categories.",
     digestable: false,
   },
   {

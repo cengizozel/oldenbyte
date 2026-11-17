@@ -32,6 +32,30 @@ export async function setFeedCacheMinutes(minutes: number): Promise<void> {
   await setConfig(FEED_TTL, String(Math.min(1440, Math.max(1, Math.floor(minutes)))));
 }
 
+// The Twitch application the Twitch widget signs in with (dev.twitch.tv,
+// free). The server's environment wins (TWITCH_CLIENT_ID and
+// TWITCH_CLIENT_SECRET); otherwise the pair saved from the Admin page. The
+// secret stays on the server: it is never sent to a browser, the admin's
+// included.
+const TWITCH_ID = "twitchClientId";
+const TWITCH_SECRET = "twitchClientSecret";
+
+export async function getTwitchApp(): Promise<{ clientId: string; clientSecret: string; fromEnv: boolean } | null> {
+  const envId = process.env.TWITCH_CLIENT_ID, envSecret = process.env.TWITCH_CLIENT_SECRET;
+  if (envId && envSecret) return { clientId: envId, clientSecret: envSecret, fromEnv: true };
+  const [clientId, clientSecret] = await Promise.all([getConfig(TWITCH_ID), getConfig(TWITCH_SECRET)]);
+  return clientId && clientSecret ? { clientId, clientSecret, fromEnv: false } : null;
+}
+
+export async function setTwitchApp(clientId: string, clientSecret: string): Promise<void> {
+  await setConfig(TWITCH_ID, clientId);
+  await setConfig(TWITCH_SECRET, clientSecret);
+}
+
+export async function clearTwitchApp(): Promise<void> {
+  await prisma.appConfig.deleteMany({ where: { key: { in: [TWITCH_ID, TWITCH_SECRET] } } });
+}
+
 export async function isRegistrationEnabled(): Promise<boolean> {
   return (await getConfig(REG_ENABLED)) === "true";
 }

@@ -115,10 +115,10 @@ Returns `{ "users": [{ "id", "username", "role", "mustChangePassword", "createdA
 Deletes the account with its settings, sessions, uploads and library folder. You cannot delete yourself or the only admin (`400`).
 
 ### `GET /api/admin/config`
-Returns `{ "registrationEnabled": false, "hasInvite": true, "feedCacheMinutes": 60 }`.
+Returns `{ "registrationEnabled": false, "hasInvite": true, "feedCacheMinutes": 60, "twitchConnected": false, "twitchFromEnv": false, "twitchClientId": "" }`. The Twitch client secret is never returned.
 
 ### `PUT /api/admin/config`
-Accepts any of `registrationEnabled` (boolean), `inviteCode` (string, stored hashed), and `feedCacheMinutes` (number, clamped to 1 to 1440; the TTL of the server feed cache). Returns `{ "ok": true, ... }` with the current values.
+Accepts any of `registrationEnabled` (boolean), `inviteCode` (string, stored hashed), and `feedCacheMinutes` (number, clamped to 1 to 1440; the TTL of the server feed cache). Also `twitchClientId` with `twitchClientSecret` (both strings; tried against Twitch first, and refused with 400 if Twitch rejects them), or `twitchDisconnect: true`. Returns `{ "ok": true, ... }` with the current values.
 
 ---
 
@@ -137,6 +137,9 @@ One entry per symbol, in order: `{ symbol, name, currency, price, prevClose, cha
 
 ### `POST /api/changedetection`
 Body `{ url, apiKey }`. Returns `{ watches: [{ id, title, url, changedAt, checkedAt, error, unseen, diff }] }`, newest change first.
+
+### `GET /api/twitch?op=channels&logins=a,b` and `?op=games`
+`{ channels: [{ login, name, avatar, live, title, game, viewers, startedAt }] }` or `{ games: [{ id, name, art }] }`. 404 `{ error: "not_connected" }` until a Twitch application is connected (see [widgets/twitch.md](widgets/twitch.md)).
 
 ### `GET /api/monitor?url=<address>`
 `{ up, status, ms, error? }`. Up means an answer below HTTP 500. Kept for 20 seconds per user and address.

@@ -269,3 +269,27 @@ describe("html widget", () => {
     expect(doc).toContain("color-scheme: dark");
   });
 });
+
+import { mapChannels, mapGames } from "@/lib/twitch";
+import { normalizeChannel } from "@/components/TwitchWidget";
+
+describe("twitch", () => {
+  const users = { data: [{ login: "alpha", display_name: "Alpha", profile_image_url: "a.png" }, { login: "beta", display_name: "Beta", profile_image_url: "b.png" }] };
+  const streams = { data: [{ user_login: "beta", title: "Playing", game_name: "Chess", viewer_count: 120, started_at: "2026-11-17T10:00:00Z" }] };
+  it("marks who is live, keeps the order asked, and drops names Twitch does not know", () => {
+    const rows = mapChannels(["Alpha", "ghost", "beta"], users, streams);
+    expect(rows.map(r => r.login)).toEqual(["alpha", "beta"]);
+    expect(rows[0]).toMatchObject({ name: "Alpha", live: false, viewers: 0 });
+    expect(rows[1]).toMatchObject({ name: "Beta", live: true, game: "Chess", viewers: 120, title: "Playing" });
+  });
+  it("sizes the box art", () => {
+    expect(mapGames({ data: [{ id: "1", name: "Chess", box_art_url: "https://x/ttv-boxart/1-{width}x{height}.jpg" }] }))
+      .toEqual([{ id: "1", name: "Chess", art: "https://x/ttv-boxart/1-104x144.jpg" }]);
+  });
+  it("accepts a channel name or its address", () => {
+    expect(normalizeChannel("TwitchDev")).toBe("twitchdev");
+    expect(normalizeChannel("https://www.twitch.tv/TwitchDev/videos")).toBe("twitchdev");
+    expect(normalizeChannel("@some_one")).toBe("some_one");
+    expect(normalizeChannel("not a channel")).toBeNull();
+  });
+});
