@@ -415,7 +415,7 @@ export const HEADER_SWAP = {
 export function LogoGlyph({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden className={className}>
-      <rect x="1.5" y="1.5" width="13" height="13" rx="3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 2.2" />
+      <path d="M1.5 5A3.5 3.5 0 0 1 5 1.5M11 1.5A3.5 3.5 0 0 1 14.5 5M14.5 11A3.5 3.5 0 0 1 11 14.5M5 14.5A3.5 3.5 0 0 1 1.5 11M7.1 1.5H8.9M7.1 14.5H8.9M1.5 7.1V8.9M14.5 7.1V8.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       <rect x="5.25" y="5.25" width="5.5" height="5.5" rx="1.5" fill="currentColor" />
     </svg>
   );

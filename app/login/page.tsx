@@ -28,7 +28,13 @@ function Logo() {
   return (
     <svg viewBox="0 0 100 100" className="w-12 h-12" aria-hidden>
       <rect width="100" height="100" rx="22" fill="#141414" />
-      <rect x="16" y="16" width="68" height="68" rx="12" fill="none" stroke="#e5e5e5" strokeWidth="4" strokeDasharray="14 10" strokeLinecap="round" />
+      <g fill="none" stroke="#e5e5e5" strokeWidth="4" strokeLinecap="round">
+        <path d="M16 30 V28 A12 12 0 0 1 28 16 H30" />
+        <path d="M70 16 H72 A12 12 0 0 1 84 28 V30" />
+        <path d="M84 70 V72 A12 12 0 0 1 72 84 H70" />
+        <path d="M30 84 H28 A12 12 0 0 1 16 72 V70" />
+        <path d="M39 16 H61 M39 84 H61 M16 39 V61 M84 39 V61" />
+      </g>
       <rect x="34" y="34" width="32" height="32" rx="8" fill="#5eead4" />
       <rect x="30" y="30" width="40" height="40" rx="10" fill="none" stroke="#5eead4" strokeOpacity="0.35" strokeWidth="6" />
     </svg>
