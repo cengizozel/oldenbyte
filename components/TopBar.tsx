@@ -639,6 +639,11 @@ function AccountSection({ open }: { open: boolean }) {
 
   if (!me) return null;
 
+  // Inside the phone app the dashboard is shown in the app's own web view.
+  // Signing out belongs to the app there (it holds the sign-in and would only
+  // sign this view back in), so the row opens the app's settings instead.
+  const phoneApp = typeof window !== "undefined" ? (window as unknown as { ReactNativeWebView?: { postMessage: (m: string) => void } }).ReactNativeWebView : undefined;
+
   // The desktop app: no account to sign out of and no password to know.
   if (me.local) {
     return (
@@ -658,14 +663,25 @@ function AccountSection({ open }: { open: boolean }) {
   return (
     <SettingsSection title="Account">
       <SettingsRow label={<span title={me.username}>{me.username}</span>} hint={me.role === "admin" ? "Administrator" : "Member"}>
-        <button
-          onClick={logout}
-          title="Log out"
-          className={`flex items-center gap-1.5 min-h-7 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors ${FOCUS_RING}`}
-        >
-          <LogOut size={14} />
-          Log out
-        </button>
+        {phoneApp ? (
+          <button
+            onClick={() => phoneApp.postMessage(JSON.stringify({ type: "oldenbyte:app-settings" }))}
+            title="Sign out, change server and more, in the app"
+            className={`flex items-center gap-1.5 min-h-7 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors ${FOCUS_RING}`}
+          >
+            <Settings size={14} />
+            App settings
+          </button>
+        ) : (
+          <button
+            onClick={logout}
+            title="Log out"
+            className={`flex items-center gap-1.5 min-h-7 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors ${FOCUS_RING}`}
+          >
+            <LogOut size={14} />
+            Log out
+          </button>
+        )}
       </SettingsRow>
 
       {me.role === "admin" && (

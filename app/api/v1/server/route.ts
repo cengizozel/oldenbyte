@@ -17,5 +17,9 @@ export async function GET() {
     // False on a server nobody has set up yet: the first account is made on the website.
     ready: users > 0,
     registration,
+    // What this server's pages do for an app that shows them: "app-settings"
+    // means the dashboard's settings offer a way into the app's own settings
+    // (a message to the app's web view), so the app need not draw one.
+    features: ["app-settings"],
   });
 }

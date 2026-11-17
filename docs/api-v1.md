@@ -39,6 +39,8 @@ The first thing an app asks after the user types an address: is this an oldenbyt
 - `ready`: false on a server nobody has set up yet. The first account is made on the website.
 - `registration`: whether new accounts can be made with an invite code.
 
+The answer of `GET /api/v1/server` also carries `features`, a list of things this server's pages do for an app that shows them in a web view. `app-settings`: inside an app's web view (where `window.ReactNativeWebView` exists) the dashboard's settings show "App settings" in place of "Log out", which posts `{"type":"oldenbyte:app-settings"}` to the app. An app that shows the dashboard on a server without this feature has to offer its own way to its settings.
+
 ### `POST /api/v1/auth/login` (no sign-in)
 
 Body `{ "username", "password", "device" }`. `device` is the name shown in Settings > Devices ("Pixel 9"); up to 60 characters, optional. The same check and rate limits as the website's sign-in.
