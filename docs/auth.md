@@ -18,7 +18,7 @@ The dashboard has per-user accounts stored in the database. Passwords are hashed
 3. On match it inserts a Session row and sets an httpOnly session cookie, named `__Host-session` in production (Secure, Path=/, no Domain, so no other subdomain can set it) and `session` in development.
 4. The middleware checks the cookie signature on every request; route handlers look the session up in the database.
 5. An invalid, missing or expired session redirects to `/login` (API routes: 401).
-6. `DELETE /api/auth` logs out: it deletes the session row and clears the cookie. Changing your password, an admin reset, or deleting the account ends all of that account's sessions.
+6. `DELETE /api/auth` logs out: it deletes the session row and clears the cookie. Changing your password, an admin reset, or deleting the account ends all of that account's sessions and signs out its devices.
 
 Login takes usernames up to 64 and passwords up to 200 characters, and is rate limited per client IP plus username, per client IP, per username, and globally (60 attempts a minute across everyone). An address that has already logged in as a user skips the per-username and global limits for that user, so someone hammering them cannot lock the owner out. At most two scrypt hashes run at once (`lib/password.ts`). Registration, setup and password changes are rate limited too (`lib/ratelimit.ts`, all in memory, reset on restart).
 
@@ -49,7 +49,7 @@ Because the cookie is `secure` in production, a login over plain `http://` (for 
 
 ## Middleware
 
-`proxy.ts` is the Next.js 16 middleware (the renamed `middleware` convention). It lets the public paths `/login`, `/api/auth` (including `/api/auth/state`), `/api/setup` and `/api/register` through. The matcher always runs it for API routes, and for pages it excludes Next.js static assets, images, the favicon and `.png` files (so the login screen's images load):
+`proxy.ts` is the Next.js 16 middleware (the renamed `middleware` convention). It lets the public paths `/login`, `/api/auth` (including `/api/auth/state`), `/api/setup`, `/api/register`, `/manifest.webmanifest`, `/api/v1/server` and `/api/v1/auth/login` through. The matcher always runs it for API routes, and for pages it excludes Next.js static assets, images, the favicon and `.png` files (so the login screen's images load):
 
 ```ts
 matcher: [
@@ -73,6 +73,14 @@ Authorization: Bearer <API_KEY>
 ```
 
 The token is accepted on `/api/config` only; every other route needs a session. Requests authenticated this way act as the first admin account, so scripts operate on the admin's data. The token path is **disabled** unless `API_KEY` is set to at least 32 characters (a shorter key is ignored, with a warning at startup). The key is compared in constant time (`lib/auth.ts`, `apiKeyValid`, `bearerAllowed`).
+
+## Devices (apps)
+
+An app, such as the phone app, signs in with `POST /api/v1/auth/login` and gets a token of its own (`obd_` plus 32 random bytes) that it sends as `Authorization: Bearer obd_...`. The database keeps only the token's SHA-256 in the Device table. The token works on API routes only, with the account's own permissions, and never expires on its own: it ends when the device is signed out (in the app, or under Settings > Devices), when the password changes, or when the account is deleted. See [api-v1.md](./api-v1.md).
+
+The middleware cannot look a token up, so it lets a request carrying something shaped like one through to the API, where `getUserFromRequest` checks it against the database. A request that presents a device token is judged on it alone and never falls back to a cookie. Device requests skip the same-origin check, since a browser never attaches the token on its own.
+
+For its in-app web view an app trades the token for a normal session cookie at `GET /api/v1/auth/web`. That session row carries the device's id and is deleted with the device.
 
 ## Environment Variables
 

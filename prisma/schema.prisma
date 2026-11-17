@@ -20,6 +20,7 @@ model User {
   createdAt          DateTime @default(now())
 
   sessions Session[]
+  devices  Device[]
   settings Setting[]
   caches   Cache[]
 }
@@ -29,6 +30,25 @@ model Session {
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
+  // Set when the session was opened by an app for its in-app web view: signing
+  // that device out ends these sessions too.
+  deviceId  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// An app signed in to the account (the phone app, later a browser extension).
+// It holds a token of its own instead of a browser cookie; only the token's
+// hash is stored, so the database cannot be used to sign in as a device.
+model Device {
+  id         String   @id @default(uuid()) // public: shown in lists, used to sign the device out
+  userId     String
+  tokenHash  String   @unique               // sha256 hex of the token
+  name       String
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

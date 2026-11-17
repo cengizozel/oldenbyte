@@ -46,3 +46,7 @@ How it works: the grid is laid out 1200px wide (so the full four-column layout r
 Rotating the phone, entering layout editing or switching dashboards closes the overview.
 
 Touch taps do not move the keyboard target (the teal logo and ring are for a keyboard).
+
+## Apps
+
+A native app talks to the server through the versioned routes in [api-v1.md](./api-v1.md): it signs in as a device, reads the dashboards and widget data, and shows any widget it has not rebuilt natively through the single-widget page `/embed/<dashboard id>/<widget id>`. Signed-in apps are listed under Settings > Devices, where each can be signed out.

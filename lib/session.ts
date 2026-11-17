@@ -6,6 +6,7 @@ import { createHash, randomBytes } from "crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "./prisma";
 import { SESSION_COOKIE, signSessionToken, verifySessionToken, apiKeyValid, bearerAllowed } from "./auth";
+import { deviceForToken, looksLikeDeviceToken, revokeAllDevices } from "./devices";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
@@ -18,6 +19,9 @@ export type SessionUser = {
   username: string;
   role: string;
   mustChangePassword: boolean;
+  // Set when the request was signed in by an app's device token (or by a web
+  // session that app opened), not by a browser sign-in.
+  deviceId?: string;
 };
 
 export type NewSession = { token: string; cookie: CookieOptions };
@@ -40,10 +44,12 @@ export function sessionCookieOptions(maxAge: number): CookieOptions {
   };
 }
 
-export async function createSession(userId: string): Promise<NewSession> {
+// `deviceId`: the session is opened by an app for its in-app web view, and
+// ends when that device is signed out.
+export async function createSession(userId: string, deviceId?: string): Promise<NewSession> {
   const sid = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-  await prisma.session.create({ data: { id: hashSid(sid), userId, expiresAt } });
+  await prisma.session.create({ data: { id: hashSid(sid), userId, expiresAt, deviceId: deviceId ?? null } });
   const token = await signSessionToken(sid, expiresAt.getTime());
   return { token, cookie: sessionCookieOptions(Math.floor(SESSION_TTL_MS / 1000)) };
 }
@@ -67,6 +73,18 @@ export async function getUserFromRequest(request: NextRequest): Promise<SessionU
     return null;
   }
 
+  // An app: its device token, checked against the Device table. A request
+  // that presents one is judged on it alone; a bad token never falls back to
+  // whatever cookie came along.
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+  if (looksLikeDeviceToken(bearer)) {
+    const device = await deviceForToken(bearer);
+    if (!device) return null;
+    const owner = await prisma.user.findUnique({ where: { id: device.userId } });
+    if (!owner) return null;
+    return { id: owner.id, username: owner.username, role: owner.role, mustChangePassword: owner.mustChangePassword, deviceId: device.id };
+  }
+
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const payload = await verifySessionToken(token);
@@ -83,6 +101,7 @@ export async function getUserFromRequest(request: NextRequest): Promise<SessionU
     username: user.username,
     role: user.role,
     mustChangePassword: user.mustChangePassword,
+    ...(session.deviceId ? { deviceId: session.deviceId } : {}),
   };
 }
 
@@ -93,8 +112,11 @@ export async function destroySession(token: string | undefined): Promise<void> {
   await prisma.session.deleteMany({ where: { id: hashSid(payload.sid) } });
 }
 
+// Everything signed in to the account: browser sessions and apps alike. Used
+// when the password changes and when an admin locks an account out.
 export async function destroyAllSessions(userId: string): Promise<void> {
   await prisma.session.deleteMany({ where: { userId } });
+  await revokeAllDevices(userId);
 }
 
 // Best-effort cleanup of expired rows; cheap and called opportunistically.

@@ -29,6 +29,28 @@ export async function ensureSchema(): Promise<void> {
     `CREATE INDEX IF NOT EXISTS "Session_userId_idx" ON "Session" ("userId")`
   );
 
+  // Sessions opened by an app for its web view carry the device, so signing
+  // the device out ends them too. Added in place on older databases.
+  const sessionCols = await prisma.$queryRawUnsafe<{ name: string }[]>(`PRAGMA table_info("Session")`);
+  if (!sessionCols.some((c) => c.name === "deviceId")) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Session" ADD COLUMN "deviceId" TEXT`);
+  }
+
+  // Apps signed in with a token of their own (lib/devices.ts).
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Device" (
+      "id"         TEXT     PRIMARY KEY,
+      "userId"     TEXT     NOT NULL,
+      "tokenHash"  TEXT     NOT NULL UNIQUE,
+      "name"       TEXT     NOT NULL,
+      "createdAt"  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "lastUsedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "Device_userId_idx" ON "Device" ("userId")`
+  );
+
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "AppConfig" (
       "key"   TEXT PRIMARY KEY,

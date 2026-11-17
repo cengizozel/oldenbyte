@@ -5,6 +5,7 @@ import { createSession, destroyAllSessions } from "@/lib/session";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { rateLimit } from "@/lib/ratelimit";
 import { requireUser, json, badRequest, tooMany } from "@/lib/http";
+import { createDevice } from "@/lib/devices";
 
 export async function POST(request: NextRequest) {
   const user = await requireUser(request);
@@ -41,7 +42,14 @@ export async function POST(request: NextRequest) {
     data: { passwordHash: await hashPassword(newPassword), mustChangePassword: false },
   });
 
+  // A new password signs everything out: browsers and apps. Whoever made the
+  // change stays in, with fresh credentials of the kind they came with.
+  const device = user.deviceId ? await prisma.device.findUnique({ where: { id: user.deviceId }, select: { name: true } }) : null;
   await destroyAllSessions(user.id);
+  if (user.deviceId && request.headers.get("authorization")?.startsWith("Bearer ")) {
+    const fresh = await createDevice(user.id, device?.name ?? "Unnamed device");
+    return json({ ok: true, token: fresh.token, device: { id: fresh.id, name: fresh.name } });
+  }
   const { token, cookie } = await createSession(user.id);
   const res = json({ ok: true });
   res.cookies.set(SESSION_COOKIE, token, cookie);

@@ -34,6 +34,7 @@ export async function DELETE(
     prisma.setting.deleteMany({ where: { userId: targetId } }),
     prisma.cache.deleteMany({ where: { userId: targetId } }),
     prisma.session.deleteMany({ where: { userId: targetId } }),
+    prisma.device.deleteMany({ where: { userId: targetId } }),
     prisma.user.delete({ where: { id: targetId } }),
   ]);
   await rm(path.join(uploadsDir, targetId), { recursive: true, force: true });

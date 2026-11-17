@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken, apiKeyValid, bearerAllowed, SESSION_COOKIE } from "@/lib/auth";
 
+// An app's device token (lib/devices.ts). This gate runs at the edge and
+// cannot look one up, so a request that presents something shaped like one
+// is let through to the API, where every route checks it against the
+// database (lib/session getUserFromRequest) and answers 401 if it is not
+// real. API routes only: pages are for browsers, which sign in with a cookie.
+function hasDeviceToken(authHeader: string | null): boolean {
+  if (!authHeader?.startsWith("Bearer obd_")) return false;
+  const n = authHeader.length - 7;
+  return n >= 40 && n <= 100;
+}
+
 // Paths reachable without a session: the login page and the unauthenticated
 // auth endpoints (state probe, login, logout, first-run setup, registration).
 // /manifest.webmanifest: browsers fetch the web app manifest without the
 // session cookie, and an install must work from the sign-in page too.
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/setup", "/api/register", "/manifest.webmanifest"];
+// /api/v1/server and /api/v1/auth/login: what an app needs before it has a
+// token (is this an oldenbyte server, and signing in).
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/setup", "/api/register", "/manifest.webmanifest", "/api/v1/server", "/api/v1/auth/login"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
@@ -47,11 +60,15 @@ export async function proxy(request: NextRequest) {
     !!authHeader?.startsWith("Bearer ") &&
     apiKeyValid(authHeader.slice(7).trim());
 
-  if (pathname.startsWith("/api/") && !bearer && crossOrigin(request)) {
+  // A device token is not a cookie: a browser never attaches it on its own,
+  // so there is nothing for another site to ride on, and no origin to check.
+  const device = pathname.startsWith("/api/") && hasDeviceToken(authHeader);
+
+  if (pathname.startsWith("/api/") && !bearer && !device && crossOrigin(request)) {
     return NextResponse.json({ error: "Cross-origin request refused" }, { status: 403 });
   }
 
-  if (isPublic(pathname) || bearer) {
+  if (isPublic(pathname) || bearer || device) {
     return NextResponse.next();
   }
 
