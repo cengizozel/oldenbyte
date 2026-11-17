@@ -306,6 +306,12 @@ at `text-2xl font-medium` (`text-lg` on phones); the date at `text-lg`; the
 dashboard switcher at `text-base` (`text-sm` on phones) in the secondary text
 color; action icons at 16px in the secondary color. No all-caps text anywhere.
 
+Under 600px the chrome is the phone frame (`docs/mobile.md`): the dashboard's
+name as a `text-2xl` semibold title, one dot per dashboard at the top right,
+and a bar at the bottom with Dashboard, Digest and Settings (22px icons over
+14px labels, the current one in the primary color). Lists opened on a phone
+use rows at least 44px tall with `text-base` labels.
+
 The settings drawer is built from `SettingsSection` and `SettingsRow`
 (`components/ui/Field.tsx`): a muted `text-sm` section title, then rows at
 least 40px tall separated by hairlines, each with its label in the primary

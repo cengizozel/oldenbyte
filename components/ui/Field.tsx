@@ -111,8 +111,10 @@ export function SettingsSection({ title, children }: { title: string; children: 
   return (
     <section className="flex flex-col">
       {/* An overline, so a section title never reads like a row's hint. */}
-      <h3 className="text-sm font-semibold text-[var(--text-primary)] pt-6 pb-1.5">{title}</h3>
-      <div className="flex flex-col divide-y divide-[var(--surface-border)]">{children}</div>
+      {/* On a phone-width screen the settings are a page: each section is a
+          card of rows under a quiet label, as phone settings are. */}
+      <h3 className="text-sm font-semibold text-[var(--text-primary)] pt-6 pb-1.5 max-[599px]:font-normal max-[599px]:text-[var(--text-muted)] max-[599px]:px-1.5 max-[599px]:pt-5">{title}</h3>
+      <div className="flex flex-col divide-y divide-[var(--surface-border)] max-[599px]:rounded-2xl max-[599px]:border max-[599px]:border-[var(--surface-border)] max-[599px]:bg-[var(--surface)] max-[599px]:px-3.5">{children}</div>
     </section>
   );
 }

@@ -11,7 +11,8 @@ import { isDemoMode, enterDemoMode, exitDemoMode } from "@/lib/demo";
 import { effectiveTimezone, timezoneOptions, zonedDate, setTimezone, setActiveTimezone, TZ_AUTO } from "@/lib/timezone";
 import Toggle from "@/components/ui/Toggle";
 import { KeyboardSettings } from "@/components/KeyboardLayer";
-import { PhoneSettings } from "@/components/MobileNav";
+import { PhoneSettings, usePhone } from "@/components/MobileNav";
+import PhoneTabBar from "@/components/PhoneTabBar";
 import { DataSettings } from "@/components/DataSettings";
 import { DevicesSettings } from "@/components/DevicesSettings";
 import { CustomWidgetsSettings } from "@/components/CustomWidgetsSettings";
@@ -749,9 +750,15 @@ function SettingsPanel({
   preload,
   onTogglePreload,
   returnFocusRef,
+  phone = false,
+  onEditLayout,
 }: {
   open: boolean;
   onClose: () => void;
+  // On a phone the settings are a page of their own under the bottom bar,
+  // not a drawer, and layout editing is reached from here.
+  phone?: boolean;
+  onEditLayout?: () => void;
   // Gets focus back when the drawer closes (the settings button).
   returnFocusRef?: RefObject<HTMLElement | null>;
   theme: Theme;
@@ -799,16 +806,31 @@ function SettingsPanel({
         aria-hidden={!open}
         inert={!open}
         tabIndex={-1}
-        className={`fixed top-0 right-0 h-full w-80 max-w-full z-50 bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl flex flex-col outline-none duration-300 ease-in-out ${open ? "translate-x-0 visible transition-transform" : "translate-x-full invisible transition-[transform,visibility]"}`}
+        className={`fixed top-0 right-0 h-full z-50 flex flex-col outline-none duration-300 ease-in-out ${phone ? "w-full bg-[var(--page-bg)] pb-[calc(60px+env(safe-area-inset-bottom,0px))]" : "w-80 max-w-full bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl"} ${open ? "translate-x-0 visible transition-transform" : "translate-x-full invisible transition-[transform,visibility]"}`}
       >
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[var(--surface-border)]">
-          <span className="text-base font-medium text-[var(--text-primary)]">Settings</span>
-          <button onClick={onClose} aria-label="Close settings" title="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors ${HIT_AREA} ${FOCUS_RING}`}>
+        <div className={`flex items-center justify-between ${phone ? "px-4 pt-3 pb-1" : "px-5 pt-5 pb-4 border-b border-[var(--surface-border)]"}`}>
+          <span className={phone ? "text-2xl font-semibold text-[var(--text-primary)]" : "text-base font-medium text-[var(--text-primary)]"}>Settings</span>
+          <button hidden={phone} onClick={onClose} aria-label="Close settings" title="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors ${HIT_AREA} ${FOCUS_RING}`}>
             <X size={16} />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pb-4 flex flex-col">
+          {phone && onEditLayout && (
+            <SettingsSection title="This dashboard">
+              <button
+                type="button"
+                onClick={() => { onClose(); onEditLayout(); }}
+                className={`flex items-center justify-between gap-3 min-h-11 py-1.5 text-sm text-left text-[var(--text-primary)] ${FOCUS_RING}`}
+              >
+                <span className="flex flex-col">
+                  Edit the layout
+                  <span className="text-[var(--text-muted)] leading-snug">Add, remove, arrange and resize widgets.</span>
+                </span>
+                <ChevronRight size={16} className="shrink-0 text-[var(--text-muted)]" />
+              </button>
+            </SettingsSection>
+          )}
           <AccountSection open={open} />
 
           <SettingsSection title="Appearance">
@@ -905,9 +927,14 @@ function SettingsPanel({
 function DashboardSwitcher({
   dashboards,
   onChange,
+  variant = "name",
 }: {
   dashboards: DashboardsState;
   onChange: (next: DashboardsState) => void;
+  // "name": the dashboard's name with a chevron (the desktop top bar).
+  // "dots": one dot per dashboard, the current one filled (the phone frame,
+  // where the name is the page's title); the same list opens from it.
+  variant?: "name" | "dots";
 }) {
   const [open, setOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -932,6 +959,12 @@ function DashboardSwitcher({
   const listRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // The phone list: rows a thumb can hit. Dragging to reorder needs a mouse,
+  // so the grip is left out there.
+  const big = variant === "dots";
+  const rowText = big ? "text-base px-3 py-3" : "text-sm px-2 py-1.5";
+  const glyph = big ? 16 : 12;
+  const rowAct = big ? "w-10 h-11 flex items-center justify-center" : "";
 
   function shiftFor(i: number): number {
     if (dragIdx === null || overIdx === null || dragIdx === overIdx) return 0;
@@ -1008,16 +1041,29 @@ function DashboardSwitcher({
 
   return (
     <div ref={wrapRef} className="relative">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 text-sm md:text-base text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-        title="Switch dashboard"
-      >
-        {active.name}
-        <ChevronDown size={14} />
-      </button>
+      {variant === "dots" ? (
+        <button
+          onClick={() => setOpen(o => !o)}
+          aria-label={`Dashboards. ${active.name} is shown.`}
+          aria-expanded={open}
+          className={`flex items-center gap-1.5 h-11 pl-3 -mr-1 pr-1 ${FOCUS_RING}`}
+        >
+          {dashboards.list.map(d => (
+            <span key={d.id} aria-hidden className={`w-1.5 h-1.5 rounded-full ${d.id === active.id ? "bg-[var(--text-primary)]" : "bg-[var(--text-muted)] opacity-50"}`} />
+          ))}
+        </button>
+      ) : (
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-1 text-sm md:text-base text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          title="Switch dashboard"
+        >
+          {active.name}
+          <ChevronDown size={14} />
+        </button>
+      )}
       {open && (
-        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 w-48 bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-xl shadow-lg p-1">
+        <div className={`absolute top-full z-50 bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-xl shadow-lg p-1 ${variant === "dots" ? "right-0 mt-0 w-64" : "mt-2 left-1/2 -translate-x-1/2 w-48"}`}>
           <div
             ref={listRef}
             onDragOver={e => {
@@ -1039,7 +1085,7 @@ function DashboardSwitcher({
               style={{ transform: shiftFor(i) ? `translateY(${shiftFor(i)}px)` : undefined }}
               className={`group/dash flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-transform duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
             >
-              <span
+              {!big && <span
                 draggable
                 onDragStart={() => setDragIdx(i)}
                 onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
@@ -1047,7 +1093,7 @@ function DashboardSwitcher({
                 className="shrink-0 pl-1 cursor-grab active:cursor-grabbing text-[var(--text-secondary)] opacity-40 hover:!opacity-80"
               >
                 <GripVertical size={12} />
-              </span>
+              </span>}
               {confirmId === d.id ? (
                 <div className="flex-1 min-w-0 flex flex-wrap items-center justify-end gap-1.5 pl-2 pr-1.5 py-1.5">
                   <span className="w-full min-w-0 break-words text-sm text-[var(--text-primary)]">Delete {d.name} and its widgets?</span>
@@ -1066,12 +1112,12 @@ function DashboardSwitcher({
                     if (e.key === "Escape") setRenamingId(null);
                   }}
                   onBlur={() => commitRename(d.id)}
-                  className="flex-1 min-w-0 text-sm px-2 py-1.5 bg-transparent outline-none text-[var(--text-primary)]"
+                  className={`flex-1 min-w-0 ${rowText} bg-transparent outline-none text-[var(--text-primary)]`}
                 />
               ) : (
                 <button
                   onClick={() => { onChange({ ...dashboards, activeId: d.id }); setOpen(false); }}
-                  className={`flex-1 min-w-0 truncate text-left text-sm px-2 py-1.5 ${
+                  className={`flex-1 min-w-0 truncate text-left ${rowText} ${
                     d.id === dashboards.activeId
                       ? "text-[var(--text-primary)] font-medium"
                       : "text-[var(--text-secondary)]"
@@ -1082,20 +1128,20 @@ function DashboardSwitcher({
               )}
               {confirmId !== d.id && <button
                 onClick={() => { setRenamingId(d.id); setDraft(d.name); }}
-                className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0`}
+                className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0 ${rowAct}`}
                 title="Rename"
                 aria-label={`Rename ${d.name}`}
               >
-                <Pencil size={12} />
+                <Pencil size={glyph} />
               </button>}
               {dashboards.list.length > 1 && confirmId !== d.id && (
                 <button
                   onClick={() => setConfirmId(d.id)}
-                  className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0 mr-1.5`}
+                  className={`opacity-70 hover:!opacity-100 focus-visible:!opacity-100 ${FOCUS_RING} text-[var(--text-secondary)] shrink-0 ${big ? rowAct : "mr-1.5"}`}
                   title="Delete dashboard"
                   aria-label={`Delete ${d.name}`}
                 >
-                  <X size={12} />
+                  <X size={glyph} />
                 </button>
               )}
             </div>
@@ -1103,7 +1149,7 @@ function DashboardSwitcher({
           </div>
           <div className="border-t border-[var(--surface-border)] mt-1 pt-1">
             {creating ? (
-              <div className="flex items-center gap-1 px-2">
+              <div className={`flex items-center gap-1 ${big ? "px-3" : "px-2"}`}>
                 <input
                   value={newName}
                   autoFocus
@@ -1114,22 +1160,23 @@ function DashboardSwitcher({
                     if (e.key === "Escape") { setCreating(false); setNewName(""); }
                   }}
                   onBlur={() => { if (newName.trim()) addDashboard(); else { setCreating(false); setNewName(""); } }}
-                  className="flex-1 min-w-0 text-sm py-1.5 bg-transparent outline-none text-[var(--text-primary)] placeholder:opacity-40"
+                  className={`flex-1 min-w-0 ${big ? "text-base py-3" : "text-sm py-1.5"} bg-transparent outline-none text-[var(--text-primary)] placeholder:opacity-40`}
                 />
                 <button
                   onMouseDown={e => { e.preventDefault(); addDashboard(); }}
-                  className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0"
+                  className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0 ${rowAct}`}
                   title="Create"
+                  aria-label="Create"
                 >
-                  <Check size={12} />
+                  <Check size={glyph} />
                 </button>
               </div>
             ) : (
               <button
                 onClick={() => setCreating(true)}
-                className="w-full flex items-center gap-1.5 text-sm px-2 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5"
+                className={`w-full flex items-center ${big ? "gap-2" : "gap-1.5"} ${rowText} rounded-lg text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5`}
               >
-                <Plus size={12} />
+                <Plus size={glyph} />
                 New dashboard
               </button>
             )}
@@ -1168,6 +1215,16 @@ export default function TopBar({
   const [timezone, setTz] = useState("");
   const [preload, setPreload] = useState(false);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  // The phone frame (docs/mobile.md): the dashboard's name as the title, the
+  // three top bar fields folded away under it, a bar at the bottom.
+  const phone = usePhone();
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+  // "/#settings": how the digest page's bottom bar opens the settings here.
+  useEffect(() => {
+    if (window.location.hash !== "#settings") return;
+    setSettingsOpen(true);
+    history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   useEffect(() => {
     storage.getItem(PRELOAD_KEY).then(v => setPreload(v === "1"));
@@ -1215,11 +1272,77 @@ export default function TopBar({
     return () => { window.removeEventListener(THEME_EVENT, onChange); window.removeEventListener(GLOW_EVENT, onGlow); };
   }, []);
 
+  const settingsPanel = (
+    <SettingsPanel
+      open={settingsOpen}
+      onClose={() => setSettingsOpen(false)}
+      theme={theme}
+      onTheme={applyTheme}
+      glow={glow}
+      onGlow={applyGlow}
+      demo={demo}
+      onToggleDemo={() => (demo ? exitDemoMode() : enterDemoMode())}
+      timezone={timezone}
+      onChangeTimezone={tz => { setTz(tz); setTimezone(tz); }}
+      preload={preload}
+      onTogglePreload={togglePreload}
+      returnFocusRef={settingsButtonRef}
+      phone={phone}
+      onEditLayout={onToggleEdit}
+    />
+  );
+
+  if (phone) {
+    const activeName = dashboards?.list.find(d => d.id === dashboards.activeId)?.name ?? "oldenbyte";
+    return (
+      <>
+        <div className="flex items-center justify-between gap-3 min-h-12">
+          <button
+            type="button"
+            onClick={() => setFieldsOpen(o => !o)}
+            aria-expanded={fieldsOpen}
+            title={fieldsOpen ? "Hide the top bar fields" : "Show the top bar fields"}
+            className={`min-w-0 flex items-center gap-1.5 text-2xl font-semibold text-[var(--text-primary)] text-left ${FOCUS_RING}`}
+          >
+            <span className="truncate">{activeName}</span>
+            <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${fieldsOpen ? "rotate-180" : ""}`} />
+          </button>
+          {editing ? (
+            <div className="flex items-center gap-2 shrink-0">
+              {onCancelEdit && (
+                <button type="button" onClick={onCancelEdit} title="Cancel layout changes" aria-label="Cancel layout changes" className={`w-9 h-9 flex items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 text-[var(--text-secondary)] ${FOCUS_RING}`}>
+                  <X size={18} />
+                </button>
+              )}
+              <button type="button" onClick={onToggleEdit} title="Done editing" aria-label="Done editing" className={`w-9 h-9 flex items-center justify-center rounded-lg bg-black/10 dark:bg-white/15 text-[var(--text-primary)] ${FOCUS_RING}`}>
+                <Check size={18} />
+              </button>
+            </div>
+          ) : dashboards && onDashboardsChange ? (
+            <DashboardSwitcher dashboards={dashboards} onChange={onDashboardsChange} variant="dots" />
+          ) : null}
+        </div>
+        {/* The desktop top bar's three fields, as they are set up there,
+            out of the way until the title is tapped. */}
+        {fieldsOpen && (
+          <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] p-3.5 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3 min-w-0">
+              <div className="min-w-0"><EditableField storageKey="topbar-phrase" defaultValue="oldenbyte" className="text-lg text-[var(--text-primary)] font-medium leading-none" /></div>
+              <div className="min-w-0 flex justify-end"><EditableField storageKey="topbar-mood" defaultValue="feeling quiet" className="text-lg text-[var(--text-primary)] font-medium leading-none" align="right" /></div>
+            </div>
+            <div className="flex justify-center"><DateDisplay timezone={timezone} /></div>
+          </div>
+        )}
+        {!editing && <PhoneTabBar active={settingsOpen ? "settings" : "dashboard"} onDashboard={() => setSettingsOpen(false)} onSettings={() => setSettingsOpen(true)} />}
+        {settingsPanel}
+      </>
+    );
+  }
+
   return (
     <>
-    {/* Phones: the two text fields share the first row and the date with its
-        controls gets a full-width row below; three columns are too narrow
-        there and wrapped the date and the right-hand text. */}
+    {/* Narrow windows that are not phones: the two text fields share the
+        first row and the date with its controls gets a full-width row below. */}
     <div className="grid grid-cols-2 md:grid-cols-3 items-center gap-y-2 md:gap-y-0 min-h-14 md:min-h-16">
       <div className="flex items-center min-w-0">
         <EditableField
@@ -1281,21 +1404,7 @@ export default function TopBar({
         />
       </div>
     </div>
-    <SettingsPanel
-      open={settingsOpen}
-      onClose={() => setSettingsOpen(false)}
-      theme={theme}
-      onTheme={applyTheme}
-      glow={glow}
-      onGlow={applyGlow}
-      demo={demo}
-      onToggleDemo={() => (demo ? exitDemoMode() : enterDemoMode())}
-      timezone={timezone}
-      onChangeTimezone={tz => { setTz(tz); setTimezone(tz); }}
-      preload={preload}
-      onTogglePreload={togglePreload}
-      returnFocusRef={settingsButtonRef}
-    />
+    {settingsPanel}
     </>
   );
 }

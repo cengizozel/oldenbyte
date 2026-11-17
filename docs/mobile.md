@@ -2,7 +2,7 @@
 
 On a phone-width window (under 600px) the dashboard stacks its widgets in one column, in reading order, and tab groups swipe. Two things make a long stack quick to get around: the overview and the jump button.
 
-Code: `components/MobileNav.tsx` (the button, `usePhone`, the Settings > Phone section) and the "Phone overview" block in `components/WidgetGrid.tsx`.
+Code: `components/MobileNav.tsx` (the button, `usePhone`, the Settings > Phone section), `components/PhoneTabBar.tsx` and the phone branch of `components/TopBar.tsx` (the frame), and the "Phone overview" block in `components/WidgetGrid.tsx`.
 
 ## Install it like an app
 
@@ -24,6 +24,18 @@ magick -background none -density 600 public/logo.svg -resize 192x192 -strip publ
 ```
 
 The maskable and Apple icons use the same mark at 72% on a full `#141414` square.
+
+## The phone frame
+
+Under 600px the page takes the shape of a phone app. It is the same page and the same widgets; only the frame around them changes.
+
+- A bar at the bottom with three places: Dashboard, Digest, Settings (`components/PhoneTabBar.tsx`). It is hidden while the layout is being edited, so nothing sits over the widget picker.
+- The top is the current dashboard's name as a title. Tapping it opens the top bar's fields (the two text fields and the clock) in a panel under it; tapping again closes it.
+- One dot per dashboard at the top right, the current one filled. Tapping the dots opens the dashboards list, with rows sized for a thumb: switch, rename, delete, new. Reordering by drag needs a mouse, so the grip is left out here.
+- Swiping left or right moves to the next or previous dashboard. The neighbour follows the finger; letting go past a quarter of the width, or after a quick flick, commits, anything less springs back. The swipe is not taken from things that scroll sideways themselves (tab groups, tables, sliders, text fields) or while the overview or layout editing is open (`SWIPE_BLOCK` and the handlers in `app/page.tsx`).
+- Settings is a full page with the bar still under it: sections become cards of rows, and a "This dashboard" section at the top holds "Edit the layout". While editing, the top right shows cancel and done in place of the dots. `/#settings` opens it from another page, which is how the Digest's bar gets there.
+
+A window 600px or wider keeps the top bar as it was.
 
 ## The jump button
 

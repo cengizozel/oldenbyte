@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import TopBar from "@/components/TopBar";
+import { usePhone } from "@/components/MobileNav";
 import WidgetGrid from "@/components/WidgetGrid";
 import KeyboardLayer from "@/components/KeyboardLayer";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -100,8 +101,102 @@ export default function Home() {
     saveDashboards(next);
   }
 
+  // ── Phone: swipe sideways to change dashboard (docs/mobile.md) ─────────────
+  // The dashboard follows the finger and its neighbour comes in beside it;
+  // past a quarter of the width, or with a quick flick, letting go completes
+  // the change. The panes are moved directly, not through state: a render per
+  // touch move would redraw every widget.
+  const phone = usePhone();
+  const panes = useRef(new Map<string, HTMLDivElement>());
+  const sw = useRef<{ x: number; y: number; t: number; lock: "h" | "v" | null; dx: number; to: string | null } | null>(null);
+  const SWIPE_BLOCK = 'input, textarea, select, [contenteditable=""], [contenteditable="true"], canvas, video, [draggable="true"], [data-no-swipe], [role="dialog"], .touch-none';
+  function neighbour(dir: -1 | 1): string | null {
+    if (!dashboards) return null;
+    const i = dashboards.list.findIndex(d => d.id === dashboards.activeId);
+    return dashboards.list[i + dir]?.id ?? null;
+  }
+  function place(id: string | null, x: number, animate: boolean) {
+    const el = id ? panes.current.get(id) : null;
+    if (!el) return;
+    el.style.transition = animate ? "transform 220ms cubic-bezier(0.25, 0.6, 0.3, 1)" : "none";
+    el.style.transform = `translateX(${x}px)`;
+  }
+  function release(id: string | null) {
+    const el = id ? panes.current.get(id) : null;
+    if (!el) return;
+    for (const k of ["transition", "transform", "display", "position", "top", "left", "width", "flexDirection", "gap"] as const) el.style[k] = "";
+  }
+  const swipe = {
+    onTouchStart: (e: React.TouchEvent) => {
+      sw.current = null;
+      if (!dashboards || dashboards.list.length < 2 || e.touches.length !== 1) return;
+      const target = e.target as HTMLElement;
+      if (target.closest(SWIPE_BLOCK)) return;
+      // A tab group swipes between its own tabs.
+      const group = target.closest("[data-cell-id]");
+      if (group && group.querySelectorAll("[data-tab-panel]").length > 1) return;
+      // Something that scrolls sideways keeps its own scroll.
+      for (let n: HTMLElement | null = target; n && n !== e.currentTarget; n = n.parentElement) {
+        if (n.scrollWidth > n.clientWidth + 2 && /(auto|scroll)/.test(getComputedStyle(n).overflowX)) return;
+      }
+      sw.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now(), lock: null, dx: 0, to: null };
+    },
+    onTouchMove: (e: React.TouchEvent) => {
+      const s = sw.current;
+      if (!s || !dashboards) return;
+      const dx = e.touches[0].clientX - s.x, dy = e.touches[0].clientY - s.y;
+      if (!s.lock) {
+        if (Math.abs(dy) > 12 && Math.abs(dy) >= Math.abs(dx)) { sw.current = null; return; }
+        if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        s.lock = "h";
+        // The neighbours may not have been opened yet: mount them now.
+        const near = [neighbour(-1), neighbour(1)].filter((id): id is string => !!id);
+        setVisited(prev => [...prev, ...near.filter(id => !prev.includes(id))]);
+      }
+      const to = neighbour(dx < 0 ? 1 : -1);
+      if (s.to && s.to !== to) release(s.to);
+      s.to = to;
+      // At either end there is nothing to bring in: the dashboard resists.
+      s.dx = to ? dx : dx * 0.25;
+      place(dashboards.activeId, s.dx, false);
+      const cur = panes.current.get(dashboards.activeId), next = to ? panes.current.get(to) : null;
+      if (cur && next) {
+        const r = cur.getBoundingClientRect();
+        Object.assign(next.style, { display: "flex", flexDirection: "column", gap: "16px", position: "fixed", top: `${Math.max(r.top - s.dx * 0, 0)}px`, left: `${r.left - s.dx}px`, width: `${r.width}px` });
+        place(to, s.dx + (dx < 0 ? 1 : -1) * (r.width + 16), false);
+      }
+    },
+    onTouchEnd: () => {
+      const s = sw.current;
+      sw.current = null;
+      if (!s || s.lock !== "h" || !dashboards) return;
+      const from = dashboards.activeId, to = s.to;
+      const width = panes.current.get(from)?.getBoundingClientRect().width ?? window.innerWidth;
+      const quick = performance.now() - s.t < 260 && Math.abs(s.dx) > 40;
+      const go = !!to && (Math.abs(s.dx) > width * 0.25 || quick);
+      const dir = s.dx < 0 ? -1 : 1;
+      place(from, go ? dir * (width + 16) : 0, true);
+      if (to) place(to, go ? 0 : -dir * (width + 16), true);
+      setTimeout(() => {
+        release(from);
+        release(to);
+        if (go && to) {
+          window.scrollTo({ top: 0, behavior: "instant" });
+          handleDashboardsChange({ ...dashboards, activeId: to });
+        }
+      }, 230);
+    },
+    onTouchCancel: () => {
+      const s = sw.current;
+      sw.current = null;
+      if (!s || !dashboards) return;
+      release(dashboards.activeId);
+      release(s.to);
+    },
+  };
+
   return (
-    <div className="min-h-screen has-[[data-active=true][data-fill-viewport=true]]:h-screen has-[[data-active=true][data-fill-viewport=true]]:overflow-hidden bg-[var(--page-bg)] flex flex-col px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6 gap-4 md:gap-5">
+    <div className="min-h-screen has-[[data-active=true][data-fill-viewport=true]]:h-screen has-[[data-active=true][data-fill-viewport=true]]:overflow-hidden bg-[var(--page-bg)] flex flex-col px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6 gap-4 md:gap-5 max-[599px]:pb-[calc(76px+env(safe-area-inset-bottom,0px))]">
       <TopBar
         editing={editing}
         onToggleEdit={() => setEditing(e => !e)}
@@ -127,7 +222,12 @@ export default function Home() {
       {dashboards && visited.map(id => {
         const active = id === dashboards.activeId;
         return (
-          <div key={id} className={active ? "flex flex-col gap-4 md:gap-5 flex-1 min-h-0" : "hidden"}>
+          <div
+            key={id}
+            ref={el => { if (el) panes.current.set(id, el); else panes.current.delete(id); }}
+            className={active ? "flex flex-col gap-4 md:gap-5 flex-1 min-h-0 max-[599px]:[touch-action:pan-y]" : "hidden"}
+            {...(active && phone && !editing ? swipe : null)}
+          >
             <WidgetGrid
               dashboardId={id}
               dashboards={dashboards.list}

@@ -1,5 +1,7 @@
 "use client";
 
+import PhoneTabBar from "@/components/PhoneTabBar";
+import { usePhone } from "@/components/MobileNav";
 import { useModelServers } from "@/lib/useModelServers";
 import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
 import { useState, useEffect, useRef } from "react";
@@ -68,6 +70,7 @@ const OPENAI_MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "o4-m
 const defaultModelsFor = (url: string) => (/openai\.com/i.test(url) ? OPENAI_MODELS : []);
 
 export default function DigestPage() {
+  const phone = usePhone();
   const [mode] = useState<"digest" | "full" | "ai">("ai");
   const [sections, setSections]   = useState<Section[]>([]);
   // Widgets left out of the digest (instance ids), chosen in the model panel.
@@ -749,18 +752,20 @@ export default function DigestPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)]">
-      <div className="max-w-3xl mx-auto px-8 py-10">
+    <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)] max-[599px]:pb-[calc(60px+env(safe-area-inset-bottom,0px))]">
+      {phone && <PhoneTabBar active="digest" />}
+      <div className="max-w-3xl mx-auto px-8 py-10 max-[599px]:px-4 max-[599px]:py-5">
 
         {/* Masthead */}
         <header className="mb-1">
           <div className="flex items-baseline justify-between mb-3">
-            <Link
+            {/* On a phone the bar at the bottom is the way back. */}
+            {phone ? <span /> : <Link
               href="/"
               className="inline-flex items-center min-h-6 font-ui text-[15px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
             >
               ← back
-            </Link>
+            </Link>}
             <span suppressHydrationWarning className="font-ui text-[15px] text-[var(--text-secondary)]">
               {dateLabel}
             </span>

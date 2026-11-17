@@ -7,6 +7,7 @@ import Toggle from "@/components/ui/Toggle";
 import { SettingsRow, SettingsSection } from "@/components/ui/Field";
 import * as storage from "@/lib/storage";
 import { MOBILE_JUMP_KEY, MOBILE_JUMP_EVENT } from "@/lib/dashboards";
+import { PHONE_TAB_BAR } from "@/components/PhoneTabBar";
 
 // Phone navigation (docs/mobile.md): the floating jump button. The overview it
 // opens lives in WidgetGrid, which owns the layout.
@@ -77,7 +78,8 @@ export function JumpButton({ items, overview, onTap, onJump }: {
   if (!vp.w) return null;
 
   const cx = drag ? drag.x : pos.side === "left" ? MARGIN + SIZE / 2 : vp.w - MARGIN - SIZE / 2;
-  const cy = drag ? drag.y : Math.min(vp.h - SIZE / 2 - 12, Math.max(SIZE / 2 + 12, pos.y * vp.h));
+  // Kept clear of the bar at the bottom of the phone frame.
+  const cy = drag ? drag.y : Math.min(vp.h - SIZE / 2 - 12 - PHONE_TAB_BAR, Math.max(SIZE / 2 + 12, pos.y * vp.h));
 
   // The name column: beside the button, centered on it, kept on screen. Rows
   // shrink (to a floor) when there are more names than fit.
