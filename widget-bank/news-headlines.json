@@ -1,0 +1,39 @@
+{
+  "id": "news-headlines",
+  "title": "Headlines",
+  "description": "Top news headlines for a country, from NewsAPI.",
+  "color": "neutral",
+  "category": "feeds",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "country",
+      "label": "Country",
+      "type": "text",
+      "default": "us",
+      "placeholder": "us",
+      "hint": "Two letters."
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Free for personal use, from newsapi.org."
+    }
+  ],
+  "fetch": {
+    "url": "https://newsapi.org/v2/top-headlines?country={config.country}&pageSize=15&apiKey={config.apiKey}",
+    "cacheMinutes": 30
+  },
+  "items": {
+    "path": "$.articles",
+    "title": "$.title",
+    "subtitle": "$.source.name",
+    "link": "$.url",
+    "meta": "$.publishedAt | timeAgo",
+    "limit": 15
+  }
+}

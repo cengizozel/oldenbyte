@@ -467,6 +467,8 @@ All modes go through the server feed cache. Errors return `500` (`503` for video
 
 `/api/custom-widgets` and the routes under it: see [custom-widgets.md](./custom-widgets.md#api).
 
+`/api/widget-bank` lists the widget files. `POST /api/widget-bank/run` `{ bankId, instance, config, today }` makes a file's request on the server and answers `{ data }`, or `{ error, setup? }`. `/api/widget-bank/secrets` holds a file's secret settings, write-only: `GET ?instance=&bankId=` answers `{ set: [keys] }`, `PUT { instance, bankId, values }` sets (a string) or clears (`null`) them, `DELETE ?instance=` clears all. See [widget-bank.md](./widget-bank.md#your-own-services-and-keys).
+
 ---
 
 ## HF Daily

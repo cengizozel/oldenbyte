@@ -1,0 +1,60 @@
+{
+  "id": "home-assistant-entity",
+  "title": "Home Assistant",
+  "description": "The current state of one Home Assistant entity, such as a temperature sensor.",
+  "color": "sky",
+  "category": "live",
+  "defaultSize": {
+    "w": 1,
+    "h": 1
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://homeassistant.lan:8123"
+    },
+    {
+      "key": "entity",
+      "label": "Entity",
+      "type": "text",
+      "placeholder": "sensor.living_room_temperature"
+    },
+    {
+      "key": "token",
+      "label": "Access token",
+      "type": "secret",
+      "hint": "Your profile, Security, Long-lived access tokens."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/states/{config.entity}",
+    "cacheMinutes": 2,
+    "headers": {
+      "Authorization": "Bearer {config.token}"
+    }
+  },
+  "layout": [
+    {
+      "component": "label",
+      "value": "$.attributes.friendly_name",
+      "muted": true
+    },
+    {
+      "component": "label",
+      "value": "$.state",
+      "size": "lg"
+    },
+    {
+      "component": "label",
+      "value": "$.attributes.unit_of_measurement",
+      "muted": true
+    },
+    {
+      "component": "label",
+      "value": "$.last_changed | timeAgo",
+      "muted": true
+    }
+  ]
+}

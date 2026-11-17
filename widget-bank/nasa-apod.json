@@ -1,0 +1,34 @@
+{
+  "id": "nasa-apod",
+  "title": "Astronomy picture",
+  "description": "NASA's Astronomy Picture of the Day.",
+  "color": "neutral",
+  "category": "live",
+  "defaultSize": {
+    "w": 2,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Free, from api.nasa.gov."
+    }
+  ],
+  "fetch": {
+    "url": "https://api.nasa.gov/planetary/apod?thumbs=true&api_key={config.apiKey}",
+    "cacheMinutes": 360
+  },
+  "layout": [
+    {
+      "component": "label",
+      "value": "$.title"
+    },
+    {
+      "component": "image",
+      "src": "$.thumbnail_url || $.url",
+      "caption": "$.explanation"
+    }
+  ]
+}

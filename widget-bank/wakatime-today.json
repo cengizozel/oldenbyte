@@ -1,0 +1,37 @@
+{
+  "id": "wakatime-today",
+  "title": "WakaTime",
+  "description": "How long you coded today, by language.",
+  "color": "teal",
+  "category": "habits",
+  "defaultSize": {
+    "w": 1,
+    "h": 2
+  },
+  "config": [
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "wakatime.com, Settings, API Key."
+    }
+  ],
+  "fetch": {
+    "url": "https://wakatime.com/api/v1/users/current/status_bar/today?api_key={config.apiKey}",
+    "cacheMinutes": 10
+  },
+  "layout": [
+    {
+      "component": "label",
+      "value": "$.data.grand_total.text",
+      "size": "lg"
+    },
+    {
+      "component": "list",
+      "path": "$.data.languages",
+      "title": "$.name",
+      "meta": "$.text",
+      "limit": 8
+    }
+  ]
+}

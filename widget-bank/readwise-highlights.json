@@ -1,0 +1,33 @@
+{
+  "id": "readwise-highlights",
+  "title": "Readwise",
+  "description": "Your most recent Readwise highlights.",
+  "color": "amber",
+  "category": "library",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "token",
+      "label": "Access token",
+      "type": "secret",
+      "hint": "From readwise.io/access_token."
+    }
+  ],
+  "fetch": {
+    "url": "https://readwise.io/api/v2/highlights/?page_size=10",
+    "cacheMinutes": 60,
+    "headers": {
+      "Authorization": "Token {config.token}"
+    }
+  },
+  "items": {
+    "path": "$.results",
+    "title": "$.text",
+    "subtitle": "$.note",
+    "meta": "$.highlighted_at | dateShort",
+    "limit": 10
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "grocy-due",
+  "title": "Grocy",
+  "description": "Products in your Grocy that are due soon.",
+  "color": "orange",
+  "category": "habits",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://grocy.lan:9283"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Manage API keys, in the wrench menu."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/stock/volatile?due_soon_days=7",
+    "cacheMinutes": 60,
+    "headers": {
+      "GROCY-API-KEY": "{config.apiKey}"
+    }
+  },
+  "layout": [
+    {
+      "component": "label",
+      "value": "Due within a week",
+      "muted": true
+    },
+    {
+      "component": "list",
+      "path": "$.due_products",
+      "title": "$.product.name",
+      "meta": "$.best_before_date | dateShort",
+      "limit": 15
+    }
+  ]
+}

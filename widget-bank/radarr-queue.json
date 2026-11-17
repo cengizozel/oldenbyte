@@ -1,0 +1,50 @@
+{
+  "id": "radarr-queue",
+  "title": "Radarr queue",
+  "description": "What your Radarr is downloading right now.",
+  "color": "amber",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://radarr.lan:7878"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Radarr, Settings, General."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/v3/queue?pageSize=20&includeMovie=true",
+    "cacheMinutes": 2,
+    "headers": {
+      "X-Api-Key": "{config.apiKey}"
+    }
+  },
+  "layout": [
+    {
+      "component": "stat-row",
+      "items": [
+        {
+          "label": "In the queue",
+          "value": "$.totalRecords | number"
+        }
+      ]
+    },
+    {
+      "component": "list",
+      "path": "$.records",
+      "title": "$.movie.title || $.title",
+      "meta": "$.timeleft || $.status",
+      "limit": 15
+    }
+  ]
+}

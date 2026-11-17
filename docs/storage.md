@@ -129,6 +129,8 @@ Global keys:
 | `custom-widgets`, `elevated-widgets` | Custom widgets: which are switched on, and the account's switches for elevated ones ([custom-widgets.md](./custom-widgets.md)) |
 | `reddit-api` | Reddit app credentials shared by every Reddit widget |
 
+Secret settings of widget files (API keys) are not settings rows: they live in `AppConfig` under `widgetSecret:<user id>:<instance>`, out of reach of the settings API and of backups ([widget-bank.md](./widget-bank.md#your-own-services-and-keys)).
+
 Per-widget keys (`<id>` is the instance ID):
 
 | Widget | Keys |

@@ -1,0 +1,51 @@
+{
+  "id": "sonarr-queue",
+  "title": "Sonarr queue",
+  "description": "What your Sonarr is downloading right now.",
+  "color": "sky",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://sonarr.lan:8989"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Sonarr, Settings, General."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/v3/queue?pageSize=20&includeSeries=true&includeEpisode=true",
+    "cacheMinutes": 2,
+    "headers": {
+      "X-Api-Key": "{config.apiKey}"
+    }
+  },
+  "layout": [
+    {
+      "component": "stat-row",
+      "items": [
+        {
+          "label": "In the queue",
+          "value": "$.totalRecords | number"
+        }
+      ]
+    },
+    {
+      "component": "list",
+      "path": "$.records",
+      "title": "$.series.title || $.title",
+      "subtitle": "$.episode.title",
+      "meta": "$.timeleft || $.status",
+      "limit": 15
+    }
+  ]
+}

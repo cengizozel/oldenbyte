@@ -1,0 +1,30 @@
+{
+  "id": "tmdb-trending",
+  "title": "Trending to watch",
+  "description": "Films and shows trending this week on TMDB.",
+  "color": "amber",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Free, from themoviedb.org, Settings, API."
+    }
+  ],
+  "fetch": {
+    "url": "https://api.themoviedb.org/3/trending/all/week?api_key={config.apiKey}",
+    "cacheMinutes": 360
+  },
+  "items": {
+    "path": "$.results",
+    "title": "$.title || $.name",
+    "subtitle": "$.overview",
+    "meta": "$.media_type",
+    "limit": 15
+  }
+}

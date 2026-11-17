@@ -1,0 +1,40 @@
+{
+  "id": "gitea-repos",
+  "title": "Gitea",
+  "description": "Repositories on your Gitea or Forgejo, most recently updated first.",
+  "color": "teal",
+  "category": "server",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://gitea.lan:3000"
+    },
+    {
+      "key": "token",
+      "label": "Access token",
+      "type": "secret",
+      "hint": "Settings, Applications. Read access to repositories is enough."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/v1/repos/search?sort=updated&order=desc&limit=12",
+    "cacheMinutes": 15,
+    "headers": {
+      "Authorization": "token {config.token}"
+    }
+  },
+  "items": {
+    "path": "$.data",
+    "title": "$.full_name",
+    "subtitle": "$.description",
+    "link": "$.html_url",
+    "meta": "$.updated_at | timeAgo",
+    "limit": 12
+  }
+}

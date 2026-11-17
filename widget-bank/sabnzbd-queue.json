@@ -1,0 +1,60 @@
+{
+  "id": "sabnzbd-queue",
+  "title": "SABnzbd",
+  "description": "Speed, time left and the downloads in your SABnzbd queue.",
+  "color": "orange",
+  "category": "server",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://sabnzbd.lan:8080"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "SABnzbd, Config, General."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api?mode=queue&output=json&apikey={config.apiKey}",
+    "cacheMinutes": 1
+  },
+  "layout": [
+    {
+      "component": "stat-row",
+      "items": [
+        {
+          "label": "Status",
+          "value": "$.queue.status"
+        },
+        {
+          "label": "Speed",
+          "value": "$.queue.speed"
+        },
+        {
+          "label": "Time left",
+          "value": "$.queue.timeleft"
+        },
+        {
+          "label": "Left",
+          "value": "$.queue.sizeleft"
+        }
+      ]
+    },
+    {
+      "component": "list",
+      "path": "$.queue.slots",
+      "title": "$.filename",
+      "subtitle": "$.status",
+      "meta": "$.timeleft",
+      "limit": 12
+    }
+  ]
+}

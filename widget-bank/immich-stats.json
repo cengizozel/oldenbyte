@@ -1,0 +1,51 @@
+{
+  "id": "immich-stats",
+  "title": "Immich",
+  "description": "Photos, videos and space used on your Immich.",
+  "color": "teal",
+  "category": "server",
+  "defaultSize": {
+    "w": 1,
+    "h": 2
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://immich.lan:2283"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "An admin's key: Account Settings, API Keys."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/server/statistics",
+    "cacheMinutes": 60,
+    "headers": {
+      "x-api-key": "{config.apiKey}"
+    }
+  },
+  "layout": [
+    {
+      "component": "stat-row",
+      "items": [
+        {
+          "label": "Photos",
+          "value": "$.photos | number"
+        },
+        {
+          "label": "Videos",
+          "value": "$.videos | number"
+        },
+        {
+          "label": "Space used",
+          "value": "$.usage | bytes"
+        }
+      ]
+    }
+  ]
+}

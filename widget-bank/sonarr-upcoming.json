@@ -1,0 +1,39 @@
+{
+  "id": "sonarr-upcoming",
+  "title": "Sonarr upcoming",
+  "description": "Episodes airing in the next week, from your Sonarr.",
+  "color": "sky",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://sonarr.lan:8989"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Sonarr, Settings, General."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/v3/calendar?start={date}&end={date+7}&includeSeries=true",
+    "cacheMinutes": 30,
+    "headers": {
+      "X-Api-Key": "{config.apiKey}"
+    }
+  },
+  "items": {
+    "path": "$",
+    "title": "$.series.title",
+    "subtitle": "$.title",
+    "meta": "$.airDateUtc | dateShort",
+    "limit": 15
+  }
+}

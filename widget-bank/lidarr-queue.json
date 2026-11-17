@@ -1,0 +1,51 @@
+{
+  "id": "lidarr-queue",
+  "title": "Lidarr queue",
+  "description": "What your Lidarr is downloading right now.",
+  "color": "teal",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://lidarr.lan:8686"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Lidarr, Settings, General."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/v1/queue?pageSize=20&includeArtist=true&includeAlbum=true",
+    "cacheMinutes": 2,
+    "headers": {
+      "X-Api-Key": "{config.apiKey}"
+    }
+  },
+  "layout": [
+    {
+      "component": "stat-row",
+      "items": [
+        {
+          "label": "In the queue",
+          "value": "$.totalRecords | number"
+        }
+      ]
+    },
+    {
+      "component": "list",
+      "path": "$.records",
+      "title": "$.album.title || $.title",
+      "subtitle": "$.artist.artistName",
+      "meta": "$.timeleft || $.status",
+      "limit": 15
+    }
+  ]
+}

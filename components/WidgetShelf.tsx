@@ -129,11 +129,12 @@ export default function WidgetShelf({
     const match = (t: Widget) =>
       !q || t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q);
     const byTitle = (a: Widget, b: Widget) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
-    const matches = templates.filter(match);
+    // Widget files that name a category are listed there, with the built-ins.
+    const matches = [...templates, ...bankTemplates.filter(t => t.category)].filter(match);
     const built = WIDGET_CATEGORIES
       .map(cat => ({ id: cat.id as string, label: cat.label, items: matches.filter(t => (t.category ?? "notes") === cat.id).sort(byTitle) }));
     // Widget files from the widget bank (JSON definitions, not code).
-    built.push({ id: "bank", label: "More", items: bankTemplates.filter(match).sort(byTitle) });
+    built.push({ id: "bank", label: "More", items: bankTemplates.filter(t => !t.category).filter(match).sort(byTitle) });
     // Custom widgets the user uploaded or installed from the catalog.
     built.push({ id: "custom", label: "Custom", items: customTemplates.filter(match).sort(byTitle) });
     return built.filter(g => g.items.length > 0);

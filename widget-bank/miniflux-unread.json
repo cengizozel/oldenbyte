@@ -1,0 +1,52 @@
+{
+  "id": "miniflux-unread",
+  "title": "Miniflux",
+  "description": "Unread entries in your Miniflux, newest first.",
+  "color": "teal",
+  "category": "feeds",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://miniflux.lan:8080"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Settings, API Keys."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/v1/entries?status=unread&order=published_at&direction=desc&limit=15",
+    "cacheMinutes": 10,
+    "headers": {
+      "X-Auth-Token": "{config.apiKey}"
+    }
+  },
+  "layout": [
+    {
+      "component": "stat-row",
+      "items": [
+        {
+          "label": "Unread",
+          "value": "$.total | number"
+        }
+      ]
+    },
+    {
+      "component": "list",
+      "path": "$.entries",
+      "title": "$.title",
+      "subtitle": "$.feed.title",
+      "link": "$.url",
+      "meta": "$.published_at | timeAgo",
+      "limit": 15
+    }
+  ]
+}

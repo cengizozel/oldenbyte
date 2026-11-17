@@ -1,0 +1,47 @@
+{
+  "id": "jellyfin-sessions",
+  "title": "Jellyfin now playing",
+  "description": "Who is watching what on your Jellyfin right now.",
+  "color": "sky",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 2
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://jellyfin.lan:8096"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Jellyfin, Dashboard, API Keys."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/Sessions?ActiveWithinSeconds=300",
+    "cacheMinutes": 1,
+    "headers": {
+      "X-Emby-Token": "{config.apiKey}"
+    }
+  },
+  "layout": [
+    {
+      "component": "label",
+      "value": "Playing now",
+      "muted": true
+    },
+    {
+      "component": "list",
+      "path": "$",
+      "title": "$.NowPlayingItem.Name",
+      "subtitle": "$.NowPlayingItem.SeriesName",
+      "meta": "$.UserName",
+      "limit": 10
+    }
+  ]
+}

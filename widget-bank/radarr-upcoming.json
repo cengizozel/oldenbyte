@@ -1,0 +1,39 @@
+{
+  "id": "radarr-upcoming",
+  "title": "Radarr upcoming",
+  "description": "Films arriving in the next month, from your Radarr.",
+  "color": "amber",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://radarr.lan:7878"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Radarr, Settings, General."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/v3/calendar?start={date}&end={date+30}",
+    "cacheMinutes": 60,
+    "headers": {
+      "X-Api-Key": "{config.apiKey}"
+    }
+  },
+  "items": {
+    "path": "$",
+    "title": "$.title",
+    "subtitle": "$.studio",
+    "meta": "$.digitalRelease | dateShort || $.physicalRelease | dateShort || $.inCinemas | dateShort",
+    "limit": 15
+  }
+}

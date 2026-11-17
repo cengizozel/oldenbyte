@@ -1,0 +1,34 @@
+{
+  "id": "raindrop-recent",
+  "title": "Raindrop",
+  "description": "The bookmarks most recently saved to your Raindrop.io.",
+  "color": "sky",
+  "category": "links",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "token",
+      "label": "Test token",
+      "type": "secret",
+      "hint": "app.raindrop.io, Settings, Integrations, create an app, then its test token."
+    }
+  ],
+  "fetch": {
+    "url": "https://api.raindrop.io/rest/v1/raindrops/0?perpage=15&sort=-created",
+    "cacheMinutes": 15,
+    "headers": {
+      "Authorization": "Bearer {config.token}"
+    }
+  },
+  "items": {
+    "path": "$.items",
+    "title": "$.title",
+    "subtitle": "$.domain",
+    "link": "$.link",
+    "meta": "$.created | timeAgo",
+    "limit": 15
+  }
+}

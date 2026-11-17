@@ -1,0 +1,40 @@
+{
+  "id": "navidrome-recent",
+  "title": "Navidrome new albums",
+  "description": "The albums most recently added to your Navidrome (or any Subsonic server).",
+  "color": "rose",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://navidrome.lan:4533"
+    },
+    {
+      "key": "user",
+      "label": "Username",
+      "type": "text"
+    },
+    {
+      "key": "password",
+      "label": "Password",
+      "type": "secret"
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/rest/getAlbumList2?type=newest&size=15&u={config.user}&p={config.password}&v=1.16.1&c=oldenbyte&f=json",
+    "cacheMinutes": 60
+  },
+  "items": {
+    "path": "$.subsonic-response.albumList2.album",
+    "title": "$.name",
+    "subtitle": "$.artist",
+    "meta": "$.year",
+    "limit": 15
+  }
+}

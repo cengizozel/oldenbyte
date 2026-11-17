@@ -1,0 +1,59 @@
+{
+  "id": "jellyseerr-requests",
+  "title": "Requests",
+  "description": "Pending, approved and available requests in Jellyseerr or Overseerr.",
+  "color": "rose",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 2
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://jellyseerr.lan:5055"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Settings, General."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/v1/request/count",
+    "cacheMinutes": 10,
+    "headers": {
+      "X-Api-Key": "{config.apiKey}"
+    }
+  },
+  "layout": [
+    {
+      "component": "stat-row",
+      "items": [
+        {
+          "label": "Pending",
+          "value": "$.pending | number"
+        },
+        {
+          "label": "Approved",
+          "value": "$.approved | number"
+        },
+        {
+          "label": "Processing",
+          "value": "$.processing | number"
+        },
+        {
+          "label": "Available",
+          "value": "$.available | number"
+        },
+        {
+          "label": "Total",
+          "value": "$.total | number"
+        }
+      ]
+    }
+  ]
+}

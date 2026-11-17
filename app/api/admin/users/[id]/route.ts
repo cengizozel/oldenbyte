@@ -8,6 +8,7 @@ import { destroyAllSessions } from "@/lib/session";
 import { hashPassword } from "@/lib/password";
 import { setUserQuotaMb } from "@/lib/quota";
 import { ClientError } from "@/lib/http";
+import { deleteSecrets } from "@/lib/widgetBankServer";
 
 const libraryDir = process.env.LIBRARY_DIR ?? path.join(process.cwd(), "data", "library");
 const uploadsDir = process.env.UPLOADS_DIR ?? path.join(process.cwd(), "data", "uploads");
@@ -44,6 +45,7 @@ export async function DELETE(
   await rm(path.join(libraryDir, targetId), { recursive: true, force: true });
   await rm(path.join(widgetsDir, targetId), { recursive: true, force: true });
   await setUserQuotaMb(targetId, null);
+  await deleteSecrets(targetId);
 
   return json({ ok: true });
 }

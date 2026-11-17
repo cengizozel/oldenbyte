@@ -1,0 +1,40 @@
+{
+  "id": "linkding-recent",
+  "title": "Linkding",
+  "description": "The bookmarks most recently saved to your Linkding.",
+  "color": "sky",
+  "category": "links",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://linkding.lan:9090"
+    },
+    {
+      "key": "token",
+      "label": "API token",
+      "type": "secret",
+      "hint": "Settings, Integrations."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/bookmarks/?limit=15",
+    "cacheMinutes": 15,
+    "headers": {
+      "Authorization": "Token {config.token}"
+    }
+  },
+  "items": {
+    "path": "$.results",
+    "title": "$.title || $.website_title || $.url",
+    "subtitle": "$.description",
+    "link": "$.url",
+    "meta": "$.date_added | timeAgo",
+    "limit": 15
+  }
+}

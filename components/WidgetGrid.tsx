@@ -143,6 +143,7 @@ export default function WidgetGrid({
             type: "custom",
             bankId: def.id,
             color: def.color ?? "neutral",
+            category: def.category,
             title: def.title,
             description: def.description,
             digestable: def.digestable ?? false,

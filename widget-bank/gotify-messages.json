@@ -1,0 +1,39 @@
+{
+  "id": "gotify-messages",
+  "title": "Gotify",
+  "description": "The latest notifications on your Gotify server.",
+  "color": "sky",
+  "category": "server",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://gotify.lan:8080"
+    },
+    {
+      "key": "token",
+      "label": "Client token",
+      "type": "secret",
+      "hint": "Clients, not Apps."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/message?limit=12",
+    "cacheMinutes": 2,
+    "headers": {
+      "X-Gotify-Key": "{config.token}"
+    }
+  },
+  "items": {
+    "path": "$.messages",
+    "title": "$.title || $.message",
+    "subtitle": "$.message",
+    "meta": "$.date | timeAgo",
+    "limit": 12
+  }
+}

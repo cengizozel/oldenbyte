@@ -1,0 +1,61 @@
+{
+  "id": "syncthing-status",
+  "title": "Syncthing",
+  "description": "How far your Syncthing is in sync, and what is still needed.",
+  "color": "teal",
+  "category": "server",
+  "defaultSize": {
+    "w": 1,
+    "h": 2
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://syncthing.lan:8384"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Actions, Settings, General."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/rest/db/completion",
+    "cacheMinutes": 2,
+    "headers": {
+      "X-API-Key": "{config.apiKey}"
+    }
+  },
+  "layout": [
+    {
+      "component": "label",
+      "value": "$.completion | percent",
+      "size": "lg"
+    },
+    {
+      "component": "progress-bar",
+      "value": "$.completion",
+      "max": 100
+    },
+    {
+      "component": "stat-row",
+      "items": [
+        {
+          "label": "Still needed",
+          "value": "$.needBytes | bytes"
+        },
+        {
+          "label": "Items needed",
+          "value": "$.needItems | number"
+        },
+        {
+          "label": "Total",
+          "value": "$.globalBytes | bytes"
+        }
+      ]
+    }
+  ]
+}

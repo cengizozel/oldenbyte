@@ -5,7 +5,7 @@ import { Puzzle, RefreshCw } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
 import {
-  effectiveLayout, interpolateUrl, resolveText, resolveValue,
+  effectiveLayout, resolveText, resolveValue, secretKeys,
   type BankPrimitive, type BankWidgetDef,
 } from "@/lib/widgetBank";
 import { tagColor } from "@/lib/colors";
@@ -18,7 +18,7 @@ type BankConfig = Record<string, string | number>;
 
 function defaultsFor(def: BankWidgetDef): BankConfig {
   const out: BankConfig = {};
-  for (const f of def.config ?? []) out[f.key] = f.default ?? (f.type === "number" ? 0 : "");
+  for (const f of def.config ?? []) if (f.type !== "secret") out[f.key] = f.default ?? (f.type === "number" ? 0 : "");
   return out;
 }
 
@@ -70,6 +70,12 @@ export default function BankWidget({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Secret settings (API keys) are kept by the server and never come back:
+  // the widget only knows which are set. `secretDraft` holds what is being
+  // typed: a string replaces, null clears.
+  const [secretsSet, setSecretsSet] = useState<string[]>([]);
+  const [secretDraft, setSecretDraft] = useState<Record<string, string | null>>({});
+  const [needsSetup, setNeedsSetup] = useState(false);
   const { ref, onScroll, topFade, bottomFade } = useScrollFade<HTMLDivElement>([data]);
 
   const fetchData = useCallback(async (cfg: BankConfig, force = false) => {
@@ -88,18 +94,24 @@ export default function BankWidget({
     }
     setLoading(true);
     try {
-      const url = interpolateUrl(def.fetch.url, cfg);
-      const res = await fetch(`/api/proxy?url=${encodeURIComponent(url)}`);
-      if (!res.ok) throw new Error(`fetch failed (${res.status})`);
-      const json = JSON.parse(await res.text());
-      setData(json);
-      await storage.setItem(cacheKey, JSON.stringify({ at: Date.now(), data: json }));
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const res = await fetch("/api/widget-bank/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bankId: def.id, instance: widget.id, config: cfg, today }),
+      });
+      const body = await res.json().catch(() => ({}));
+      setNeedsSetup(body.setup === true);
+      if (!res.ok) throw new Error(typeof body.error === "string" ? body.error : `fetch failed (${res.status})`);
+      setData(body.data);
+      await storage.setItem(cacheKey, JSON.stringify({ at: Date.now(), data: body.data }));
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
     } finally {
       setLoading(false);
     }
-  }, [def, cacheKey]);
+  }, [def, cacheKey, widget.id]);
 
   useEffect(() => {
     if (!def) return;
@@ -112,6 +124,12 @@ export default function BankWidget({
       setDraft(cfg);
       fetchData(cfg);
     });
+    if (secretKeys(def).length) {
+      fetch(`/api/widget-bank/secrets?instance=${encodeURIComponent(widget.id)}&bankId=${encodeURIComponent(def.id)}`)
+        .then(r => (r.ok ? r.json() : { set: [] }))
+        .then((d: { set?: string[] }) => setSecretsSet(Array.isArray(d.set) ? d.set : []))
+        .catch(() => {});
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.id, def?.id]);
 
@@ -247,7 +265,7 @@ export default function BankWidget({
   const front = (
     <>
       <WidgetHeader
-        onSettings={() => { setDraft(config); setSettingsOpen(true); }}
+        onSettings={() => { setDraft(config); setSecretDraft({}); setSettingsOpen(true); }}
         c={c}
         icon={Puzzle}
         title={widget.title}
@@ -256,6 +274,8 @@ export default function BankWidget({
         <div ref={ref} onScroll={onScroll} className="absolute inset-0 overflow-y-auto pr-3 flex flex-col gap-3">
           {loading && !hasContent ? (
             <LoadingState c={c} />
+          ) : needsSetup ? (
+            <EmptyState c={c}>connect it in the settings</EmptyState>
           ) : error && !hasContent ? (
             <p className="text-red-400 text-sm">{error}</p>
           ) : hasContent ? (
@@ -276,13 +296,26 @@ export default function BankWidget({
       onSave={async () => {
         setConfig(draft);
         await storage.setItem(storageKey, JSON.stringify(draft));
+        if (Object.keys(secretDraft).length) {
+          try {
+            const res = await fetch("/api/widget-bank/secrets", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ instance: widget.id, bankId: def.id, values: secretDraft }),
+            });
+            const body = await res.json().catch(() => ({}));
+            if (res.ok && Array.isArray(body.set)) setSecretsSet(body.set);
+            else { setError("Could not save the key."); return; }
+          } catch { setError("Could not save the key."); return; }
+          setSecretDraft({});
+        }
         setSettingsOpen(false);
         fetchData(draft, true);
       }}
-      onCancel={() => { setDraft(config); setSettingsOpen(false); }}
+      onCancel={() => { setDraft(config); setSecretDraft({}); setSettingsOpen(false); }}
     >
       {(def.config ?? []).map(f => (
-        <SettingsField key={f.key} c={c} label={f.label}>
+        <SettingsField key={f.key} c={c} label={f.label} hint={f.hint}>
           {f.type === "select" ? (
             <SettingsSelect
               value={String(draft[f.key] ?? "")}
@@ -290,12 +323,26 @@ export default function BankWidget({
             >
               {(f.options ?? []).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </SettingsSelect>
+          ) : f.type === "secret" ? (
+            <div className="flex items-center gap-2">
+              <SettingsInput
+                type="password"
+                autoComplete="off"
+                value={secretDraft[f.key] ?? ""}
+                placeholder={secretDraft[f.key] === null ? "will be removed" : secretsSet.includes(f.key) ? "saved; type to replace" : f.placeholder}
+                onChange={e => setSecretDraft(d => ({ ...d, [f.key]: e.target.value }))}
+                className="flex-1 min-w-0"
+              />
+              {secretsSet.includes(f.key) && secretDraft[f.key] !== null && (
+                <SmallButton c={c} onClick={() => setSecretDraft(d => ({ ...d, [f.key]: null }))} title="Remove the saved key">Remove</SmallButton>
+              )}
+            </div>
           ) : (
             <SettingsInput
-              type="text"
+              type={f.type === "url" ? "url" : "text"}
               inputMode={f.type === "number" ? "decimal" : undefined}
               value={String(draft[f.key] ?? "")}
-              placeholder={f.placeholder}
+              placeholder={f.placeholder ?? (f.type === "url" ? "http://service.lan:8080" : undefined)}
               onChange={e => setDraft(d => ({ ...d, [f.key]: f.type === "number" ? Number(e.target.value) : e.target.value }))}
             />
           )}
@@ -305,6 +352,7 @@ export default function BankWidget({
       <SettingsNote c={c}>
         {def.description}
         <span className="block mt-1 break-all">source: {def.fetch.url.split("?")[0]}</span>
+        {secretKeys(def).length > 0 && <span className="block mt-1">Keys are kept on the server and sent only to that address. They are not part of a backup.</span>}
       </SettingsNote>
       <SmallButton c={c} onClick={() => fetchData(config, true)} disabled={loading} className="self-start">
         <RefreshCw size={12} className={loading ? "animate-spin" : ""} />

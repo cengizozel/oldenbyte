@@ -1,0 +1,38 @@
+{
+  "id": "audiobookshelf-progress",
+  "title": "Audiobookshelf",
+  "description": "The books and podcasts you are in the middle of.",
+  "color": "orange",
+  "category": "library",
+  "defaultSize": {
+    "w": 1,
+    "h": 2
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://audiobookshelf.lan:13378"
+    },
+    {
+      "key": "token",
+      "label": "API token",
+      "type": "secret",
+      "hint": "Settings, Users, your user."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/me/items-in-progress?limit=10",
+    "cacheMinutes": 15,
+    "headers": {
+      "Authorization": "Bearer {config.token}"
+    }
+  },
+  "items": {
+    "path": "$.libraryItems",
+    "title": "$.media.metadata.title",
+    "subtitle": "$.media.metadata.authorName || $.media.metadata.author",
+    "limit": 10
+  }
+}

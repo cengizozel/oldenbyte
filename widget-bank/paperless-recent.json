@@ -1,0 +1,50 @@
+{
+  "id": "paperless-recent",
+  "title": "Paperless",
+  "description": "The documents most recently added to your Paperless-ngx.",
+  "color": "teal",
+  "category": "library",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://paperless.lan:8000"
+    },
+    {
+      "key": "token",
+      "label": "API token",
+      "type": "secret",
+      "hint": "Your profile, API Auth Token."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/api/documents/?ordering=-added&page_size=12",
+    "cacheMinutes": 15,
+    "headers": {
+      "Authorization": "Token {config.token}"
+    }
+  },
+  "layout": [
+    {
+      "component": "stat-row",
+      "items": [
+        {
+          "label": "Documents",
+          "value": "$.count | number"
+        }
+      ]
+    },
+    {
+      "component": "list",
+      "path": "$.results",
+      "title": "$.title",
+      "meta": "$.created | dateShort",
+      "limit": 12
+    }
+  ]
+}

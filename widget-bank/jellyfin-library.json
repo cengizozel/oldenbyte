@@ -1,0 +1,63 @@
+{
+  "id": "jellyfin-library",
+  "title": "Jellyfin library",
+  "description": "How many films, shows, episodes and songs your Jellyfin holds.",
+  "color": "sky",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 2
+  },
+  "config": [
+    {
+      "key": "url",
+      "label": "Address",
+      "type": "url",
+      "placeholder": "http://jellyfin.lan:8096"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Jellyfin, Dashboard, API Keys."
+    }
+  ],
+  "fetch": {
+    "url": "{config.url}/Items/Counts",
+    "cacheMinutes": 120,
+    "headers": {
+      "X-Emby-Token": "{config.apiKey}"
+    }
+  },
+  "layout": [
+    {
+      "component": "stat-row",
+      "items": [
+        {
+          "label": "Films",
+          "value": "$.MovieCount | number"
+        },
+        {
+          "label": "Shows",
+          "value": "$.SeriesCount | number"
+        },
+        {
+          "label": "Episodes",
+          "value": "$.EpisodeCount | number"
+        },
+        {
+          "label": "Albums",
+          "value": "$.AlbumCount | number"
+        },
+        {
+          "label": "Songs",
+          "value": "$.SongCount | number"
+        },
+        {
+          "label": "Books",
+          "value": "$.BookCount | number"
+        }
+      ]
+    }
+  ]
+}

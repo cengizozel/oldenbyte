@@ -1,0 +1,36 @@
+{
+  "id": "lastfm-recent",
+  "title": "Last.fm",
+  "description": "The tracks a Last.fm user listened to most recently.",
+  "color": "rose",
+  "category": "media",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "user",
+      "label": "Last.fm user",
+      "type": "text"
+    },
+    {
+      "key": "apiKey",
+      "label": "API key",
+      "type": "secret",
+      "hint": "Free, from last.fm/api/account/create."
+    }
+  ],
+  "fetch": {
+    "url": "https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={config.user}&api_key={config.apiKey}&format=json&limit=15",
+    "cacheMinutes": 5
+  },
+  "items": {
+    "path": "$.recenttracks.track",
+    "title": "$.name",
+    "subtitle": "$.artist.#text",
+    "link": "$.url",
+    "meta": "$.date.#text || now",
+    "limit": 15
+  }
+}

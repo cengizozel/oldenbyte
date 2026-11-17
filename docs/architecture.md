@@ -70,7 +70,7 @@ components/
   TopBar.tsx            # Header: editable fields, date/clock, dashboard switcher, settings panel
   WidgetCard.tsx        # Fallback/empty widget shell
   WidgetGrid.tsx        # Grid layout, view modes, drag-drop, persistence, WIDGET_COMPONENTS
-  WidgetShelf.tsx       # Edit-mode picker (built-ins + Community group), export/import, undo
+  WidgetShelf.tsx       # Edit-mode picker (built-ins, widget files, custom widgets, the Community catalog tab), export/import, undo
   *Widget.tsx           # One component per widget type (Notepad, Reader, Feed, Reddit, YouTube,
                         # Weather, F1, arXiv, HF, Calendar, Schedule, Tracker, Rhythm, Upkeep,
                         # Bookmarks, Typing, Chess, TV, Chat, Kiwix, Anytype, Text)
@@ -109,7 +109,7 @@ lib/
 
 tests/                  # Vitest unit tests (caldav, rss, settingKeys, ssrf, text)
 tools/anytype-bridge/   # Optional write bridge for Anytype (Python)
-widget-bank/            # Community widget definitions (one JSON file each)
+widget-bank/            # Widget files (one JSON definition each)
 addons/                 # Add-ons for built-in widgets (one JSON file each)
 instrumentation.ts      # Startup: SESSION_SECRET check, table creation/migration, maintenance
 proxy.ts                # Auth gate: 401 for API calls, redirect to /login for pages
@@ -168,7 +168,7 @@ A declarative engine for community widgets: each one is a JSON file in `widget-b
 - [`lib/widgetBank.ts`](../lib/widgetBank.ts) defines the schema, validates untrusted defs, and resolves `$.path | transform` expressions and `{config.key}` URL interpolation.
 - `/api/widget-bank` serves every valid def in `widget-bank/`, skipping and reporting invalid files.
 - [`components/BankWidget.tsx`](../components/BankWidget.tsx) renders a def: it fetches the declared URL through `/api/proxy`, caches the response in the settings store per the def's `cacheMinutes`, and maps the data onto the primitives with the same chrome, colors, and dark mode as built-in widgets.
-- Bank widgets appear in the edit-mode picker under a Community group.
+- Widget files appear in the edit-mode picker under their category, or under More. The Community tab is the catalog of custom widgets (docs/custom-widgets.md).
 
 See [widget-bank.md](widget-bank.md) for the definition format, primitives, and contribution checklist.
 

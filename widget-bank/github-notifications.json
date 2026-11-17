@@ -1,0 +1,34 @@
+{
+  "id": "github-notifications",
+  "title": "GitHub notifications",
+  "description": "Your unread GitHub notifications.",
+  "color": "neutral",
+  "category": "feeds",
+  "defaultSize": {
+    "w": 1,
+    "h": 3
+  },
+  "config": [
+    {
+      "key": "token",
+      "label": "Access token",
+      "type": "secret",
+      "hint": "A classic token with the notifications scope."
+    }
+  ],
+  "fetch": {
+    "url": "https://api.github.com/notifications?per_page=20",
+    "cacheMinutes": 5,
+    "headers": {
+      "Authorization": "Bearer {config.token}",
+      "X-GitHub-Api-Version": "2022-11-28"
+    }
+  },
+  "items": {
+    "path": "$",
+    "title": "$.subject.title",
+    "subtitle": "$.repository.full_name",
+    "meta": "$.updated_at | timeAgo",
+    "limit": 20
+  }
+}
