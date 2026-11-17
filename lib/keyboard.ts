@@ -22,6 +22,7 @@ export type KeyboardAction =
   | "nextDashboard"
   | "newDashboard"
   | "editLayout"
+  | "appSettings"
   | "help";
 
 export type KeyboardConfig = {
@@ -63,6 +64,8 @@ export const KEYBOARD_KEY = "keyboard-config";
 export const KEYBOARD_EVENT = "keyboardconfigchange";
 // Asks the dashboard switcher to open in create mode (the name prompt).
 export const NEW_DASHBOARD_EVENT = "keyboardnewdashboard";
+// Asks the top bar to open the Settings drawer.
+export const OPEN_SETTINGS_EVENT = "keyboardopensettings";
 
 // Order here is the order in Settings > Keyboard and the cheat sheet.
 export const KEYBOARD_ACTIONS: { id: KeyboardAction; label: string }[] = [
@@ -80,6 +83,7 @@ export const KEYBOARD_ACTIONS: { id: KeyboardAction; label: string }[] = [
   { id: "nextDashboard", label: "Next dashboard" },
   { id: "newDashboard",  label: "New dashboard" },
   { id: "editLayout",    label: "Toggle layout editing" },
+  { id: "appSettings",   label: "Open Settings" },
   { id: "help",          label: "Show shortcuts" },
 ];
 
@@ -110,6 +114,7 @@ export const DEFAULT_KEYBOARD: KeyboardConfig = {
     nextDashboard: "]",
     newDashboard: "n",
     editLayout: "g",
+    appSettings: "s",
     help: "?",
   },
 };

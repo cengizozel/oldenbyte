@@ -13,7 +13,7 @@ import Toggle from "@/components/ui/Toggle";
 import { KeyboardSettings } from "@/components/KeyboardLayer";
 import { PhoneSettings } from "@/components/MobileNav";
 import { DataSettings } from "@/components/DataSettings";
-import { NEW_DASHBOARD_EVENT } from "@/lib/keyboard";
+import { NEW_DASHBOARD_EVENT, OPEN_SETTINGS_EVENT } from "@/lib/keyboard";
 import { FOCUS_RING, HIT_AREA, SettingsRow, SettingsSection } from "@/components/ui/Field";
 
 // ── EditableField ─────────────────────────────────────────────────────────
@@ -1137,6 +1137,12 @@ export default function TopBar({
   const [theme, setTheme] = useState<Theme>("light");
   const [glow, setGlow] = useState<GlowPrefs>(DEFAULT_GLOW);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The keyboard's Settings key (Space s by default).
+  useEffect(() => {
+    const onOpen = () => setSettingsOpen(true);
+    window.addEventListener(OPEN_SETTINGS_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, onOpen);
+  }, []);
   const [demo, setDemo] = useState(false);
   const [timezone, setTz] = useState("");
   const [preload, setPreload] = useState(false);

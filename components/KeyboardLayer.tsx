@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 import { RotateCcw, ChevronDown } from "lucide-react";
 import type { DashboardsState } from "@/lib/dashboards";
 import {
-  DEFAULT_KEYBOARD, KEYBOARD_ACTIONS, KEYBOARD_EVENT, NEW_DASHBOARD_EVENT, MAX_CELLS, MAX_TABS,
+  DEFAULT_KEYBOARD, KEYBOARD_ACTIONS, KEYBOARD_EVENT, NEW_DASHBOARD_EVENT, OPEN_SETTINGS_EVENT, MAX_CELLS, MAX_TABS,
   cellDigit, cellFromKey, tabFromKey, actionForKey, isBindableKey, isEditableTarget, keyLabel, rebind,
   loadKeyboardConfig, saveKeyboardConfig, TIMEOUT_RANGE, REPEAT_RANGE, REPEATABLE, type KeyboardAction, type KeyboardConfig,
 } from "@/lib/keyboard";
@@ -424,6 +424,7 @@ export default function KeyboardLayer({
     }
     if (action === "editLayout") { finish(false); toggleEdit(); return; }
     if (action === "newDashboard") { finish(false); window.dispatchEvent(new Event(NEW_DASHBOARD_EVENT)); return; }
+    if (action === "appSettings") { finish(false); window.dispatchEvent(new Event(OPEN_SETTINGS_EVENT)); return; }
     if (!d || d.list.length < 2) { finish(); return; }
     const i = d.list.findIndex(x => x.id === d.activeId);
     const step = action === "nextDashboard" ? 1 : -1;

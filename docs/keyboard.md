@@ -20,6 +20,7 @@ Defaults, all pressed after the leader (**Space**):
 | `[` / `]` | Previous / next dashboard |
 | `n` | New dashboard (opens the switcher at the name prompt) |
 | `g` | Toggle layout editing (it was `l` before the moves took `h j k l`; a saved config still holding `l` moves to `g`) |
+| `s` | Open Settings (Escape closes it) |
 | `?` | Cheat sheet with the current bindings (any key closes it) |
 | `Escape` | Cancel a pending command; on a focused widget, leave it |
 
