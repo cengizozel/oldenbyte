@@ -16,6 +16,7 @@ import {
   addCheck, removeCheck, stopCheck, unstopCheck, normalizeItem, orderRows, shiftDay,
   stateAt, scoreAt, perfectSince, nextExpiry, sampleScores, summarize, dayChecks, formatSpan,
 } from "@/lib/upkeep";
+import CollapsingHero from "./ui/CollapsingHero";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING, Stepper } from "./ui/Field";
 import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsField, SettingsListRow, SettingsListControl, SettingsNote, LIST_TITLE_INPUT, ROW_ACTION, Chip, SettingsAddRow } from "./ui/WidgetChrome";
@@ -305,14 +306,15 @@ export default function UpkeepWidget({
       {!loaded ? null : items.length === 0 ? (
         <EmptyState c={c} action={t("empty.upkeep")} />
       ) : (
-        <div className="flex-1 min-h-0 flex flex-col gap-3">
-          <div className="shrink-0 flex justify-center">
+        <CollapsingHero
+          size={112}
+          figure={compact => (
             <ScoreRing
               rows={ringRows}
               total={ringRows.reduce((a, r) => a + r.weight, 0)}
               size={112}
               stroke={14}
-              center={
+              center={compact ? undefined : (
                 <>
                   <span className={`text-2xl font-semibold tabular-nums leading-none ${perfect ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>
                     {pct ?? "-"}
@@ -321,22 +323,26 @@ export default function UpkeepWidget({
                     {perfect ? "perfect" : "/ 100"}
                   </span>
                 </>
-              }
+              )}
             />
-          </div>
-
-          {perfect && since != null ? (
-            <div className={`shrink-0 flex items-center justify-center gap-1 text-sm tabular-nums ${c.label} opacity-70`}>
+          )}
+          summary={
+            <>
+              <span className={`text-xl font-semibold tabular-nums leading-none ${perfect ? "text-emerald-600 dark:text-emerald-400" : c.text}`}>{pct ?? "-"}</span>
+              <span className={`text-sm opacity-70 ${c.label}`}>{perfect ? "perfect" : "/ 100"}</span>
+            </>
+          }
+          status={perfect && since != null ? (
+            <span className={`inline-flex items-center gap-1 text-sm tabular-nums ${c.label} opacity-70`}>
               <Flame size={12} />
-              <span>at 100 for {formatSpan(at - since)}</span>
-            </div>
+              at 100 for {formatSpan(at - since)}
+            </span>
           ) : next ? (
-            <div className={`shrink-0 flex items-center justify-center gap-1 text-sm tabular-nums ${c.label} opacity-70 truncate px-2`}>
-              <span className="truncate">{next.item.name} runs out in {formatSpan(next.at - at)}</span>
-            </div>
-          ) : null}
-
-          <ul className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-1">
+            <span className={`text-sm tabular-nums ${c.label} opacity-70`}>{next.item.name} runs out in {formatSpan(next.at - at)}</span>
+          ) : undefined}
+        >
+          {list => (
+          <ul {...list} className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-1">
             {rows.map(r => (
               <li key={r.id} className={`flex items-center rounded-lg transition-colors ${r.on ? "bg-black/10 dark:bg-white/15" : "hover:bg-black/5 dark:hover:bg-white/10"}`}>
                 <button
@@ -371,7 +377,8 @@ export default function UpkeepWidget({
               </li>
             ))}
           </ul>
-        </div>
+          )}
+        </CollapsingHero>
       )}
     </>
   );

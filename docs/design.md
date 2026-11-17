@@ -282,6 +282,19 @@ the palette `label` color at 50% opacity.
   collection is always `SettingsAddRow`; read-only information is
   `SettingsInfo`, an inset block with a heading and bullets.
 
+## A large figure above a list
+
+Upkeep and Tracker open with one large figure (a ring with a number in it) above a list. `components/ui/CollapsingHero.tsx` gives it two sizes, so a short card is not all ring:
+
+- **Large:** the figure centered, its status line under it. Used when the card's body is at least 300px tall and the list is at its top.
+- **Compact:** the figure at 44px on the left, with its number and status beside it on one 48px row; the list gets the rest. Used when the body is shorter than 300px, and when the list is scrolled.
+
+Scrolling the list down shrinks the figure and slides it left in 300ms; scrolling up at the top of the list brings it back. It does not come back on its own when the list reaches the top, because a list that fits after shrinking would make it grow and shrink in turns. Text inside a figure is left out when compact (it would be under 14px) and shown beside it at full size. A new widget with a figure above a list uses this component and does not draw its own.
+
+## Save, cancel and reset
+
+Anything that saves, cancels or resets is drawn by `SaveCancelRow` (a whole row: reset or delete on the left, which asks first; cancel and save on the right) or by `SaveCancelButtons` (the cancel and save pair, for an edit inside a row). Both are in `components/ui/WidgetChrome.tsx`. Never draw these as bare icons, in a widget, a popover or the top bar.
+
 ## Page chrome
 
 Top bar text, in the same face as the widgets: title and the right-hand field

@@ -10,6 +10,7 @@ import { tagColor } from "@/lib/colors";
 import { formatClock, formatDuration, formatDate, localDateStr } from "@/lib/format";
 import FlipCard from "./ui/FlipCard";
 import { SettingsInput, HIT_AREA, FOCUS_RING } from "./ui/Field";
+import CollapsingHero from "./ui/CollapsingHero";
 import { EmptyState, WidgetHeader, SmallButton, SettingsFace, SettingsField, SettingsListRow, LIST_TITLE_INPUT, ROW_ACTION, SettingsAddRow, SaveCancelButtons } from "./ui/WidgetChrome";
 
 type Item = { id: string; name: string };
@@ -381,15 +382,16 @@ export default function TrackerWidget({
       {!loaded ? null : items.length === 0 ? (
         <EmptyState c={c} action={t("empty.tracker")} />
       ) : (
-        <div className="flex-1 min-h-0 flex flex-col gap-3">
-          <div className="shrink-0 flex justify-center">
+        <CollapsingHero
+          size={112}
+          figure={compact => (
             <Donut
               rows={sortedRows}
               size={112}
               stroke={14}
               hovered={hovered}
               onHover={setHovered}
-              center={hoveredRow ? (
+              center={compact ? undefined : hoveredRow ? (
                 <>
                   <span className={`text-sm font-semibold tabular-nums ${c.text}`}>{hoveredPct}%</span>
                   <span className={`text-sm leading-tight line-clamp-2 ${c.label} opacity-70`}>{hoveredRow.name}</span>
@@ -401,9 +403,21 @@ export default function TrackerWidget({
                 </>
               )}
             />
-          </div>
-
-          <ul className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-1">
+          )}
+          summary={hoveredRow ? (
+            <>
+              <span className={`text-xl font-semibold tabular-nums leading-none ${c.text}`}>{hoveredPct}%</span>
+              <span className={`text-sm opacity-70 truncate ${c.label}`}>{hoveredRow.name}</span>
+            </>
+          ) : (
+            <>
+              <span className={`text-xl font-semibold tabular-nums leading-none ${c.text}`}>{formatClock(total)}</span>
+              <span className={`text-sm opacity-70 ${c.label}`}>total</span>
+            </>
+          )}
+        >
+          {list => (
+          <ul {...list} className="flex-1 min-h-0 overflow-y-auto pr-3 flex flex-col gap-1">
             {sortedRows.map(r => {
               const isActive = r.id === activeId;
               return (
@@ -430,7 +444,8 @@ export default function TrackerWidget({
               );
             })}
           </ul>
-        </div>
+          )}
+        </CollapsingHero>
       )}
     </>
   );
