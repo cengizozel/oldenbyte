@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocalInstall } from "@/lib/useLocalInstall";
 import { useCallback, useEffect, useState } from "react";
 import { timeAgo } from "@/lib/format";
 import { FOCUS_RING, SettingsRow, SettingsSection } from "@/components/ui/Field";
@@ -12,6 +13,8 @@ import { FOCUS_RING, SettingsRow, SettingsSection } from "@/components/ui/Field"
 type Device = { id: string; name: string; createdAt: string; lastUsedAt: string; current: boolean };
 
 export function DevicesSettings() {
+  // The desktop app is itself the one signed-in app there; nothing to manage.
+  const local = useLocalInstall();
   const [devices, setDevices] = useState<Device[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -42,6 +45,7 @@ export function DevicesSettings() {
     }
   }
 
+  if (local) return null;
   return (
     <SettingsSection title="Devices">
       {failed ? (

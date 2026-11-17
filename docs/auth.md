@@ -92,3 +92,7 @@ For its in-app web view an app trades the token for a normal session cookie at `
 There is no password environment variable: the admin account is created in the browser on first run and all credentials live in the database.
 
 `SESSION_SECRET` has no safe default in production: if it is unset the app **refuses to start** (`instrumentation.ts`), because the cookie would otherwise be signed with a constant that is public in this repo and therefore trivially forgeable. In development an unset secret falls back to a throwaway value so a local checkout runs without configuration.
+
+## The desktop app
+
+The desktop app (`oldenbyte-desktop`) runs this server for one person on their own computer, makes the one account itself and signs its window in through the app API. It starts the server with `OLDENBYTE_LOCAL=1`; `/api/me` then answers `local: true`, and the settings drawer leaves out what has no meaning there: logging out, changing the password, and the list of signed-in apps.

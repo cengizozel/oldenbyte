@@ -581,7 +581,7 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: str
 
 // ── AccountSection ─────────────────────────────────────────────────────────
 
-type Me = { id: string; username: string; role: string; mustChangePassword: boolean };
+type Me = { id: string; username: string; role: string; mustChangePassword: boolean; local?: boolean };
 
 // Lives inside the settings drawer. Fetches the current session user when the
 // drawer opens and offers logout + an inline password-change disclosure.
@@ -638,6 +638,22 @@ function AccountSection({ open }: { open: boolean }) {
   }
 
   if (!me) return null;
+
+  // The desktop app: no account to sign out of and no password to know.
+  if (me.local) {
+    return (
+      <SettingsSection title="This computer">
+        <SettingsRow label="Kept on this computer" hint="The desktop app runs this dashboard here and signs you in by itself." />
+        <a
+          href="/admin"
+          className={`flex items-center justify-between gap-3 min-h-10 py-1.5 text-sm text-[var(--text-primary)] hover:text-[var(--text-secondary)] transition-colors ${FOCUS_RING}`}
+        >
+          <span>Server settings</span>
+          <ChevronRight size={14} className="text-[var(--text-muted)]" />
+        </a>
+      </SettingsSection>
+    );
+  }
 
   return (
     <SettingsSection title="Account">

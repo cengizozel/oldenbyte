@@ -9,5 +9,9 @@ export async function GET(request: NextRequest) {
     username: user.username,
     role: user.role,
     mustChangePassword: user.mustChangePassword,
+    // The desktop app runs this server for one person on their own computer
+    // and signs them in by itself: signing out or changing the password has
+    // no meaning there, so the settings leave those out.
+    ...(process.env.OLDENBYTE_LOCAL === "1" ? { local: true } : {}),
   });
 }
