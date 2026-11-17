@@ -3,10 +3,14 @@
 import PhoneTabBar from "@/components/PhoneTabBar";
 import { usePhone } from "@/components/MobileNav";
 import { useModelServers } from "@/lib/useModelServers";
-import { HIT_AREA, FOCUS_RING } from "@/components/ui/Field";
+import { HIT_AREA, FOCUS_RING, SettingsInput, SettingsRow, SettingsSection, SettingsSelect } from "@/components/ui/Field";
+import PhoneSheet from "@/components/ui/PhoneSheet";
+import Toggle from "@/components/ui/Toggle";
+import { SaveCancelButtons, SmallButton } from "@/components/ui/WidgetChrome";
+import { colorMap } from "@/lib/widgets";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Zap, ChevronRight } from "lucide-react";
+import { Zap, ChevronRight, RotateCw, SlidersHorizontal } from "lucide-react";
 import * as storage from "@/lib/storage";
 import { widgets as widgetDefs } from "@/lib/widgets";
 import { normalizeCitations } from "@/lib/citations";
@@ -751,21 +755,166 @@ export default function DigestPage() {
     };
   }
 
+  // A phone-width screen (docs/mobile.md, The digest): the page takes the
+  // phone frame's shape. A title with the date, two buttons, each section a
+  // card that folds, and the setup in a sheet. The writing keeps its face.
+  if (phone) {
+    const n = colorMap.neutral;
+    const canSave = Boolean(draft.baseUrl && draft.model && (draft.apiKey || !NEEDS_KEY.test(draft.baseUrl)));
+    const offers = servers.offers(draft.baseUrl, draft.model);
+    const shown = sectionSummaries.filter(s => !skippedLabels.has(s.label));
+    const iconButton = `w-11 h-11 flex items-center justify-center rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] ${FOCUS_RING}`;
+    const chip = (on: boolean) => `h-9 px-3 rounded-lg text-sm ${FOCUS_RING} ${on ? "bg-[var(--text-primary)] text-[var(--page-bg)] font-medium" : "bg-black/5 dark:bg-white/10 text-[var(--text-primary)]"}`;
+    return (
+      <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)] pb-[calc(76px+env(safe-area-inset-bottom,0px))]">
+        <PhoneTabBar active="digest" />
+        <header className="flex items-start justify-between gap-3 px-4 pt-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold leading-tight">Digest</h1>
+            <p suppressHydrationWarning className="text-sm text-[var(--text-muted)]">{dateLabel}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {configured && !aiLoading && !generating && (
+              <button type="button" title="Write it again" aria-label="Write it again" className={iconButton}
+                onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; storage.removeItem(`digest-ai-sections-${today}`); generateSummary(); }}>
+                <RotateCw size={18} />
+              </button>
+            )}
+            <button type="button" title="Digest setup" aria-label="Digest setup" className={iconButton} onClick={openSettings}>
+              <SlidersHorizontal size={18} />
+            </button>
+          </div>
+        </header>
+
+        <main className="px-4 pt-4 flex flex-col gap-3">
+          {!configured ? (
+            <div className="text-center px-4 pt-24">
+              <p className="font-[family-name:var(--font-playfair)] text-[17px] italic leading-relaxed">
+                A morning briefing written from your widgets, by a model you choose: one on your network or a hosted one.
+              </p>
+              <button type="button" onClick={openSettings} className={`mt-5 h-12 px-5 rounded-xl text-base font-medium bg-[var(--text-primary)] text-[var(--page-bg)] ${FOCUS_RING}`}>
+                Set up a model
+              </button>
+            </div>
+          ) : aiLoading ? (
+            <p className="text-[15px] text-[var(--text-secondary)] text-center pt-24 animate-pulse">composing briefing…</p>
+          ) : aiError ? (
+            <p className="font-[family-name:var(--font-playfair)] text-base italic text-center px-4 pt-24">{aiError}</p>
+          ) : !loading && sections.length === 0 ? (
+            <p className="font-[family-name:var(--font-playfair)] text-base italic text-center px-4 pt-24">
+              Nothing to write about yet: the dashboard on screen has no widgets the digest reads.
+            </p>
+          ) : shown.map(sec => (
+            <article key={sec.label} className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)]">
+              <button type="button" aria-expanded={!collapsed[sec.label]} onClick={() => setCollapsed(c => ({ ...c, [sec.label]: !c[sec.label] }))}
+                className={`w-full min-h-12 flex items-center justify-between gap-3 px-4 text-left text-base font-semibold rounded-2xl ${FOCUS_RING}`}>
+                <span className="truncate">{sec.label}</span>
+                <ChevronRight size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${collapsed[sec.label] ? "" : "rotate-90"}`} />
+              </button>
+              {!collapsed[sec.label] && (
+                <div className="flex flex-col gap-3 px-4 pb-4">
+                  {sec.prose
+                    ? renderProse(sec.prose, sec.refs)
+                    : generating
+                      ? <p className="text-[15px] text-[var(--text-secondary)] animate-pulse">composing…</p>
+                      : <p className="font-[family-name:var(--font-playfair)] text-base italic">no content.</p>}
+                </div>
+              )}
+            </article>
+          ))}
+        </main>
+
+        <PhoneSheet open={showSettings} onClose={() => setShowSettings(false)} label="Digest setup" className="bg-[var(--page-bg)] border-[var(--surface-border)] text-[var(--text-primary)]">
+          <h2 className="text-lg font-semibold shrink-0">Digest setup</h2>
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-1 px-1">
+            <SettingsSection title="Model server">
+              <div className="flex flex-wrap gap-2 py-3">
+                {PRESETS.map(p => (
+                  <button key={p.label} type="button" aria-pressed={draft.baseUrl === p.url} onClick={() => setEndpoint(p.url)} className={chip(draft.baseUrl === p.url)}>{p.label}</button>
+                ))}
+              </div>
+              <div className="flex flex-col gap-1.5 py-3">
+                <label htmlFor="digest-address" className="text-sm text-[var(--text-primary)]">Address</label>
+                <SettingsInput id="digest-address" value={draft.baseUrl} inputMode="url" autoCapitalize="none" autoCorrect="off" placeholder="http://localhost:11434/v1" className="font-mono !text-base !bg-[var(--page-bg)]"
+                  onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, baseUrl: v })); setModels(defaultModelsFor(v)); setModelsError(""); }} />
+              </div>
+              <div className="flex flex-col gap-1.5 py-3">
+                <label htmlFor="digest-model" className="text-sm text-[var(--text-primary)]">Model</label>
+                {loadingModels ? (
+                  <span className="text-sm italic animate-pulse py-2">searching models…</span>
+                ) : models.length > 0 ? (
+                  <SettingsSelect id="digest-model" value={draft.model} onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} className="font-mono !text-base !bg-[var(--page-bg)]">
+                    <option value="" disabled>select a model…</option>
+                    {draft.model && !models.includes(draft.model) && <option value={draft.model}>{draft.model}</option>}
+                    {models.map(m => <option key={m} value={m}>{m}</option>)}
+                  </SettingsSelect>
+                ) : (
+                  <SettingsInput id="digest-model" value={draft.model} autoCapitalize="none" autoCorrect="off" placeholder="e.g. gpt-4o-mini or llama3.2" className="font-mono !text-base !bg-[var(--page-bg)]"
+                    onChange={e => setDraft(d => ({ ...d, model: e.target.value }))} />
+                )}
+                {modelsError && <p className="text-sm text-red-600 dark:text-red-400 leading-snug">{modelsError}</p>}
+              </div>
+              {NEEDS_KEY.test(draft.baseUrl) && (
+                <div className="flex flex-col gap-1.5 py-3">
+                  <label htmlFor="digest-key" className="text-sm text-[var(--text-primary)]">API key</label>
+                  <SettingsInput id="digest-key" type="password" value={draft.apiKey} placeholder="sk-..." className="font-mono !text-base !bg-[var(--page-bg)]"
+                    onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))} />
+                </div>
+              )}
+              <SettingsRow label="Models" hint="Ask this address what it offers.">
+                <SmallButton c={n} onClick={() => loadModelsFor(draft.baseUrl, draft.apiKey, draft.model || model)} disabled={loadingModels}>Load models</SmallButton>
+              </SettingsRow>
+              <SettingsRow label="On your network" hint={servers.nothingFound && !offers.length ? "No model server answered on the usual ports." : "Ollama, LM Studio or llama.cpp."}>
+                <SmallButton c={n} onClick={servers.find} disabled={servers.finding}>{servers.finding ? "Looking…" : "Find servers"}</SmallButton>
+              </SettingsRow>
+              {offers.map(o => (
+                <SettingsRow key={o.key} label={o.label} hint={o.note}>
+                  <SmallButton c={n} onClick={() => { setDraft(d => ({ ...d, baseUrl: o.url, model: o.model })); setModelsError(""); loadModelsFor(o.url, draft.apiKey, o.model); }}>Use</SmallButton>
+                </SettingsRow>
+              ))}
+            </SettingsSection>
+            {sections.length > 0 && (
+              <SettingsSection title="Sections">
+                {sections.map(sec => (
+                  <SettingsRow key={sec.id} label={sec.label}>
+                    <Toggle checked={!skip.includes(sec.id)} onChange={() => toggleSkip(sec.id)} label={sec.label} />
+                  </SettingsRow>
+                ))}
+              </SettingsSection>
+            )}
+            <SettingsSection title="Writing">
+              <SettingsRow label="Show it as it is written" hint="Sections appear while the model writes.">
+                <Toggle checked={streamingMode} label="Show it as it is written"
+                  onChange={() => { const next = !streamingMode; setStreamingMode(next); localStorage.setItem("digest-streaming", String(next)); }} />
+              </SettingsRow>
+              {canSave && (
+                <SettingsRow label="Write today's again" hint="Save, then compose with this model.">
+                  <SmallButton c={n} onClick={() => saveSettings(true)}>Save and write</SmallButton>
+                </SettingsRow>
+              )}
+            </SettingsSection>
+          </div>
+          <SaveCancelButtons c={n} onCancel={() => setShowSettings(false)} onSave={() => saveSettings(false)} saveDisabled={!canSave} className="self-end" />
+        </PhoneSheet>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)] max-[599px]:pb-[calc(60px+env(safe-area-inset-bottom,0px))]">
-      {phone && <PhoneTabBar active="digest" />}
-      <div className="max-w-3xl mx-auto px-8 py-10 max-[599px]:px-4 max-[599px]:py-5">
+    // Under 600px this is replaced by the phone layout above as soon as the
+    // width is known; until then it is kept out of sight.
+    <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)] max-[599px]:invisible">
+      <div className="max-w-3xl mx-auto px-8 py-10">
 
         {/* Masthead */}
         <header className="mb-1">
           <div className="flex items-baseline justify-between mb-3">
-            {/* On a phone the bar at the bottom is the way back. */}
-            {phone ? <span /> : <Link
+            <Link
               href="/"
               className="inline-flex items-center min-h-6 font-ui text-[15px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
             >
               ← back
-            </Link>}
+            </Link>
             <span suppressHydrationWarning className="font-ui text-[15px] text-[var(--text-secondary)]">
               {dateLabel}
             </span>

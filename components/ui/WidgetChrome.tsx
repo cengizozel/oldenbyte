@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref, type RefObject } from "react";
-import { FaceShownContext } from "./FlipCard";
+import { FaceShownContext, SheetCancelContext } from "./FlipCard";
 import { createPortal } from "react-dom";
 import { useTabGroup } from "@/lib/tabGroup";
 import { useT } from "@/lib/useT";
@@ -146,7 +146,7 @@ export function ErrorState({ c, children, onRetry, busy }: { c: ColorClasses; ch
 // and save on the right. Real 28px buttons on a fill, 16px glyphs, so they read
 // as the face's actions and not as stray marks. Without onSave the right side
 // is a single close.
-const FACE_BUTTON = `w-7 h-7 flex items-center justify-center rounded-lg transition-colors bg-black/5 dark:bg-white/10 ${FOCUS_RING}`;
+const FACE_BUTTON = `w-7 h-7 [.ob-sheet_&]:w-11 [.ob-sheet_&]:h-11 [.ob-sheet_&]:rounded-xl flex items-center justify-center rounded-lg transition-colors bg-black/5 dark:bg-white/10 ${FOCUS_RING}`;
 export function SaveCancelRow({
   c,
   onSave,
@@ -673,6 +673,13 @@ export function SettingsFace({
   const faceRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef(onCancel);
   cancelRef.current = onCancel;
+  // In a phone's sheet, the handle and a tap outside cancel too.
+  const sheetCancel = useContext(SheetCancelContext);
+  useEffect(() => {
+    if (!sheetCancel) return;
+    sheetCancel.current = () => cancelRef.current();
+    return () => { sheetCancel.current = null; };
+  }, [sheetCancel]);
   // In a tab group the row steps aside while this face shows.
   const group = useTabGroup();
   const shown = useContext(FaceShownContext) ?? true;
@@ -712,7 +719,8 @@ export function SettingsFace({
 // Hierarchy: the label is medium weight at full strength, the hint under it
 // is light, and the control stands on its own fill, so the three never read
 // as the same thing.
-export const SETTINGS_LABEL = "text-sm font-medium";
+// In a phone's sheet (.ob-sheet) labels and controls are sized for a thumb.
+export const SETTINGS_LABEL = "text-sm [.ob-sheet_&]:text-base font-medium";
 export const SETTINGS_HINT = "text-sm opacity-70 leading-snug";
 export function SettingsField({ c, label, hint, children, inline = false }: { c: ColorClasses; label: ReactNode; hint?: ReactNode; children: ReactNode; inline?: boolean }) {
   return (
@@ -894,7 +902,7 @@ export function Chip({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`h-7 px-2.5 rounded-md text-sm leading-none whitespace-nowrap shrink-0 transition-colors ${FOCUS_RING} ${
+      className={`h-7 px-2.5 [.ob-sheet_&]:h-9 [.ob-sheet_&]:px-3.5 [.ob-sheet_&]:rounded-lg rounded-md text-sm leading-none whitespace-nowrap shrink-0 transition-colors ${FOCUS_RING} ${
         active ? "bg-black/75 text-white dark:bg-white/85 dark:text-black font-medium" : `bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 ${c.text}`
       } ${className}`}
     >
@@ -920,7 +928,7 @@ export function SmallButton({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={`whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-sm bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 disabled:opacity-40 transition-colors ${FOCUS_RING} ${c.label} ${className}`}
+      className={`whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 h-7 px-2.5 [.ob-sheet_&]:h-9 [.ob-sheet_&]:px-3.5 rounded-lg text-sm bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 disabled:opacity-40 transition-colors ${FOCUS_RING} ${c.label} ${className}`}
     >
       {children}
     </button>

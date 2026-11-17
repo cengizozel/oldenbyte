@@ -1,14 +1,21 @@
 "use client";
 
-import { createContext, type ReactNode } from "react";
+import { createContext, useRef, type ReactNode, type RefObject } from "react";
 import type { ColorClasses } from "@/lib/widgets";
 import { useTabGroup } from "@/lib/tabGroup";
+import { usePhone } from "@/lib/usePhone";
+import PhoneSheet from "@/components/ui/PhoneSheet";
 
 // Whether the face a component sits on is the one showing. The back face is
 // always mounted (for the flip), so a settings face reads this to know when
 // it is really open. Null outside a flip card: an overlay face is mounted
 // only while open.
 export const FaceShownContext = createContext<boolean | null>(null);
+
+// On a phone the settings face opens in a sheet (below). The face puts its
+// cancel here, so the sheet's handle and a tap outside can call it. Null when
+// the face is on the back of the card.
+export const SheetCancelContext = createContext<RefObject<(() => void) | null> | null>(null);
 
 // The standard widget shell: rounded color card whose front face flips to a
 // settings back face with a 3D rotateY transition. Extracted from the pattern
@@ -35,6 +42,12 @@ export default function FlipCard({
   // at the same height as in a single widget. (The back face keeps it: the
   // row hides while a settings face is open.)
   const inGroup = !!useTabGroup();
+  // A phone-width screen: the card does not turn over. Its settings rise in a
+  // sheet over the dashboard, with the card's own colors, so they are as tall
+  // as they need to be and not as small as the card.
+  const phone = usePhone();
+  const cancel = useRef<(() => void) | null>(null);
+  const turned = flipped && !phone;
   return (
     <div
       className={`rounded-2xl border h-full relative group ${c.bg} ${c.border} ${c.glow} ${className}`}
@@ -45,7 +58,7 @@ export default function FlipCard({
         style={{
           transformStyle: "preserve-3d",
           WebkitTransformStyle: "preserve-3d",
-          transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          transform: turned ? "rotateY(180deg)" : "rotateY(0deg)",
         }}
       >
         {/* Each face is opaque (it must hide the other one mid-flip and when
@@ -60,13 +73,13 @@ export default function FlipCard({
             // The shown face inherits pointer events rather than forcing
             // them on, so edit mode's pass-through (presses fall to the
             // tile, which drags) reaches the content too.
-            pointerEvents: flipped ? "none" : undefined,
+            pointerEvents: turned ? "none" : undefined,
           }}
           // The hidden face stays in the DOM for the flip animation; inert keeps
           // it out of the tab order and the accessibility tree.
-          inert={flipped}
+          inert={turned}
         >
-          <FaceShownContext.Provider value={!flipped}>{front}</FaceShownContext.Provider>
+          <FaceShownContext.Provider value={!turned}>{front}</FaceShownContext.Provider>
         </div>
         <div
           className={`absolute inset-px p-[19px] flex flex-col gap-3 rounded-[15px] overflow-clip ${c.bg} ${backClassName}`}
@@ -74,13 +87,20 @@ export default function FlipCard({
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
             transform: "rotateY(180deg)",
-            pointerEvents: flipped ? undefined : "none",
+            pointerEvents: turned ? undefined : "none",
           }}
-          inert={!flipped}
+          inert={!turned}
         >
-          <FaceShownContext.Provider value={flipped}>{back}</FaceShownContext.Provider>
+          {!phone && <FaceShownContext.Provider value={flipped}>{back}</FaceShownContext.Provider>}
         </div>
       </div>
+      {phone && (
+        <PhoneSheet open={flipped} onClose={() => cancel.current?.()} label="Settings" keepMounted className={`${c.bg} ${c.border} ${backClassName}`}>
+          <SheetCancelContext.Provider value={cancel}>
+            <FaceShownContext.Provider value={flipped}>{back}</FaceShownContext.Provider>
+          </SheetCancelContext.Provider>
+        </PhoneSheet>
+      )}
     </div>
   );
 }

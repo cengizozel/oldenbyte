@@ -12,20 +12,7 @@ import { PHONE_TAB_BAR } from "@/components/PhoneTabBar";
 // Phone navigation (docs/mobile.md): the floating jump button. The overview it
 // opens lives in WidgetGrid, which owns the layout.
 
-// A phone-width window. The layout bands in WidgetGrid follow the grid's own
-// width; this follows the real viewport, which the overview needs because it
-// lays the grid out wider than the screen.
-export function usePhone(): boolean {
-  const [phone, setPhone] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 599px)");
-    const on = () => setPhone(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return phone;
-}
+export { usePhone } from "@/lib/usePhone";
 
 export type JumpItem = { id: string; label: string; member: boolean };
 

@@ -311,6 +311,9 @@ name as a `text-2xl` semibold title, one dot per dashboard at the top right,
 and a bar at the bottom with Dashboard, Digest and Settings (22px icons over
 14px labels, the current one in the primary color). Lists opened on a phone
 use rows at least 44px tall with `text-base` labels.
+Settings that sit inside a card on a wide screen open in a bottom sheet on a
+phone (`PhoneSheet`); never build a second phone-only settings layout for a
+widget.
 
 The settings drawer is built from `SettingsSection` and `SettingsRow`
 (`components/ui/Field.tsx`): a muted `text-sm` section title, then rows at

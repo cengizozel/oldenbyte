@@ -37,6 +37,14 @@ Under 600px the page takes the shape of a phone app. It is the same page and the
 
 A window 600px or wider keeps the top bar as it was.
 
+### Sheets
+
+On a phone a widget's settings do not turn the card over: they rise in a sheet from the bottom (`components/ui/PhoneSheet.tsx`), in the card's own colors, as tall as they need up to just under the page title, scrolling inside past that. Save, cancel and reset are the same row as everywhere, larger. Dragging the handle down or tapping outside cancels. `FlipCard` does this for every widget, so a widget's settings face is written once; inside a sheet (`.ob-sheet`) labels, chips and buttons are sized for a thumb. The sheet stays mounted while closed, like the back of the card, so a face keeps its state.
+
+### The digest
+
+Under 600px the digest drops the newspaper masthead for the frame's shape: "Digest" as the title with the date under it, a button to write it again and one for setup, each section a card that folds, and the writing in its own serif face. Setup is a sheet with the server presets as chips, address, model and key as fields, the sections as switches, and cancel and save at the bottom. Before a model is set the page shows one sentence and a "Set up a model" button.
+
 ## The jump button
 
 A floating round button with the oldenbyte mark, like iOS AssistiveTouch. It is shown on the visible dashboard, on phones only, and not while editing the layout or with a widget in full screen.
