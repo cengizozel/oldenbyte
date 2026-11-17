@@ -97,6 +97,17 @@ async function readText(userId: string, id: string, title: string): Promise<stri
   }
 }
 
+async function readTodo(userId: string, id: string, title: string): Promise<string> {
+  const cfg = await readJSON<{ tasks?: { text: string; done: boolean }[] }>(userId, `todo-widget-${id}`);
+  const tasks = cfg?.tasks ?? [];
+  if (!tasks.length) return "This to-do list is empty.";
+  const open = tasks.filter(t => !t.done), done = tasks.filter(t => t.done);
+  const lines = [`## ${title} (To-do list)`, `${open.length} open, ${done.length} done.`];
+  if (open.length) lines.push("Open:", ...open.slice(0, 60).map(t => `- ${truncate(t.text, 200)}`));
+  if (done.length) lines.push("Done:", ...done.slice(0, 30).map(t => `- ${truncate(t.text, 200)}`));
+  return lines.join("\n");
+}
+
 async function readWeather(userId: string, id: string, title: string): Promise<string> {
   const cfg = await readJSON<{ name: string; lat: number; lon: number; unit?: "c" | "f" }>(userId, `weather-widget-${id}`);
   if (!cfg || !isFinite(cfg.lat) || !isFinite(cfg.lon)) return "The weather widget has no location configured.";
@@ -438,6 +449,7 @@ export async function readWidgetData(userId: string, id: string, type: string, t
     switch (type) {
       case "notebook": return await readNotebook(userId, id, title);
       case "text":     return await readText(userId, id, title);
+      case "todo":     return await readTodo(userId, id, title);
       case "weather":  return await readWeather(userId, id, title);
       case "calendar": return await readCalendar(userId, id, title, opts);
       case "schedule": return await readSchedule(userId, id, title);

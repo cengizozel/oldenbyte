@@ -18,10 +18,16 @@ A self-hosted personal dashboard. Drag and resize widgets, keep several dashboar
 
 | Kind | Widgets |
 |---|---|
-| **Notes** | Notepad (daily, with a calendar), Text, Bookmarks |
-| **Reading** | Feed (RSS, with favorites), Reddit, YouTube (with TubeArchivist), arXiv, HF Daily, Reader (PDF and EPUB), Kiwix, Anytype |
-| **Time** | Calendar (CalDAV), Schedule, Tracker, Rhythm, Upkeep |
-| **Other** | Weather, F1, Deficit, Typing, Chess (Stockfish), TV (IPTV), Chat |
+| **Feeds** | Feed (RSS, with favorites), Reddit, YouTube (with TubeArchivist), arXiv, HF Daily |
+| **Notes** | Notepad (daily, with a calendar), Text, Todo |
+| **Links** | Bookmarks, Search |
+| **Time** | Calendar (CalDAV), Schedule, Clock |
+| **Habits** | Tracker, Rhythm, Upkeep, Deficit |
+| **Live** | Weather, F1 |
+| **Library** | Reader (PDF and EPUB), Kiwix, Anytype |
+| **Media** | TV (IPTV) |
+| **Play** | Chess (Stockfish), Typing |
+| **AI** | Chat |
 
 New widgets can also be single JSON files in `widget-bank/`, no React needed. See [docs/widget-bank.md](docs/widget-bank.md).
 

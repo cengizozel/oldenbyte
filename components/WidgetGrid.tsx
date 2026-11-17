@@ -42,6 +42,9 @@ import AnytypeWidget from "./AnytypeWidget";
 import WeatherWidget from "./WeatherWidget";
 import CalendarWidget from "./CalendarWidget";
 import ScheduleWidget from "./ScheduleWidget";
+import SearchWidget from "./SearchWidget";
+import TodoWidget from "./TodoWidget";
+import ClockWidget from "./ClockWidget";
 import BankWidget from "./BankWidget";
 import type { BankWidgetDef } from "@/lib/widgetBank";
 const ReaderWidget = dynamic(() => import("./ReaderWidget"), { ssr: false });
@@ -110,6 +113,9 @@ const WIDGET_COMPONENTS: Record<Exclude<WidgetType, "custom" | "empty">, Compone
   chat: ChatWidget,
   kiwix: KiwixWidget,
   anytype: AnytypeWidget,
+  search: SearchWidget,
+  todo: TodoWidget,
+  clock: ClockWidget,
 };
 
 function renderWidget(widget: Widget, extraClass = "", bankDefs: Record<string, BankWidgetDef> = {}) {

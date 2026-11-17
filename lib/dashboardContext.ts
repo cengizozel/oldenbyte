@@ -12,7 +12,7 @@ type WidgetInstance = { id: string; type: string; title: string };
 
 // Widget types whose contents the chat can read (lib/widgetData.ts has a
 // reader for each); reader/chat/empty have no useful text.
-const ENTRY_TYPES = new Set(["notebook", "text", "f1", "weather", "calendar", "schedule", "rss", "reddit", "youtube", "arxiv", "hf", "tracker", "rhythm", "upkeep", "deficit", "bookmarks", "chess"]);
+const ENTRY_TYPES = new Set(["notebook", "text", "f1", "weather", "calendar", "schedule", "rss", "reddit", "youtube", "arxiv", "hf", "tracker", "rhythm", "upkeep", "deficit", "bookmarks", "chess", "todo"]);
 
 async function readJSON<T>(key: string): Promise<T | null> {
   return parseJson<T | null>(await storage.getItem(key), null);
@@ -65,7 +65,7 @@ const KIND_LABELS: Record<string, string> = {
   rss: "Feed", reddit: "Reddit", youtube: "YouTube", hf: "Hugging Face papers", arxiv: "arXiv papers",
   f1: "Formula 1", calendar: "Calendar", schedule: "Schedule", weather: "Weather", notebook: "Notepad",
   text: "Text", tracker: "Time tracker", rhythm: "Habits", upkeep: "Daily essentials", deficit: "Calorie deficit",
-  bookmarks: "Bookmarks", chess: "Chess",
+  bookmarks: "Bookmarks", chess: "Chess", todo: "To-do list",
 };
 export function kindLabel(type: string): string {
   return KIND_LABELS[type] ?? type;

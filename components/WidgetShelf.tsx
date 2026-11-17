@@ -124,7 +124,7 @@ export default function WidgetShelf({
     const byTitle = (a: Widget, b: Widget) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
     const matches = templates.filter(match);
     const built = WIDGET_CATEGORIES
-      .map(cat => ({ id: cat.id as string, label: cat.label, items: matches.filter(t => (t.category ?? "tools") === cat.id).sort(byTitle) }));
+      .map(cat => ({ id: cat.id as string, label: cat.label, items: matches.filter(t => (t.category ?? "notes") === cat.id).sort(byTitle) }));
     // Community widgets come from the widget bank (JSON defs, not code).
     built.push({ id: "community", label: "Community", items: bankTemplates.filter(match).sort(byTitle) });
     return built.filter(g => g.items.length > 0);

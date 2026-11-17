@@ -746,7 +746,7 @@ export function SettingsNote({ c, children }: { c: ColorClasses; children: React
 // button (plus glyph and the word). Enter adds too. Every collection uses
 // this, so the row cannot differ between widgets.
 export function SettingsAddRow({
-  c, value, onChange, onAdd, placeholder, busy = false, inputRef,
+  c, value, onChange, onAdd, placeholder, busy = false, inputRef, list,
 }: {
   c: ColorClasses;
   value: string;
@@ -755,6 +755,8 @@ export function SettingsAddRow({
   placeholder: string;
   busy?: boolean;
   inputRef?: Ref<HTMLInputElement>;
+  // The id of a <datalist> with suggestions for the field.
+  list?: string;
 }) {
   const t = useT();
   return (
@@ -766,6 +768,7 @@ export function SettingsAddRow({
         onChange={e => onChange(e.target.value)}
         onKeyDown={e => { if (e.key === "Enter") onAdd(); }}
         placeholder={placeholder}
+        list={list}
         className="flex-1 min-w-0"
       />
       <SmallButton c={c} onClick={onAdd} disabled={busy} title={t("common.add")}>

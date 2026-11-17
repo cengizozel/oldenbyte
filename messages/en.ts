@@ -44,6 +44,7 @@ const en = {
     weather: "choose a location",
     calendar: "connect a CalDAV calendar",
     tv: "add a channel",
+    clock: "add a city",
   },
 } as const;
 
