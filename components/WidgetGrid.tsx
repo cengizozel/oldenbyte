@@ -28,10 +28,12 @@ import { templateIdOf } from "@/lib/customWidgets";
 const COLS = 4;
 const GAP = 16;
 // The phone overview lays the grid out this wide (past the 1150px where the
-// full layout starts), caps a row's height so a two-row dashboard is not
-// stretched down the whole phone, and animates over this long.
+// full layout starts) and as tall as it would be on a computer's screen of
+// that width, so it is a small picture of the dashboard as it was arranged,
+// not the same columns stretched down a tall phone. It animates over
+// OVERVIEW_MS.
 const OVERVIEW_WIDTH = 1200;
-const OVERVIEW_ROW_MAX = 520;
+const OVERVIEW_HEIGHT = 650; // a 16:10 screen at that width, less the top bar
 const OVERVIEW_MS = 340;
 
 type TabLayoutItem = LayoutItem & { tabs?: string[] };
@@ -539,6 +541,18 @@ export default function WidgetGrid({
   const ovAnchor = useRef<{ id: string; top: number; left: number; width: number } | null>(null);
   const ovLand = useRef<{ id: string; y: number } | null>(null);
   const ovOpenAt = useRef(0);
+  // True while the overview is zooming in or out. Only then is the grid kept
+  // as one ready-drawn layer (will-change), which is what makes the zoom
+  // smooth; at rest it is drawn at the size it is shown, which costs a phone
+  // far less graphics memory.
+  const [ovMoving, setOvMoving] = useState(false);
+  useEffect(() => {
+    if (!ov) { setOvMoving(false); return; }
+    if (ov.phase === "enter" || ov.phase === "zoom") { setOvMoving(true); return; }
+    if (ov.phase !== "open") return;
+    const t = setTimeout(() => setOvMoving(false), OVERVIEW_MS + 80);
+    return () => clearTimeout(t);
+  }, [ov]);
   const overviewOn = !!ov && phone && !editing && active;
 
   const isMobile = phone || (size.width > 0 && size.width < 600);
@@ -607,7 +621,7 @@ export default function WidgetGrid({
     if (!outer) return;
     if (ov.phase === "prep") {
       const s = outer.clientWidth / OVERVIEW_WIDTH;
-      const vh = Math.min(outer.clientHeight / s, numRows * OVERVIEW_ROW_MAX + (numRows - 1) * GAP);
+      const vh = Math.min(outer.clientHeight / s, OVERVIEW_HEIGHT);
       const oy = Math.max(0, (outer.clientHeight - vh * s) / 2);
       setOv({ phase: "place", s, vh, oy, tf: { x: 0, y: oy, k: s }, animate: false });
     } else if (ov.phase === "place") {
@@ -1095,12 +1109,11 @@ export default function WidgetGrid({
           transform: `translate(${ov.tf.x}px, ${ov.tf.y}px) scale(${ov.tf.k})`,
           transition: ov.animate ? `transform ${OVERVIEW_MS}ms cubic-bezier(0.25, 0.6, 0.3, 1)` : "none",
           opacity: ov.phase === "prep" || ov.phase === "place" ? 0 : 1,
-          // No will-change here. It would make the browser keep this whole
-          // layer (the grid at desktop width, several screens tall) drawn at
-          // full resolution while it is shown at a third of its size: on a
-          // phone that is past what the graphics memory holds, and Android
-          // then drops pieces of the page (cards cut off, the top bar gone).
-          // Without it the layer is drawn at the size it is shown.
+          // will-change only while it moves. Kept on at rest, the browser
+          // holds this whole layer at full resolution while it is shown at a
+          // third of its size, and a phone short of graphics memory drops
+          // pieces of the page.
+          willChange: ovMoving ? "transform" : undefined,
         } : undefined}
       >
         {editing && size.width > 0 && (
