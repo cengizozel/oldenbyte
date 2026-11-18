@@ -144,6 +144,7 @@ export default function TodoWidget({ widget, className = "" }: { widget: Widget;
       back={
         <SettingsFace
           c={c}
+          onReset={() => setDraftHide(DEFAULT.hideDone)}
           onSave={() => { apply({ ...config, hideDone: draftHide }); setSettingsOpen(false); }}
           onCancel={() => setSettingsOpen(false)}
         >
