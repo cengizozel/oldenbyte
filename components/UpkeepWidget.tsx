@@ -107,6 +107,8 @@ export default function UpkeepWidget({
 
   const [items, setItems] = useState<Item[]>([]);
   const [order, setOrder] = useState<Order>("custom");
+  // The order chosen in the settings face: applied on save, like the rest.
+  const [draftOrder, setDraftOrder] = useState<Order>("custom");
   const [log, setLog] = useState<Log>({});
   // The clock the whole view is drawn at; ticks every 30s so countdowns move.
   const [now, setNow] = useState(0);
@@ -199,10 +201,6 @@ export default function UpkeepWidget({
   function persistConfig(nextItems: Item[], nextOrder: Order = order) {
     storage.setItem(configKey, JSON.stringify({ items: nextItems, order: nextOrder }));
   }
-  function changeOrder(next: Order) {
-    setOrder(next);
-    persistConfig(items, next);
-  }
   function persistLog(next: Log) {
     setLog(next);
     storage.setItem(logKey, JSON.stringify(next));
@@ -269,7 +267,8 @@ export default function UpkeepWidget({
     for (const [id, ts] of Object.entries(log)) if (validIds.has(id)) nextLog[id] = ts;
     setItems(cleaned);
     setDraft(cleaned);
-    persistConfig(cleaned);
+    setOrder(draftOrder);
+    persistConfig(cleaned, draftOrder);
     persistLog(nextLog);
     setSettingsOpen(false);
   }
@@ -290,7 +289,7 @@ export default function UpkeepWidget({
   const front = (
     <>
       <WidgetHeader
-        onSettings={() => { setDraft(items); setSettingsOpen(true); }}
+        onSettings={() => { setDraft(items); setDraftOrder(order); setSettingsOpen(true); }}
         c={c}
         icon={ShieldCheck}
         title="Upkeep"
@@ -387,11 +386,11 @@ export default function UpkeepWidget({
   const draftTotal = draft.reduce((a, it) => a + (it.weight > 0 ? it.weight : 0), 0);
 
   const back = (
-    <SettingsFace c={c} onReset={() => setDraft([])} onSave={handleSave} onCancel={() => { setDraft(items); setSettingsOpen(false); }}>
+    <SettingsFace c={c} onReset={() => { setDraft([]); setDraftOrder("custom"); }} onSave={handleSave} onCancel={() => { setDraft(items); setDraftOrder(order); setSettingsOpen(false); }}>
       <SettingsAddRow c={c} value={nameInput} onChange={setNameInput} onAdd={addItem} placeholder="e.g. teeth clean, showered" />
       <SettingsField c={c} label="Order" inline>
         {([["custom", "As arranged"], ["need", "By need"]] as [Order, string][]).map(([key, label]) => (
-          <Chip key={key} c={c} active={order === key} onClick={() => changeOrder(key)} title={key === "need" ? "Off items first, heaviest first, then running items soonest to run out first" : "The order below, drag the dots to arrange"}>
+          <Chip key={key} c={c} active={draftOrder === key} onClick={() => setDraftOrder(key)} title={key === "need" ? "Off items first, heaviest first, then running items soonest to run out first" : "The order below, drag the dots to arrange"}>
             {label}
           </Chip>
         ))}
@@ -421,11 +420,11 @@ export default function UpkeepWidget({
                 className={`transition-[transform,opacity] duration-150 ${dragIdx === i ? "opacity-40" : ""}`}
                 leading={
                   <span
-                    draggable={order === "custom"}
+                    draggable={draftOrder === "custom"}
                     onDragStart={() => setDragIdx(i)}
                     onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
-                    title={order === "custom" ? "Drag to reorder" : undefined}
-                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${order === "custom" ? "cursor-grab active:cursor-grabbing" : ""}`}
+                    title={draftOrder === "custom" ? "Drag to reorder" : undefined}
+                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${draftOrder === "custom" ? "cursor-grab active:cursor-grabbing" : ""}`}
                     style={{ backgroundColor: colorOf(it.id) }}
                   />
                 }
