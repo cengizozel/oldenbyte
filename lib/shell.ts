@@ -38,8 +38,9 @@ export const SHELL_EDIT_EVENT = "oldenbyte:edit-layout";
 // dashboard; "again" and "setup" on the digest.
 export const SHELL_ASK_EVENT = "oldenbyte:shell";
 
-// An app that also draws the title sets window.__obShellTitle; the pages then
-// leave their own title rows out.
+// An app that also draws the title sets window.__obShellTitle, and marks the
+// document with data-ob-title so the rows are hidden by CSS from the first
+// paint; the pages then leave their own title rows out.
 export function shellTitleNow(): boolean {
   return typeof window !== "undefined" && !!shellNow() && (window as AppWindow & { __obShellTitle?: unknown }).__obShellTitle === true;
 }

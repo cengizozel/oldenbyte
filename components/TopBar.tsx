@@ -834,7 +834,7 @@ function SettingsPanel({
         tabIndex={-1}
         className={`fixed top-0 right-0 h-full z-50 flex flex-col outline-none duration-300 ease-in-out ${phone ? "w-full bg-[var(--page-bg)] pb-[calc(var(--ob-bar)+env(safe-area-inset-bottom,0px))]" : "w-80 max-w-full bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl"} ${open ? "translate-x-0 visible transition-transform" : "translate-x-full invisible transition-[transform,visibility]"}`}
       >
-        <div hidden={phone && nativeTitle} className={`flex items-center justify-between ${phone ? "px-4 pt-3 pb-1" : "px-5 pt-5 pb-4 border-b border-[var(--surface-border)]"}`}>
+        <div hidden={phone && nativeTitle} className={`${phone ? "ob-own-title " : ""}flex items-center justify-between ${phone ? "px-4 pt-3 pb-1" : "px-5 pt-5 pb-4 border-b border-[var(--surface-border)]"}`}>
           <span className={phone ? "text-2xl font-semibold text-[var(--text-primary)]" : "text-base font-medium text-[var(--text-primary)]"}>Settings</span>
           <button hidden={phone} onClick={onClose} aria-label="Close settings" title="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors ${HIT_AREA} ${FOCUS_RING}`}>
             <X size={16} />
@@ -1377,7 +1377,7 @@ export default function TopBar({
         {nativeTitle && dashboards && onDashboardsChange && (
           <DashboardSwitcher dashboards={dashboards} onChange={onDashboardsChange} variant="sheet" sheetOpen={manageOpen} onSheetClose={() => setManageOpen(false)} />
         )}
-        <div className="flex items-center justify-between gap-3 min-h-12" hidden={nativeTitle}>
+        <div className="ob-own-title flex items-center justify-between gap-3 min-h-12" hidden={nativeTitle}>
           <button
             type="button"
             onClick={() => setFieldsOpen(o => !o)}

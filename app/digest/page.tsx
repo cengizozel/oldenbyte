@@ -784,7 +784,7 @@ export default function DigestPage() {
     return (
       <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)] pb-[calc(var(--ob-bar)+16px+env(safe-area-inset-bottom,0px))]">
         <PhoneTabBar active="digest" />
-        <header hidden={nativeTitle} className="flex items-start justify-between gap-3 px-4 pt-3">
+        <header hidden={nativeTitle} className="ob-own-title flex items-start justify-between gap-3 px-4 pt-3">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold leading-tight">Digest</h1>
             <p suppressHydrationWarning className="text-sm text-[var(--text-muted)]">{dateLabel}</p>
