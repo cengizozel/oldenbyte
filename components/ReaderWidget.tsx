@@ -732,7 +732,7 @@ export default function ReaderWidget({
 
   const uploadZone = (compact = false) => (
     <div
-      className={`flex flex-col items-center justify-center gap-3 flex-1 min-h-0 ${compact ? "" : "border-2 border-dashed rounded-xl"} border-black/15 dark:border-white/15`}
+      className={`flex flex-col flex-wrap content-center items-center justify-center gap-3 flex-1 min-h-0 overflow-hidden ${compact ? "" : "border-2 border-dashed rounded-xl"} border-black/15 dark:border-white/15`}
       onDragOver={e => e.preventDefault()}
       onDrop={e => {
         e.preventDefault();
