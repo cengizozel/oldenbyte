@@ -22,6 +22,7 @@ export async function GET() {
     // (a message to the app's web view), so the app need not draw one.
     // "shell": the pages work under the app's native bar (lib/shell.ts): they
     // leave their own bar out and "/?view=settings" is the settings alone.
-    features: ["app-settings", "shell"],
+    // "shell-title": the pages also leave their title rows to the app.
+    features: ["app-settings", "shell", "shell-title"],
   });
 }

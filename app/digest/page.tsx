@@ -1,7 +1,8 @@
 "use client";
 
 import PhoneTabBar from "@/components/PhoneTabBar";
-import { useShell } from "@/lib/useShell";
+import { useShell, useShellTitle } from "@/lib/useShell";
+import { SHELL_ASK_EVENT } from "@/lib/shell";
 import { usePhone } from "@/components/MobileNav";
 import { useModelServers } from "@/lib/useModelServers";
 import { HIT_AREA, FOCUS_RING, SettingsInput, SettingsRow, SettingsSection, SettingsSelect } from "@/components/ui/Field";
@@ -77,6 +78,14 @@ const defaultModelsFor = (url: string) => (/openai\.com/i.test(url) ? OPENAI_MOD
 export default function DigestPage() {
   const phone = usePhone();
   useShell(); // inside the phone app the app draws the bar
+  // ...and, in a newer app, the title with the two buttons, which ask here.
+  const nativeTitle = useShellTitle();
+  const asked = useRef<(what?: string) => void>(() => {});
+  useEffect(() => {
+    const on = (e: Event) => asked.current(((e as CustomEvent).detail ?? {}).do);
+    window.addEventListener(SHELL_ASK_EVENT, on);
+    return () => window.removeEventListener(SHELL_ASK_EVENT, on);
+  }, []);
   const [mode] = useState<"digest" | "full" | "ai">("ai");
   const [sections, setSections]   = useState<Section[]>([]);
   // Widgets left out of the digest (instance ids), chosen in the model panel.
@@ -765,12 +774,17 @@ export default function DigestPage() {
     const canSave = Boolean(draft.baseUrl && draft.model && (draft.apiKey || !NEEDS_KEY.test(draft.baseUrl)));
     const offers = servers.offers(draft.baseUrl, draft.model);
     const shown = sectionSummaries.filter(s => !skippedLabels.has(s.label));
+    const again = () => { setSectionSummaries([]); summaryRequestedRef.current = false; storage.removeItem(`digest-ai-sections-${today}`); generateSummary(); };
+    asked.current = what => {
+      if (what === "setup") openSettings();
+      else if (what === "again" && configured && !aiLoading && !generating) again();
+    };
     const iconButton = `w-11 h-11 flex items-center justify-center rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--text-secondary)] ${FOCUS_RING}`;
     const chip = (on: boolean) => `h-9 px-3 rounded-lg text-sm ${FOCUS_RING} ${on ? "bg-[var(--text-primary)] text-[var(--page-bg)] font-medium" : "bg-black/5 dark:bg-white/10 text-[var(--text-primary)]"}`;
     return (
       <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)] pb-[calc(var(--ob-bar)+16px+env(safe-area-inset-bottom,0px))]">
         <PhoneTabBar active="digest" />
-        <header className="flex items-start justify-between gap-3 px-4 pt-3">
+        <header hidden={nativeTitle} className="flex items-start justify-between gap-3 px-4 pt-3">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold leading-tight">Digest</h1>
             <p suppressHydrationWarning className="text-sm text-[var(--text-muted)]">{dateLabel}</p>
@@ -778,7 +792,7 @@ export default function DigestPage() {
           <div className="flex items-center gap-2 shrink-0">
             {configured && !aiLoading && !generating && (
               <button type="button" title="Write it again" aria-label="Write it again" className={iconButton}
-                onClick={() => { setSectionSummaries([]); summaryRequestedRef.current = false; storage.removeItem(`digest-ai-sections-${today}`); generateSummary(); }}>
+                onClick={again}>
                 <RotateCw size={18} />
               </button>
             )}
@@ -788,6 +802,7 @@ export default function DigestPage() {
           </div>
         </header>
 
+        {nativeTitle && <p suppressHydrationWarning className="px-4 pt-1 text-sm text-[var(--text-muted)]">{dateLabel}</p>}
         <main className="px-4 pt-4 flex flex-col gap-3">
           {!configured ? (
             <div className="text-center px-4 pt-24">

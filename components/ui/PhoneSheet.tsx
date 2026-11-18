@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { tellShell } from "@/lib/shell";
 
 // The sheet that rises from the bottom of a phone-width screen
 // (docs/mobile.md, Sheets): settings open in it instead of inside a card, so
@@ -36,7 +37,10 @@ export default function PhoneSheet({ open, onClose, label, className = "", keepM
   useEffect(() => {
     if (!open) return;
     lockScroll(true);
-    return () => lockScroll(false);
+    // Inside the phone app the bar at the bottom is the app's own and floats
+    // over the page: it steps aside while a sheet is up (lib/shell.ts).
+    tellShell({ type: "oldenbyte:sheet", open: true });
+    return () => { lockScroll(false); tellShell({ type: "oldenbyte:sheet", open: false }); };
   }, [open]);
 
   if (!ready || (!open && !keepMounted)) return null;

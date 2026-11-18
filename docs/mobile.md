@@ -53,6 +53,8 @@ The phone app draws what floats over the page with the phone's own controls, and
 - Each tab is a page of its own, and a page that saves over a value another page changed is refused (`lib/storage.ts`). So a page tells the app when it saved something (`oldenbyte:changed`), and the app loads a tab that is behind again when it is next shown.
 - "Edit the layout" in the Settings tab sends `oldenbyte:edit-layout`; the app switches to the Dashboard tab and fires the same event on its window, which starts editing.
 - The server says its pages can do this with `"shell"` in `features` on `/api/v1/server`. An app talking to an older server shows the one full-screen page as before.
+- With `"shell-title"` too, the app also draws each tab's title and the buttons beside it, and sets `window.__obShellTitle` so the pages leave their own title rows out. The dashboard tells the app its dashboards (`oldenbyte:dashboards`) and whether the layout is being edited (`oldenbyte:editing`); the app's menu and buttons ask the page through a `oldenbyte:shell` event on the window with `detail.do`: `switch` (with `id`), `manage` (the list to rename, delete and add, as a sheet), `fields`, `edit-done`, `edit-cancel`, and on the digest `again` and `setup`.
+- A sheet tells the app when it goes up and down (`oldenbyte:sheet`), and the app's bar steps aside meanwhile, as it does during layout editing. On an iPhone the bar floats over the page, so the page keeps room for it under its last line (`--ob-bar`); Android's bar takes its own space.
 
 ## The jump button
 

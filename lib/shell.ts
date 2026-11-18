@@ -32,3 +32,14 @@ export function noteSaved() {
 
 // Asked by the app (it runs this in the dashboard's page): start editing the layout.
 export const SHELL_EDIT_EVENT = "oldenbyte:edit-layout";
+
+// Asked by the app, as a CustomEvent on window with detail { do, ... }:
+// "switch" (id), "fields", "manage", "edit-done", "edit-cancel" on the
+// dashboard; "again" and "setup" on the digest.
+export const SHELL_ASK_EVENT = "oldenbyte:shell";
+
+// An app that also draws the title sets window.__obShellTitle; the pages then
+// leave their own title rows out.
+export function shellTitleNow(): boolean {
+  return typeof window !== "undefined" && !!shellNow() && (window as AppWindow & { __obShellTitle?: unknown }).__obShellTitle === true;
+}

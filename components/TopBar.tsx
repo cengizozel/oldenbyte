@@ -13,7 +13,9 @@ import Toggle from "@/components/ui/Toggle";
 import { KeyboardSettings } from "@/components/KeyboardLayer";
 import { PhoneSettings, usePhone } from "@/components/MobileNav";
 import PhoneTabBar from "@/components/PhoneTabBar";
-import { tellShell } from "@/lib/shell";
+import PhoneSheet from "@/components/ui/PhoneSheet";
+import { SHELL_ASK_EVENT, tellShell } from "@/lib/shell";
+import { useShellTitle } from "@/lib/useShell";
 import { DataSettings } from "@/components/DataSettings";
 import { DevicesSettings } from "@/components/DevicesSettings";
 import { CustomWidgetsSettings } from "@/components/CustomWidgetsSettings";
@@ -774,6 +776,7 @@ function SettingsPanel({
   onTogglePreload: () => void;
 }) {
   const locale = useLocale();
+  const nativeTitle = useShellTitle(); // inside the phone app the title is the app's
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -809,7 +812,7 @@ function SettingsPanel({
         tabIndex={-1}
         className={`fixed top-0 right-0 h-full z-50 flex flex-col outline-none duration-300 ease-in-out ${phone ? "w-full bg-[var(--page-bg)] pb-[calc(var(--ob-bar)+env(safe-area-inset-bottom,0px))]" : "w-80 max-w-full bg-[var(--surface)] border-l border-[var(--surface-border)] shadow-2xl"} ${open ? "translate-x-0 visible transition-transform" : "translate-x-full invisible transition-[transform,visibility]"}`}
       >
-        <div className={`flex items-center justify-between ${phone ? "px-4 pt-3 pb-1" : "px-5 pt-5 pb-4 border-b border-[var(--surface-border)]"}`}>
+        <div hidden={phone && nativeTitle} className={`flex items-center justify-between ${phone ? "px-4 pt-3 pb-1" : "px-5 pt-5 pb-4 border-b border-[var(--surface-border)]"}`}>
           <span className={phone ? "text-2xl font-semibold text-[var(--text-primary)]" : "text-base font-medium text-[var(--text-primary)]"}>Settings</span>
           <button hidden={phone} onClick={onClose} aria-label="Close settings" title="Close" className={`text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors ${HIT_AREA} ${FOCUS_RING}`}>
             <X size={16} />
@@ -929,15 +932,21 @@ function DashboardSwitcher({
   dashboards,
   onChange,
   variant = "name",
+  sheetOpen,
+  onSheetClose,
 }: {
   dashboards: DashboardsState;
   onChange: (next: DashboardsState) => void;
   // "name": the dashboard's name with a chevron (the desktop top bar).
   // "dots": one dot per dashboard, the current one filled (the phone frame,
   // where the name is the page's title); the same list opens from it.
-  variant?: "name" | "dots";
+  variant?: "name" | "dots" | "sheet";
+  // "sheet": no button of its own; the list is a sheet shown while sheetOpen.
+  sheetOpen?: boolean;
+  onSheetClose?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const close = () => { setOpen(false); onSheetClose?.(); };
   const [renamingId, setRenamingId] = useState<string | null>(null);
   // Deleting a dashboard asks first, in its row, like a settings reset, and
   // disarms by itself.
@@ -962,7 +971,7 @@ function DashboardSwitcher({
   const wrapRef = useRef<HTMLDivElement>(null);
   // The phone list: rows a thumb can hit. Dragging to reorder needs a mouse,
   // so the grip is left out there.
-  const big = variant === "dots";
+  const big = variant !== "name";
   const rowText = big ? "text-base px-3 py-3" : "text-sm px-2 py-1.5";
   const glyph = big ? 16 : 12;
   const rowAct = big ? "w-10 h-11 flex items-center justify-center" : "";
@@ -1015,7 +1024,7 @@ function DashboardSwitcher({
     });
     setCreating(false);
     setNewName("");
-    setOpen(false);
+    close();
   }
 
   function reorder(from: number, to: number) {
@@ -1040,31 +1049,9 @@ function DashboardSwitcher({
     setRenamingId(null);
   }
 
-  return (
-    <div ref={wrapRef} className="relative">
-      {variant === "dots" ? (
-        <button
-          onClick={() => setOpen(o => !o)}
-          aria-label={`Dashboards. ${active.name} is shown.`}
-          aria-expanded={open}
-          className={`flex items-center gap-1.5 h-11 pl-3 -mr-1 pr-1 ${FOCUS_RING}`}
-        >
-          {dashboards.list.map(d => (
-            <span key={d.id} aria-hidden className={`w-1.5 h-1.5 rounded-full ${d.id === active.id ? "bg-[var(--text-primary)]" : "bg-[var(--text-muted)] opacity-50"}`} />
-          ))}
-        </button>
-      ) : (
-        <button
-          onClick={() => setOpen(o => !o)}
-          className="flex items-center gap-1 text-sm md:text-base text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-          title="Switch dashboard"
-        >
-          {active.name}
-          <ChevronDown size={14} />
-        </button>
-      )}
-      {open && (
-        <div className={`absolute top-full z-50 bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-xl shadow-lg p-1 ${variant === "dots" ? "right-0 mt-0 w-64" : "mt-2 left-1/2 -translate-x-1/2 w-48"}`}>
+  // The list: one row per dashboard, then the row that adds one.
+  const list = (
+    <>
           <div
             ref={listRef}
             onDragOver={e => {
@@ -1117,7 +1104,7 @@ function DashboardSwitcher({
                 />
               ) : (
                 <button
-                  onClick={() => { onChange({ ...dashboards, activeId: d.id }); setOpen(false); }}
+                  onClick={() => { onChange({ ...dashboards, activeId: d.id }); close(); }}
                   className={`flex-1 min-w-0 truncate text-left ${rowText} ${
                     d.id === dashboards.activeId
                       ? "text-[var(--text-primary)] font-medium"
@@ -1182,6 +1169,43 @@ function DashboardSwitcher({
               </button>
             )}
           </div>
+    </>
+  );
+
+  return (
+    <div ref={wrapRef} className="relative">
+      {variant === "sheet" ? null : variant === "dots" ? (
+        <button
+          onClick={() => setOpen(o => !o)}
+          aria-label={`Dashboards. ${active.name} is shown.`}
+          aria-expanded={open}
+          className={`flex items-center gap-1.5 h-11 pl-3 -mr-1 pr-1 ${FOCUS_RING}`}
+        >
+          {dashboards.list.map(d => (
+            <span key={d.id} aria-hidden className={`w-1.5 h-1.5 rounded-full ${d.id === active.id ? "bg-[var(--text-primary)]" : "bg-[var(--text-muted)] opacity-50"}`} />
+          ))}
+        </button>
+      ) : (
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-1 text-sm md:text-base text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          title="Switch dashboard"
+        >
+          {active.name}
+          <ChevronDown size={14} />
+        </button>
+      )}
+      {variant === "sheet" ? (
+        // Inside the phone app (lib/shell.ts) the app's own menu switches
+        // dashboards; this list, for renaming, deleting and adding, opens
+        // from that menu as a sheet.
+        <PhoneSheet open={!!sheetOpen} onClose={close} label="Dashboards" className="bg-[var(--page-bg)] border-[var(--surface-border)] text-[var(--text-primary)]">
+          <h2 className="text-lg font-semibold shrink-0">Dashboards</h2>
+          <div className="flex-1 min-h-0 overflow-y-auto">{list}</div>
+        </PhoneSheet>
+      ) : open && (
+        <div className={`absolute top-full z-50 bg-[var(--shelf-bg)] backdrop-blur-sm border border-[var(--surface-border)] rounded-xl shadow-lg p-1 ${variant === "dots" ? "right-0 mt-0 w-64" : "mt-2 left-1/2 -translate-x-1/2 w-48"}`}>
+          {list}
         </div>
       )}
     </div>
@@ -1223,6 +1247,33 @@ export default function TopBar({
   // three top bar fields folded away under it, a bar at the bottom.
   const phone = usePhone();
   const [fieldsOpen, setFieldsOpen] = useState(false);
+  // Inside the phone app the title, the dashboards menu and the buttons that
+  // end layout editing are the app's own (lib/shell.ts): the page tells the
+  // app what to show there and does what the app asks.
+  const nativeTitle = useShellTitle();
+  const [manageOpen, setManageOpen] = useState(false);
+  useEffect(() => {
+    if (!nativeTitle || !dashboards || settingsOnly) return;
+    tellShell({ type: "oldenbyte:dashboards", list: dashboards.list.map(d => ({ id: d.id, name: d.name })), activeId: dashboards.activeId });
+  }, [nativeTitle, dashboards, settingsOnly]);
+  useEffect(() => {
+    if (nativeTitle && !settingsOnly) tellShell({ type: "oldenbyte:editing", editing });
+  }, [nativeTitle, editing, settingsOnly]);
+  const asked = useRef<(detail: { do?: string; id?: string }) => void>(() => {});
+  useEffect(() => {
+    asked.current = detail => {
+      if (detail.do === "switch" && dashboards && onDashboardsChange && dashboards.list.some(d => d.id === detail.id)) onDashboardsChange({ ...dashboards, activeId: detail.id as string });
+      else if (detail.do === "fields") setFieldsOpen(o => !o);
+      else if (detail.do === "manage") setManageOpen(true);
+      else if (detail.do === "edit-done") onToggleEdit?.();
+      else if (detail.do === "edit-cancel") onCancelEdit?.();
+    };
+  });
+  useEffect(() => {
+    const on = (e: Event) => asked.current((e as CustomEvent).detail ?? {});
+    window.addEventListener(SHELL_ASK_EVENT, on);
+    return () => window.removeEventListener(SHELL_ASK_EVENT, on);
+  }, []);
   // "/#settings": how the digest page's bottom bar opens the settings here.
   useEffect(() => {
     if (window.location.hash !== "#settings") return;
@@ -1301,7 +1352,10 @@ export default function TopBar({
     const activeName = dashboards?.list.find(d => d.id === dashboards.activeId)?.name ?? "oldenbyte";
     return (
       <>
-        <div className="flex items-center justify-between gap-3 min-h-12">
+        {nativeTitle && dashboards && onDashboardsChange && (
+          <DashboardSwitcher dashboards={dashboards} onChange={onDashboardsChange} variant="sheet" sheetOpen={manageOpen} onSheetClose={() => setManageOpen(false)} />
+        )}
+        <div className="flex items-center justify-between gap-3 min-h-12" hidden={nativeTitle}>
           <button
             type="button"
             onClick={() => setFieldsOpen(o => !o)}
