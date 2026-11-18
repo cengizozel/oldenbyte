@@ -40,6 +40,11 @@ const OVERVIEW_NUDGE = 1.06; // how much larger than fitted it starts and leaves
 // rows to the window, and lays them out as for a window with this much.
 const SHORT_WINDOW = 440;
 const SHORT_WINDOW_AS = 660;
+// The same goes for a dashboard with more rows than a window can hold: below
+// this row height the rows stop sharing the window and the page scrolls, with
+// rows no smaller than those of an ordinary dashboard in an ordinary window.
+const MIN_ROW = 56;
+const SCROLL_ROW = 92;
 
 type TabLayoutItem = LayoutItem & { tabs?: string[] };
 
@@ -570,10 +575,12 @@ export default function WidgetGrid({
   // floating window): fitting every row into it leaves cards that are only a
   // header. There the grid keeps the row height it would have in a window of
   // ordinary height and the page scrolls instead.
-  const shortWindow = !overviewOn && !isMobile && viewportBelowTop > 0 && viewportBelowTop < SHORT_WINDOW;
-  const fillViewport = overviewOn ? true : shortWindow ? false : editing ? !isMobile : viewMode === "full";
-
+  // The same when the dashboard has more rows than the window can hold at a
+  // usable height, however tall the window is.
   const numRows = Math.max(...layout.map(l => l.y + l.h), 1);
+  const fitRow = viewportBelowTop > 0 ? Math.floor((viewportBelowTop - 24 - (numRows - 1) * GAP) / numRows) : Infinity;
+  const shortWindow = !overviewOn && !isMobile && viewportBelowTop > 0 && (viewportBelowTop < SHORT_WINDOW || fitRow < MIN_ROW);
+  const fillViewport = overviewOn ? true : shortWindow ? false : editing ? !isMobile : viewMode === "full";
 
   const cellEl = (id: string) =>
     containerRef.current?.querySelector<HTMLElement>(`[data-cell-id="${CSS.escape(id)}"]`) ?? null;
@@ -710,7 +717,7 @@ export default function WidgetGrid({
     setTimeout(() => el.removeAttribute("data-kb-focus"), 1400);
   }
   const rowHeight = shortWindow
-    ? Math.floor((SHORT_WINDOW_AS - 24 - (numRows - 1) * GAP) / numRows)
+    ? Math.max(SCROLL_ROW, Math.floor((SHORT_WINDOW_AS - 24 - (numRows - 1) * GAP) / numRows))
     : size.height > 0
     ? Math.floor((size.height - (numRows - 1) * GAP) / numRows)
     : 200;

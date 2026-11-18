@@ -286,6 +286,8 @@ the palette `label` color at 50% opacity.
 
 The full layout fits every row into the window. Below 440px of room under the top bar (a browser snapped to a strip, a small floating window) that leaves cards that are only a header, so there the rows keep the height they would have in a window with 660px of room and the page scrolls.
 
+The same happens when a dashboard has more rows than the window can hold: once fitting them would leave rows under 56px, the rows get a height of their own (92px at least) and the page scrolls, however tall the window is.
+
 ## A large figure above a list
 
 Upkeep and Tracker open with one large figure (a ring with a number in it) above a list. `components/ui/CollapsingHero.tsx` gives it two sizes, so a short card is not all ring:
