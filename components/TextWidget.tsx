@@ -119,7 +119,9 @@ export default function TextWidget({
       el.style.position = "absolute";
       el.style.visibility = "hidden";
 
-      let lo = 8, hi = 150;
+      // Never under 14px, the smallest readable size: text too long for the
+      // card at that size scrolls instead.
+      let lo = 14, hi = 150;
       while (lo < hi - 1) {
         const mid = Math.floor((lo + hi) / 2);
         el.style.fontSize = `${mid}px`;
@@ -189,7 +191,7 @@ export default function TextWidget({
           />
 
           {/* Auto-fit text display */}
-          <div ref={containerRef} className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+          <div ref={containerRef} className="relative flex-1 min-h-0 flex items-center-safe justify-center overflow-x-hidden overflow-y-auto">
             {display ? (
               <div
                 ref={textRef}
