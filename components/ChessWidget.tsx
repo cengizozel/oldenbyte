@@ -21,6 +21,7 @@ const ENGINE_PATH = "/stockfish/stockfish-18-lite-single.js";
 const MIN_ELO = 1300;
 const MAX_ELO = 2800;
 const GUTTER = 18;   // room for the coordinates beside and under the board
+const MIN_COORDS = 128; // the smallest board that gets coordinates: 16px a rank
 const EVAL_W = 14;   // the evaluation bar and its gap
 const MOVE_TIME_MS = 700;
 const GREEN = "rgba(34, 197, 94, 0.85)";
@@ -495,11 +496,15 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
   // Layout
   const bar = evalBar && mode === "game" ? EVAL_W : 0; // hidden in puzzles, it gives the answer away
   const side = Math.floor(Math.max(0, Math.min(box.w - bar, box.h)));
-  const inner = side - GUTTER;
+  // The coordinates need a line of text per rank: in a card too small for
+  // that the board takes the whole space and they are left out.
+  const coords = side - GUTTER >= MIN_COORDS;
+  const gutter = coords ? GUTTER : 0;
+  const inner = side - gutter;
   const orient: Color = mode === "puzzle" ? puzzleColor : playerColor;
   const whiteShare = score ? barShare(score) : 0.5;
   const capRow = (glyphs: string, adv: number) => (
-    <div className={`shrink-0 h-5 flex items-center gap-1.5 text-sm leading-none ${c.label}`} style={{ paddingLeft: Math.max(0, (box.w - side) / 2) + bar + GUTTER }}>
+    <div className={`shrink-0 h-5 flex items-center gap-1.5 text-sm leading-none ${c.label}`} style={{ paddingLeft: Math.max(0, (box.w - side) / 2) + bar + gutter }}>
       <span className="tracking-tight">{glyphs}</span>
       {adv > 0 && <span className="opacity-80 tabular-nums">+{adv}</span>}
     </div>
@@ -586,11 +591,11 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
       {mode === "game" ? capRow(caps[opp], -yours) : capRow("", 0)}
 
       <div ref={contentRef} className="flex-1 min-h-0 flex items-center justify-center">
-        {side > GUTTER && (
+        {inner > 0 && (
           /* Coordinates sit outside the board, in the card's own text color:
              ranks down the left, files along the bottom, flipped with the
              board when you play Black. The evaluation bar sits left of them. */
-          <div className={`grid text-sm tabular-nums ${c.label}`} style={{ gridTemplateColumns: `${bar ? `${bar}px ` : ""}${GUTTER}px ${inner}px`, gridTemplateRows: `${inner}px ${GUTTER}px` }}>
+          <div className={`grid text-sm tabular-nums ${c.label}`} style={{ gridTemplateColumns: `${bar ? `${bar}px ` : ""}${gutter}px ${inner}px`, gridTemplateRows: `${inner}px ${gutter}px` }}>
             {bar > 0 && (
               <div className="pr-1 h-full" title={score ? formatScore(score) : ""}>
                 <div role="img" aria-label={`Evaluation ${score ? formatScore(score) : ""}`} className="relative w-2.5 h-full rounded-sm overflow-hidden bg-neutral-800 ring-1 ring-black/20 dark:ring-white/15">
@@ -599,7 +604,7 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
               </div>
             )}
             <div className="flex flex-col opacity-80">
-              {(orient === "w" ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8]).map(r => <span key={r} className="flex-1 flex items-center justify-center">{r}</span>)}
+              {coords && (orient === "w" ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8]).map(r => <span key={r} className="flex-1 flex items-center justify-center">{r}</span>)}
             </div>
             <div data-no-swipe style={{ width: inner, height: inner }}>
               <Chessboard
@@ -623,7 +628,7 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
             {bar > 0 && <span />}
             <span />
             <div className="flex opacity-80">
-              {(orient === "w" ? "abcdefgh" : "hgfedcba").split("").map(f => <span key={f} className="flex-1 flex items-center justify-center">{f}</span>)}
+              {coords && (orient === "w" ? "abcdefgh" : "hgfedcba").split("").map(f => <span key={f} className="flex-1 flex items-center justify-center">{f}</span>)}
             </div>
           </div>
         )}
