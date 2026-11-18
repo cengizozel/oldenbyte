@@ -2,7 +2,7 @@
 
 A self-hosted personal dashboard. Drag and resize widgets, keep several dashboards, and let a local AI assistant read what is on them.
 
-![screenshot](public/screenshot.png)
+![oldenbyte on a laptop and on a phone](docs/img/devices.png)
 
 ## Highlights
 

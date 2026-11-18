@@ -1,0 +1,21 @@
+{
+  "out": "../../../../oldenbyte-mobile/docs/img/phones.png",
+  "gap": 64,
+  "items": [
+    {
+      "frame": "android",
+      "image": "../shots/android.png",
+      "height": 620
+    },
+    {
+      "frame": "iphone",
+      "image": "../shots/iphone.png",
+      "height": 620
+    },
+    {
+      "frame": "fold",
+      "image": "../shots/fold.png",
+      "height": 560
+    }
+  ]
+}

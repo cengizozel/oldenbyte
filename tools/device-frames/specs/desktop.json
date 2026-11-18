@@ -1,0 +1,24 @@
+{
+  "out": "../../../../oldenbyte-desktop/docs/img/desktops.png",
+  "gap": 0,
+  "items": [
+    {
+      "frame": "macbook",
+      "image": "../shots/desktop.png",
+      "height": 380,
+      "os": "mac"
+    },
+    {
+      "frame": "thinkpad",
+      "image": "../shots/desktop.png",
+      "height": 380,
+      "os": "linux"
+    },
+    {
+      "frame": "surface",
+      "image": "../shots/desktop.png",
+      "height": 380,
+      "os": "windows"
+    }
+  ]
+}

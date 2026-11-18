@@ -1,0 +1,16 @@
+{
+  "out": "../../../docs/img/devices.png",
+  "gap": 10,
+  "items": [
+    {
+      "frame": "macbook",
+      "image": "../shots/desktop.png",
+      "height": 520
+    },
+    {
+      "frame": "iphone",
+      "image": "../shots/iphone.png",
+      "height": 440
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "out": "../../../../oldenbyte-extension/docs/img/browsers.png",
+  "gap": 56,
+  "items": [
+    {
+      "frame": "chrome",
+      "image": "../shots/desktop.png",
+      "height": 420,
+      "icon": "../shots/icon.png",
+      "popup": "../shots/popup.png",
+      "popupWidth": 250
+    },
+    {
+      "frame": "firefox",
+      "image": "../shots/desktop.png",
+      "height": 420,
+      "icon": "../shots/icon.png",
+      "popup": "../shots/popup.png",
+      "popupWidth": 250
+    }
+  ]
+}
