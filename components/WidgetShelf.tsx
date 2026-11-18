@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { GripVertical, Download, Upload, Search, Undo2, Redo2, Trash2, ChevronDown, ChevronUp, Eraser, X } from "lucide-react";
 import type { Widget } from "@/lib/widgets";
 import { colorMap, WIDGET_CATEGORIES } from "@/lib/widgets";
+import { NEEDS_SERVER_MACHINE, ON_DEVICE } from "@/lib/onDevice";
 import { FOCUS_RING } from "@/components/ui/Field";
 import { UploadWidget, CommunityCatalog } from "@/components/CustomWidgetPicker";
 
@@ -130,7 +131,9 @@ export default function WidgetShelf({
       !q || t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q);
     const byTitle = (a: Widget, b: Widget) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
     // Widget files that name a category are listed there, with the built-ins.
-    const matches = [...templates, ...bankTemplates.filter(t => t.category)].filter(match);
+    const matches = [...templates, ...bankTemplates.filter(t => t.category)]
+      .filter(t => !(ON_DEVICE && NEEDS_SERVER_MACHINE.has(t.type)))
+      .filter(match);
     const built = WIDGET_CATEGORIES
       .map(cat => ({ id: cat.id as string, label: cat.label, items: matches.filter(t => (t.category ?? "notes") === cat.id).sort(byTitle) }));
     // Widget files from the widget bank (JSON definitions, not code).
