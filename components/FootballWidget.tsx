@@ -259,7 +259,7 @@ export default function FootballWidget({ widget, className = "" }: { widget: Wid
                 const word = o === "W" ? "Won" : o === "L" ? "Lost" : o === "D" ? "Drew" : "";
                 return (
                   <li key={m.id} className={`flex items-center gap-2 py-1.5 ${hairline(i)}`} title={`${m.competition} · ${dayLabel(m.date, tz)}`}>
-                    <span aria-label={word} className={`shrink-0 w-5 h-5 rounded-md text-xs font-medium flex items-center justify-center ${tone}`}>{o ?? ""}</span>
+                    <span aria-label={word} className={`shrink-0 w-5 h-5 rounded-md text-sm leading-none font-medium flex items-center justify-center ${tone}`}>{o ?? ""}</span>
                     <Crest side={opponent(m)} px={18} />
                     <span className={`flex-1 min-w-0 truncate text-sm ${c.text}`}>{opponent(m).name}<span className={`opacity-70 ${c.label}`}> · {where(m)}</span></span>
                     <span className={`shrink-0 text-sm font-medium tabular-nums ${c.text}`}>{m.home.score ?? "-"}:{m.away.score ?? "-"}</span>
