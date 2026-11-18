@@ -538,7 +538,7 @@ export default function NotebookWidget({
 
         {/* Calendar */}
         {showCalendar && (
-        <div className="w-36 shrink-0 flex flex-col gap-2">
+        <div className="w-40 -mx-2 px-2 -mb-3 shrink-0 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col gap-2">
 
           <div className="flex items-center justify-between">
             <button onClick={prevMonth} aria-label="Previous month" className={`opacity-70 hover:opacity-100 ${HIT_AREA} ${FOCUS_RING} ${c.label}`}><ChevronLeft size={14} /></button>
