@@ -474,7 +474,7 @@ export default function RhythmWidget({
                 secondary = isOpen
                   ? <span>started {agoLabel(now - open[it.id])}</span>
                   : (bed && wake)
-                    ? <span className="tabular-nums">{fmtTimeOfDay(bed.mean)} → {fmtTimeOfDay(wake.mean)}</span>
+                    ? <span className="tabular-nums">{fmtTimeOfDay(bed.mean)} to {fmtTimeOfDay(wake.mean)}</span>
                     : <span>tap to start</span>;
                 primary = isOpen
                   ? <span className={`text-sm tabular-nums font-medium ${c.label}`}>{formatClock((now - open[it.id]) / 1000)}</span>
@@ -743,7 +743,7 @@ export default function RhythmWidget({
                           ) : isSession ? (
                             <span className={`text-sm opacity-80 ${c.text} tabular-nums`}>
                               avg {formatDuration(avgDur)}
-                              {bed && wake && <> · {fmtTimeOfDay(bed.mean)} → {fmtTimeOfDay(wake.mean)}</>}
+                              {bed && wake && <> · {fmtTimeOfDay(bed.mean)} to {fmtTimeOfDay(wake.mean)}</>}
                               <span className="opacity-70"> · {sess.length} in {STATS_DAYS}d</span>
                             </span>
                           ) : (
