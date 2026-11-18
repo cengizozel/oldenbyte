@@ -197,7 +197,7 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
   }, []);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 p-4">
+    <div className="flex flex-col flex-1 min-h-0 p-5">
       <SettingsFace c={c} onReset={() => setDraft(DEFAULT_CONFIG)} onSave={() => onSave(draft)} onCancel={onCancel} saveDisabled={!draft.baseUrl.trim() || !draft.model.trim()}>
 
         <div>
@@ -272,7 +272,7 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
         <p className={`text-sm opacity-70 mt-1 ${c.label}`}>Behavior</p>
 
         <div>
-          <p className={`text-sm mb-1 opacity-70 ${c.label}`}>System prompt <span className="opacity-70">(optional)</span></p>
+          <p className={`text-sm mb-1 opacity-70 ${c.label}`}>System prompt (optional)</p>
           <SettingsTextarea
             value={draft.system}
             onChange={e => setDraft(d => ({ ...d, system: e.target.value }))}
@@ -310,7 +310,7 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
         </div>
 
         <div>
-          <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Thinking <span className="opacity-70">(reasoning models)</span></p>
+          <p className={`text-sm mb-1 opacity-70 ${c.label}`}>Thinking (reasoning models)</p>
           <div className="flex flex-wrap gap-1">
             {EFFORT_OPTIONS.map(opt => (
               <Chip
@@ -333,7 +333,7 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
           >
             <ChevronRight size={12} className={`transition-transform ${advancedOpen ? "rotate-90" : ""}`} />
             Advanced
-            <span className="opacity-70">
+            <span>
               (cap: {draft.maxTokens ? `${draft.maxTokens} tokens` : "none"}{draft.maxTokens !== LENGTH_PRESETS[draft.length].cap ? ", custom" : ""})
             </span>
           </button>
@@ -556,7 +556,7 @@ export default function SettingsPanel({ c, config, widgetId, onCancel, onSave }:
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className={`text-sm opacity-70 ${c.label}`}>Anytype write bridge <span className="opacity-70">(optional, enables creating notes)</span></p>
+            <p className={`text-sm opacity-70 ${c.label}`}>Anytype write bridge (optional, enables creating notes)</p>
             <SmallButton
               c={c}
               onClick={async () => {
