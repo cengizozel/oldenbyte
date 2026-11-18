@@ -60,8 +60,11 @@ export default function AppHost() {
 
 // Runs before anything else on the page: requests to this origin's /api wait
 // for the host, then go to it; requests to other sites go out through the app
-// where there is one; the rest is the browser's own fetch. (No comments inside
-// the script itself: it is put on the page as one line.)
+// where there is one; the rest is the browser's own fetch. Libraries that load
+// with XMLHttpRequest (the video player, the book reader) get the same
+// treatment for /api. (No comments and no patterns with slashes inside the
+// script itself: it is put on the page as one line and its backslashes are
+// read twice.)
 export const APP_FETCH_SCRIPT = `(function(){
   var real=window.fetch.bind(window),waiting=[];
   window.__obHostReady=function(){var q=waiting;waiting=[];q.forEach(function(run){run()})};
@@ -76,5 +79,50 @@ export const APP_FETCH_SCRIPT = `(function(){
       var run=function(){window.__obHost(path,init).then(resolve,reject)};
       if(window.__obHost)run();else waiting.push(run);
     });
+  };
+  var RX=window.XMLHttpRequest;
+  var apiPath=function(u){
+    var url=String(u);
+    var path=url.indexOf(location.origin)===0?url.slice(location.origin.length):url;
+    return path.indexOf("/api/")===0?path:null;
+  };
+  window.XMLHttpRequest=class extends RX{
+    open(method,url){
+      this.__ob=apiPath(url)?{method:method,url:String(url),headers:{}}:null;
+      if(!this.__ob)return super.open.apply(this,arguments);
+    }
+    setRequestHeader(k,v){if(this.__ob)this.__ob.headers[k]=v;else super.setRequestHeader(k,v);}
+    getResponseHeader(k){return this.__ob?(this.__ob.res?this.__ob.res.headers.get(k):null):super.getResponseHeader(k);}
+    getAllResponseHeaders(){
+      if(!this.__ob)return super.getAllResponseHeaders();
+      var out="";if(this.__ob.res)this.__ob.res.headers.forEach(function(v,k){out+=k+": "+v+"\\r\\n"});return out;
+    }
+    abort(){if(this.__ob){this.__ob.aborted=true;if(this.__ob.ctl)this.__ob.ctl.abort();}else super.abort();}
+    send(body){
+      var o=this.__ob,self=this;
+      if(!o)return super.send(body);
+      var set=function(k,v){Object.defineProperty(self,k,{configurable:true,value:v})};
+      var fire=function(type,extra){var e=new ProgressEvent(type,extra||{});self.dispatchEvent(e);var h=self["on"+type];if(typeof h==="function")h.call(self,e)};
+      o.ctl=new AbortController();
+      window.fetch(o.url,{method:o.method,headers:o.headers,body:body==null?undefined:body,signal:o.ctl.signal}).then(function(res){
+        o.res=res;
+        return res.arrayBuffer().then(function(buf){
+          if(o.aborted)return;
+          var type=self.responseType||"text",text=null,value;
+          if(type===""||type==="text"||type==="json")text=new TextDecoder().decode(buf);
+          if(type==="arraybuffer")value=buf;
+          else if(type==="blob")value=new Blob([buf],{type:res.headers.get("content-type")||""});
+          else if(type==="json"){try{value=JSON.parse(text)}catch(e){value=null}}
+          else value=text;
+          set("status",res.status);set("statusText",res.statusText);set("responseURL",o.url);set("response",value);
+          if(text!==null)set("responseText",text);
+          set("readyState",4);
+          fire("readystatechange");fire("progress",{lengthComputable:true,loaded:buf.byteLength,total:buf.byteLength});fire("load",{loaded:buf.byteLength,total:buf.byteLength});fire("loadend");
+        });
+      }).catch(function(){
+        if(o.aborted){fire("abort");fire("loadend");return;}
+        set("status",0);set("readyState",4);fire("readystatechange");fire("error");fire("loadend");
+      });
+    }
   };
 })();`;

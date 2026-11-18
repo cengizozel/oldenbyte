@@ -45,8 +45,12 @@ export async function writeFile(p: string, data: string | Uint8Array): Promise<v
   await device().set(at(p), bytes.toString("base64"));
 }
 
-// Folders are only names here; making one is always fine.
-export async function mkdir(): Promise<void> {}
+// A folder is only the start of its files' names, so an empty one is kept as
+// a mark of its own, which listings leave out.
+const MARK = ".dir";
+export async function mkdir(p: string): Promise<void> {
+  await device().set(`${at(p)}/${MARK}`, "");
+}
 
 export async function unlink(p: string): Promise<void> {
   if (!(await device().get(at(p)))) throw new Missing(p);
@@ -82,9 +86,10 @@ async function entries(p: string): Promise<Entry[]> {
     const rest = full.slice(under.length);
     const i = rest.indexOf("/");
     const name = i < 0 ? rest : rest.slice(0, i);
-    if (name) seen.set(name, (seen.get(name) ?? false) || i >= 0);
+    // A folder's own mark shows that it exists and is not listed.
+    if (name && name !== MARK) seen.set(name, (seen.get(name) ?? false) || i >= 0);
   }
-  if (!seen.size) throw new Missing(p);
+  if (!seen.size && !all.length) throw new Missing(p);
   return [...seen].map(([name, folder]) => ({ name, isFile: () => !folder, isDirectory: () => folder }));
 }
 

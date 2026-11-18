@@ -23,12 +23,12 @@ const LEAVE_OUT = new Set([
 ]);
 
 // Routes that only make sense with a server behind them: signing in and
-// accounts, other devices, the machine the server runs on, and the ones that
-// move files through Node's streams. lib/appHost/localApi.ts answers the few
-// of these the interface asks for on a device.
+// accounts, other devices, and the machine the server runs on.
+// lib/appHost/localApi.ts answers the few of these the interface asks for on
+// a device.
 const SERVER_ONLY = [
   "auth", "setup", "register", "admin", "account", "me", "v1", "docker", "server-stats",
-  "upload", "files", "library", "custom-widgets/media",
+  "custom-widgets/media",
 ];
 
 // The server's helpers that are swapped for a device's version.
@@ -37,8 +37,8 @@ const STAND_INS = ["prisma", "session", "ssrf", "requestUser", "password"];
 // Node's own modules, as far as the packed code uses them.
 const NODE = {
   fs: "fs", "fs/promises": "fsPromises", path: "path", crypto: "crypto",
-  stream: "absent", util: "absent", os: "absent", net: "absent", "node:net": "absent", dns: "absent", "dns/promises": "absent",
-  "node:async_hooks": "absent", undici: "absent", busboy: "absent",
+  stream: "stream", busboy: "busboy", util: "absent", os: "absent", net: "absent", "node:net": "absent", dns: "absent", "dns/promises": "absent",
+  "node:async_hooks": "absent", undici: "absent",
 };
 
 // Folders the server reads its shipped files from; they travel in the bundle.

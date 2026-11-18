@@ -570,7 +570,7 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (tz: str
 
 // ── AccountSection ─────────────────────────────────────────────────────────
 
-type Me = { id: string; username: string; role: string; mustChangePassword: boolean; local?: boolean };
+type Me = { id: string; username: string; role: string; mustChangePassword: boolean; local?: boolean; device?: boolean };
 
 // Lives inside the settings drawer. Fetches the current session user when the
 // drawer opens and offers logout + an inline password-change disclosure.
@@ -632,6 +632,28 @@ function AccountSection({ open }: { open: boolean }) {
   // Signing out belongs to the app there (it holds the sign-in and would only
   // sign this view back in), so the row opens the app's settings instead.
   const phoneApp = typeof window !== "undefined" ? (window as unknown as { ReactNativeWebView?: { postMessage: (m: string) => void } }).ReactNativeWebView : undefined;
+
+  // The phone app with its data on the phone: nobody to sign in, and no
+  // server behind it. The app's own settings hold what there is to change
+  // (how the app is used, the user's other devices).
+  if (me.device) {
+    return (
+      <SettingsSection title="This device">
+        <SettingsRow label="Kept on this device" hint="Your dashboards and what is in them stay here, with no account and no server.">
+          {phoneApp && (
+            <button
+              onClick={() => phoneApp.postMessage(JSON.stringify({ type: "oldenbyte:app-settings" }))}
+              title="How you use oldenbyte, your other devices and more, in the app"
+              className={`flex items-center gap-1.5 min-h-7 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors ${FOCUS_RING}`}
+            >
+              <Settings size={14} />
+              App settings
+            </button>
+          )}
+        </SettingsRow>
+      </SettingsSection>
+    );
+  }
 
   // The desktop app: no account to sign out of and no password to know.
   if (me.local) {
