@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, type CSSProperties, type ReactNode } from "react";
+import { OverlayFace } from "@/components/ui/FlipCard";
 import { Chessboard } from "react-chessboard";
 import type { Arrow, PieceDropHandlerArgs } from "react-chessboard";
 import { Chess, type Move, type Square } from "chess.js";
@@ -516,11 +517,11 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
   }, [view, n]);
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col h-full relative ${c.bg} ${c.border} ${c.glow} ${className}`}>
+    <div className={`rounded-2xl border p-5 flex flex-col h-full relative overflow-clip ${c.bg} ${c.border} ${c.glow} ${className}`}>
       <WidgetHeader c={c} icon={Swords} title={mode === "puzzle" ? "Daily puzzle" : "Chess"} onSettings={() => { setDraft({ elo, evalBar, coach }); setSettingsOpen(true); }} />
 
       {settingsOpen && (
-        <div className={`absolute inset-px z-30 rounded-[15px] p-5 flex flex-col ${c.bg}`}>
+        <OverlayFace c={c} layer="z-30" className="p-5">
           <SettingsFace
             c={c}
             onReset={() => setDraft({ elo: 1500, evalBar: false, coach: true })}
@@ -544,11 +545,11 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
               <Toggle checked={draft.coach} onChange={() => setDraft(d => ({ ...d, coach: !d.coach }))} label="Blunder alerts" />
             </SettingsField>
           </SettingsFace>
-        </div>
+        </OverlayFace>
       )}
 
       {recordOpen && (
-        <div className={`absolute inset-px z-30 rounded-[15px] p-5 flex flex-col gap-3 ${c.bg}`}>
+        <OverlayFace c={c} layer="z-30" className="p-5 gap-3">
           <WidgetHeader panel c={c} icon={Trophy} title="Record" />
           <div className={`flex-1 min-h-0 flex flex-col gap-4 overflow-y-auto pr-3 text-sm ${c.text}`}>
             <div className="grid grid-cols-3 gap-2">
@@ -583,7 +584,7 @@ export default function ChessWidget({ widget, className = "" }: { widget: Widget
           <div className="shrink-0 flex justify-end">
             <SmallButton c={c} onClick={() => setRecordOpen(false)}>Back to game</SmallButton>
           </div>
-        </div>
+        </OverlayFace>
       )}
 
       {/* The rows around the board keep their height in every mode, so the

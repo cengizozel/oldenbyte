@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { OverlayFace } from "@/components/ui/FlipCard";
 import { Flag, RotateCcw } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -102,7 +103,7 @@ export default function F1Widget({
       <WidgetHeader c={c} icon={Flag} title="Formula 1" onSettings={() => { setDraftMode(standingsMode); setSettingsOpen(true); }} />
 
       {settingsOpen && (
-        <div className={`absolute inset-px z-30 rounded-[15px] p-5 flex flex-col ${c.bg}`}>
+        <OverlayFace c={c} layer="z-30" className="p-5">
           <SettingsFace
             c={c}
             onReset={() => setDraftMode("top5")}
@@ -115,7 +116,7 @@ export default function F1Widget({
               ))}
             </SettingsField>
           </SettingsFace>
-        </div>
+        </OverlayFace>
       )}
 
       <div className="flex-1 min-h-0 relative">

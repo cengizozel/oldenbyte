@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { OverlayFace } from "@/components/ui/FlipCard";
 import { NotebookPen, Bold, Italic, Underline, List, History, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -484,7 +485,7 @@ export default function NotebookWidget({
       />
 
       {settingsOpen && (
-        <div className={`absolute inset-px z-30 rounded-[15px] p-5 flex flex-col ${c.bg}`}>
+        <OverlayFace c={c} layer="z-30" className="p-5">
           <SettingsFace c={c} onReset={() => { setDraftName(""); setDraftCalendar(true); }} onSave={saveSettings} onCancel={() => setSettingsOpen(false)}>
             <SettingsField c={c} label="Name">
               <SettingsInput value={draftName} onChange={e => setDraftName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveSettings()} placeholder={widget.title} />
@@ -493,7 +494,7 @@ export default function NotebookWidget({
               <Toggle checked={draftCalendar} onChange={() => setDraftCalendar(v => !v)} label="Show the month calendar" />
             </SettingsField>
           </SettingsFace>
-        </div>
+        </OverlayFace>
       )}
 
       <div className="flex gap-3 flex-1 min-h-0">
@@ -588,7 +589,7 @@ export default function NotebookWidget({
 
       {/* History overlay: all dated notes across every notepad */}
       {historyOpen && (
-        <div className={`absolute inset-px z-30 rounded-[15px] p-5 flex flex-col ${c.bg}`}>
+        <OverlayFace c={c} layer="z-30" className="p-5">
           <WidgetHeader
             panel
             c={c}
@@ -619,7 +620,7 @@ export default function NotebookWidget({
               </div>
             ))}
           </div>
-        </div>
+        </OverlayFace>
       )}
     </div>
   );

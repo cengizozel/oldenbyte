@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { OverlayFace } from "@/components/ui/FlipCard";
 import { Keyboard, RotateCcw, Target } from "lucide-react";
 import { colorMap, type Widget, type ColorClasses } from "@/lib/widgets";
 import { TYPING_WORDS } from "@/lib/typingWords";
@@ -812,7 +813,7 @@ export default function TypingWidget({
           const lengths = optionsFor(d.mode);
           const pickMode = (m: Mode) => { const opts = optionsFor(m); set({ mode: m, length: opts.includes(d.length) ? d.length : (opts[0] ?? d.length) }); };
           return (
-            <div className={`absolute inset-px z-30 rounded-[15px] p-5 flex flex-col ${c.bg}`}>
+            <OverlayFace c={c} layer="z-30" className="p-5">
               <SettingsFace c={c} onSave={() => { applyConfig(d); setSettingsOpen(false); }} onCancel={() => setSettingsOpen(false)} onReset={() => setDraftCfg(DEFAULT_CONFIG)}>
                 <SettingsField c={c} label="Mode" inline>
                   {(["words", "time", "drill", "metro"] as Mode[]).map(m => (
@@ -884,7 +885,7 @@ export default function TypingWidget({
                   ))}
                 </SettingsField>
               </SettingsFace>
-            </div>
+            </OverlayFace>
           );
         })()}
 

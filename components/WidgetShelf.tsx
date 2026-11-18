@@ -88,7 +88,12 @@ export default function WidgetShelf({
   // Collapsed = a small draggable pill, so the panel stops covering the grid
   // while arranging widgets. Remembered per device.
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem("shelf-collapsed") === "1"; } catch { return false; }
+    // On a phone the open panel covers most of the screen, so until the
+    // user has chosen otherwise it starts folded there.
+    try {
+      const kept = localStorage.getItem("shelf-collapsed");
+      return kept === null ? window.matchMedia("(max-width: 599px)").matches : kept === "1";
+    } catch { return false; }
   });
   function toggleCollapsed(next: boolean) {
     setCollapsed(next);

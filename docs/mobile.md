@@ -37,9 +37,13 @@ Under 600px the page takes the shape of a phone app. It is the same page and the
 
 A window 600px or wider keeps the top bar as it was.
 
+### Editing the layout
+
+A dashboard keeps the grid it has on a wide screen; a phone shows it as one column in reading order. Editing on a phone changes that order and nothing else: the tiles are short and alike so one can be carried past the others, and when a widget is moved the widgets trade places in the grid, each taking the cell of the one that was there, so the grid's shape stays as it was arranged (`reorderFromPhone` in `components/WidgetGrid.tsx`). Sizes are set on a wide screen. Entering and leaving without moving anything changes nothing. The widget picker starts folded on a phone.
+
 ### Sheets
 
-On a phone a widget's settings do not turn the card over: they rise in a sheet from the bottom (`components/ui/PhoneSheet.tsx`), in the card's own colors, as tall as they need up to just under the page title, scrolling inside past that. Save, cancel and reset are the same row as everywhere, larger. Dragging the handle down or tapping outside cancels. `FlipCard` does this for every widget, so a widget's settings face is written once; inside a sheet (`.ob-sheet`) labels, chips and buttons are sized for a thumb. The sheet stays mounted while closed, like the back of the card, so a face keeps its state.
+On a phone a widget's settings do not turn the card over: they rise in a sheet from the bottom (`components/ui/PhoneSheet.tsx`), in the card's own colors, as tall as they need up to just under the page title, scrolling inside past that. Save, cancel and reset are the same row as everywhere, larger. Dragging the handle down or tapping outside cancels. `FlipCard` does this for every widget that turns over, and `OverlayFace` (same file) for the ones that lay a face over a card that must stay as it is (a chess board, a schedule), so a widget's settings face is written once; inside a sheet (`.ob-sheet`) labels, chips and buttons are sized for a thumb. The sheet stays mounted while closed, like the back of the card, so a face keeps its state.
 
 ### The digest
 

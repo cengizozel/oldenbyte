@@ -44,6 +44,8 @@ const SHORT_WINDOW_AS = 660;
 // this row height the rows stop sharing the window and the page scrolls, with
 // rows no smaller than those of an ordinary dashboard in an ordinary window.
 const MIN_ROW = 56;
+// Half the height of a tile while the layout is edited on a phone.
+const PHONE_EDIT_ROW = 52;
 const SCROLL_ROW = 92;
 
 type TabLayoutItem = LayoutItem & { tabs?: string[] };
@@ -875,6 +877,21 @@ export default function WidgetGrid({
     return { x: 0, y: maxY, w: defaultW, h: defaultH };
   }
 
+  // Editing on a phone (docs/mobile.md). The dashboard keeps the grid it has
+  // on a wide screen: a phone shows it as one column in reading order, and
+  // editing there only changes that order. The widgets trade places in the
+  // grid, each taking the cell of the one that was there, so the grid's shape
+  // stays as it was arranged. Sizes are set on a wide screen.
+  const reading = (items: TabLayoutItem[]) => items.slice().sort((a, b) => a.y - b.y || a.x - b.x);
+  const phoneEditLayout = reading(layout).map((item, index) => ({ i: item.i, x: 0, y: index * 2, w: 1, h: 2 }));
+  function reorderFromPhone(order: string[]) {
+    const slots = reading(layout);
+    if (order.length !== slots.length || order.every((id, i) => id === slots[i].i)) return;
+    const byId = new Map(layout.map(l => [l.i, l]));
+    if (order.some(id => !byId.has(id))) return;
+    setLayout(order.map((id, i) => ({ ...(byId.get(id) as TabLayoutItem), x: slots[i].x, y: slots[i].y, w: slots[i].w, h: slots[i].h })));
+  }
+
   function addWidget(template: Widget, instanceId?: string) {
     pushHistory();
     const id = instanceId ?? `${template.id}-${Date.now()}`;
@@ -1174,13 +1191,17 @@ export default function WidgetGrid({
         {!loaded ? null : editing ? (
           size.width > 0 && (
             <GridLayout
-              layout={layout}
+              layout={isMobile ? phoneEditLayout : layout}
               cols={isMobile ? 1 : COLS}
-              rowHeight={rowHeight}
+              // On a phone the tiles are short and all alike, so several fit
+              // on the screen and one can be carried past the others.
+              rowHeight={isMobile ? PHONE_EDIT_ROW : rowHeight}
               width={size.width}
               margin={[GAP, GAP]}
               containerPadding={[0, 0]}
               onLayoutChange={(newLayout) => {
+                // One column on a phone: only the order can change there.
+                if (isMobile) { reorderFromPhone(newLayout.slice().sort((a, b) => a.y - b.y).map(l => l.i)); return; }
                 setLayout(prev => {
                   const tabsMap: Record<string, string[]> = {};
                   for (const item of prev) {
@@ -1193,8 +1214,8 @@ export default function WidgetGrid({
                 });
               }}
               isDraggable
-              isResizable
-              isDroppable
+              isResizable={!isMobile}
+              isDroppable={!isMobile}
               onDragStart={() => pushHistory()}
               onResizeStart={() => pushHistory()}
               droppingItem={droppingId ? { i: droppingId, w: 1, h: 1 } : undefined}

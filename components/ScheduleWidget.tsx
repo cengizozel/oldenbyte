@@ -1,6 +1,7 @@
 "use client";
 
 import { zoned } from "@/lib/timezone";
+import { OverlayFace } from "@/components/ui/FlipCard";
 import { useEffect, useRef, useState } from "react";
 import { CalendarRange, Plus, Check, FileText, Copy } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
@@ -599,7 +600,7 @@ export default function ScheduleWidget({
 
         {/* Entry editor */}
         {editor && (
-          <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col gap-3 p-5 overflow-y-auto ${c.bg}`}>
+          <OverlayFace c={c} layer="z-40" className="gap-3 p-5 overflow-y-auto">
             <p className={`text-sm opacity-70 ${c.label}`}>
               {editor.id ? "Edit entry" : "New entry"}
             </p>
@@ -691,12 +692,12 @@ export default function ScheduleWidget({
             </div>
             {editor.error && <p className="text-red-400 text-sm">{editor.error}</p>}
             <SaveCancelRow c={c} onSave={saveEditor} onCancel={() => setEditor(null)} onDelete={editor.id ? deleteEntry : undefined} />
-          </div>
+          </OverlayFace>
         )}
 
         {/* Grid-hours settings */}
         {settingsOpen && (
-          <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col p-5 ${c.bg}`}>
+          <OverlayFace c={c} layer="z-40" className="p-5">
             <SettingsFace
               c={c}
               onReset={() => { setDraftStart(DEFAULT_CONFIG.startHour); setDraftEnd(DEFAULT_CONFIG.endHour); }}
@@ -721,12 +722,12 @@ export default function ScheduleWidget({
               </div>
               {draftEnd - draftStart < 6 && <SettingsError>The grid must span at least 6 hours.</SettingsError>}
             </SettingsFace>
-          </div>
+          </OverlayFace>
         )}
 
         {/* Export as text */}
         {exportOpen && (
-          <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col gap-3 p-5 ${c.bg}`}>
+          <OverlayFace c={c} layer="z-40" className="gap-3 p-5">
             <div className="flex items-center justify-between">
               <p className={`text-sm opacity-70 ${c.label}`}>Export</p>
               <SmallButton c={c} onClick={copyExport}>
@@ -738,7 +739,7 @@ export default function ScheduleWidget({
               {exportText()}
             </pre>
             <SaveCancelRow c={c} onCancel={() => setExportOpen(false)} />
-          </div>
+          </OverlayFace>
         )}
 
         {/* Split-from-group confirmation after dragging one day of a repeating entry */}
@@ -747,7 +748,7 @@ export default function ScheduleWidget({
           if (!src) return null;
           const groupDays = src.days.map(d => DAYS_SHORT[d]).join(", ");
           return (
-            <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col gap-3 p-5 ${c.bg}`}>
+            <OverlayFace c={c} layer="z-40" className="gap-3 p-5">
               <p className={`text-sm opacity-70 ${c.label}`}>Split from group</p>
               <p className={`text-sm leading-relaxed ${c.text} opacity-80`}>
                 &ldquo;{src.title}&rdquo; repeats on {groupDays}. Moving this block pulls {DAYS[splitAsk.fromDay]} out of that group:
@@ -764,7 +765,7 @@ export default function ScheduleWidget({
                   Split and move
                 </SmallButton>
               </div>
-            </div>
+            </OverlayFace>
           );
         })()}
       </>

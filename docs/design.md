@@ -317,6 +317,12 @@ Settings that sit inside a card on a wide screen open in a bottom sheet on a
 phone (`PhoneSheet`); never build a second phone-only settings layout for a
 widget.
 
+A card can be made too small for its own settings (one row of a busy
+dashboard). Under 220px of card height the face opens over the page in the
+card's colors (`FaceWindow` in `components/ui/FlipCard.tsx`), and closes by
+its own row, Escape or a click outside. Faces over a card go through
+`OverlayFace`, never a hand-made absolute layer.
+
 The settings drawer is built from `SettingsSection` and `SettingsRow`
 (`components/ui/Field.tsx`): a muted `text-sm` section title, then rows at
 least 40px tall separated by hairlines, each with its label in the primary

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { OverlayFace } from "@/components/ui/FlipCard";
 import { MessageSquare, Plus, X, Pencil } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { timeAgo } from "@/lib/chat/format";
@@ -28,7 +29,7 @@ export default function HistoryPanel({ c, conversations, activeId, active, filte
   const [renameDraft, setRenameDraft] = useState("");
 
   return (
-    <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col ${c.bg}`}>
+    <OverlayFace c={c} layer="z-40" className="">
       <div className="px-4 pt-5 shrink-0">
         <WidgetHeader
           c={c}
@@ -102,6 +103,6 @@ export default function HistoryPanel({ c, conversations, activeId, active, filte
           );
         })}
       </div>
-    </div>
+    </OverlayFace>
   );
 }

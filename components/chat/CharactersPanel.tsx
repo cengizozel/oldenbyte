@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { OverlayFace } from "@/components/ui/FlipCard";
 import { Users, Plus, X, Pencil, Copy, Trash2 } from "lucide-react";
 import type { ColorClasses } from "@/lib/widgets";
 import { DEFAULT_CHARACTER_ID, type Character } from "@/lib/chat/types";
@@ -21,7 +22,7 @@ export function CharactersPanel({ c, characters, activeCharId, filter, onCreate,
   onDelete: (id: string) => void;
 }) {
   return (
-    <div className={`absolute inset-px z-40 rounded-[15px] flex flex-col ${c.bg}`}>
+    <OverlayFace c={c} layer="z-40" className="">
       <div className="px-4 pt-5 shrink-0">
         <WidgetHeader
           c={c}
@@ -63,7 +64,7 @@ export function CharactersPanel({ c, characters, activeCharId, filter, onCreate,
           );
         })}
       </div>
-    </div>
+    </OverlayFace>
   );
 }
 
@@ -79,7 +80,7 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
   const set = (patch: Partial<Character>) => setCharDraft(d => ({ ...d, ...patch }));
 
   return (
-    <div className={`absolute inset-px z-50 rounded-[15px] flex flex-col ${c.bg}`}>
+    <OverlayFace c={c} layer="z-50" className="">
       <div className="px-4 pt-5 shrink-0">
         <WidgetHeader
           c={c}
@@ -124,6 +125,6 @@ export function CharacterEditor({ c, character, onCancel, onSave }: {
       <div className="px-4 pb-4 pt-2 shrink-0">
         <SaveCancelRow c={c} onSave={() => onSave(charDraft)} onCancel={onCancel} />
       </div>
-    </div>
+    </OverlayFace>
   );
 }

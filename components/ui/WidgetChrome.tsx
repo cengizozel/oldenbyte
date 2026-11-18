@@ -98,8 +98,10 @@ export function DetailHead({ c, onBack, href, title, image }: { c: ColorClasses;
 export function ScrollFades({ c, top, bottom }: { c: ColorClasses; top: boolean; bottom: boolean }) {
   return (
     <>
-      {top && <div className={`absolute top-0 left-0 right-0 h-12 bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
-      {bottom && <div className={`absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
+      {/* Never more than part of the list: in a short card a full-height
+          fade would wash out the only row there is. */}
+      {top && <div className={`absolute top-0 left-0 right-0 h-12 max-h-[25%] bg-gradient-to-b ${c.fade} to-transparent pointer-events-none`} />}
+      {bottom && <div className={`absolute bottom-0 left-0 right-0 h-20 max-h-[35%] bg-gradient-to-t ${c.fade} to-transparent pointer-events-none`} />}
     </>
   );
 }
@@ -175,6 +177,15 @@ export function SaveCancelRow({
     const t = setTimeout(() => setConfirm(false), 5000);
     return () => clearTimeout(t);
   }, [confirm]);
+  // In a phone's sheet, the handle and a tap outside cancel too.
+  const sheetCancel = useContext(SheetCancelContext);
+  const cancelNow = useRef(onCancel);
+  cancelNow.current = onCancel;
+  useEffect(() => {
+    if (!sheetCancel) return;
+    sheetCancel.current = () => cancelNow.current();
+    return () => { sheetCancel.current = null; };
+  }, [sheetCancel]);
   const destroy = onDelete ?? onReset;
   const question = onDelete ? t("common.deleteQuestion") : t("common.resetQuestion");
   const verb = onDelete ? t("common.delete") : t("common.reset");

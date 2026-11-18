@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
+import { OverlayFace } from "@/components/ui/FlipCard";
 import { Bot, Send, Square, Loader, MessageSquare, Plus, ChevronDown, Power, Paperclip, ArrowDown, type LucideIcon } from "lucide-react";
 import { colorMap, type Widget } from "@/lib/widgets";
 import * as storage from "@/lib/storage";
@@ -1022,7 +1023,7 @@ export default function ChatWidget({
       )}
 
       {settingsOpen ? (
-        <SettingsPanel c={c} config={config} widgetId={widget.id} onCancel={() => setSettingsOpen(false)} onSave={saveSettings} />
+        <OverlayFace c={c} inline><SettingsPanel c={c} config={config} widgetId={widget.id} onCancel={() => setSettingsOpen(false)} onSave={saveSettings} /></OverlayFace>
       ) : (
         /* Chat view */
         <>
